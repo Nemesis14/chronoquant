@@ -5,31 +5,29 @@
 import os
 import json
 import sqlite3
+import subprocess
 import pandas as pd
 from binance.client import Client
-from datetime import datetime, timezone, timedelta
+from datetime       import datetime, timezone
 
 # =============================================================================
 # Load API keys from JSON file
 # =============================================================================
-keys_path = "C:/connection/binance_keys.json"
-with open(keys_path, "r") as f:
-    keys       = json.load(f)
+keys          = json.load(open("C:/connection/binance_keys.json", "r"))
 API_KEY       = keys["api_key"]
 API_SECRET    = keys["api_secret"]
-
-# =============================================================================
-# Initialize Binance client
-# =============================================================================
 client        = Client(API_KEY, API_SECRET)
 
 # =============================================================================
 # Database and table parameters
 # =============================================================================
-db_path       = "data/bchusdt_data.db"
-table         = "bchusdt_1m"
-symbol        = "BCHUSDT"
-interval      = Client.KLINE_INTERVAL_1MINUTE
+repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+
+# Beolvassuk a konfigurációt és a db path-t
+db_path   = json.load(open(os.path.join(repo_root, "config.json"), "r"))["db_path"]
+table     = "bchusdt_1m"
+symbol    = "BCHUSDT"
+interval  = Client.KLINE_INTERVAL_1MINUTE
 
 # =============================================================================
 # Function to sync data from Binance to SQLite

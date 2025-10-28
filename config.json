@@ -1,3 +1,62 @@
 {
-    "db_path": "D:/repos/chronoquant/data/bchusdt_data.db"
+    "database": {
+        "db_path":          "D:/repos/chronoquant/data/bchusdt_data.db",
+        "dev_data": {
+            "db_path":          "DATABASE_PATH_HERE",
+            "table_name":       "bchusdt_1m",
+            "table_name_dev":   "bchusdt_1m_dev",
+            "rolling_window":   240,
+            "target":           "spike_flag",
+            "percentile":       0.9,
+            "indicator_config": {
+                "momentum": {
+                    "rsi": [
+                        {
+                            "name":   "rsi_backward",
+                            "window": 14
+                        }
+                    ],
+                    "roc": [
+                        {
+                            "name":   "roc",
+                            "window": 14
+                        },
+                        {
+                            "name":   "roc",
+                            "window": 140
+                        }
+                    ]
+                },
+                "trend": {
+                    "macd": [
+                        {
+                            "name": "macd_diff"
+                        }
+                    ],
+                    "sma": [
+                        {
+                            "name":   "sma_ratio",
+                            "window": 14
+                        },
+                        {
+                            "name":   "sma_ratio",
+                            "window": 140
+                        }
+                    ]
+                },
+                "volatility": {
+                    "bollinger_band": [
+                        {
+                            "name":   "bb_width",
+                            "window": 14
+                        },
+                        {
+                            "name":   "bb_width",
+                            "window": 140
+                        }
+                    ]
+                }
+            }
+        }
+    }
 }

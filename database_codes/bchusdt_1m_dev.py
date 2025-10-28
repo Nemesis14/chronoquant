@@ -6,39 +6,26 @@ import json
 import ta
 
 
-def create_dev_data_table(config_path, open_time_from, open_time_to):
+def create_dev_data_table(open_time_from, open_time_to):
 
     # =============================================================================
     # DB_PATH retrieval
     # =============================================================================
-    repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
-    DB_PATH   = json.load(open(os.path.join(repo_root, "config.json"), "r"))["db_path"]
+    import sys, os; sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
+    import utils as utils
+    
+    config  = utils._load_config()
 
-    # =============================================================================
-    # Load configuration from JSON file
-    # =============================================================================
-    with open(config_path, 'r') as f:
-        config = json.load(f)
+    db_cfg  = config.get("database", {})        # a "database" alatti dict
+    dev_cfg = db_cfg.get("dev_data", {})        # a "dev_data" alatti dict
 
-    DB_PATH          = DB_PATH
-    TABLE_NAME       = config["table_name"]
-    TABLE_NAME_DEV   = config.get("table_name_dev", f"{TABLE_NAME}_dev")
-    ROLLING_WINDOW   = config["rolling_window"]
-    TARGET           = config["target"]
-    PERCENTILE       = config["percentile"]
-    indicator_config = config["indicator_config"]
-
-    # =============================================================================
-    # Generate features list from indicator configuration
-    # =============================================================================
-    features = []
-    for category, indicators in indicator_config.items():
-        for indicator, params_list in indicators.items():
-            for params in params_list:
-                if "window" in params:
-                    features.append(f"{params['name']}_{params['window']}")
-                else:
-                    features.append(params["name"])
+    DB_PATH          = db_cfg.get("db_path")            # string: a DB file útvonala
+    TABLE_NAME       = dev_cfg.get("table_name")
+    TABLE_NAME_DEV   = dev_cfg.get("table_name_dev")
+    ROLLING_WINDOW   = dev_cfg.get("rolling_window")
+    TARGET           = dev_cfg.get("target")
+    PERCENTILE       = dev_cfg.get("percentile")
+    indicator_config = dev_cfg.get("indicator_config")
 
     # =============================================================================
     # Fetch data from database for given time interval
@@ -67,29 +54,64 @@ def create_dev_data_table(config_path, open_time_from, open_time_to):
     df[TARGET]       = (df["ratio"] >= percentile_value).astype(int)
 
     # =============================================================================
-    # Calculate technical indicators
+    # build features with prefix
+    # =============================================================================
+    prefix           = "feat_"  
+    indicator_config = config.get("database", {}).get("dev_data", {}).get("indicator_config", {})
+
+    # features lista összeállítása (duplikátum eltávolítás, sorrend megtartása)
+    features = []
+    _seen = set()
+    for category, indicators in indicator_config.items():
+        if not isinstance(indicators, dict):
+            continue
+        for params_list in indicators.values():
+            if not isinstance(params_list, list):
+                continue
+            for params in params_list:
+                if not isinstance(params, dict):
+                    continue
+                name = params.get("name")
+                if not name:
+                    continue
+                window = params.get("window")
+                feat = f"{name}_{window}" if window is not None else name
+                if feat not in _seen:
+                    features.append(feat)
+                    _seen.add(feat)
+    
+    # =============================================================================
+    # create indicators and add to DataFrame
     # =============================================================================
     # Momentum indicators
     for params in indicator_config["momentum"]["rsi"]:
-        df[f"{params['name']}_{params['window']}"] = ta.momentum.RSIIndicator(
+        name = f"{params['name']}_{params['window']}"
+        df[f"{prefix}{name}"] = ta.momentum.RSIIndicator(
             close=df["close"], window=params["window"]
         ).rsi()
+
     for params in indicator_config["momentum"]["roc"]:
-        df[f"{params['name']}_{params['window']}"] = ta.momentum.ROCIndicator(
+        name = f"{params['name']}_{params['window']}"
+        df[f"{prefix}{name}"] = ta.momentum.ROCIndicator(
             close=df["close"], window=params["window"]
         ).roc()
+
     # Trend indicators
     for params in indicator_config["trend"]["macd"]:
-        macd_calc = ta.trend.MACD(close=df["close"])
-        df[params["name"]] = macd_calc.macd_diff()
+        name = params["name"]
+        df[f"{prefix}{name}"] = ta.trend.MACD(close=df["close"]).macd_diff()
+
     for params in indicator_config["trend"]["sma"]:
-        df[f"{params['name']}_{params['window']}"] = df["close"] / ta.trend.SMAIndicator(
+        name = f"{params['name']}_{params['window']}"
+        df[f"{prefix}{name}"] = df["close"] / ta.trend.SMAIndicator(
             close=df["close"], window=params["window"]
         ).sma_indicator()
+
     # Volatility indicators
     for params in indicator_config["volatility"]["bollinger_band"]:
+        name = f"{params['name']}_{params['window']}"
         bb_calc = ta.volatility.BollingerBands(close=df["close"], window=params["window"])
-        df[f"{params['name']}_{params['window']}"] = bb_calc.bollinger_wband()
+        df[f"{prefix}{name}"] = bb_calc.bollinger_wband()
 
     # =============================================================================
     # Write DataFrame to dev table in database, including index as column

@@ -2,7 +2,6 @@
     "database": {
         "db_path":          "D:/repos/chronoquant/data/bchusdt_data.db",
         "dev_data": {
-            "db_path":          "DATABASE_PATH_HERE",
             "table_name":       "bchusdt_1m",
             "table_name_dev":   "bchusdt_1m_dev",
             "rolling_window":   240,

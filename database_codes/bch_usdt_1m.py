@@ -1,30 +1,29 @@
 # =============================================================================
-# drop and recreate the sqlite database and bchusdt_1m table (composite pk)
+# BCHUSDT 1m sync utilities
 # =============================================================================
-
 import os
 import sqlite3
 import json
 import pandas as pd
 from binance.client import Client
-from datetime       import datetime, timezone
+from datetime import datetime, timezone
 import utils as utils
 
 # =============================================================================
 # Create / reset database and table
 # =============================================================================
-# Logic:
-#   - read database path and dev table name from config via utils._load_config()
-#   - if database file exists: remove it to fully reset (drop)
-#   - create a new sqlite file and a table with:
-#       * columns: open_time_ms INTEGER, open_time TEXT, open/high/low/close/volume REAL
-#       * composite PRIMARY KEY (open_time_ms, open_time)
-#       * UNIQUE constraints on open_time_ms and open_time individually
-#   - print status messages about removal/creation
-# =============================================================================
-
 def create_bchusdt_1m(config_path=None):
-    # load configuration
+    # ---------------------------------------------------------------------
+    # Purpose:
+    #   Drop (if exists) and recreate the sqlite database file and the base table.
+    #
+    # Behavior:
+    #   - Reads db_path and table_name from config via utils._load_config(config_path)
+    #   - If the DB file exists it is removed (full reset)
+    #   - Creates the table with columns:
+    #       open_time_ms INTEGER, open_time TEXT, open/high/low/close/volume REAL
+    #     Composite PRIMARY KEY (open_time_ms, open_time)
+    # ---------------------------------------------------------------------
     cfg         = utils._load_config(config_path)
     db_path     = cfg["database"]["db_path"]
     table_name  = cfg.get("database", {}).get("dev_data", {}).get("table_name", "bchusdt_1m")
@@ -60,74 +59,89 @@ def create_bchusdt_1m(config_path=None):
 
 # =============================================================================
 # Sync function: fetch klines from Binance and upsert into SQLite
-# =============================================================================
-# Logic:
-#   - read db path, table name and optional symbol from config via utils._load_config()
-#   - load Binance API keys from keys_path and create Client
-#   - determine start_ms:
-#       * if no rows in table -> fallback to 2017-01-01 UTC in ms
-#       * else -> last open_time_ms + 60_000 (next minute)
-#   - determine end_ms using Binance server time, floored to full minute
-#   - if start_ms >= end_ms -> no new data
-#   - fetch historical klines between start_ms and end_ms
-#   - transform into DataFrame:
-#       * add open_time_ms as integer
-#       * convert to local time (UTC+2), floor to minute, format "YYYY-MM-DD HH:MM"
-#       * coerce numeric columns
-#       * keep relevant columns in desired order
-#   - insert using INSERT OR IGNORE to avoid duplicates
-#   - print inserted counts and range (if any)
-# =============================================================================
+# -----------------------------------------------------------------------------
+# NOTE:
+# - This function no longer performs timezone shifting on the klines.
+#   The open_time column will be directly derived (formatted) from open_time_ms.
+# - The caller (main) provides start_str and end_str as local formatted strings.
+# - The Binance API keys path and config path are fixed inside this module.
+# -----------------------------------------------------------------------------
+def sync_bchusdt_1m(start_str, end_str):
+    # ---------------------------------------------------------------------
+    # Purpose:
+    #   Sync 1-minute BCHUSDT klines from Binance between start_str and end_str.
+    #
+    # Inputs:
+    #   - start_str: formatted local time string "YYYY-MM-DD HH:MM:SS" or ISO-like.
+    #   - end_str:   formatted local time string "YYYY-MM-DD HH:MM:SS" or ISO-like.
+    #
+    # Behavior:
+    #   - Reads DB path and table name from config via utils._load_config()
+    #   - Loads Binance API keys from a fixed path inside the function
+    #   - Converts provided start/end strings to epoch milliseconds (no manual tz shifts)
+    #   - Fetches klines, sets open_time by formatting open_time_ms directly
+    #   - Inserts rows into sqlite using INSERT OR IGNORE to avoid duplicates
+    # ---------------------------------------------------------------------
+    cfg        = utils._load_config()
+    db_path    = cfg["database"]["db_path"]
+    table_name = cfg.get("database", {}).get("dev_data", {}).get("table_name", "bchusdt_1m")
+    symbol     = cfg.get("database", {}).get("dev_data", {}).get("symbol", "BCHUSDT")
+    interval   = Client.KLINE_INTERVAL_1MINUTE
 
-def sync_bchusdt_1m(config_path=None, keys_path="C:/connection/binance_keys.json"):
-    # =============================================================================
-    #  load configuration
-    # =============================================================================
-    cfg         = utils._load_config(config_path)
-    db_path     = cfg["database"]["db_path"]
-    table_name  = cfg.get("database", {}).get("dev_data", {}).get("table_name", "bchusdt_1m")
-    symbol      = cfg.get("database", {}).get("dev_data", {}).get("symbol", "BCHUSDT")
-    interval    = Client.KLINE_INTERVAL_1MINUTE
+    # Fixed keys path (not a function parameter)
+    keys_path = "C:/connection/binance_keys.json"
 
-    # load Binance API keys and instantiate client
+    # ---------------------------------------------------------------------
+    # Load Binance keys and instantiate client
+    # ---------------------------------------------------------------------
+    if not os.path.exists(keys_path):
+        raise FileNotFoundError(f"Binance keys file not found: {keys_path}")
     with open(keys_path, "r", encoding="utf-8") as f:
-        keys       = json.load(f)
-    api_key     = keys["api_key"]
-    api_secret  = keys["api_secret"]
-    client      = Client(api_key, api_secret)
+        keys = json.load(f)
 
-    # fetch last stored timestamp from DB
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT MAX(open_time_ms) FROM {table_name}")
-        row = cursor.fetchone()
+    api_key    = keys.get("api_key") or keys.get("key")
+    api_secret = keys.get("api_secret") or keys.get("secret")
+    if not api_key or not api_secret:
+        raise RuntimeError("Binance API key/secret missing in keys file")
 
-    # compute start_ms
-    if row is None or row[0] is None:
-        # fallback start date (UTC -> ms)
-        start_ms = int(datetime(2017, 1, 1, 0, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
-    else:
-        # next minute after last stored candle
-        start_ms = int(row[0]) + 60_000
+    client = Client(api_key, api_secret)
 
-    # determine end_ms from Binance server time (floor to full minute)
-    server_ms   = client.get_server_time()["serverTime"]
-    end_ms      = server_ms - (server_ms % 60_000)
+    # ---------------------------------------------------------------------
+    # Parse provided start/end strings into epoch milliseconds.
+    # Note: naive datetimes are interpreted as system-local time here.
+    # ---------------------------------------------------------------------
+    def _str_to_epoch_ms(s):
+        try:
+            dt = datetime.fromisoformat(s)
+        except Exception:
+            dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+        # If naive, datetime.timestamp() treats it as system local time.
+        return int(dt.timestamp() * 1000)
 
-    # nothing to fetch?
-    if start_ms >= end_ms:
-        print("No new data to sync.")
+    try:
+        start_ms = _str_to_epoch_ms(start_str)
+        end_ms   = _str_to_epoch_ms(end_str)
+    except Exception as e:
+        print(f"Error parsing start/end times: {e}")
         return
 
-    # =============================================================================
-    #  fetch historical klines from Binance
-    # =============================================================================
-    raw_data    = client.get_historical_klines(symbol, interval, start_ms, end_ms)
+
+    # ---------------------------------------------------------------------
+    # Fetch historical klines from Binance
+    # ---------------------------------------------------------------------
+    try:
+        raw_data = client.get_historical_klines(symbol, interval, start_ms, end_ms)
+    except Exception as e:
+        print(f"Binance API error while fetching klines: {e}")
+        return
+
     if not raw_data:
         print("No data returned by Binance.")
         return
 
-    # build DataFrame from raw_data
+    # ---------------------------------------------------------------------
+    # Build DataFrame from raw_data
+    # ---------------------------------------------------------------------
     df = pd.DataFrame(
         raw_data,
         columns=[
@@ -137,29 +151,30 @@ def sync_bchusdt_1m(config_path=None, keys_path="C:/connection/binance_keys.json
         ]
     )
 
-    # original timestamp in ms
-    df["open_time_ms"] = df["open_time"].astype("int64")
+    # original timestamp in ms (as provided by Binance)
+    df["open_time_ms"] = pd.to_numeric(df["open_time"], errors="coerce").astype("int64")
 
-    # convert times: UTC -> local (UTC+2), floor to minute, format
-    dt_utc          = pd.to_datetime(df["open_time_ms"], unit="ms", utc=True)
-    dt_local        = (dt_utc + pd.Timedelta(hours=2)).dt.floor("min")
-    df["open_time"] = dt_local.dt.strftime("%Y-%m-%d %H:%M")
+    # Derive open_time directly from open_time_ms (no manual tz shift).
+    # Use UTC-based conversion to human readable string; this keeps the
+    # timestamp consistent with open_time_ms (same instant expressed).
+    df["open_time"] = pd.to_datetime(df["open_time_ms"], unit="ms", utc=True).dt.strftime("%Y-%m-%d %H:%M:%S")
 
     # coerce numeric columns to float (allow NaN)
     for col in ["open", "high", "low", "close", "volume"]:
-        df[col]    = pd.to_numeric(df[col], errors="coerce")
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # keep only relevant columns in correct order
     df = df[["open_time_ms", "open_time", "open", "high", "low", "close", "volume"]]
 
     # prepare records for bulk insert
-    records     = list(df.itertuples(index=False, name=None))
+    records = list(df.itertuples(index=False, name=None))
 
-    # =============================================================================
-    #  insert into sqlite with INSERT OR IGNORE to avoid duplicates
-    # =============================================================================
+    # ---------------------------------------------------------------------
+    # Insert into sqlite with INSERT OR IGNORE to avoid duplicates
+    # ---------------------------------------------------------------------
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
+        before_changes = conn.total_changes
         cursor.executemany(
             f"""
             INSERT OR IGNORE INTO {table_name}
@@ -169,11 +184,11 @@ def sync_bchusdt_1m(config_path=None, keys_path="C:/connection/binance_keys.json
             records
         )
         conn.commit()
-        inserted = conn.total_changes
+        after_changes = conn.total_changes
+        inserted = after_changes - before_changes
 
     # print summary
     print(f"Attempted to insert rows: {len(records)}")
-    print(f"SQLite reported total changes in this connection: {inserted}")
+    print(f"Inserted rows (this run): {inserted}")
     if not df.empty:
         print(f"Range inserted (source frame): {df['open_time'].min()} -> {df['open_time'].max()}")
-

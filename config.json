@@ -1,9 +1,10 @@
 {
     "database": {
-      "db_path": "C:/repos/chronoquant/data/bchusdt_data.db",
+      "db_path": "D:/repos/chronoquant/data/bchusdt_data.db",
       "dev_data": {
         "table_name": "bchusdt_1m",
         "table_name_dev": "bchusdt_1m_dev",
+        "symbol": "BCHUSDT",
         "rolling_window": 240,
         "target": "spike_flag",
         "percentile": 0.9,

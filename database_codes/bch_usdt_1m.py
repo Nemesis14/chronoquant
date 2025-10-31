@@ -14,7 +14,7 @@ from binance.client import Client
 
 import utils  # _load_config(), ms_to_utc_str()
 
-def sync_bchusdt_1m_from_ms(open_time_ms_from: int) -> None:
+def sync_bchusdt_1m(open_time_ms_from: int) -> None:
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------

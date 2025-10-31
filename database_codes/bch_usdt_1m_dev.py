@@ -1,52 +1,49 @@
 import pandas as pd
-import subprocess
-import os
 import sqlite3
-import json
 import ta
 from datetime import timedelta
 
 
-def create_dev_data_table(open_time_from, open_time_to, feat_window:int = 240):
-
+def sync_bchusdt_1m_dev(open_time_from, feat_window: int = 240):
 	# =============================================================================
-	# DB_PATH retrieval
+	# Load configuration and database parameters
 	# =============================================================================
-	import sys, os; sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
+	import sys, os
+	sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
 	import utils as utils
-	
-	config	= utils._load_config()
 
-	db_cfg	= config.get("database", {})		# a "database" alatti dict
-	dev_cfg	= db_cfg.get("dev_data", {})		# a "dev_data" alatti dict
+	config = utils._load_config()
 
-	DB_PATH			 = db_cfg.get("db_path")			# string: a DB file útvonala
-	TABLE_NAME		 = dev_cfg.get("table_name")
-	TABLE_NAME_DEV	 = dev_cfg.get("table_name_dev")
-	ROLLING_WINDOW	 = dev_cfg.get("rolling_window")
-	TARGET			 = dev_cfg.get("target")
-	PERCENTILE		 = dev_cfg.get("percentile")
+	db_cfg  = config.get("database", {})
+	dev_cfg = db_cfg.get("dev_data", {})
+
+	DB_PATH         = db_cfg.get("db_path")
+	TABLE_NAME      = dev_cfg.get("table_name")
+	TABLE_NAME_DEV  = dev_cfg.get("table_name_dev")
+	ROLLING_WINDOW  = dev_cfg.get("rolling_window")
+	TARGET          = dev_cfg.get("target")
+	PERCENTILE      = dev_cfg.get("percentile")
 
 	# =============================================================================
-	# Fetch data from database for given time interval
+	# Fetch data from the database for the specified time range
 	# =============================================================================
 	fetch_start_ts = (pd.to_datetime(open_time_from) - timedelta(minutes=feat_window)).strftime('%Y-%m-%d %H:%M:%S')
-	
+
 	conn = sqlite3.connect(DB_PATH)
 	query = f"""
 		SELECT t.open_time, t.close
 		FROM {TABLE_NAME} t
-		WHERE open_time BETWEEN ? AND ?
+		WHERE open_time >=?
 		ORDER BY open_time ASC
 	"""
-	df = pd.read_sql_query(query, conn, params=(fetch_start_ts, open_time_to))
+	df = pd.read_sql_query(query, conn, params=(fetch_start_ts,))
 	conn.close()
 
 	df["open_time"] = pd.to_datetime(df["open_time"])
 	df.set_index("open_time", inplace=True)
 
 	# =============================================================================
-	# Calculate rolling max, ratio, and percentile-based target
+	# Compute rolling maximum, ratio, and percentile-based target variable
 	# =============================================================================
 	df["rolling_max"] = (
 		df.iloc[::-1]["close"].rolling(window=ROLLING_WINDOW, min_periods=1).max().iloc[::-1]
@@ -56,12 +53,11 @@ def create_dev_data_table(open_time_from, open_time_to, feat_window:int = 240):
 	df[TARGET]       = (df["ratio"] >= percentile_value).astype(int)
 
 	# =============================================================================
-	# build features with prefix
+	# Build the feature list and avoid duplicates
 	# =============================================================================
-	prefix			= "feat_"  
-	indicator_config = config.get("database", {}).get("dev_data", {}).get("indicator_config", {})
+	prefix = "feat_"
+	indicator_config = dev_cfg.get("indicator_config", {})
 
-	# features lista összeállítása (duplikátum eltávolítás, sorrend megtartása)
 	features = []
 	_seen = set()
 	for category, indicators in indicator_config.items():
@@ -81,11 +77,12 @@ def create_dev_data_table(open_time_from, open_time_to, feat_window:int = 240):
 				if feat not in _seen:
 					features.append(feat)
 					_seen.add(feat)
-	
+
 	# =============================================================================
-	# create indicators and add to DataFrame
+	# Generate technical indicators
 	# =============================================================================
-	# Momentum indicators
+
+	# --- Momentum indicators ---
 	for params in indicator_config.get("momentum", {}).get("rsi", []):
 		name = f"{params['name']}_{params['window']}"
 		df[f"{prefix}{name}"] = ta.momentum.RSIIndicator(
@@ -98,7 +95,7 @@ def create_dev_data_table(open_time_from, open_time_to, feat_window:int = 240):
 			close=df["close"], window=params["window"]
 		).roc()
 
-	# Trend indicators
+	# --- Trend indicators ---
 	for params in indicator_config.get("trend", {}).get("macd", []):
 		name = params["name"]
 		df[f"{prefix}{name}"] = ta.trend.MACD(close=df["close"]).macd_diff()
@@ -109,33 +106,29 @@ def create_dev_data_table(open_time_from, open_time_to, feat_window:int = 240):
 			close=df["close"], window=params["window"]
 		).sma_indicator()
 
-	# Volatility indicators
+	# --- Volatility indicators ---
 	for params in indicator_config.get("volatility", {}).get("bollinger_band", []):
 		name = f"{params['name']}_{params['window']}"
 		bb_calc = ta.volatility.BollingerBands(close=df["close"], window=params["window"])
 		df[f"{prefix}{name}"] = bb_calc.bollinger_wband()
 
 	# =============================================================================
-	# Slice to exact write interval: only rows from open_time_from .. open_time_to
-	# (a fetch_start csak a feature-khez kellett)
+	# Slice the data to include only rows starting from open_time_from
 	# =============================================================================
-	mask     = (df.index >= open_time_from) & (df.index <= open_time_to)
+	mask = (df.index >= pd.to_datetime(open_time_from))
 	write_df = df.loc[mask].copy().reset_index()
 
 	if write_df.empty:
-		print("A számított feature-ök alapján nincs sor az appendelendő intervallumban.")
+		print("No rows found for the specified interval; nothing to append.")
 		return
 
 	# =============================================================================
-	# Write DataFrame to dev table in database: append if exists, create if not
+	# Write computed data to the development table (append mode)
 	# =============================================================================
-	# pandas.to_sql with if_exists='append' will create the table if it does not exist,
-	# otherwise it will append the new rows. We write the reset_index() frame so the
-	# open_time column is a real column (index=False).
 	conn = sqlite3.connect(DB_PATH)
 	try:
 		write_df.to_sql(TABLE_NAME_DEV, conn, if_exists='append', index=False)
 	finally:
 		conn.close()
 
-	print(f"Appended {len(write_df)} rows into '{TABLE_NAME_DEV}' in DB '{DB_PATH}' for interval {open_time_from} to {open_time_to}.")
+	print(f"Appended {len(write_df)} rows into '{TABLE_NAME_DEV}'")

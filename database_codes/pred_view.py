@@ -1,13 +1,10 @@
 # =============================================================================
-# Simple prediction probability viewer
+# Display latest prediction probabilities and chart
 # =============================================================================
 # Purpose:
-#  - Query the final logistic-regression table for the last 2 hours
-#    and display:
-#     1) a small tail of the dataframe
-#     2) a simple line chart of predicted probability over time
-#  - Minimal, no parameters (lookback fixed to 2 hours = 120 minutes)
-#  - Plot megjelenik a printek UTÁN (display használatával)
+#  - Query predictions table for last N minutes
+#  - Print statistics
+#  - Plot probability over time with decision thresholds
 # =============================================================================
 
 import sqlite3
@@ -16,73 +13,80 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from IPython.display import display
 
-import utils as utils  # project utils that exposes _load_config()
+import utils
 
-# Lookback (minutes)
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 LOOKBACK_MINUTES = 120
 
-def run_pred_view():
-    """
-    Single-shot viewer (no loop, no clear_output).
-    Displays logs first, then the plot below.
-    """
-    cfg         = utils._load_config()
-    db_path     = cfg.get("database", {}).get("db_path")
-    final_table = "bch_usdt_1m_logreg_base"
+# =============================================================================
+# display_predictions() -> None
+# =============================================================================
+# Purpose:
+#  - Query last LOOKBACK_MINUTES from predictions table
+#  - Print stats (count, time range)
+#  - Plot pred_prob over time with thresholds
+#  - Display using IPython.display
+# =============================================================================
+def display_predictions() -> None:
+	# -------------------------------------------------------------------------
+	# Load configuration
+	# -------------------------------------------------------------------------
+	config       = utils._load_config()
+	db_path      = config["database"]["db_path"]
+	table_pred   = config["database"]["tables"]["predictions"]
 
-    if not db_path:
-        print("⚠️ Database path not configured (database.db_path). Exiting.")
-        return
+	# -------------------------------------------------------------------------
+	# Compute time range
+	# -------------------------------------------------------------------------
+	now      = datetime.now().replace(second=0, microsecond=0)
+	start_dt = now - timedelta(minutes=LOOKBACK_MINUTES)
+	start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    now = datetime.now().replace(second=0, microsecond=0)
-    start_dt  = now - timedelta(minutes=LOOKBACK_MINUTES)
-    start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+	print(f"📊 Querying {LOOKBACK_MINUTES}m from '{table_pred}' since {start_str}")
 
-    print(f"📊 Querying last {LOOKBACK_MINUTES} minutes from table '{final_table}' since {start_str}")
+	# -------------------------------------------------------------------------
+	# Fetch data
+	# -------------------------------------------------------------------------
+	with sqlite3.connect(db_path) as conn:
+		df = pd.read_sql_query(
+			f"""
+			SELECT open_time, pred_prob FROM {table_pred}
+			WHERE open_time >= ? ORDER BY open_time ASC
+			""",
+			conn,
+			params=(start_str,)
+		)
 
-    try:
-        with sqlite3.connect(db_path) as conn:
-            sql = f"""
-                SELECT "open_time", "target_prob"
-                FROM "{final_table}"
-                WHERE "open_time" >= ?
-                ORDER BY "open_time" ASC
-            """
-            df = pd.read_sql_query(sql, conn, params=(start_str,))
-    except Exception as e:
-        print(f"❌ DB query error: {e}")
-        return
+	if df.empty:
+		print("⚠️ No data found")
+		return
 
-    if df.empty:
-        print("⚠️ No rows found for the requested interval.")
-        return
+	# -------------------------------------------------------------------------
+	# Print statistics
+	# -------------------------------------------------------------------------
+	print(f"✅ Found {len(df)} data points")
+	print(f"⏰ Range: {df['open_time'].min()} to {df['open_time'].max()}")
 
-    # Print statistics FIRST
-    print(f"✅ Found {len(df)} data points")
-    print(f"⏰ Time range: {df['open_time'].min()} to {df['open_time'].max()}")
-    
-    # Create the plot
-    fig = plt.figure(figsize=(10, 4))
-    
-    try:
-        x = pd.to_datetime(df["open_time"])
-    except Exception:
-        x = df["open_time"]
-    y = pd.to_numeric(df["target_prob"], errors="coerce")
+	# -------------------------------------------------------------------------
+	# Plot
+	# -------------------------------------------------------------------------
+	fig, ax = plt.subplots(figsize=(10, 4))
 
-    plt.plot(x, y, label="Predicted Probability", color="dodgerblue", marker="o", markersize=3)
-    plt.axhline(y=0.01, color="red", linestyle="--", linewidth=1, label="Short Threshold (0.01)")
-    plt.axhline(y=0.1, color="green", linestyle="--", linewidth=1, label="Long Threshold (0.1)")
-    plt.title("Predicted Probability Over Time")
-    plt.xlabel("open_time")
-    plt.ylabel("target_prob")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    
-    # Display the plot AFTER all prints
-    display(fig)
-    plt.close(fig)  # Close to avoid duplicate display
+	x = pd.to_datetime(df["open_time"])
+	y = pd.to_numeric(df["pred_prob"], errors="coerce")
 
+	ax.plot(x, y, label="Pred Prob", color="dodgerblue", marker="o", markersize=3)
+	ax.axhline(y=0.01, color="red", linestyle="--", lw=1, label="Short (0.01)")
+	ax.axhline(y=0.10, color="green", linestyle="--", lw=1, label="Long (0.1)")
 
+	ax.set_title("Prediction Probability")
+	ax.set_xlabel("Time")
+	ax.set_ylabel("Probability")
+	ax.legend()
+	ax.grid(True)
+	plt.tight_layout()
+
+	display(fig)
+	plt.close(fig)

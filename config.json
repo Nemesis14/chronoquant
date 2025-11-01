@@ -1,65 +1,51 @@
 {
     "database": {
-      "db_path": "D:/repos/chronoquant/data/bchusdt_data.db",
-      "dev_data": {
-        "table_name": "bchusdt_1m",
-        "table_name_dev": "bchusdt_1m_dev",
+        "db_path": "D:/repos/chronoquant/data/bchusdt_data.db",
         "symbol": "BCHUSDT",
-        "rolling_window": 240,
-        "target": "spike_flag",
-        "percentile": 0.9,
-        "indicator_config": {
-          "momentum": {
-            "rsi": [
-              {
-                "name": "rsi_backward",
-                "window": 14
-              }
-            ],
-            "roc": [
-              {
-                "name": "roc",
-                "window": 14
-              },
-              {
-                "name": "roc",
-                "window": 140
-              }
-            ]
-          },
-          "trend": {
-            "macd": [
-              {
-                "name": "macd_diff"
-              }
-            ],
-            "sma": [
-              {
-                "name": "sma_ratio",
-                "window": 14
-              },
-              {
-                "name": "sma_ratio",
-                "window": 140
-              }
-            ]
-          },
-          "volatility": {
-            "bollinger_band": [
-              {
-                "name": "bb_width",
-                "window": 14
-              },
-              {
-                "name": "bb_width",
-                "window": 140
-              }
-            ]
-          }
+        "interval": "1m",
+        "tables": {
+            "ohlcv": "bchusdt_1m",
+            "features": "bchusdt_1m_features",
+            "predictions": "bchusdt_1m_predictions"
+        },
+        "features": {
+            "rolling_window": 240,
+            "target_percentile": 0.9,
+            "indicators": {
+                "momentum": {
+                    "rsi": [
+                        {"window": 14}
+                    ],
+                    "roc": [
+                        {"window": 14},
+                        {"window": 140}
+                    ]
+                },
+                "trend": {
+                    "macd": [
+                        {"fast": 12, "slow": 26}
+                    ],
+                    "sma": [
+                        {"window": 14},
+                        {"window": 140}
+                    ]
+                },
+                "volatility": {
+                    "bollinger": [
+                        {"window": 14},
+                        {"window": 140}
+                    ]
+                }
+            }
         }
-      }
     },
     "model": {
-      "logreg_base_table": "bch_usdt_1m_logreg_base"
+        "type": "logreg",
+        "model_dir": "model_dev/logreg_base",
+        "model_file": "model.pkl",
+        "features_file": "features.json"
+    },
+    "api": {
+        "binance_keys_path": "C:/connection/binance_keys.json"
     }
-  }
+}

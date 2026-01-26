@@ -31,9 +31,9 @@ def fetch_predictions_df(lookback_minutes: int = LOOKBACK_MINUTES, print_status:
 	# -------------------------------------------------------------------------
 	# Load configuration
 	# -------------------------------------------------------------------------
-	config       = utils._load_config()
-	db_path      = config["database"]["db_path"]
-	table_pred   = config["database"]["tables"]["predictions"]
+	db_cfg       = utils.load_db_config()
+	db_path      = db_cfg["database"]["db_path"]
+	table_pred   = db_cfg["database"]["tables"]["predictions"]
 
 	# -------------------------------------------------------------------------
 	# Compute time range

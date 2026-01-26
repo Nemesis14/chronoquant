@@ -30,11 +30,12 @@ def sync_ohlcv(open_time_ms_from: int) -> None:
 	# -------------------------------------------------------------------------
 	# Load configuration
 	# -------------------------------------------------------------------------
-	config       = utils._load_config()
-	db_path      = config["database"]["db_path"]
-	symbol       = config["database"]["symbol"]
-	table_name   = config["database"]["tables"]["ohlcv"]
-	binance_keys = config["api"]["binance_keys_path"]
+	db_cfg       = utils.load_db_config()
+	env_cfg      = utils.load_env_config()
+	db_path      = db_cfg["database"]["db_path"]
+	symbol       = db_cfg["database"]["symbol"]
+	table_name   = db_cfg["database"]["tables"]["ohlcv"]
+	binance_keys = env_cfg["api"]["binance_keys_path"]
 
 	# -------------------------------------------------------------------------
 	# Load Binance API keys

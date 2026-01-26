@@ -1,0 +1,8 @@
+{
+    "model": {
+        "type": "logreg",
+        "model_dir": "model_dev/logreg_base",
+        "model_file": "model.pkl",
+        "features_file": "features.json"
+    }
+}

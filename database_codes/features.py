@@ -34,11 +34,12 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 	# -------------------------------------------------------------------------
 	# Load configuration
 	# -------------------------------------------------------------------------
-	config      = utils._load_config()
-	db_path     = config["database"]["db_path"]
-	table_ohlcv = config["database"]["tables"]["ohlcv"]
-	table_feat  = config["database"]["tables"]["features"]
-	cfg_feat    = config["database"]["features"]
+	db_cfg      = utils.load_db_config()
+	feat_cfg    = utils.load_features_config()
+	db_path     = db_cfg["database"]["db_path"]
+	table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
+	table_feat  = db_cfg["database"]["tables"]["features"]
+	cfg_feat    = feat_cfg["database"]["features"]
 
 	# -------------------------------------------------------------------------
 	# Fetch raw OHLCV data

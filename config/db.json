@@ -1,0 +1,12 @@
+{
+    "database": {
+        "db_path": "D:/database/bchusdt_data.db",
+        "symbol": "BCHUSDT",
+        "interval": "1m",
+        "tables": {
+            "ohlcv": "bchusdt_1m",
+            "features": "bchusdt_1m_features",
+            "predictions": "bchusdt_1m_predictions"
+        }
+    }
+}

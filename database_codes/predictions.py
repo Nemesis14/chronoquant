@@ -31,13 +31,14 @@ def sync_predictions(start_time: str) -> None:
 	# -------------------------------------------------------------------------
 	# Load configuration
 	# -------------------------------------------------------------------------
-	config        = utils._load_config()
-	db_path       = config["database"]["db_path"]
-	table_feat    = config["database"]["tables"]["features"]
-	table_pred    = config["database"]["tables"]["predictions"]
-	model_dir     = config["model"]["model_dir"]
-	model_file    = config["model"]["model_file"]
-	features_file = config["model"]["features_file"]
+	db_cfg        = utils.load_db_config()
+	model_cfg     = utils.load_models_config()
+	db_path       = db_cfg["database"]["db_path"]
+	table_feat    = db_cfg["database"]["tables"]["features"]
+	table_pred    = db_cfg["database"]["tables"]["predictions"]
+	model_dir     = model_cfg["model"]["model_dir"]
+	model_file    = model_cfg["model"]["model_file"]
+	features_file = model_cfg["model"]["features_file"]
 
 	# -------------------------------------------------------------------------
 	# Load model and features

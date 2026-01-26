@@ -35,21 +35,31 @@ def _resolve_path(path: str) -> str:
 		return path
 	return os.path.join(_runtime_root(), path)
 
+def _config_root() -> str:
+	if getattr(sys, "frozen", False):
+		return os.path.join(os.path.dirname(sys.executable), "config")
+	return os.path.join(_repo_root(), "config")
 
-# -------------------------------------------------------------------------
-# _load_config(config_path=None)
-# -------------------------------------------------------------------------
-# Purpose:
-#  - Load configuration from JSON file
-#  - If config_path is None, use <repo_root>/config.json
-#  - Open file and return parsed dict
-# -------------------------------------------------------------------------
-def _load_config(config_path=None):
-	if config_path is None:
-		repo_root   = _repo_root()
-		config_path = os.path.join(repo_root, "config.json")
-	with open(config_path, "r", encoding="utf-8") as f:
+def _load_json(path: str) -> dict:
+	if os.path.isabs(path):
+		load_path = path
+	else:
+		load_path = os.path.join(_config_root(), path)
+	with open(load_path, "r", encoding="utf-8") as f:
 		return json.load(f)
+
+def load_db_config() -> dict:
+	return _load_json("db.json")
+
+def load_features_config() -> dict:
+	return _load_json("features.json")
+
+def load_models_config() -> dict:
+	return _load_json("models.json")
+
+def load_env_config() -> dict:
+	return _load_json("env.json")
+
 
 # =============================================================================
 # TIME HELPERS (UTC+0 / epoch milliseconds)

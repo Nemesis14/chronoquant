@@ -1,0 +1,7 @@
+pandas
+python-binance
+matplotlib
+ipython
+ta
+statsmodels
+pyinstaller

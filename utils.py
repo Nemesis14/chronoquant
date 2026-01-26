@@ -5,6 +5,7 @@
 import os
 import json
 import subprocess
+import sys
 from datetime import datetime, timezone
 
 # =============================================================================
@@ -23,6 +24,16 @@ def _repo_root():
 		["git", "rev-parse", "--show-toplevel"],
 		text=True
 	).strip()
+
+def _runtime_root():
+	if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+		return sys._MEIPASS
+	return _repo_root()
+
+def _resolve_path(path: str) -> str:
+	if os.path.isabs(path):
+		return path
+	return os.path.join(_runtime_root(), path)
 
 
 # -------------------------------------------------------------------------

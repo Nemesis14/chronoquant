@@ -42,8 +42,9 @@ def sync_predictions(start_time: str) -> None:
 	# -------------------------------------------------------------------------
 	# Load model and features
 	# -------------------------------------------------------------------------
-	features_path = os.path.join(model_dir, features_file)
-	model_path    = os.path.join(model_dir, model_file)
+	resolved_model_dir = utils._resolve_path(model_dir)
+	features_path = os.path.join(resolved_model_dir, features_file)
+	model_path    = os.path.join(resolved_model_dir, model_file)
 
 	with open(features_path, "r", encoding="utf-8") as f:
 		features_data = json.load(f)
@@ -56,7 +57,7 @@ def sync_predictions(start_time: str) -> None:
 	# -------------------------------------------------------------------------
 	# Fetch feature data
 	# -------------------------------------------------------------------------
-	cols_str = ", ".join([f'"{c}"' for c in (["open_time", "target"] + feature_list)])
+	cols_str = ", ".join([f'"{c}"' for c in (["open_time", "close", "target"] + feature_list)])
 
 	with sqlite3.connect(db_path) as conn:
 		df = pd.read_sql_query(
@@ -80,9 +81,8 @@ def sync_predictions(start_time: str) -> None:
 	# -------------------------------------------------------------------------
 	# Insert predictions
 	# -------------------------------------------------------------------------
-	result_df = df[["open_time", "pred_prob", "target"]]
 
 	with sqlite3.connect(db_path) as conn:
-		result_df.to_sql(table_pred, conn, index=False, if_exists="append")
+		df.to_sql(table_pred, conn, index=False, if_exists = "append")
 
-	print(f"✅ Inserted {len(result_df)} predictions into '{table_pred}'")
+	print(f"✅ Inserted {len(df)} predictions into '{table_pred}'")

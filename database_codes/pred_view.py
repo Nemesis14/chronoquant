@@ -21,15 +21,13 @@ import utils
 LOOKBACK_MINUTES = 120
 
 # =============================================================================
-# display_predictions() -> None
+# fetch_predictions_df(lookback_minutes: int, print_status: bool) -> pd.DataFrame
 # =============================================================================
 # Purpose:
 #  - Query last LOOKBACK_MINUTES from predictions table
-#  - Print stats (count, time range)
-#  - Plot pred_prob over time with thresholds
-#  - Display using IPython.display
+#  - Optionally print stats (count, time range)
 # =============================================================================
-def display_predictions() -> None:
+def fetch_predictions_df(lookback_minutes: int = LOOKBACK_MINUTES, print_status: bool = True) -> pd.DataFrame:
 	# -------------------------------------------------------------------------
 	# Load configuration
 	# -------------------------------------------------------------------------
@@ -41,10 +39,11 @@ def display_predictions() -> None:
 	# Compute time range
 	# -------------------------------------------------------------------------
 	now      = datetime.now().replace(second=0, microsecond=0)
-	start_dt = now - timedelta(minutes=LOOKBACK_MINUTES)
+	start_dt = now - timedelta(minutes=lookback_minutes)
 	start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-	print(f"📊 Querying {LOOKBACK_MINUTES}m from '{table_pred}' since {start_str}")
+	if print_status:
+		print(f"📊 Querying {lookback_minutes}m from '{table_pred}' since {start_str}")
 
 	# -------------------------------------------------------------------------
 	# Fetch data
@@ -60,19 +59,31 @@ def display_predictions() -> None:
 		)
 
 	if df.empty:
-		print("⚠️ No data found")
-		return
+		if print_status:
+			print("⚠️ No data found")
+		return df
 
 	# -------------------------------------------------------------------------
 	# Print statistics
 	# -------------------------------------------------------------------------
-	print(f"✅ Found {len(df)} data points")
-	print(f"⏰ Range: {df['open_time'].min()} to {df['open_time'].max()}")
+	if print_status:
+		print(f"✅ Found {len(df)} data points")
+		print(f"⏰ Range: {df['open_time'].min()} to {df['open_time'].max()}")
 
+	return df
+
+# =============================================================================
+# plot_predictions_df(df: pd.DataFrame, ax: matplotlib axis | None) -> Figure
+# =============================================================================
+def plot_predictions_df(df: pd.DataFrame, ax=None):
 	# -------------------------------------------------------------------------
 	# Plot
 	# -------------------------------------------------------------------------
-	fig, ax = plt.subplots(figsize=(10, 4))
+	if ax is None:
+		fig, ax = plt.subplots(figsize=(10, 4))
+	else:
+		fig = ax.figure
+		ax.clear()
 
 	x = pd.to_datetime(df["open_time"])
 	y = pd.to_numeric(df["pred_prob"], errors="coerce")
@@ -86,7 +97,24 @@ def display_predictions() -> None:
 	ax.set_ylabel("Probability")
 	ax.legend()
 	ax.grid(True)
-	plt.tight_layout()
+	fig.tight_layout()
 
+	return fig
+
+# =============================================================================
+# display_predictions() -> None
+# =============================================================================
+# Purpose:
+#  - Query last LOOKBACK_MINUTES from predictions table
+#  - Print stats (count, time range)
+#  - Plot pred_prob over time with thresholds
+#  - Display using IPython.display
+# =============================================================================
+def display_predictions() -> None:
+	df = fetch_predictions_df()
+	if df.empty:
+		return
+
+	fig = plot_predictions_df(df)
 	display(fig)
 	plt.close(fig)

@@ -120,7 +120,7 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 
 	# Select only open_time, target, and feature columns (all with 'feat_' prefix)
 	feat_cols    = [c for c in df_reset.columns if c.startswith(feat_prefix)]
-	cols_to_keep = ["open_time", "target"] + feat_cols
+	cols_to_keep = ["open_time", "close", "target"] + feat_cols
 	df_final     = df_reset[cols_to_keep]
 
 	with sqlite3.connect(db_path) as conn:

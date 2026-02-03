@@ -1,6 +1,10 @@
 {
     "database": {
-        "db_path": "D:/database/bchusdt_data.db",
+        "active_env": "dev",
+        "db_paths": {
+            "dev": "D:/database/bchusdt_data_dev.db",
+            "prod": "D:/database/bchusdt_data_prod.db"
+        },
         "symbol": "BCHUSDT",
         "interval": "1m",
         "tables": {

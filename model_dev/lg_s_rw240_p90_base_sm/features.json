@@ -1,0 +1,10 @@
+[
+    "feat_rsi_14",
+    "feat_roc_14",
+    "feat_roc_140",
+    "feat_macd_diff",
+    "feat_sma_ratio_14",
+    "feat_sma_ratio_140",
+    "feat_bb_width_14",
+    "feat_bb_width_140"
+]

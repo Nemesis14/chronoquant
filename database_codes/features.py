@@ -40,6 +40,7 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 	table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
 	table_feat  = db_cfg["database"]["tables"]["features"]
 	cfg_feat    = feat_cfg["database"]["features"]
+	targets_cfg = cfg_feat.get("targets", [])
 
 	# -------------------------------------------------------------------------
 	# Fetch raw OHLCV data
@@ -62,15 +63,26 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 	df.set_index("open_time", inplace=True)
 
 	# -------------------------------------------------------------------------
-	# Compute target variable
+	# Compute target variables
 	# -------------------------------------------------------------------------
-	rolling_win = cfg_feat["rolling_window"]
-	percentile  = cfg_feat["target_percentile"]
+	for target_cfg in targets_cfg:
+		direction = target_cfg["direction"]
+		rolling_win = target_cfg["rolling_window"]
+		percentile = target_cfg["percentile"]
+		target_col = utils.target_name_from_config(target_cfg)
 
-	df["rolling_max"] = df["close"][::-1].rolling(rolling_win, min_periods=1).max()[::-1]
-	df["ratio"]       = df["rolling_max"] / df["close"]
-	threshold         = df["ratio"].quantile(percentile)
-	df["target"]      = (df["ratio"] >= threshold).astype(int)
+		if direction == "long":
+			rolling_max = df["close"][::-1].rolling(rolling_win, min_periods=1).max()[::-1]
+			ratio_long = rolling_max / df["close"]
+			threshold = ratio_long.quantile(percentile)
+			df[target_col] = (ratio_long >= threshold).astype(int)
+		elif direction == "short":
+			rolling_min = df["close"][::-1].rolling(rolling_win, min_periods=1).min()[::-1]
+			ratio_short = df["close"] / rolling_min
+			threshold = ratio_short.quantile(percentile)
+			df[target_col] = (ratio_short >= threshold).astype(int)
+		else:
+			raise ValueError(f"Unknown target direction: {direction}")
 
 	# -------------------------------------------------------------------------
 	# Generate technical indicators with 'feat_' prefix
@@ -119,9 +131,10 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 	# -------------------------------------------------------------------------
 	df_reset = df.reset_index()
 
-	# Select only open_time, target, and feature columns (all with 'feat_' prefix)
+	# Select open_time, targets, and feature columns (all with 'feat_' prefix)
 	feat_cols    = [c for c in df_reset.columns if c.startswith(feat_prefix)]
-	cols_to_keep = ["open_time", "close", "target"] + feat_cols
+	target_cols  = utils.target_columns_from_config(feat_cfg)
+	cols_to_keep = ["open_time", "close"] + target_cols + feat_cols
 	df_final     = df_reset[cols_to_keep]
 
 	with sqlite3.connect(db_path) as conn:

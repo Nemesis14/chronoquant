@@ -4,6 +4,7 @@ import time
 import sqlite3
 import threading
 import queue
+import traceback
 
 import pandas as pd
 
@@ -38,11 +39,7 @@ def truncate_log_if_configured(config: dict) -> None:
         if not log_file:
             return
         if not os.path.isabs(log_file):
-            try:
-                repo_root = utils._repo_root()
-                log_file = os.path.join(repo_root, log_file)
-            except Exception:
-                pass
+            log_file = os.path.join(utils._app_root(), log_file)
         log_dir = os.path.dirname(log_file)
         if log_dir and not os.path.exists(log_dir):
             try:
@@ -111,10 +108,10 @@ class Worker:
 
                     if max_ohlcv:
                         print(f"   Last: {max_ohlcv}")
-                        start_ms = int(pd.to_datetime(max_ohlcv).timestamp() * 1000) + 60000
+                        start_ms = int(pd.to_datetime(max_ohlcv, utc=True).timestamp() * 1000) + 60000
                     else:
                         print(f"   Table empty. Initializing from {settings.INIT_START_DATE}...")
-                        start_ms = int(pd.to_datetime(settings.INIT_START_DATE).timestamp() * 1000)
+                        start_ms = int(pd.to_datetime(settings.INIT_START_DATE, utc=True).timestamp() * 1000)
 
                     sync_ohlcv(start_ms)
 
@@ -128,7 +125,7 @@ class Worker:
                             print(f"   Table empty. Initializing from {start_feat}...")
                             sync_features(start_feat)
                         elif max_feat < max_ohlcv_now:
-                            start_feat = (pd.to_datetime(max_feat) + pd.Timedelta(minutes=1)).strftime(
+                            start_feat = (pd.to_datetime(max_feat, utc=True) + pd.Timedelta(minutes=1)).strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             )
                             print(f"   Last: {max_feat}")
@@ -148,7 +145,7 @@ class Worker:
                             print(f"   Table empty. Initializing from {start_pred}...")
                             sync_predictions(start_pred)
                         elif max_pred < max_feat_now:
-                            start_pred = (pd.to_datetime(max_pred) + pd.Timedelta(minutes=1)).strftime(
+                            start_pred = (pd.to_datetime(max_pred, utc=True) + pd.Timedelta(minutes=1)).strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             )
                             print(f"   Last: {max_pred}")
@@ -168,8 +165,9 @@ class Worker:
                     print(f"\n{settings.SEPARATOR}")
                     print(f"Cycle #{cycle} complete. Sleeping {settings.POLL_SECONDS}s...")
                     print(settings.SEPARATOR)
-                except Exception as exc:
-                    print(f"ERROR: {exc}")
+                except Exception:
+                    print("ERROR: Execution failed")
+                    print(traceback.format_exc())
 
                 cycle += 1
                 if self.stop_event.wait(settings.POLL_SECONDS):

@@ -8,7 +8,7 @@
 # =============================================================================
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 import matplotlib.pyplot as plt
 from IPython.display import display
@@ -32,43 +32,47 @@ def fetch_predictions_df(lookback_minutes: int = LOOKBACK_MINUTES, print_status:
 	# Load configuration
 	# -------------------------------------------------------------------------
 	db_cfg       = utils.load_db_config()
+	model_cfg    = utils.load_models_config()
 	db_path      = db_cfg["database"]["db_path"]
 	table_pred   = db_cfg["database"]["tables"]["predictions"]
+	models       = model_cfg.get("models", {})
+	active_models = [mid for mid, meta in models.items() if meta.get("active")]
+	if len(active_models) == 0:
+		raise ValueError("No active models found in config/models.json")
+	pred_cols = [f"{mid}_p" for mid in active_models]
 
 	# -------------------------------------------------------------------------
 	# Compute time range
 	# -------------------------------------------------------------------------
-	now      = datetime.now().replace(second=0, microsecond=0)
+	now      = datetime.now(timezone.utc).replace(second=0, microsecond=0)
 	start_dt = now - timedelta(minutes=lookback_minutes)
 	start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 	if print_status:
-		print(f"📊 Querying {lookback_minutes}m from '{table_pred}' since {start_str}")
+		print(f"Querying {lookback_minutes}m from '{table_pred}' since {start_str}")
 
 	# -------------------------------------------------------------------------
 	# Fetch data
 	# -------------------------------------------------------------------------
 	with sqlite3.connect(db_path) as conn:
+		select_cols = ", ".join(["open_time"] + pred_cols)
 		df = pd.read_sql_query(
-			f"""
-			SELECT open_time, pred_prob FROM {table_pred}
-			WHERE open_time >= ? ORDER BY open_time ASC
-			""",
+			f"SELECT {select_cols} FROM {table_pred} WHERE open_time >= ? ORDER BY open_time ASC",
 			conn,
 			params=(start_str,)
 		)
 
 	if df.empty:
 		if print_status:
-			print("⚠️ No data found")
+			print("No data found")
 		return df
 
 	# -------------------------------------------------------------------------
 	# Print statistics
 	# -------------------------------------------------------------------------
 	if print_status:
-		print(f"✅ Found {len(df)} data points")
-		print(f"⏰ Range: {df['open_time'].min()} to {df['open_time'].max()}")
+		print(f"Found {len(df)} data points")
+		print(f"Range: {df['open_time'].min()} to {df['open_time'].max()}")
 
 	return df
 
@@ -86,9 +90,19 @@ def plot_predictions_df(df: pd.DataFrame, ax=None):
 		ax.clear()
 
 	x = pd.to_datetime(df["open_time"])
-	y = pd.to_numeric(df["pred_prob"], errors="coerce")
+	pred_cols = [c for c in df.columns if c != "open_time"]
+	color_map = {}
+	for col in pred_cols:
+		if "_s_" in col:
+			color_map[col] = "crimson"
+		elif "_l_" in col:
+			color_map[col] = "dodgerblue"
+		else:
+			color_map[col] = "gray"
 
-	ax.plot(x, y, label="Pred Prob", color="dodgerblue", marker="o", markersize=3)
+	for col in pred_cols:
+		y = pd.to_numeric(df[col], errors="coerce")
+		ax.plot(x, y, label=col, color=color_map.get(col, "gray"), marker="o", markersize=3)
 	ax.axhline(y=0.01, color="red", linestyle="--", lw=1, label="Short (0.01)")
 	ax.axhline(y=0.10, color="green", linestyle="--", lw=1, label="Long (0.1)")
 

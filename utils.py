@@ -20,14 +20,22 @@ from datetime import datetime, timezone
 #  - Return stripped path string
 # -------------------------------------------------------------------------
 def _repo_root():
-	return subprocess.check_output(
-		["git", "rev-parse", "--show-toplevel"],
-		text=True
-	).strip()
+	try:
+		return subprocess.check_output(
+			["git", "rev-parse", "--show-toplevel"],
+			text=True
+		).strip()
+	except Exception:
+		return os.path.abspath(os.getcwd())
 
 def _runtime_root():
 	if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
 		return sys._MEIPASS
+	return _repo_root()
+
+def _app_root() -> str:
+	if getattr(sys, "frozen", False):
+		return os.path.dirname(sys.executable)
 	return _repo_root()
 
 def _resolve_path(path: str) -> str:
@@ -49,7 +57,13 @@ def _load_json(path: str) -> dict:
 		return json.load(f)
 
 def load_db_config() -> dict:
-	return _load_json("db.json")
+	cfg 		= _load_json("db.json")
+	db_cfg 		= cfg.get("database", {})
+	db_paths 	= db_cfg.get("db_paths", {})
+	active_env  = db_cfg.get("active_env")
+	if active_env in db_paths:
+		db_cfg["db_path"] = db_paths[active_env]
+	return cfg
 
 def load_features_config() -> dict:
 	return _load_json("features.json")
@@ -60,6 +74,29 @@ def load_models_config() -> dict:
 def load_env_config() -> dict:
 	return _load_json("env.json")
 
+def _format_percentile(percentile: float) -> str:
+	text = str(percentile)
+	if "." in text:
+		text = text.split(".", 1)[1]
+	text = text.rstrip("0") or "0"
+	return text.zfill(2)
+
+def target_col_name(kind: str, rolling_window: int, percentile: float) -> str:
+	pct = _format_percentile(percentile)
+	return f"trg_{kind}_rw_{rolling_window}_prc_{pct}"
+
+def target_name_from_config(cfg: dict) -> str:
+	name = cfg.get("name")
+	if name:
+		return name
+	return target_col_name(cfg["direction"], cfg["rolling_window"], cfg["percentile"])
+
+def target_columns_from_config(features_cfg: dict) -> list:
+	targets = features_cfg.get("database", {}).get("features", {}).get("targets", [])
+	cols = []
+	for cfg in targets:
+		cols.append(target_name_from_config(cfg))
+	return cols
 
 # =============================================================================
 # TIME HELPERS (UTC+0 / epoch milliseconds)

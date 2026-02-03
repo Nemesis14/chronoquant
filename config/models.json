@@ -1,8 +1,52 @@
 {
-    "model": {
-        "type": "logreg",
-        "model_dir": "model_dev/logreg_base",
-        "model_file": "model.pkl",
-        "features_file": "features.json"
+    "models": {
+        "lg_l_rw240_p90_base_sm": {
+            "target_name": "trg_l_rw_240_prc_09",
+            "family": "logreg",
+            "variant": "base",
+            "trainer": "statsmodels",
+            "paths": {
+                "model_dir": "model_dev/lg_l_rw240_p90_base_sm",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict",
+                "proba": true
+            },
+            "active": true
+        },
+        "lg_s_rw240_p90_base_sm": {
+            "target_name": "trg_s_rw_240_prc_09",
+            "family": "logreg",
+            "variant": "base",
+            "trainer": "statsmodels",
+            "paths": {
+                "model_dir": "model_dev/lg_s_rw240_p90_base_sm",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict",
+                "proba": true
+            },
+            "active": true
+        },
+        "xgb_l_rw240_p90_v1": {
+            "target_name": "trg_l_rw_240_prc_09",
+            "family": "xgb",
+            "variant": "v1",
+            "trainer": "xgboost",
+            "paths": {
+                "model_dir": "model_dev/xgb_l_rw240_p90_v1",
+                "model_file": "model.json",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "active": false
+        }
     }
 }

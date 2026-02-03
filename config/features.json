@@ -1,31 +1,60 @@
 {
     "database": {
         "features": {
-            "rolling_window": 240,
-            "target_percentile": 0.9,
+            "targets": [
+                {
+                    "direction": "long",
+                    "name": "trg_l_rw_240_prc_09",
+                    "rolling_window": 240,
+                    "percentile": 0.9
+                },
+                {
+                    "direction": "short",
+                    "name": "trg_s_rw_240_prc_09",
+                    "rolling_window": 240,
+                    "percentile": 0.9
+                }
+            ],
             "indicators": {
                 "momentum": {
                     "rsi": [
-                        {"window": 14}
+                        {
+                            "window": 14
+                        }
                     ],
                     "roc": [
-                        {"window": 14},
-                        {"window": 140}
+                        {
+                            "window": 14
+                        },
+                        {
+                            "window": 140
+                        }
                     ]
                 },
                 "trend": {
                     "macd": [
-                        {"fast": 12, "slow": 26}
+                        {
+                            "fast": 12,
+                            "slow": 26
+                        }
                     ],
                     "sma": [
-                        {"window": 14},
-                        {"window": 140}
+                        {
+                            "window": 14
+                        },
+                        {
+                            "window": 140
+                        }
                     ]
                 },
                 "volatility": {
                     "bollinger": [
-                        {"window": 14},
-                        {"window": 140}
+                        {
+                            "window": 14
+                        },
+                        {
+                            "window": 140
+                        }
                     ]
                 }
             }

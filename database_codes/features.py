@@ -72,15 +72,17 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 		target_col = utils.target_name_from_config(target_cfg)
 
 		if direction == "long":
-			rolling_max = df["close"][::-1].rolling(rolling_win, min_periods=1).max()[::-1]
-			ratio_long = rolling_max / df["close"]
-			threshold = ratio_long.quantile(percentile)
-			df[target_col] = (ratio_long >= threshold).astype(int)
+			rolling_max 	= df["close"][::-1].rolling(rolling_win, min_periods=1).max()[::-1]
+			ratio_long 		= rolling_max / df["close"]
+			threshold 		= ratio_long.quantile(percentile)
+			df[target_col]  = (ratio_long >= threshold).astype(int)
+
 		elif direction == "short":
-			rolling_min = df["close"][::-1].rolling(rolling_win, min_periods=1).min()[::-1]
-			ratio_short = df["close"] / rolling_min
-			threshold = ratio_short.quantile(percentile)
-			df[target_col] = (ratio_short >= threshold).astype(int)
+			rolling_min 	= df["close"][::-1].rolling(rolling_win, min_periods=1).min()[::-1]
+			ratio_short 	= rolling_min / df["close"]
+			threshold 		= ratio_short.quantile(1 - percentile)  # ha percentile=0.9 => 0.1
+			df[target_col] 	= (ratio_short <= threshold).astype(int)
+
 		else:
 			raise ValueError(f"Unknown target direction: {direction}")
 

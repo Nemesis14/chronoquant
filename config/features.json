@@ -10,9 +10,9 @@
                 },
                 {
                     "direction": "short",
-                    "name": "trg_s_rw_240_prc_09",
+                    "name": "trg_s_rw_240_prc_01",
                     "rolling_window": 240,
-                    "percentile": 0.9
+                    "percentile": 0.1
                 }
             ],
             "indicators": {

@@ -17,7 +17,7 @@
             "active": true
         },
         "lg_s_rw240_p90_base_sm": {
-            "target_name": "trg_s_rw_240_prc_09",
+            "target_name": "trg_s_rw_240_prc_01",
             "family": "logreg",
             "variant": "base",
             "trainer": "statsmodels",
@@ -48,5 +48,32 @@
             },
             "active": false
         }
+    },
+    "trading_strategy": {
+        "signal_type": "spread_based",
+        "description": "Uses the difference between long and short model predictions",
+        "cut_offs": {
+            "long_signal": {
+                "threshold": 0.0139,
+                "description": "Spread >= +0.0139 (P90)",
+                "accuracy": "16.15%",
+                "lift": 1.61,
+                "interpretation": "Strong signal for uptrend (big price increase expected)"
+            },
+            "short_signal": {
+                "threshold": -0.0142,
+                "description": "Spread <= -0.0142 (P10)",
+                "accuracy": "13.04%",
+                "lift": 1.30,
+                "interpretation": "Strong signal for downtrend (big price decrease expected)"
+            },
+            "neutral_zone": {
+                "min": -0.0142,
+                "max": 0.0139,
+                "recommendation": "Do not trade - insufficient signal strength"
+            }
+        },
+        "validation_date": "2026-02-17",
+        "training_period": "2019-11-28 to 2026-01-31"
     }
 }

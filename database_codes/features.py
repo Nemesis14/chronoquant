@@ -80,7 +80,7 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 		elif direction == "short":
 			rolling_min 	= df["close"][::-1].rolling(rolling_win, min_periods=1).min()[::-1]
 			ratio_short 	= rolling_min / df["close"]
-			threshold 		= ratio_short.quantile(1 - percentile)  # ha percentile=0.9 => 0.1
+			threshold 		= ratio_short.quantile(percentile)  # percentile=0.1 => alsó 10%
 			df[target_col] 	= (ratio_short <= threshold).astype(int)
 
 		else:

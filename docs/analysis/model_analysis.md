@@ -1,4 +1,4 @@
-﻿# Model Analysis & Cut-off Strategy
+# Model Analysis & Cut-off Strategy
 
 ## Date: 2026-02-17
 

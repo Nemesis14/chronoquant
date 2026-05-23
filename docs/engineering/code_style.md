@@ -1,4 +1,4 @@
-﻿# ChronoQuant Code Style Guide
+# ChronoQuant Code Style Guide
 
 ## Overview
 This document codifies the code style conventions used throughout the ChronoQuant project. Follow these guidelines when writing or modifying code to maintain consistency and readability.
@@ -78,10 +78,10 @@ Break code logic into labeled sections with dashes (79 chars):
 Use sparingly. When needed, explain *why*, not what:
 
 ```python
-# âś… Good: explains intent
+# Good: explains intent
 rolling_max = df["close"][::-1].rolling(rolling_win).max()[::-1]  # Reverse to look forward
 
-# âťŚ Avoid: describes obvious code
+# Avoid: describes obvious code
 rolling_max = df["close"].rolling(rolling_win).max()  # Get rolling max
 ```
 
@@ -96,15 +96,16 @@ rolling_max = df["close"].rolling(rolling_win).max()  # Get rolling max
 - Continuation lines should use PEP 8 compliant hanging indents or alignment with the opening delimiter.
 
 ### Variable Assignment Alignment
-Do not vertically align assignments with extra spaces or tabs. Keep one normal space around `=`.
+Align `=` signs for short, related assignment blocks when it improves scanability.
+Use spaces only; never use tabs for alignment.
 
 ```python
-# Use normal PEP 8 assignment spacing
-db_cfg = utils.load_db_config()
-feat_cfg = utils.load_features_config()
-db_path = db_cfg["database"]["db_path"]
+# Related config assignments
+db_cfg      = utils.load_db_config()
+feat_cfg    = utils.load_features_config()
+db_path     = db_cfg["database"]["db_path"]
 table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
-table_feat = db_cfg["database"]["tables"]["features"]
+table_feat  = db_cfg["database"]["tables"]["features"]
 
 # Longer names on separate lines
 with sqlite3.connect(db_path) as conn:
@@ -114,9 +115,13 @@ with sqlite3.connect(db_path) as conn:
     )
 ```
 
-### Function Parameter Alignment
-Do not align function parameters, type annotations, defaults, or colons with tabs/spaces across multiple lines.
-Use one parameter per line for long signatures and keep normal PEP 8 spacing around `:` and `=`.
+### Function and Call Parameter Alignment
+Function definitions follow normal PEP 8 spacing for annotations and defaults:
+`lookback_bars: int = 240`.
+
+For multi-line function calls, align keyword argument `=` signs within the
+same call block. This is a ChronoQuant project convention for readability,
+and it is a deliberate local exception to strict PEP 8 keyword-call spacing.
 
 ```python
 # Good
@@ -127,6 +132,12 @@ def sync_features(
 ) -> None:
     ...
 
+parser.add_argument(
+    "--start",
+    default = settings.INIT_START_DATE,
+    help    = "Start time, format: YYYY-MM-DD HH:MM:SS",
+)
+
 # Avoid
 def sync_features(
     start_time:    str,
@@ -134,18 +145,47 @@ def sync_features(
     end_time:      str | None   = None,
 ) -> None:
     ...
+
+parser.add_argument(
+    "--start",
+    default=settings.INIT_START_DATE,
+    help="Start time, format: YYYY-MM-DD HH:MM:SS",
+)
+```
+
+The same rule applies to every multi-line call with keyword arguments:
+
+```python
+# Good
+rebuild_derived_tables(
+    start            = args.start,
+    end              = args.end,
+    drop             = args.drop,
+    features_only    = args.features_only,
+    predictions_only = args.predictions_only,
+)
+
+# Avoid
+rebuild_derived_tables(
+    start=args.start,
+    end=args.end,
+    drop=args.drop,
+    features_only=args.features_only,
+    predictions_only=args.predictions_only,
+)
 ```
 
 ### Multi-line Dictionary/Config Access
-Use simple assignments without column alignment:
+Keep config extraction readable. Use alignment for short, related blocks and
+split long expressions onto separate lines.
 
 ```python
 # Config loading pattern
-paths = model_meta["paths"]
+paths     = model_meta["paths"]
 model_dir = paths["model_dir"]
 feat_file = paths["features_file"]
 resolved_model_dir = utils._resolve_path(model_dir)
-features_path = os.path.join(resolved_model_dir, feat_file)
+features_path      = os.path.join(resolved_model_dir, feat_file)
 ```
 
 ---
@@ -175,11 +215,11 @@ rolling_win  # Rolling window size (integer)
 
 ### Function Names
 - **snake_case** with descriptive verb-first action:
-  - `sync_features()` â€” fetch and sync
-  - `fetch_predictions_df()` â€” retrieve data
-  - `get_last_timestamp()` â€” retrieve single value
-  - `load_db_config()` â€” load configuration
-  - `_resolve_path()` â€” private helper (leading underscore)
+  - `sync_features()` - fetch and sync
+  - `fetch_predictions_df()` - retrieve data
+  - `get_last_timestamp()` - retrieve single value
+  - `load_db_config()` - load configuration
+  - `_resolve_path()` - private helper (leading underscore)
 
 ---
 
@@ -231,7 +271,7 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 Use **PEP 484 type hints** on all function signatures:
 
 ```python
-# âś… Good
+# Good
 def sync_features(start_time: str, lookback_bars: int = 240) -> None:
     ...
 
@@ -241,7 +281,7 @@ def get_last_timestamp(db_path: str, table_name: str) -> str:
 def load_db_config() -> dict:
     ...
 
-# âś… Optional for complex types
+# Optional for complex types
 def fetch_predictions_df(db_path: str, table: str) -> pd.DataFrame:
     ...
 ```
@@ -253,12 +293,12 @@ def fetch_predictions_df(db_path: str, table: str) -> pd.DataFrame:
 Use **f-strings** (Python 3.6+):
 
 ```python
-# âś… Good
+# Good
 print(f"Computed {len(df_final)} feature rows into '{table_feat}'")
 print(f"   Last: {max_ohlcv}")
 print(f"Cycle #{cycle} at {utils.now_utc_str()}")
 
-# âťŚ Avoid
+# Avoid
 print("Computed {} rows into '{}'".format(len(df_final), table_feat))
 print("Computed " + str(len(df_final)) + " rows")
 ```
@@ -281,36 +321,22 @@ except Exception:
 try:
     ...
 except Exception as e:
-    print(f"âťŚ Error in sync_features: {str(e)}")
+    print(f"ERROR in sync_features: {str(e)}")
     traceback.print_exc()
 ```
 
 ---
 
-## Emoji Usage (Console Output)
+## Console Output
 
-Use semantic emojis for log clarity:
+Prefer plain ASCII status prefixes. Avoid emojis in runtime logs because
+Windows consoles, packaged executables, and redirected log files can use
+different encodings.
 
-| Emoji | Usage |
-|-------|-------|
-| âś… | Success/completion |
-| âťŚ | Error/failure |
-| đźŚ | API/network operation |
-| đź’ľ | Database operation |
-| âš™ď¸Ź | Configuration/setup |
-| đź¤– | ML model operation |
-| đź“Š | Data/analytics |
-| đź–Ąď¸Ź | UI/display |
-| âšˇ | Performance/speed |
-| đź”´ | Critical signal |
-| đźź˘ | Positive signal |
-| âšŞ | Neutral state |
-
-**Example:**
 ```python
-print("âś… Computed 1,234 feature rows into 'FEATURES'")
-print("đźŚ Fetching BTCUSDT klines from Binance...")
-print("âťŚ No feature rows found since 2026-05-16")
+print("OK: Computed 1,234 feature rows into 'FEATURES'")
+print("INFO: Fetching BCHUSDT klines from Binance...")
+print("ERROR: No feature rows found since 2026-05-16")
 ```
 
 ---
@@ -370,7 +396,7 @@ When writing code for ChronoQuant:
 - [ ] Add type hints on all functions
 - [ ] Use f-strings for formatting
 - [ ] Use emoji in console output for clarity
-- [ ] Follow config â†’ logic â†’ error flow
+- [ ] Follow config -> logic -> error flow
 - [ ] Keep main_app.py minimal for PyInstaller
 
 

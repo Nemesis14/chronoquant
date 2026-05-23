@@ -1,4 +1,4 @@
-﻿# Feature Engineering Plan for ChronoQuant
+# Feature Engineering Plan for ChronoQuant
 
 ## Executive Summary
 

@@ -1,6 +1,5 @@
-﻿import os
+import os
 import sys
-import time
 import sqlite3
 import threading
 import queue
@@ -41,15 +40,12 @@ def truncate_log_if_configured(config: dict) -> None:
         if not os.path.isabs(log_file):
             log_file = os.path.join(utils._app_root(), log_file)
         log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            try:
-                os.makedirs(log_dir, exist_ok=True)
-            except Exception:
-                pass
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
         with open(log_file, "w", encoding="utf-8") as f:
             f.write("")
-    except Exception:
-        pass
+    except OSError as exc:
+        print(f"WARN: Failed to truncate configured log file: {exc}")
 
 
 class QueueWriter:

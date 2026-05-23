@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # Converted from legacy SHORT model development notebook
 # =============================================================================
 
@@ -12,9 +12,9 @@
 import sqlite3
 import pandas as pd
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..", "..")))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import utils
 
 # =============================================================================
@@ -55,10 +55,10 @@ ROLLING_WINDOW  = 240
 conn = sqlite3.connect(DB_PATH)
 
 query = f"""
-	SELECT *
-	FROM {table_features}
-	WHERE open_time BETWEEN '{open_time_from}' AND '{open_time_to}'
-	ORDER BY open_time ASC
+    SELECT *
+    FROM {table_features}
+    WHERE open_time BETWEEN '{open_time_from}' AND '{open_time_to}'
+    ORDER BY open_time ASC
 """
 df_dev = pd.read_sql_query(query, conn)
 conn.close()
@@ -73,13 +73,13 @@ df_dev.set_index("open_time", inplace=True)
 # Display
 # -------------------------------------------------------------------------
 print(f"\n{'='*70}")
-print(f"đź“Š LOADED DATA FROM '{table_features}'")
+print(f"LOADED DATA FROM '{table_features}'")
 print(f"{'='*70}")
 print(f"Shape: {df_dev.shape}")
 print(f"Time range: {df_dev.index.min()} to {df_dev.index.max()}")
-print(f"\nđź”Ť Last 5 rows:")
+print("\nLast 5 rows:")
 print(f"{'-'*70}")
-display(df_dev.tail())
+print(df_dev.tail().to_string())
 print(f"{'='*70}\n")
 
 # --- Code cell 3 ---
@@ -96,7 +96,6 @@ if not target_name:
 # parameters for logistic elimination
 # =============================================================================
 import statsmodels.api as sm
-from IPython.display import display
 
 p_threshold = 0.01    # p-value cutoff for keeping a variable
 max_iter    = 100     # maximum elimination iterations
@@ -189,7 +188,7 @@ print(remaining)
 
 if result is not None:
     try:
-        display(result.summary().tables[1])
+        print(result.summary().tables[1])
     except Exception:
         print(result.summary())
 else:
@@ -200,7 +199,6 @@ else:
 
 # --- Code cell 7 ---
 import json
-from pathlib import Path
 
 # =============================================================================
 # export only remaining feature names to JSON
@@ -210,40 +208,42 @@ output_path = Path("features.json")
 with open(output_path, "w", encoding="utf-8") as f:
     json.dump(remaining, f, ensure_ascii=False, indent=4)
 
-print(f"\nâś… Remaining feature nevek elmentve ide: {output_path.resolve()}")
+print(f"\nOK: Remaining feature names saved to: {output_path.resolve()}")
 
 
 # =============================================================================
-# Slim save â€“ adatmentes mentĂ©s, hogy a fĂˇjl kicsi maradjon
+# Save compact statsmodels artifact
 # =============================================================================
 
-import os
 import pickle
 
-# ModellmentĂ©s cĂ©lmappa Ă©s Ăştvonal
+# Model output path
 model_path = "model.pkl"
 
-# ElĹ‘melegĂ­tĂ©s: nĂ©hĂˇny statisztika cache-elĂ©se, hogy remove_data utĂˇn is elĂ©rhetĹ‘ legyen
+# Warm up summary statistics before removing data
 try:
-    _ = model.summary()
+    _ = result.summary()
 except Exception:
     pass
 
-# ElsĹ‘dleges mĂłdszer: hivatalos statsmodels save() adatmentĂ©ssel
-try:
-    model.save(model_path, remove_data=True)
-    print(f"âś… Slim model saved to: {model_path} (via save(remove_data=True))")
+if result is None:
+    raise RuntimeError("No fitted model available to save")
 
-# Fallback: ha a save() remove_data paramĂ©ter nem tĂˇmogatott
+# Primary save path: statsmodels native save without training data
+try:
+    result.save(model_path, remove_data=True)
+    print(f"OK: Slim model saved to: {model_path} (via save(remove_data=True))")
+
+# Fallback when save(remove_data=True) is unavailable
 except Exception:
-    print("âš ď¸Ź .save(remove_data=True) nem tĂˇmogatott, fallback mentĂ©s indul...")
+    print("WARN: save(remove_data=True) unavailable, using pickle fallback...")
     try:
-        model.remove_data()
+        result.remove_data()
     except Exception:
         pass
     with open(model_path, "wb") as f:
-        pickle.dump(model, f)
-    print(f"âś… Slim model saved to: {model_path} (via pickle fallback)")
+        pickle.dump(result, f)
+    print(f"OK: Slim model saved to: {model_path} (via pickle fallback)")
 
 
 

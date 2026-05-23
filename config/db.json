@@ -2,8 +2,8 @@
     "database": {
         "active_env": "dev",
         "db_paths": {
-            "dev": "D:/database/bchusdt_data_dev.db",
-            "prod": "D:/database/bchusdt_data_prod.db"
+            "dev": "D:/repos/chronoquant/database/bchusdt_data_dev.db",
+            "prod": "D:/repos/chronoquant/database/bchusdt_data_prod.db"
         },
         "symbol": "BCHUSDT",
         "interval": "1m",

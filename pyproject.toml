@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chronoquant"
+version = "0.1.0"
+description = "Real-time ML trading signal prediction system for Binance OHLCV data."
+requires-python = ">=3.12"
+dependencies = [
+    "pandas",
+    "python-binance",
+    "matplotlib",
+    "ipython",
+    "ta",
+    "statsmodels",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.20.0",
+    "pytest>=9.0.3",
+]
+

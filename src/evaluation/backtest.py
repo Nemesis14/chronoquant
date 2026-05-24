@@ -387,7 +387,6 @@ def summarize_trades(
     losses = returns[returns <= 0]
     final_equity = float(equity_df["equity"].iloc[-1])
     entry_times = pd.to_datetime(trades_df["entry_time"])
-    exit_times = pd.to_datetime(trades_df["exit_time"])
     between_entries = entry_times.diff().dt.total_seconds().dropna() / 60.0
     total_minutes = max(1.0, (end_time - start_time).total_seconds() / 60.0)
     exposure_minutes = trades_df["hold_minutes"].astype(float).sum()

@@ -1,0 +1,31 @@
+{
+    "initial_equity": 10000.0,
+    "final_equity": 11342.748714558742,
+    "profit": 1342.748714558742,
+    "total_return": 0.13427487145587413,
+    "trade_count": 65,
+    "winning_trades": 34,
+    "losing_trades": 31,
+    "win_rate": 0.5230769230769231,
+    "avg_net_return": 0.0020130851716837826,
+    "median_net_return": 0.001425110272306629,
+    "best_trade": 0.013767235964036395,
+    "worst_trade": -0.02990980976780655,
+    "profit_factor": 1.4619153039702255,
+    "max_drawdown": -0.08938469035396679,
+    "avg_hold_minutes": 42.07692307692308,
+    "median_hold_minutes": 34.0,
+    "avg_minutes_between_entries": 8062.671875,
+    "median_minutes_between_entries": 4286.0,
+    "exposure_pct": 0.005203576864535769,
+    "exit_reasons": {
+        "probability_exit": 32,
+        "take_profit": 29,
+        "max_hold": 4
+    },
+    "strategy_id": "lasso_long_fw240_q90_managed_v1",
+    "model_id": "logit_l_fw240_q90_l1_v1",
+    "start": "2025-05-23 14:30:00",
+    "end": "2026-05-23 14:30:00",
+    "output_dir": "D:\\repos\\chronoquant\\backtests\\lasso_long_fw240_q90_managed_v1"
+}

@@ -21,6 +21,7 @@ from modeling.metrics import binary_classification_metrics
 from modeling.reports import write_training_report
 from modeling.sampling import load_sample_definition, validate_sample_definition
 from modeling.training_windows import (
+    between,
     final_train_test_split,
     fold_sample_size_row,
     fold_split,
@@ -85,6 +86,16 @@ def train_lasso_logreg(
         random_state=random_state,
         verbose=verbose,
     )
+    validation_predictions_df = validation_predictions_for_alpha(
+        dataset=dataset,
+        sample=sample,
+        alpha=best_alpha,
+        class_weight=class_weight,
+        solver=solver,
+        max_iter=max_iter,
+        random_state=random_state,
+        verbose=verbose,
+    )
 
     artifacts = {
         "model_id": model_id,
@@ -106,6 +117,7 @@ def train_lasso_logreg(
         "n_features_selected": len(selected_features),
         "selected_features": selected_features,
         "final_metrics": final_metrics,
+        "validation_predictions_path": "validation_predictions.csv",
         "sample_sizes": sample_sizes,
     }
 
@@ -116,6 +128,7 @@ def train_lasso_logreg(
         cv_df=cv_df,
         artifacts=artifacts,
         selected_features=selected_features,
+        validation_predictions_df=validation_predictions_df,
     )
     write_training_report(
         output_dir=output_dir,
@@ -191,6 +204,47 @@ def _cross_validate_alphas(
             )
 
     return results, sample_sizes
+
+
+# =============================================================================
+# validation_predictions_for_alpha(...) -> pd.DataFrame
+# =============================================================================
+# Purpose:
+#  - Collect out-of-fold validation predictions for the selected alpha only
+# =============================================================================
+def validation_predictions_for_alpha(
+    dataset: ModelingDataset,
+    sample: dict,
+    alpha: float,
+    class_weight: str | None,
+    solver: str,
+    max_iter: int,
+    random_state: int,
+    verbose: bool,
+) -> pd.DataFrame:
+    rows = []
+    for fold in sample["folds"]:
+        split = fold_split(dataset, fold)
+        if verbose:
+            print(f"Validation predictions fold {fold['fold']} alpha={alpha}", flush=True)
+        model = _build_model(alpha, class_weight, solver, max_iter, random_state)
+        model.fit(split.X_train, split.y_train)
+        valid_pred = model.predict_proba(split.X_eval)[:, 1]
+        valid_time = dataset.open_time.loc[
+            between(dataset.open_time, fold["valid_start"], fold["valid_end"])
+        ]
+        rows.append(
+            pd.DataFrame(
+                {
+                    "fold": fold["fold"],
+                    "open_time": valid_time.reset_index(drop=True),
+                    "y_true": split.y_eval.reset_index(drop=True),
+                    "y_pred": valid_pred,
+                    "alpha": alpha,
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
 # =============================================================================

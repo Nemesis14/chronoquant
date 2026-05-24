@@ -30,7 +30,7 @@ def test_train_lasso_logreg_writes_artifacts(tmp_path, monkeypatch) -> None:
     df = pd.DataFrame(
         {
             "open_time": pd.date_range("2024-01-01", periods=periods, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "trg_l_rw_240_prc_09": target,
+            "trg_l_fw240_q90": target,
             "feat_signal": target + (index / 1000),
             "feat_noise": np.sin(index),
         }
@@ -75,7 +75,7 @@ def test_train_lasso_logreg_writes_artifacts(tmp_path, monkeypatch) -> None:
     output_dir = tmp_path / "model"
     result = train_lasso_logreg(
         model_id     = "unit_lasso",
-        target_col   = "trg_l_rw_240_prc_09",
+        target_col   = "trg_l_fw240_q90",
         sample_dir   = sample_dir,
         output_dir   = output_dir,
         alphas       = [0.1, 1.0],

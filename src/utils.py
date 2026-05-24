@@ -71,6 +71,15 @@ def load_models_config() -> dict:
 def load_model_params_config() -> dict:
     return _load_json("model_params.json")
 
+def load_model_registry_config() -> dict:
+    return _load_json("model_registry.json")
+
+def load_predictions_config() -> dict:
+    return _load_json("predictions.json")
+
+def load_strategies_config() -> dict:
+    return _load_json("strategies.json")
+
 def load_env_config() -> dict:
     return _load_json("env.json")
 
@@ -82,6 +91,54 @@ def active_model_ids(model_cfg: dict) -> list[str]:
 
 def prediction_col_name(model_id: str) -> str:
     return f"{model_id}_p"
+
+
+def live_prediction_columns() -> dict[str, str]:
+    cfg = load_predictions_config()
+    columns = cfg.get("live_predictions", {}).get("column_names", {})
+    defaults = {
+        "target": "target",
+        "prediction": "prediction",
+        "signal": "signal",
+    }
+    return {**defaults, **columns}
+
+
+def live_model_id(model_cfg: dict | None = None, env_cfg: dict | None = None) -> str:
+    model_cfg = model_cfg or load_models_config()
+    env_cfg = env_cfg or load_env_config()
+    models = model_cfg.get("models", {})
+    model_id = env_cfg.get("runtime", {}).get("model_id")
+
+    if model_id:
+        if model_id not in models:
+            raise ValueError(f"Runtime model not found in config/models.json: {model_id}")
+        return model_id
+
+    active_ids = active_model_ids(model_cfg)
+    if len(active_ids) != 1:
+        raise ValueError("Set config/env.json runtime.model_id for the single live model")
+    return active_ids[0]
+
+
+def live_model_meta(model_cfg: dict | None = None, env_cfg: dict | None = None) -> tuple[str, dict]:
+    model_cfg = model_cfg or load_models_config()
+    model_id = live_model_id(model_cfg=model_cfg, env_cfg=env_cfg)
+    return model_id, model_cfg["models"][model_id]
+
+
+def target_direction_from_name(target_name: str) -> str:
+    if target_name.startswith("trg_l_"):
+        return "long"
+    if target_name.startswith("trg_s_"):
+        return "short"
+    raise ValueError(f"Cannot infer target direction from target name: {target_name}")
+
+
+def signal_probability_threshold(predictions_cfg: dict | None = None) -> float:
+    predictions_cfg = predictions_cfg or load_predictions_config()
+    signal_cfg = predictions_cfg.get("live_predictions", {}).get("signal", {})
+    return float(signal_cfg.get("threshold", 0.5))
 
 
 def long_short_prediction_columns(model_cfg: dict) -> tuple[str, str]:
@@ -109,16 +166,22 @@ def signal_cutoffs_from_config(model_cfg: dict) -> tuple[float, float]:
     short_cutoff = cutoffs.get("short_signal", {}).get("threshold", -0.0142)
     return float(long_cutoff), float(short_cutoff)
 
-def _format_percentile(percentile: float) -> str:
-    text = str(percentile)
-    if "." in text:
-        text = text.split(".", 1)[1]
-    text = text.rstrip("0") or "0"
-    return text.zfill(2)
+def _format_quantile(percentile: float) -> str:
+    value = int(round(float(percentile) * 100))
+    return f"q{value:02d}"
+
+
+def _format_target_direction(kind: str) -> str:
+    if kind in {"long", "l"}:
+        return "l"
+    if kind in {"short", "s"}:
+        return "s"
+    return kind
 
 def target_col_name(kind: str, rolling_window: int, percentile: float) -> str:
-    pct = _format_percentile(percentile)
-    return f"trg_{kind}_rw_{rolling_window}_prc_{pct}"
+    direction = _format_target_direction(kind)
+    quantile = _format_quantile(percentile)
+    return f"trg_{direction}_fw{rolling_window}_{quantile}"
 
 def target_name_from_config(cfg: dict) -> str:
     name = cfg.get("name")

@@ -24,6 +24,13 @@ METRIC_COLUMNS = [
     "log_loss",
 ]
 
+METRIC_PAIR_COLUMNS = [
+    "roc_auc",
+    "pr_auc",
+    "brier_score",
+    "log_loss",
+]
+
 
 # =============================================================================
 # write_training_report(...) -> None
@@ -60,13 +67,9 @@ def write_training_report(
         xscale=tuning_xscale,
     )
     feature_df = pd.DataFrame(feature_rows)
-    performance_df = pd.DataFrame(
-        performance_rows(
-            artifacts=artifacts,
-            cv_summary_df=cv_summary_df,
-            tuning_param=tuning_param,
-        )
-    )
+    best_cv_df = pd.DataFrame([best_cv_performance_row(artifacts, cv_summary_df, tuning_param)])
+    final_df = pd.DataFrame([final_performance_row(artifacts)])
+    validation_calibration_html = validation_calibration_section(output_dir)
 
     best_value = artifacts.get("best_tuning_value", artifacts.get(f"best_{tuning_param}"))
     html_text = f"""<!doctype html>
@@ -102,14 +105,19 @@ def write_training_report(
     <h2>Train and CV metrics by {html.escape(tuning_label)}</h2>
     <img src="{plot_uri}" alt="Train and CV metrics by {html.escape(tuning_label)}">
 
-    <h2>CV summary</h2>
+    <h2>CV summary by parameter</h2>
     {_df_to_html(cv_summary_df)}
+
+    <h2>Best-parameter CV performance</h2>
+    {_df_to_html(best_cv_df)}
+
+    {validation_calibration_html}
+
+    <h2>Final performance</h2>
+    {_df_to_html(final_df)}
 
     <h2>{html.escape(feature_table_title)}</h2>
     {_df_to_html(feature_df)}
-
-    <h2>Final performance</h2>
-    {_df_to_html(performance_df)}
 </body>
 </html>
 """
@@ -185,55 +193,145 @@ def cv_plot_data_uri(
 
 
 # =============================================================================
-# performance_rows(...) -> list[dict]
+# validation_calibration_section(output_dir: Path) -> str
 # =============================================================================
 # Purpose:
-#  - Flatten final train/test and selected CV metrics for report table
+#  - Render a calibration/lift section from best-parameter validation predictions
 # =============================================================================
-def performance_rows(
+def validation_calibration_section(output_dir: Path) -> str:
+    prediction_path = output_dir / "validation_predictions.csv"
+    if not prediction_path.exists():
+        return ""
+
+    predictions_df = pd.read_csv(prediction_path)
+    summary_df = validation_calibration_summary(predictions_df, n_bins=20)
+    if summary_df.empty:
+        return ""
+
+    plot_uri = validation_calibration_plot_data_uri(summary_df)
+    return f"""
+    <h2>Validation Probability Calibration</h2>
+    <img src="{plot_uri}" alt="Validation probability calibration by bin">
+    {_df_to_html(summary_df)}
+"""
+
+
+# =============================================================================
+# validation_calibration_summary(predictions_df: pd.DataFrame, n_bins: int) -> pd.DataFrame
+# =============================================================================
+# Purpose:
+#  - Split validation predictions into equal-count probability bins
+#  - Compare mean predicted probability with realized target rate
+# =============================================================================
+def validation_calibration_summary(
+    predictions_df: pd.DataFrame,
+    n_bins: int = 20,
+) -> pd.DataFrame:
+    required = {"y_true", "y_pred"}
+    if predictions_df.empty or not required.issubset(predictions_df.columns):
+        return pd.DataFrame()
+
+    df = predictions_df[["y_true", "y_pred"]].copy()
+    df["y_true"] = pd.to_numeric(df["y_true"], errors="coerce")
+    df["y_pred"] = pd.to_numeric(df["y_pred"], errors="coerce")
+    df = df.dropna(subset=["y_true", "y_pred"]).sort_values("y_pred").reset_index(drop=True)
+    if df.empty:
+        return pd.DataFrame()
+
+    bin_count = min(n_bins, len(df))
+    df["bin"] = pd.qcut(df.index, q=bin_count, labels=False, duplicates="drop") + 1
+    base_rate = float(df["y_true"].mean())
+    summary = df.groupby("bin", as_index=False).agg(
+        n=("y_true", "size"),
+        pred_min=("y_pred", "min"),
+        pred_max=("y_pred", "max"),
+        pred_mean=("y_pred", "mean"),
+        target_rate=("y_true", "mean"),
+    )
+    summary["baseline_target_rate"] = base_rate
+    summary["lift"] = summary["target_rate"] / base_rate if base_rate > 0 else None
+    return summary[
+        [
+            "bin",
+            "n",
+            "pred_min",
+            "pred_max",
+            "pred_mean",
+            "target_rate",
+            "baseline_target_rate",
+            "lift",
+        ]
+    ]
+
+
+# =============================================================================
+# validation_calibration_plot_data_uri(summary_df: pd.DataFrame) -> str
+# =============================================================================
+# Purpose:
+#  - Build base64 PNG for prediction mean vs realized target-rate by bin
+# =============================================================================
+def validation_calibration_plot_data_uri(summary_df: pd.DataFrame) -> str:
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    ax.plot(summary_df["bin"], summary_df["pred_mean"], marker="o", label="Mean predicted probability")
+    ax.plot(summary_df["bin"], summary_df["target_rate"], marker="o", label="Realized target rate")
+    if "baseline_target_rate" in summary_df.columns and not summary_df.empty:
+        baseline = summary_df["baseline_target_rate"].iloc[0]
+        ax.axhline(baseline, color="gray", linestyle="--", linewidth=1.4, label="Baseline target rate")
+
+    ax.set_xlabel("Prediction bin (low to high probability)")
+    ax.set_ylabel("rate")
+    ax.set_title("Validation calibration by equal-count probability bin")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", dpi=140)
+    plt.close(fig)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+# =============================================================================
+# best_cv_performance_row(...) -> dict
+# =============================================================================
+# Purpose:
+#  - Return train/valid metric pairs at the selected tuning value
+# =============================================================================
+def best_cv_performance_row(
     artifacts: dict,
     cv_summary_df: pd.DataFrame,
     tuning_param: str,
-) -> list[dict]:
-    rows = []
-    for split, metrics in artifacts["final_metrics"].items():
-        rows.append(
-            {
-                "split": split,
-                "n": metrics["n"],
-                "positive_rate": metrics["positive_rate"],
-                "roc_auc": metrics["roc_auc"],
-                "pr_auc": metrics["pr_auc"],
-                "brier_score": metrics["brier_score"],
-                "log_loss": metrics["log_loss"],
-            }
-        )
-
+) -> dict:
     best_value = artifacts.get("best_tuning_value", artifacts.get(f"best_{tuning_param}"))
     cv_row = cv_summary_df.loc[cv_summary_df[tuning_param] == best_value].iloc[0]
-    rows.extend(
-        [
-            {
-                "split": "cv_train_mean_at_best_param",
-                "n": None,
-                "positive_rate": None,
-                "roc_auc": cv_row.get("train_roc_auc"),
-                "pr_auc": cv_row.get("train_pr_auc"),
-                "brier_score": cv_row.get("train_brier_score"),
-                "log_loss": cv_row.get("train_log_loss"),
-            },
-            {
-                "split": "cv_valid_mean_at_best_param",
-                "n": None,
-                "positive_rate": None,
-                "roc_auc": cv_row.get("valid_roc_auc"),
-                "pr_auc": cv_row.get("valid_pr_auc"),
-                "brier_score": cv_row.get("valid_brier_score"),
-                "log_loss": cv_row.get("valid_log_loss"),
-            },
-        ]
-    )
-    return rows
+    result = {
+        tuning_param: best_value,
+    }
+    for metric in METRIC_PAIR_COLUMNS:
+        result[f"train_{metric}"] = cv_row.get(f"train_{metric}")
+        result[f"valid_{metric}"] = cv_row.get(f"valid_{metric}")
+    return result
+
+
+# =============================================================================
+# final_performance_row(artifacts: dict) -> dict
+# =============================================================================
+# Purpose:
+#  - Return final train/test metric pairs in one comparable report row
+# =============================================================================
+def final_performance_row(artifacts: dict) -> dict:
+    final_train = artifacts["final_metrics"]["final_train"]
+    final_test = artifacts["final_metrics"]["final_test"]
+    result = {
+        "train_n": final_train["n"],
+        "test_n": final_test["n"],
+        "train_positive_rate": final_train["positive_rate"],
+        "test_positive_rate": final_test["positive_rate"],
+    }
+    for metric in METRIC_PAIR_COLUMNS:
+        result[f"train_{metric}"] = final_train.get(metric)
+        result[f"test_{metric}"] = final_test.get(metric)
+    return result
 
 
 # =============================================================================

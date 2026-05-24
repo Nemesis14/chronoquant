@@ -30,7 +30,7 @@ def test_train_lightgbm_binary_writes_standard_artifacts(tmp_path, monkeypatch) 
     df = pd.DataFrame(
         {
             "open_time": pd.date_range("2024-01-01", periods=periods, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "trg_l_rw_240_prc_09": target,
+            "trg_l_fw240_q90": target,
             "feat_signal": target + (index / 1000),
             "feat_noise": np.sin(index),
             "feat_trend": index / periods,
@@ -101,7 +101,7 @@ def test_train_lightgbm_binary_writes_standard_artifacts(tmp_path, monkeypatch) 
     output_dir = tmp_path / "model"
     result = train_lightgbm_binary(
         model_id      = "unit_lgbm",
-        target_col    = "trg_l_rw_240_prc_09",
+        target_col    = "trg_l_fw240_q90",
         sample_dir    = sample_dir,
         output_dir    = output_dir,
         param_profile = "unit_lightgbm",

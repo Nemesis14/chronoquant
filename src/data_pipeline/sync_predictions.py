@@ -2,10 +2,10 @@
 # Load model and generate predictions from feature data
 # =============================================================================
 # Purpose:
-#  - Load active model and feature list
+#  - Load the single runtime model and feature list
 #  - Fetch feature rows from database
 #  - Compute prediction probabilities
-#  - Insert predictions into database
+#  - Insert live prediction rows into database
 # =============================================================================
 
 import os
@@ -21,10 +21,11 @@ from db.table_ops import drop_existing_open_times, ensure_table_columns
 # sync_predictions(start_time: str, end_time: str | None = None) -> None
 # =============================================================================
 # Purpose:
-#  - Load active model and feature list from disk
+#  - Load the configured runtime model and feature list from disk
 #  - Fetch feature data from start_time onwards
 #  - Compute probabilities using configured method
-#  - Insert [open_time, close, target columns, <model_id>_p] into predictions table
+#  - Insert generic [open_time, close, target, prediction] rows into the live
+#    predictions table
 # Parameters:
 #  - start_time: "YYYY-MM-DD HH:MM:SS" (UTC)
 #  - end_time: optional "YYYY-MM-DD HH:MM:SS" upper bound for controlled rebuilds
@@ -35,7 +36,6 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
     # Load configuration
     # -------------------------------------------------------------------------
     db_cfg     = utils.load_db_config()
-    feat_cfg   = utils.load_features_config()
     model_cfg  = utils.load_models_config()
     db_path    = db_cfg["database"]["db_path"]
     table_feat = db_cfg["database"]["tables"]["features"]
@@ -45,46 +45,33 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
     if not models:
         raise ValueError("No models defined in config/models.json")
 
-    active_models = [mid for mid, meta in models.items() if meta.get("active")]
-    if len(active_models) == 0:
-        raise ValueError("No active models found in config/models.json")
+    model_id, model_meta = utils.live_model_meta(model_cfg)
+    target_col = model_meta["target_name"]
+    paths      = model_meta["paths"]
+    model_dir  = paths["model_dir"]
+    feat_file  = paths["features_file"]
+    model_file = paths["model_file"]
+    resolved_model_dir = utils._resolve_path(model_dir)
+    features_path      = os.path.join(resolved_model_dir, feat_file)
+    model_path         = os.path.join(resolved_model_dir, model_file)
 
-    active_meta = {}
-    all_features = []
-    for model_id in active_models:
-        model_meta = models[model_id]
-        paths      = model_meta["paths"]
-        model_dir  = paths["model_dir"]
-        feat_file  = paths["features_file"]
-        model_file = paths["model_file"]
-        resolved_model_dir = utils._resolve_path(model_dir)
-        features_path      = os.path.join(resolved_model_dir, feat_file)
-        model_path         = os.path.join(resolved_model_dir, model_file)
+    with open(features_path, "r", encoding="utf-8") as f:
+        features_data = json.load(f)
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
 
-        with open(features_path, "r", encoding="utf-8") as f:
-            features_data = json.load(f)
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
-
-        feature_list = _feature_list_for_prediction(
-            features_data = features_data,
-            model         = model,
-            trainer       = model_meta.get("trainer", ""),
-        )
-        active_meta[model_id] = {
-            "model_meta": model_meta,
-            "model_dir": model_dir,
-            "model": model,
-            "features": feature_list,
-        }
-        all_features.extend(feature_list)
-    all_features = list(dict.fromkeys(all_features))
+    feature_list = _feature_list_for_prediction(
+        features_data = features_data,
+        model         = model,
+        trainer       = model_meta.get("trainer", ""),
+    )
 
     # -------------------------------------------------------------------------
     # Fetch feature data
     # -------------------------------------------------------------------------
-    target_cols = utils.target_columns_from_config(feat_cfg)
-    cols_str = ", ".join([f'"{c}"' for c in (["open_time", "close"] + target_cols + all_features)])
+    select_cols = ["open_time", "close", target_col] + feature_list
+    select_cols = list(dict.fromkeys(select_cols))
+    cols_str = ", ".join([f'"{c}"' for c in select_cols])
 
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(
@@ -105,32 +92,27 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
     df = df.drop_duplicates(subset=["open_time"], keep="last").copy()
 
     # -------------------------------------------------------------------------
-    # Insert predictions (no feature columns)
+    # Insert live prediction rows (no feature columns)
     # -------------------------------------------------------------------------
-    out_cols = ["open_time", "close"] + target_cols
-    df_out = df[out_cols].copy()
+    trainer        = model_meta.get("trainer", "")
+    predict_cfg    = model_meta.get("predict", {})
+    predict_method = predict_cfg.get("method", "predict")
 
-    for model_id in active_models:
-        meta           = active_meta[model_id]["model_meta"]
-        model          = active_meta[model_id]["model"]
-        feature_list   = active_meta[model_id]["features"]
-        trainer        = meta.get("trainer", "")
-        predict_cfg    = meta.get("predict", {})
-        predict_method = predict_cfg.get("method", "predict")
+    X = df[feature_list].fillna(0)
+    if trainer.startswith("statsmodels") and "const" not in X.columns:
+        X.insert(0, "const", 1.0)
 
-        X = df[feature_list].fillna(0)
-        if trainer.startswith("statsmodels") and "const" not in X.columns:
-            X.insert(0, "const", 1.0)
+    if predict_method == "predict_proba":
+        proba = model.predict_proba(X)
+        if hasattr(proba, "shape") and len(proba.shape) == 2:
+            proba = proba[:, 1]
+    else:
+        proba = model.predict(X)
 
-        if predict_method == "predict_proba":
-            proba = model.predict_proba(X)
-            if hasattr(proba, "shape") and len(proba.shape) == 2:
-                proba = proba[:, 1]
-        else:
-            proba = model.predict(X)
-
-        pred_col = f"{model_id}_p"
-        df_out[pred_col] = pd.to_numeric(proba, errors="coerce").astype(float)
+    live_cols = utils.live_prediction_columns()
+    df_out = df[["open_time", "close"]].copy()
+    df_out[live_cols["target"]] = df[target_col]
+    df_out[live_cols["prediction"]] = pd.to_numeric(proba, errors="coerce").astype(float)
 
     ensure_table_columns(db_path, table_pred, df_out)
     df_out = drop_existing_open_times(df_out, db_path, table_pred)
@@ -141,7 +123,7 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
     with sqlite3.connect(db_path) as conn:
         df_out.to_sql(table_pred, conn, index=False, if_exists="append")
 
-    print(f"Inserted {len(df_out)} predictions into '{table_pred}' ({', '.join([f'{mid}_p' for mid in active_models])})")
+    print(f"Inserted {len(df_out)} predictions into '{table_pred}' ({model_id} -> prediction)")
 
 
 # =============================================================================

@@ -1,0 +1,848 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>lasso_long_fw240_q90_conservative_v1 backtest report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 32px; color: #222; }
+        table { border-collapse: collapse; margin: 12px 0 28px 0; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+        th:first-child, td:first-child { text-align: left; }
+        th { background: #f3f5f7; }
+    </style>
+</head>
+<body>
+    <h1>lasso_long_fw240_q90_conservative_v1 backtest report</h1>
+    <h2>Strategy config</h2>
+    <pre>{
+    "description": "Conservative LONG/FLAT strategy using the L1 logistic long model. Entry threshold is based on the top 5% validation probability bin.",
+    "model_id": "logit_l_fw240_q90_l1_v1",
+    "side": "long",
+    "start": "2025-05-23 14:30:00",
+    "end": "2026-05-23 14:30:00",
+    "initial_equity": 10000.0,
+    "entry_threshold": 0.188,
+    "rearm_threshold": 0.148,
+    "exit_threshold": 0.105,
+    "min_hold_minutes": 30,
+    "max_hold_minutes": 240,
+    "take_profit_pct": 0.022,
+    "stop_loss_pct": 0.012,
+    "trailing_activation_pct": 0.012,
+    "trailing_stop_pct": 0.0075,
+    "cooldown_minutes": 120,
+    "fee_bps_per_side": 10.0,
+    "slippage_bps_per_side": 2.0,
+    "output_dir": "backtests/lasso_long_fw240_q90_conservative_v1"
+}</pre>
+    <h2>Summary</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>initial_equity</th>
+      <th>final_equity</th>
+      <th>profit</th>
+      <th>total_return</th>
+      <th>trade_count</th>
+      <th>winning_trades</th>
+      <th>losing_trades</th>
+      <th>win_rate</th>
+      <th>avg_net_return</th>
+      <th>median_net_return</th>
+      <th>best_trade</th>
+      <th>worst_trade</th>
+      <th>profit_factor</th>
+      <th>max_drawdown</th>
+      <th>avg_hold_minutes</th>
+      <th>median_hold_minutes</th>
+      <th>avg_minutes_between_entries</th>
+      <th>median_minutes_between_entries</th>
+      <th>exposure_pct</th>
+      <th>exit_reasons</th>
+      <th>strategy_id</th>
+      <th>model_id</th>
+      <th>start</th>
+      <th>end</th>
+      <th>output_dir</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>10000.000000</td>
+      <td>4648.880210</td>
+      <td>-5351.119790</td>
+      <td>-0.535112</td>
+      <td>268</td>
+      <td>113</td>
+      <td>155</td>
+      <td>0.421642</td>
+      <td>-0.002807</td>
+      <td>-0.002971</td>
+      <td>0.019754</td>
+      <td>-0.014171</td>
+      <td>0.508128</td>
+      <td>-0.535613</td>
+      <td>29.402985</td>
+      <td>30.000000</td>
+      <td>1967.157303</td>
+      <td>796.000000</td>
+      <td>0.014992</td>
+      <td>{'probability_exit': 112, 'stop_loss': 72, 'trailing_stop': 71, 'take_profit': 13}</td>
+      <td>lasso_long_fw240_q90_conservative_v1</td>
+      <td>logit_l_fw240_q90_l1_v1</td>
+      <td>2025-05-23 14:30:00</td>
+      <td>2026-05-23 14:30:00</td>
+      <td>D:\repos\chronoquant\backtests\lasso_long_fw240_q90_conservative_v1</td>
+    </tr>
+  </tbody>
+</table>
+    <h2>Exit reasons</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>exit_reason</th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>probability_exit</td>
+      <td>112</td>
+    </tr>
+    <tr>
+      <td>stop_loss</td>
+      <td>72</td>
+    </tr>
+    <tr>
+      <td>trailing_stop</td>
+      <td>71</td>
+    </tr>
+    <tr>
+      <td>take_profit</td>
+      <td>13</td>
+    </tr>
+  </tbody>
+</table>
+    <h2>Recent trades</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>entry_time</th>
+      <th>entry_signal_time</th>
+      <th>exit_time</th>
+      <th>exit_reason</th>
+      <th>hold_minutes</th>
+      <th>entry_price</th>
+      <th>exit_price</th>
+      <th>entry_prediction</th>
+      <th>entry_target</th>
+      <th>gross_return</th>
+      <th>net_return</th>
+      <th>equity_after</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2026-02-05 12:25:00</td>
+      <td>2026-02-05 12:24:00</td>
+      <td>2026-02-05 13:19:00</td>
+      <td>trailing_stop</td>
+      <td>54</td>
+      <td>501.500280</td>
+      <td>503.989932</td>
+      <td>0.196694</td>
+      <td>0.000000</td>
+      <td>0.005366</td>
+      <td>0.002956</td>
+      <td>5978.255610</td>
+    </tr>
+    <tr>
+      <td>2026-02-05 20:08:00</td>
+      <td>2026-02-05 20:07:00</td>
+      <td>2026-02-05 20:17:00</td>
+      <td>stop_loss</td>
+      <td>9</td>
+      <td>476.895360</td>
+      <td>471.078381</td>
+      <td>0.189040</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5893.536368</td>
+    </tr>
+    <tr>
+      <td>2026-02-05 23:44:00</td>
+      <td>2026-02-05 23:43:00</td>
+      <td>2026-02-05 23:58:00</td>
+      <td>stop_loss</td>
+      <td>14</td>
+      <td>459.491880</td>
+      <td>453.887182</td>
+      <td>0.203341</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5810.017701</td>
+    </tr>
+    <tr>
+      <td>2026-02-06 04:14:00</td>
+      <td>2026-02-06 04:13:00</td>
+      <td>2026-02-06 04:47:00</td>
+      <td>probability_exit</td>
+      <td>33</td>
+      <td>454.890960</td>
+      <td>452.409500</td>
+      <td>0.199134</td>
+      <td>1.000000</td>
+      <td>-0.005057</td>
+      <td>-0.007442</td>
+      <td>5766.778572</td>
+    </tr>
+    <tr>
+      <td>2026-02-06 13:50:00</td>
+      <td>2026-02-06 13:49:00</td>
+      <td>2026-02-06 14:51:00</td>
+      <td>take_profit</td>
+      <td>61</td>
+      <td>489.297840</td>
+      <td>499.962380</td>
+      <td>0.224004</td>
+      <td>1.000000</td>
+      <td>0.022204</td>
+      <td>0.019754</td>
+      <td>5880.695806</td>
+    </tr>
+    <tr>
+      <td>2026-02-06 18:14:00</td>
+      <td>2026-02-06 18:13:00</td>
+      <td>2026-02-06 19:10:00</td>
+      <td>trailing_stop</td>
+      <td>56</td>
+      <td>499.499880</td>
+      <td>502.699940</td>
+      <td>0.201685</td>
+      <td>0.000000</td>
+      <td>0.006809</td>
+      <td>0.004396</td>
+      <td>5906.545731</td>
+    </tr>
+    <tr>
+      <td>2026-02-06 22:36:00</td>
+      <td>2026-02-06 22:35:00</td>
+      <td>2026-02-06 22:37:00</td>
+      <td>trailing_stop</td>
+      <td>1</td>
+      <td>515.803140</td>
+      <td>520.958287</td>
+      <td>0.202056</td>
+      <td>1.000000</td>
+      <td>0.010398</td>
+      <td>0.007976</td>
+      <td>5953.658927</td>
+    </tr>
+    <tr>
+      <td>2026-02-07 02:03:00</td>
+      <td>2026-02-07 02:02:00</td>
+      <td>2026-02-07 02:39:00</td>
+      <td>probability_exit</td>
+      <td>36</td>
+      <td>531.706320</td>
+      <td>529.594060</td>
+      <td>0.188191</td>
+      <td>0.000000</td>
+      <td>-0.003574</td>
+      <td>-0.005963</td>
+      <td>5918.159217</td>
+    </tr>
+    <tr>
+      <td>2026-02-07 07:23:00</td>
+      <td>2026-02-07 07:22:00</td>
+      <td>2026-02-07 07:46:00</td>
+      <td>trailing_stop</td>
+      <td>23</td>
+      <td>515.403060</td>
+      <td>521.355208</td>
+      <td>0.192595</td>
+      <td>0.000000</td>
+      <td>0.011953</td>
+      <td>0.009527</td>
+      <td>5974.544211</td>
+    </tr>
+    <tr>
+      <td>2026-02-07 12:21:00</td>
+      <td>2026-02-07 12:20:00</td>
+      <td>2026-02-07 12:57:00</td>
+      <td>probability_exit</td>
+      <td>36</td>
+      <td>526.205220</td>
+      <td>525.194940</td>
+      <td>0.192898</td>
+      <td>0.000000</td>
+      <td>-0.001521</td>
+      <td>-0.003914</td>
+      <td>5951.159240</td>
+    </tr>
+    <tr>
+      <td>2026-02-07 16:12:00</td>
+      <td>2026-02-07 16:11:00</td>
+      <td>2026-02-07 16:43:00</td>
+      <td>probability_exit</td>
+      <td>31</td>
+      <td>527.005380</td>
+      <td>522.495480</td>
+      <td>0.199683</td>
+      <td>0.000000</td>
+      <td>-0.008161</td>
+      <td>-0.010539</td>
+      <td>5888.442939</td>
+    </tr>
+    <tr>
+      <td>2026-02-08 12:53:00</td>
+      <td>2026-02-08 12:52:00</td>
+      <td>2026-02-08 13:03:00</td>
+      <td>stop_loss</td>
+      <td>10</td>
+      <td>537.707520</td>
+      <td>531.148779</td>
+      <td>0.208115</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5804.996453</td>
+    </tr>
+    <tr>
+      <td>2026-02-10 15:08:00</td>
+      <td>2026-02-10 15:07:00</td>
+      <td>2026-02-10 15:57:00</td>
+      <td>probability_exit</td>
+      <td>49</td>
+      <td>519.003780</td>
+      <td>515.896800</td>
+      <td>0.193600</td>
+      <td>0.000000</td>
+      <td>-0.005589</td>
+      <td>-0.007972</td>
+      <td>5758.716284</td>
+    </tr>
+    <tr>
+      <td>2026-02-11 15:18:00</td>
+      <td>2026-02-11 15:17:00</td>
+      <td>2026-02-11 15:50:00</td>
+      <td>stop_loss</td>
+      <td>32</td>
+      <td>514.102800</td>
+      <td>507.831980</td>
+      <td>0.189777</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5677.108184</td>
+    </tr>
+    <tr>
+      <td>2026-02-13 15:52:00</td>
+      <td>2026-02-13 15:51:00</td>
+      <td>2026-02-13 16:52:00</td>
+      <td>probability_exit</td>
+      <td>60</td>
+      <td>544.308840</td>
+      <td>546.790620</td>
+      <td>0.207795</td>
+      <td>0.000000</td>
+      <td>0.004961</td>
+      <td>0.002552</td>
+      <td>5691.598408</td>
+    </tr>
+    <tr>
+      <td>2026-02-13 23:16:00</td>
+      <td>2026-02-13 23:15:00</td>
+      <td>2026-02-14 00:03:00</td>
+      <td>probability_exit</td>
+      <td>47</td>
+      <td>569.713920</td>
+      <td>563.487280</td>
+      <td>0.253735</td>
+      <td>0.000000</td>
+      <td>-0.010534</td>
+      <td>-0.012906</td>
+      <td>5618.145028</td>
+    </tr>
+    <tr>
+      <td>2026-02-19 14:56:00</td>
+      <td>2026-02-19 14:55:00</td>
+      <td>2026-02-19 15:31:00</td>
+      <td>probability_exit</td>
+      <td>35</td>
+      <td>549.209820</td>
+      <td>545.990780</td>
+      <td>0.196025</td>
+      <td>0.000000</td>
+      <td>-0.005463</td>
+      <td>-0.007848</td>
+      <td>5574.056567</td>
+    </tr>
+    <tr>
+      <td>2026-02-20 15:58:00</td>
+      <td>2026-02-20 15:57:00</td>
+      <td>2026-02-20 16:08:00</td>
+      <td>trailing_stop</td>
+      <td>10</td>
+      <td>560.212020</td>
+      <td>564.321863</td>
+      <td>0.208700</td>
+      <td>0.000000</td>
+      <td>0.007739</td>
+      <td>0.005324</td>
+      <td>5603.730437</td>
+    </tr>
+    <tr>
+      <td>2026-02-22 07:17:00</td>
+      <td>2026-02-22 07:16:00</td>
+      <td>2026-02-22 07:51:00</td>
+      <td>probability_exit</td>
+      <td>34</td>
+      <td>582.016380</td>
+      <td>581.383700</td>
+      <td>0.188244</td>
+      <td>0.000000</td>
+      <td>-0.000687</td>
+      <td>-0.003083</td>
+      <td>5586.454817</td>
+    </tr>
+    <tr>
+      <td>2026-02-23 01:24:00</td>
+      <td>2026-02-23 01:23:00</td>
+      <td>2026-02-23 01:38:00</td>
+      <td>stop_loss</td>
+      <td>14</td>
+      <td>544.008780</td>
+      <td>537.373179</td>
+      <td>0.222057</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5507.287874</td>
+    </tr>
+    <tr>
+      <td>2026-02-23 20:00:00</td>
+      <td>2026-02-23 19:59:00</td>
+      <td>2026-02-23 20:13:00</td>
+      <td>stop_loss</td>
+      <td>13</td>
+      <td>510.102000</td>
+      <td>503.879980</td>
+      <td>0.196342</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5429.242824</td>
+    </tr>
+    <tr>
+      <td>2026-02-24 02:41:00</td>
+      <td>2026-02-24 02:40:00</td>
+      <td>2026-02-24 03:32:00</td>
+      <td>probability_exit</td>
+      <td>51</td>
+      <td>486.397260</td>
+      <td>486.402700</td>
+      <td>0.189449</td>
+      <td>0.000000</td>
+      <td>0.000411</td>
+      <td>-0.001987</td>
+      <td>5418.455787</td>
+    </tr>
+    <tr>
+      <td>2026-02-24 15:11:00</td>
+      <td>2026-02-24 15:10:00</td>
+      <td>2026-02-24 15:41:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>476.895360</td>
+      <td>475.904800</td>
+      <td>0.190187</td>
+      <td>1.000000</td>
+      <td>-0.001678</td>
+      <td>-0.004071</td>
+      <td>5396.397507</td>
+    </tr>
+    <tr>
+      <td>2026-02-24 18:32:00</td>
+      <td>2026-02-24 18:31:00</td>
+      <td>2026-02-24 18:47:00</td>
+      <td>stop_loss</td>
+      <td>15</td>
+      <td>492.498480</td>
+      <td>486.491181</td>
+      <td>0.228134</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5319.923910</td>
+    </tr>
+    <tr>
+      <td>2026-02-25 01:13:00</td>
+      <td>2026-02-25 01:12:00</td>
+      <td>2026-02-25 02:04:00</td>
+      <td>stop_loss</td>
+      <td>51</td>
+      <td>504.100800</td>
+      <td>497.951980</td>
+      <td>0.251591</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5244.534039</td>
+    </tr>
+    <tr>
+      <td>2026-02-25 13:26:00</td>
+      <td>2026-02-25 13:25:00</td>
+      <td>2026-02-25 13:42:00</td>
+      <td>trailing_stop</td>
+      <td>16</td>
+      <td>504.200820</td>
+      <td>510.638352</td>
+      <td>0.213823</td>
+      <td>1.000000</td>
+      <td>0.013173</td>
+      <td>0.010744</td>
+      <td>5300.882788</td>
+    </tr>
+    <tr>
+      <td>2026-02-27 04:18:00</td>
+      <td>2026-02-27 04:17:00</td>
+      <td>2026-02-27 04:48:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>488.897760</td>
+      <td>485.802820</td>
+      <td>0.203517</td>
+      <td>0.000000</td>
+      <td>-0.005933</td>
+      <td>-0.008316</td>
+      <td>5256.801717</td>
+    </tr>
+    <tr>
+      <td>2026-02-28 06:37:00</td>
+      <td>2026-02-28 06:36:00</td>
+      <td>2026-02-28 07:25:00</td>
+      <td>stop_loss</td>
+      <td>48</td>
+      <td>446.789340</td>
+      <td>441.339582</td>
+      <td>0.210004</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5182.306365</td>
+    </tr>
+    <tr>
+      <td>2026-02-28 13:51:00</td>
+      <td>2026-02-28 13:50:00</td>
+      <td>2026-02-28 14:30:00</td>
+      <td>probability_exit</td>
+      <td>39</td>
+      <td>448.889760</td>
+      <td>448.210340</td>
+      <td>0.192395</td>
+      <td>0.000000</td>
+      <td>-0.001114</td>
+      <td>-0.003509</td>
+      <td>5164.124065</td>
+    </tr>
+    <tr>
+      <td>2026-02-28 22:40:00</td>
+      <td>2026-02-28 22:39:00</td>
+      <td>2026-02-28 22:45:00</td>
+      <td>stop_loss</td>
+      <td>5</td>
+      <td>466.693320</td>
+      <td>461.000782</td>
+      <td>0.193636</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>5090.942069</td>
+    </tr>
+    <tr>
+      <td>2026-03-01 02:06:00</td>
+      <td>2026-03-01 02:05:00</td>
+      <td>2026-03-01 02:41:00</td>
+      <td>probability_exit</td>
+      <td>35</td>
+      <td>464.992980</td>
+      <td>464.907000</td>
+      <td>0.195046</td>
+      <td>0.000000</td>
+      <td>0.000215</td>
+      <td>-0.002183</td>
+      <td>5079.830892</td>
+    </tr>
+    <tr>
+      <td>2026-03-04 07:49:00</td>
+      <td>2026-03-04 07:48:00</td>
+      <td>2026-03-04 08:26:00</td>
+      <td>probability_exit</td>
+      <td>37</td>
+      <td>454.690920</td>
+      <td>449.910000</td>
+      <td>0.210393</td>
+      <td>0.000000</td>
+      <td>-0.010119</td>
+      <td>-0.012492</td>
+      <td>5016.375408</td>
+    </tr>
+    <tr>
+      <td>2026-03-04 14:50:00</td>
+      <td>2026-03-04 14:49:00</td>
+      <td>2026-03-04 15:53:00</td>
+      <td>probability_exit</td>
+      <td>63</td>
+      <td>469.893960</td>
+      <td>471.505680</td>
+      <td>0.429454</td>
+      <td>0.000000</td>
+      <td>0.003831</td>
+      <td>0.001425</td>
+      <td>5023.524296</td>
+    </tr>
+    <tr>
+      <td>2026-03-11 13:22:00</td>
+      <td>2026-03-11 13:21:00</td>
+      <td>2026-03-11 13:46:00</td>
+      <td>stop_loss</td>
+      <td>24</td>
+      <td>459.991980</td>
+      <td>454.381182</td>
+      <td>0.192352</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>4952.334772</td>
+    </tr>
+    <tr>
+      <td>2026-03-13 00:35:00</td>
+      <td>2026-03-13 00:34:00</td>
+      <td>2026-03-13 00:39:00</td>
+      <td>stop_loss</td>
+      <td>4</td>
+      <td>472.994580</td>
+      <td>467.225181</td>
+      <td>0.245379</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>4882.154091</td>
+    </tr>
+    <tr>
+      <td>2026-03-23 11:08:00</td>
+      <td>2026-03-23 11:07:00</td>
+      <td>2026-03-23 11:11:00</td>
+      <td>trailing_stop</td>
+      <td>3</td>
+      <td>479.095800</td>
+      <td>482.556219</td>
+      <td>0.190953</td>
+      <td>0.000000</td>
+      <td>0.007626</td>
+      <td>0.005210</td>
+      <td>4907.591969</td>
+    </tr>
+    <tr>
+      <td>2026-03-24 10:14:00</td>
+      <td>2026-03-24 10:13:00</td>
+      <td>2026-03-24 10:44:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>469.993980</td>
+      <td>471.505680</td>
+      <td>0.197465</td>
+      <td>0.000000</td>
+      <td>0.003618</td>
+      <td>0.001212</td>
+      <td>4913.539950</td>
+    </tr>
+    <tr>
+      <td>2026-03-27 05:57:00</td>
+      <td>2026-03-27 05:56:00</td>
+      <td>2026-03-27 06:35:00</td>
+      <td>probability_exit</td>
+      <td>38</td>
+      <td>470.994180</td>
+      <td>467.306520</td>
+      <td>0.199669</td>
+      <td>0.000000</td>
+      <td>-0.007433</td>
+      <td>-0.009812</td>
+      <td>4865.328875</td>
+    </tr>
+    <tr>
+      <td>2026-03-29 14:28:00</td>
+      <td>2026-03-29 14:27:00</td>
+      <td>2026-03-29 14:32:00</td>
+      <td>stop_loss</td>
+      <td>4</td>
+      <td>466.693320</td>
+      <td>461.000782</td>
+      <td>0.200953</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>4796.381175</td>
+    </tr>
+    <tr>
+      <td>2026-04-22 05:41:00</td>
+      <td>2026-04-22 05:40:00</td>
+      <td>2026-04-22 06:12:00</td>
+      <td>probability_exit</td>
+      <td>31</td>
+      <td>469.293840</td>
+      <td>465.106960</td>
+      <td>0.223428</td>
+      <td>0.000000</td>
+      <td>-0.008525</td>
+      <td>-0.010902</td>
+      <td>4744.091812</td>
+    </tr>
+    <tr>
+      <td>2026-05-06 04:39:00</td>
+      <td>2026-05-06 04:38:00</td>
+      <td>2026-05-06 04:42:00</td>
+      <td>trailing_stop</td>
+      <td>3</td>
+      <td>473.294640</td>
+      <td>476.304720</td>
+      <td>0.189569</td>
+      <td>1.000000</td>
+      <td>0.006762</td>
+      <td>0.004349</td>
+      <td>4764.724507</td>
+    </tr>
+    <tr>
+      <td>2026-05-18 01:42:00</td>
+      <td>2026-05-18 01:41:00</td>
+      <td>2026-05-18 02:12:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>388.177620</td>
+      <td>390.421900</td>
+      <td>0.203662</td>
+      <td>0.000000</td>
+      <td>0.006184</td>
+      <td>0.003772</td>
+      <td>4782.697175</td>
+    </tr>
+    <tr>
+      <td>2026-05-18 06:21:00</td>
+      <td>2026-05-18 06:20:00</td>
+      <td>2026-05-18 06:27:00</td>
+      <td>trailing_stop</td>
+      <td>6</td>
+      <td>364.572900</td>
+      <td>366.556174</td>
+      <td>0.264232</td>
+      <td>1.000000</td>
+      <td>0.005842</td>
+      <td>0.003431</td>
+      <td>4799.107192</td>
+    </tr>
+    <tr>
+      <td>2026-05-18 12:17:00</td>
+      <td>2026-05-18 12:16:00</td>
+      <td>2026-05-18 12:17:00</td>
+      <td>trailing_stop</td>
+      <td>0</td>
+      <td>370.974180</td>
+      <td>374.593816</td>
+      <td>0.345925</td>
+      <td>1.000000</td>
+      <td>0.010161</td>
+      <td>0.007740</td>
+      <td>4836.250431</td>
+    </tr>
+    <tr>
+      <td>2026-05-18 15:24:00</td>
+      <td>2026-05-18 15:23:00</td>
+      <td>2026-05-18 15:54:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>374.274840</td>
+      <td>372.125560</td>
+      <td>0.200879</td>
+      <td>0.000000</td>
+      <td>-0.005345</td>
+      <td>-0.007729</td>
+      <td>4798.870827</td>
+    </tr>
+    <tr>
+      <td>2026-05-18 23:01:00</td>
+      <td>2026-05-18 23:00:00</td>
+      <td>2026-05-18 23:31:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>381.976380</td>
+      <td>380.423900</td>
+      <td>0.192372</td>
+      <td>0.000000</td>
+      <td>-0.003666</td>
+      <td>-0.006054</td>
+      <td>4769.817424</td>
+    </tr>
+    <tr>
+      <td>2026-05-19 11:51:00</td>
+      <td>2026-05-19 11:50:00</td>
+      <td>2026-05-19 12:21:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>381.476280</td>
+      <td>382.923400</td>
+      <td>0.188285</td>
+      <td>0.000000</td>
+      <td>0.004195</td>
+      <td>0.001788</td>
+      <td>4778.345341</td>
+    </tr>
+    <tr>
+      <td>2026-05-19 14:45:00</td>
+      <td>2026-05-19 14:44:00</td>
+      <td>2026-05-19 14:46:00</td>
+      <td>stop_loss</td>
+      <td>1</td>
+      <td>366.773340</td>
+      <td>362.299586</td>
+      <td>0.252564</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>4710.630304</td>
+    </tr>
+    <tr>
+      <td>2026-05-22 23:35:00</td>
+      <td>2026-05-22 23:34:00</td>
+      <td>2026-05-22 23:41:00</td>
+      <td>stop_loss</td>
+      <td>6</td>
+      <td>365.373060</td>
+      <td>360.916386</td>
+      <td>0.190705</td>
+      <td>0.000000</td>
+      <td>-0.011802</td>
+      <td>-0.014171</td>
+      <td>4643.874873</td>
+    </tr>
+    <tr>
+      <td>2026-05-23 09:09:00</td>
+      <td>2026-05-23 09:08:00</td>
+      <td>2026-05-23 09:39:00</td>
+      <td>probability_exit</td>
+      <td>30</td>
+      <td>344.568900</td>
+      <td>345.630860</td>
+      <td>0.303260</td>
+      <td>0.000000</td>
+      <td>0.003483</td>
+      <td>0.001078</td>
+      <td>4648.880210</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--sample-id",
-        default = "base_rw240_dev",
+        default = "base_fw240_dev",
         help    = "Sample identifier used under samples/<sample-id>",
     )
     parser.add_argument(

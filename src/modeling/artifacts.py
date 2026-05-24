@@ -28,6 +28,7 @@ def save_training_artifacts(
     artifacts: dict,
     selected_features: list[str] | None = None,
     model_params: dict | None = None,
+    validation_predictions_df: pd.DataFrame | None = None,
 ) -> None:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -45,6 +46,8 @@ def save_training_artifacts(
     _write_json(output_dir / "features.json", features_payload)
     _write_json(output_dir / "metrics.json", artifacts)
     cv_df.to_csv(output_dir / "cv_results.csv", index=False)
+    if validation_predictions_df is not None:
+        validation_predictions_df.to_csv(output_dir / "validation_predictions.csv", index=False)
 
     if model_params is not None:
         _write_json(output_dir / "params.json", model_params)

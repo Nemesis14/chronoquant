@@ -9,7 +9,7 @@ Analysis of the prediction spread (long_p - short_p) to determine optimal tradin
 
 ## 1. Spread Distribution
 
-The spread is calculated as: **`spread = lg_l_rw240_p90_base_sm_p - lg_s_rw240_p90_base_sm_p`**
+The spread is calculated as: **`spread = logit_l_fw240_q90_pval_v1_p - logit_s_fw240_q10_pval_v1_p`**
 
 ### Statistics
 | Metric | Value |
@@ -82,7 +82,7 @@ SHORT Signal Zone     â”‚      NEUTRAL Zone      â”‚     LONG Signal Z
 
 ## 4. Model Composition
 
-### Long Model (lg_l_rw240_p90_base_sm)
+### Long Model (logit_l_fw240_q90_pval_v1)
 - **Target:** Top 10% price increases (rolling 240min window)
 - **P-value threshold:** 0.01
 - **Features selected:** 7 features
@@ -94,7 +94,7 @@ SHORT Signal Zone     â”‚      NEUTRAL Zone      â”‚     LONG Signal Z
   - feat_bb_width_14
   - feat_bb_width_140
 
-### Short Model (lg_s_rw240_p90_base_sm)
+### Short Model (logit_s_fw240_q10_pval_v1)
 - **Target:** Bottom 10% price decreases (rolling 240min window)
 - **P-value threshold:** 0.01
 - **Features selected:** 8 features

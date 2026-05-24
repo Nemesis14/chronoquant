@@ -1,0 +1,41 @@
+{
+    "schema_version": 1,
+    "live_predictions": {
+        "description": "Application-facing live prediction table. It stores only the currently configured runtime model output with stable generic column names.",
+        "runtime_model_source": "config/env.json -> runtime.model_id",
+        "runtime_model_metadata_source": "config/models.json -> models.<runtime.model_id>",
+        "source_feature_table": "config/db.json -> database.tables.features",
+        "destination_table": "config/db.json -> database.tables.predictions",
+        "column_names": {
+            "target": "target",
+            "prediction": "prediction",
+            "signal": "signal"
+        },
+        "column_docs": {
+            "open_time": "UTC minute timestamp copied from the features table.",
+            "close": "Close price copied from the features table for app display.",
+            "target": "The target value copied from the runtime model's configured target_name column in the features table.",
+            "prediction": "The runtime model probability for its configured target.",
+            "signal": "Trading label derived from prediction and the configured signal threshold."
+        },
+        "signal": {
+            "threshold": 0.5,
+            "direction_source": "Inferred from the runtime model target_name prefix: trg_l_ emits LONG above threshold, trg_s_ emits SHORT above threshold.",
+            "neutral_rule": "prediction < threshold",
+            "note": "Tune this threshold with model evaluation before using it as a live trading cutoff."
+        }
+    },
+    "evaluation_predictions": {
+        "description": "Model comparison predictions should be generated outside the live predictions table.",
+        "recommended_storage": "Model/evaluation artifacts under models/<model_id>/ or a future narrow evaluation table.",
+        "recommended_columns": [
+            "open_time",
+            "model_id",
+            "target_name",
+            "target",
+            "probability",
+            "run_id",
+            "created_at"
+        ]
+    }
+}

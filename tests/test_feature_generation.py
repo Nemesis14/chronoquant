@@ -52,8 +52,8 @@ def test_sync_features_expanded_columns_and_idempotency(tmp_path, monkeypatch) -
             CREATE TABLE {table_feat} (
                 open_time TEXT,
                 close REAL,
-                trg_l_rw_240_prc_09 INTEGER,
-                trg_s_rw_240_prc_01 INTEGER,
+                trg_l_fw240_q90 INTEGER,
+                trg_s_fw240_q10 INTEGER,
                 feat_rsi_14 REAL
             )
             """,

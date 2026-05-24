@@ -4,13 +4,13 @@
             "targets": [
                 {
                     "direction": "long",
-                    "name": "trg_l_rw_240_prc_09",
+                    "name": "trg_l_fw240_q90",
                     "rolling_window": 240,
                     "percentile": 0.9
                 },
                 {
                     "direction": "short",
-                    "name": "trg_s_rw_240_prc_01",
+                    "name": "trg_s_fw240_q10",
                     "rolling_window": 240,
                     "percentile": 0.1
                 }

@@ -20,6 +20,7 @@ from modeling.reports import write_training_report
 from modeling.sampling import load_sample_definition, validate_sample_definition
 from modeling.training_windows import (
     DatasetSplit,
+    between,
     final_train_test_split,
     fold_sample_size_row,
     fold_split,
@@ -82,6 +83,15 @@ def train_statsmodels_pvalue_logreg(
         min_features=min_features,
         verbose=verbose,
     )
+    validation_predictions_df = validation_predictions_for_rounds(
+        dataset=dataset,
+        sample=sample,
+        p_threshold=p_threshold,
+        pvalue_rounds=best_rounds,
+        max_fit_iter=max_fit_iter,
+        min_features=min_features,
+        verbose=verbose,
+    )
 
     artifacts = {
         "model_id": model_id,
@@ -106,6 +116,7 @@ def train_statsmodels_pvalue_logreg(
         "pvalue_path": pvalue_path,
         "final_metrics": final_metrics,
         "feature_coefficients": feature_rows,
+        "validation_predictions_path": "validation_predictions.csv",
         "sample_sizes": sample_sizes,
     }
 
@@ -117,6 +128,7 @@ def train_statsmodels_pvalue_logreg(
         cv_df=cv_df,
         artifacts=artifacts,
         selected_features=final_features,
+        validation_predictions_df=validation_predictions_df,
     )
     write_training_report(
         output_dir=output_dir,
@@ -203,6 +215,55 @@ def _cross_validate_rounds(
             )
 
     return results, sample_sizes
+
+
+# =============================================================================
+# validation_predictions_for_rounds(...) -> pd.DataFrame
+# =============================================================================
+# Purpose:
+#  - Collect out-of-fold validation predictions for the selected p-value round
+# =============================================================================
+def validation_predictions_for_rounds(
+    dataset: ModelingDataset,
+    sample: dict,
+    p_threshold: float,
+    pvalue_rounds: int,
+    max_fit_iter: int,
+    min_features: int,
+    verbose: bool,
+) -> pd.DataFrame:
+    rows = []
+    for fold in sample["folds"]:
+        split = fold_split(dataset, fold)
+        if verbose:
+            print(f"Validation predictions fold {fold['fold']} pvalue_rounds={pvalue_rounds}", flush=True)
+        path = _fit_pvalue_path(
+            X=split.X_train,
+            y=split.y_train,
+            p_threshold=p_threshold,
+            max_rounds=pvalue_rounds,
+            max_fit_iter=max_fit_iter,
+            min_features=min_features,
+        )
+        state = path[-1]
+        valid_pred = _predict(state["model"], split.X_eval, state["features"])
+        valid_time = dataset.open_time.loc[
+            between(dataset.open_time, fold["valid_start"], fold["valid_end"])
+        ]
+        rows.append(
+            pd.DataFrame(
+                {
+                    "fold": fold["fold"],
+                    "open_time": valid_time.reset_index(drop=True),
+                    "y_true": split.y_eval.reset_index(drop=True),
+                    "y_pred": valid_pred.reset_index(drop=True),
+                    "pvalue_rounds": pvalue_rounds,
+                    "actual_rounds": state["round"],
+                    "selected_features": len(state["features"]),
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
 # =============================================================================

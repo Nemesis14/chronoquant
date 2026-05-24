@@ -1,0 +1,21 @@
+{
+    "description": "Conservative LONG/FLAT strategy using the L1 logistic long model. Entry threshold is based on the top 5% validation probability bin.",
+    "model_id": "logit_l_fw240_q90_l1_v1",
+    "side": "long",
+    "start": "2025-05-23 14:30:00",
+    "end": "2026-05-23 14:30:00",
+    "initial_equity": 10000.0,
+    "entry_threshold": 0.188,
+    "rearm_threshold": 0.148,
+    "exit_threshold": 0.105,
+    "min_hold_minutes": 30,
+    "max_hold_minutes": 240,
+    "take_profit_pct": 0.022,
+    "stop_loss_pct": 0.012,
+    "trailing_activation_pct": 0.012,
+    "trailing_stop_pct": 0.0075,
+    "cooldown_minutes": 120,
+    "fee_bps_per_side": 10.0,
+    "slippage_bps_per_side": 2.0,
+    "output_dir": "backtests/lasso_long_fw240_q90_conservative_v1"
+}

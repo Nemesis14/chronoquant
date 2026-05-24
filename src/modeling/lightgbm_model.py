@@ -18,6 +18,7 @@ from modeling.metrics import binary_classification_metrics
 from modeling.reports import write_training_report
 from modeling.sampling import load_sample_definition, validate_sample_definition
 from modeling.training_windows import (
+    between,
     final_train_test_split,
     fold_sample_size_row,
     fold_split,
@@ -84,6 +85,15 @@ def train_lightgbm_binary(
         random_state=random_state,
         verbose=verbose,
     )
+    validation_predictions_df = validation_predictions_for_value(
+        dataset=dataset,
+        sample=sample,
+        base_params=base_params,
+        tuning_param=tuning_param,
+        tuning_value=best_value,
+        random_state=random_state,
+        verbose=verbose,
+    )
     final_params = _params_for_value(base_params, tuning_param, best_value, random_state)
 
     artifacts = {
@@ -106,6 +116,7 @@ def train_lightgbm_binary(
         "model_params": final_params,
         "final_metrics": final_metrics,
         "feature_importance": feature_importance,
+        "validation_predictions_path": "validation_predictions.csv",
         "sample_sizes": sample_sizes,
     }
 
@@ -116,6 +127,7 @@ def train_lightgbm_binary(
         cv_df=cv_df,
         artifacts=artifacts,
         selected_features=dataset.feature_cols,
+        validation_predictions_df=validation_predictions_df,
         model_params={
             "param_profile": param_profile,
             "tuning_param": tuning_param,
@@ -199,6 +211,47 @@ def _cross_validate_values(
             )
 
     return results, sample_sizes
+
+
+# =============================================================================
+# validation_predictions_for_value(...) -> pd.DataFrame
+# =============================================================================
+# Purpose:
+#  - Collect out-of-fold validation predictions for the selected tuning value only
+# =============================================================================
+def validation_predictions_for_value(
+    dataset: ModelingDataset,
+    sample: dict,
+    base_params: dict,
+    tuning_param: str,
+    tuning_value: int | float,
+    random_state: int,
+    verbose: bool,
+) -> pd.DataFrame:
+    rows = []
+    params = _params_for_value(base_params, tuning_param, tuning_value, random_state)
+    for fold in sample["folds"]:
+        split = fold_split(dataset, fold)
+        if verbose:
+            print(f"Validation predictions fold {fold['fold']} {tuning_param}={tuning_value}", flush=True)
+        model = _build_model(params)
+        model.fit(split.X_train, split.y_train)
+        valid_pred = model.predict_proba(split.X_eval)[:, 1]
+        valid_time = dataset.open_time.loc[
+            between(dataset.open_time, fold["valid_start"], fold["valid_end"])
+        ]
+        rows.append(
+            pd.DataFrame(
+                {
+                    "fold": fold["fold"],
+                    "open_time": valid_time.reset_index(drop=True),
+                    "y_true": split.y_eval.reset_index(drop=True),
+                    "y_pred": valid_pred,
+                    tuning_param: tuning_value,
+                }
+            )
+        )
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
 
 # =============================================================================

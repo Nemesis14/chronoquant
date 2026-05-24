@@ -33,6 +33,8 @@ def test_config_loads() -> None:
 
     db_cfg = utils.load_db_config()
     model_cfg = utils.load_models_config()
+    predictions_cfg = utils.load_predictions_config()
 
     assert "database" in db_cfg
     assert "models" in model_cfg
+    assert "live_predictions" in predictions_cfg

@@ -27,7 +27,7 @@ def test_load_modeling_dataset_from_features_table(tmp_path) -> None:
         {
             "open_time": pd.date_range("2024-01-01", periods=5, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
             "close": [1, 2, 3, 4, 5],
-            "trg_l_rw_240_prc_09": [0, 1, 0, 1, 0],
+            "trg_l_fw240_q90": [0, 1, 0, 1, 0],
             "feat_a": [0.1, 0.2, 0.3, 0.4, 0.5],
             "feat_b": [1.0, 1.1, 1.2, 1.3, 1.4],
         }
@@ -37,12 +37,12 @@ def test_load_modeling_dataset_from_features_table(tmp_path) -> None:
         df.to_sql(table_name, conn, index=False, if_exists="replace")
 
     dataset = load_modeling_dataset(
-        target_col = "trg_l_rw_240_prc_09",
+        target_col = "trg_l_fw240_q90",
         db_path    = str(db_path),
         table_name = table_name,
     )
 
-    assert dataset.target_col == "trg_l_rw_240_prc_09"
+    assert dataset.target_col == "trg_l_fw240_q90"
     assert dataset.feature_cols == ["feat_a", "feat_b"]
     assert list(dataset.X.columns) == ["feat_a", "feat_b"]
     assert len(dataset.y) == 5

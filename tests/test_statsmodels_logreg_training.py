@@ -32,7 +32,7 @@ def test_train_statsmodels_pvalue_logreg_writes_standard_artifacts(tmp_path, mon
     df = pd.DataFrame(
         {
             "open_time": pd.date_range("2024-01-01", periods=periods, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "trg_l_rw_240_prc_09": target,
+            "trg_l_fw240_q90": target,
             "feat_signal": signal,
             "feat_noise_a": np.cos(index / 11),
             "feat_noise_b": (index % 13) / 13,
@@ -78,7 +78,7 @@ def test_train_statsmodels_pvalue_logreg_writes_standard_artifacts(tmp_path, mon
     output_dir = tmp_path / "model"
     result = train_statsmodels_pvalue_logreg(
         model_id      = "unit_statsmodels",
-        target_col    = "trg_l_rw_240_prc_09",
+        target_col    = "trg_l_fw240_q90",
         sample_dir    = sample_dir,
         output_dir    = output_dir,
         p_threshold   = 0.05,

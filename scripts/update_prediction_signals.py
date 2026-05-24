@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
-Update predictions table with spread and signal columns.
-Implements the cut-off strategy from docs/analysis/model_analysis.md
+Update predictions table with the live signal column.
 """
 
 import sqlite3

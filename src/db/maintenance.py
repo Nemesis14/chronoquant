@@ -4,7 +4,7 @@
 # Purpose:
 #  - Provide reusable database maintenance operations for scripts and tests
 #  - Rebuild derived tables from existing OHLCV data
-#  - Update spread-based prediction signal columns
+#  - Update live prediction signal columns
 # =============================================================================
 
 import sqlite3
@@ -35,45 +35,41 @@ def drop_table(db_path: str, table_name: str) -> None:
 # update_prediction_signals(db_path: str, table_name: str) -> None
 # =============================================================================
 # Purpose:
-#  - Add spread and signal columns if missing
-#  - Recompute spread-based LONG/SHORT/NEUTRAL signal values
+#  - Add signal column if missing
+#  - Recompute LONG/SHORT/NEUTRAL signal values from the generic live prediction
 # Parameters:
 #  - db_path: SQLite database path
 #  - table_name: predictions table
 # =============================================================================
 def update_prediction_signals(db_path: str, table_name: str) -> None:
     model_cfg = utils.load_models_config()
-    long_col, short_col = utils.long_short_prediction_columns(model_cfg)
-    long_cutoff, short_cutoff = utils.signal_cutoffs_from_config(model_cfg)
+    predictions_cfg = utils.load_predictions_config()
+    _, model_meta = utils.live_model_meta(model_cfg)
+    target_name = model_meta["target_name"]
+    direction = utils.target_direction_from_name(target_name)
+    threshold = utils.signal_probability_threshold(predictions_cfg)
+    signal_value = "LONG" if direction == "long" else "SHORT"
+    live_cols = utils.live_prediction_columns()
+    prediction_col = live_cols["prediction"]
     columns = table_columns(db_path, table_name)
 
     with sqlite3.connect(db_path) as conn:
-        if "spread" not in columns:
-            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN spread REAL")
-
         if "signal" not in columns:
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN signal TEXT")
 
         conn.execute(
             f"""
             UPDATE {table_name}
-            SET spread = {long_col} - {short_col}
-            """,
-        )
-        conn.execute(
-            f"""
-            UPDATE {table_name}
             SET signal = CASE
-                WHEN spread >= ? THEN 'LONG'
-                WHEN spread <= ? THEN 'SHORT'
+                WHEN {prediction_col} >= ? THEN ?
                 ELSE 'NEUTRAL'
             END
             """,
-            (long_cutoff, short_cutoff),
+            (threshold, signal_value),
         )
         conn.commit()
 
-    print(f"Updated spread and signal columns in '{table_name}'")
+    print(f"Updated signal column in '{table_name}' using {prediction_col} >= {threshold}")
 
 
 # =============================================================================

@@ -115,8 +115,8 @@ Implementation tasks:
 - [x] Include OHLCV fields required by technical indicators: `open`, `high`,
   `low`, `close`, `volume`.
 - [x] Keep current target columns unchanged:
-  - `trg_l_rw_240_prc_09`
-  - `trg_s_rw_240_prc_01`
+  - `trg_l_fw240_q90`
+  - `trg_s_fw240_q10`
 - [x] Keep feature names consistently prefixed with `feat_`.
 - [x] Keep feature generation deterministic from OHLCV and config.
 - [x] Rebuild derived features after implementation and verify:
@@ -233,11 +233,11 @@ Status: **done for the first reusable implementation**.
 Implemented:
 - `src/modeling/sampling.py`
 - `scripts/create_sample_splits.py`
-- `samples/base_rw240_dev/folds.json`
-- `samples/base_rw240_dev/metadata.json`
+- `samples/base_fw240_dev/folds.json`
+- `samples/base_fw240_dev/metadata.json`
 
 Current generated sample:
-- `sample_id`: `base_rw240_dev`
+- `sample_id`: `base_fw240_dev`
 - source table: `bchusdt_1m_features`
 - data range: `2019-11-28 10:00:00 -> 2026-05-23 14:30:00`
 - split type: expanding window
@@ -261,14 +261,14 @@ Recommended default:
 - Use rolling or expanding time-series CV.
 - Keep the final test period untouched by hyperparameter selection.
 - Store fold definitions by `sample_id`, for example:
-  - `samples/base_rw240_2017_2026/folds.json`
-  - `samples/base_rw240_2017_2026/metadata.json`
+  - `samples/base_fw240_2017_2026/folds.json`
+  - `samples/base_fw240_2017_2026/metadata.json`
 
 Suggested split artifact:
 
 ```json
 {
-  "sample_id": "base_rw240_2017_2026",
+  "sample_id": "base_fw240_2017_2026",
   "target_horizon_minutes": 240,
   "folds": [
     {
@@ -341,21 +341,21 @@ Status: **implemented for the first reusable workflow**.
 Implemented:
 - `src/modeling/lasso_logreg.py`
 - long model first training run:
-  - model id: `lg_l_rw240_p90_lasso_v1`
-  - sample id: `base_rw240_dev`
+  - model id: `logit_l_fw240_q90_l1_v1`
+  - sample id: `base_fw240_dev`
   - alpha grid: `30.0`, `60.0`, `100.0`, `150.0`, `220.0`, `330.0`,
     `500.0`, `750.0`, `1000.0`
   - selected alpha: `100.0`
   - selected features: 17 / 47
-  - report: `models/lg_l_rw240_p90_lasso_v1/report.html`
+  - report: `models/logit_l_fw240_q90_l1_v1/report.html`
 - short model first training run:
-  - model id: `lg_s_rw240_p90_lasso_v1`
-  - sample id: `base_rw240_dev`
+  - model id: `logit_s_fw240_q10_l1_v1`
+  - sample id: `base_fw240_dev`
   - alpha grid: `30.0`, `60.0`, `100.0`, `150.0`, `220.0`, `330.0`,
     `500.0`, `750.0`, `1000.0`
   - selected alpha: `100.0`
   - selected features: 20 / 47
-  - report: `models/lg_s_rw240_p90_lasso_v1/report.html`
+  - report: `models/logit_s_fw240_q10_l1_v1/report.html`
 
 Important training note:
 - The first interactive training run uses `row_stride=60`. The CV fold time
@@ -419,8 +419,8 @@ Create `scripts/train_model.py`.
 CLI examples:
 
 ```powershell
-uv run python scripts/train_model.py --model-id lg_l_rw240_p90_lasso_v1
-uv run python scripts/train_model.py --model-id lg_s_rw240_p90_lasso_v1
+uv run python scripts/train_model.py --model-id logit_l_fw240_q90_l1_v1
+uv run python scripts/train_model.py --model-id logit_s_fw240_q10_l1_v1
 ```
 
 Model config should define only model-specific information:
@@ -445,24 +445,24 @@ Implemented:
 - shared artifact writing in `src/modeling/artifacts.py`
 - shared CV/final split slicing in `src/modeling/training_windows.py`
 - LightGBM candidate entries in `config/models.json`:
-  - `lgbm_l_rw240_p90_stable_v1`
-  - `lgbm_s_rw240_p90_stable_v1`
+  - `lgbm_l_fw240_q90_stable_v1`
+  - `lgbm_s_fw240_q10_stable_v1`
 
 First training runs:
 - long model:
-  - model id: `lgbm_l_rw240_p90_stable_v1`
-  - sample id: `base_rw240_dev`
+  - model id: `lgbm_l_fw240_q90_stable_v1`
+  - sample id: `base_fw240_dev`
   - iterated parameter: `num_leaves`
   - grid: `7`, `15`, `31`, `63`
   - selected `num_leaves`: `7`
-  - report: `models/lgbm_l_rw240_p90_stable_v1/report.html`
+  - report: `models/lgbm_l_fw240_q90_stable_v1/report.html`
 - short model:
-  - model id: `lgbm_s_rw240_p90_stable_v1`
-  - sample id: `base_rw240_dev`
+  - model id: `lgbm_s_fw240_q10_stable_v1`
+  - sample id: `base_fw240_dev`
   - iterated parameter: `num_leaves`
   - grid: `7`, `15`, `31`, `63`
   - selected `num_leaves`: `7`
-  - report: `models/lgbm_s_rw240_p90_stable_v1/report.html`
+  - report: `models/lgbm_s_fw240_q10_stable_v1/report.html`
 
 Default stabilizing parameter profile:
 - profile id: `lightgbm_binary_stable_v1`
@@ -509,8 +509,8 @@ Status: **implemented**.
 Implemented:
 - `src/modeling/statsmodels_logreg.py`
 - removed legacy notebook-conversion files:
-  - `src/modeling/lg_l_rw240_p90_base_sm_dev.py`
-  - `src/modeling/lg_s_rw240_p90_base_sm_dev.py`
+  - `src/modeling/logit_l_fw240_q90_pval_v1_dev.py`
+  - `src/modeling/logit_s_fw240_q10_pval_v1_dev.py`
 - baseline model entries in `config/models.json` now use
   `trainer: statsmodels_pvalue_logreg`.
 
@@ -527,7 +527,9 @@ P-value regularization rule:
 ## Task 7: Prediction Compatibility
 
 Purpose: make `sync_predictions.py` work with the new Lasso artifacts and keep
-support for existing statsmodels artifacts during transition.
+support for existing statsmodels artifacts during transition. The production
+predictions table is application-facing, so it stores only the configured
+runtime model output.
 
 Implementation tasks:
 - Extend `config/models.json` model metadata with artifact type:
@@ -537,9 +539,13 @@ Implementation tasks:
   - load selected `features.json`.
   - load scaler when model requires one.
   - call the right prediction method.
-  - write `<model_id>_p` columns.
-- Keep prediction output schema model-agnostic.
-- Keep long/short spread logic outside model inference.
+  - write generic live columns: `target`, `prediction`, `signal`.
+- Keep production prediction output schema model-agnostic and stable across
+  model switches.
+- Keep runtime model and target documentation in `config/predictions.json`,
+  with the active model selected by `config/env.json`.
+- Keep multi-model prediction outputs outside the live predictions table; store
+  them as evaluation artifacts when needed.
 
 ## Task 8: Model-Independent Cut-off Analysis
 
@@ -550,21 +556,17 @@ Create `src/evaluation/cutoff.py`.
 Inputs:
 - `open_time`
 - fact columns:
-  - long target
-  - short target
+  - target column(s) needed by the evaluated model or model set
 - prediction columns:
-  - long model probability
-  - short model probability
-- optional spread column, or compute `long_p - short_p`.
+  - model probability from an evaluation frame or model artifact
+  - optional multiple model probabilities when comparing model sets
 
 Responsibilities:
-- Compute spread.
-- Search cut-offs for LONG and SHORT signals.
+- Search cut-offs for the evaluated model direction.
 - Evaluate:
   - signal frequency.
   - positive target rate inside signal zone.
   - lift versus baseline.
-  - overlap/conflict between long and short target outcomes.
   - neutral zone coverage.
 - Return thresholds and metrics independent of model family.
 
@@ -583,23 +585,79 @@ Purpose: keep old and new models comparable and switchable.
 
 Update `config/models.json` to support:
 - multiple inactive candidate models.
-- exactly one active long model and one active short model for production spread.
+- exactly one runtime model for production predictions via `config/env.json`.
 - model family.
 - sample id.
 - metric summary.
 - artifact paths.
 
 Example model ids:
-- `lg_l_rw240_p90_base_sm`
-- `lg_s_rw240_p90_base_sm`
-- `lg_l_rw240_p90_lasso_v1`
-- `lg_s_rw240_p90_lasso_v1`
+- `logit_l_fw240_q90_pval_v1`
+- `logit_s_fw240_q10_pval_v1`
+- `logit_l_fw240_q90_l1_v1`
+- `logit_s_fw240_q10_l1_v1`
 
 Activation rule:
 - Do not delete baseline models.
 - Add Lasso models as inactive first.
 - Promote only after rebuild, prediction generation, cutoff analysis, and
   comparison against baseline.
+
+Recommended model id convention for future renames:
+- Keep `model_id` compact, stable, and safe as a prediction column prefix.
+- Store full human-readable explanation in `config/model_registry.json`, not only in the
+  id.
+- Suggested pattern:
+  - `<family>_<direction>_fw<horizon>_q<target_quantile>_<variant>_v<version>`
+- Examples:
+  - `logit_l_fw240_q90_pval_v1`
+  - `logit_s_fw240_q10_pval_v1`
+  - `logit_l_fw240_q90_l1_v1`
+  - `logit_s_fw240_q10_l1_v1`
+  - `lgbm_l_fw240_q90_stable_v1`
+  - `lgbm_s_fw240_q10_stable_v1`
+
+Naming notes:
+- Use `l` and `s` only for direction.
+- Use `fw240` for the target forward horizon.
+- Prefer `q90` / `q10` over `p90` / `p10`, because `p` can also mean
+  probability or p-value.
+- Use family names that distinguish implementation/model type:
+  - `logit` for logistic regression.
+  - `lgbm` for LightGBM.
+  - `xgb` for XGBoost.
+- Put details such as trainer implementation, p-value threshold, alpha grid,
+  LightGBM fixed parameters, sample id, and report notes in registry metadata.
+
+Recommended registry metadata:
+- `display_name`
+- `description`
+- `target`:
+  - `direction`
+  - `horizon_minutes`
+  - `quantile`
+  - `column`
+- `trainer`
+- `sample_id`
+- `artifact_type`
+- `prediction_column`
+- `metric_summary`
+
+Prediction storage rule:
+- The live `predictions` table is for the application and should keep generic
+  columns: `open_time`, `close`, `target`, `prediction`, and `signal`.
+- Do not put `model_id` or `target_name` into the live table; document those via
+  `config/predictions.json` and `config/env.json`.
+- Do not add every candidate model's prediction to the live table.
+- For model comparison, store predictions outside the live table, preferably as
+  model/evaluation artifacts or a narrow evaluation table with:
+  - `open_time`
+  - `model_id`
+  - `probability`
+  - `run_id`
+  - `created_at`
+- Candidate evaluation volume can justify a separate table later, but it should
+  remain separate from the app-facing live predictions table.
 
 ## Task 10: Rebuild and Validation Workflow
 
@@ -610,7 +668,8 @@ Workflow:
 2. Rebuild derived features and predictions on a bounded interval.
 3. Validate duplicates and row ranges.
 4. Train long and short Lasso models using the same `sample_id`.
-5. Generate predictions for baseline and candidate models.
+5. Generate evaluation predictions for baseline and candidate models outside the
+   live predictions table.
 6. Run model-independent cut-off analysis.
 7. Compare candidate vs baseline.
 8. Promote model config only if candidate improves agreed metrics.

@@ -29,13 +29,35 @@
                         {
                             "window": 140
                         }
+                    ],
+                    "stochastic": [
+                        {
+                            "window": 14,
+                            "smooth_window": 3
+                        }
+                    ],
+                    "cci": [
+                        {
+                            "window": 20
+                        }
+                    ],
+                    "williams_r": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "adx": [
+                        {
+                            "window": 14
+                        }
                     ]
                 },
                 "trend": {
                     "macd": [
                         {
                             "fast": 12,
-                            "slow": 26
+                            "slow": 26,
+                            "signal": 9
                         }
                     ],
                     "sma": [
@@ -45,15 +67,125 @@
                         {
                             "window": 140
                         }
-                    ]
-                },
-                "volatility": {
-                    "bollinger": [
+                    ],
+                    "ema": [
                         {
                             "window": 14
                         },
                         {
                             "window": 140
+                        }
+                    ],
+                    "wma": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "kama": [
+                        {
+                            "window": 10,
+                            "fast": 2,
+                            "slow": 30
+                        }
+                    ]
+                },
+                "volatility": {
+                    "bollinger": [
+                        {
+                            "window": 14,
+                            "window_dev": 2
+                        },
+                        {
+                            "window": 140,
+                            "window_dev": 2
+                        }
+                    ],
+                    "atr": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "historical_vol": [
+                        {
+                            "window": 20
+                        }
+                    ]
+                },
+                "volume": {
+                    "volume_sma": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "volume_ratio": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "obv": [
+                        {}
+                    ],
+                    "obv_roc": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "mfi": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "ad_line": [
+                        {}
+                    ],
+                    "cmf": [
+                        {
+                            "window": 20
+                        }
+                    ]
+                },
+                "price_action": {
+                    "returns": [
+                        {
+                            "type": "log"
+                        }
+                    ],
+                    "returns_sma": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "returns_std": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "returns_skew": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "returns_kurt": [
+                        {
+                            "window": 14
+                        }
+                    ],
+                    "range_metrics": [
+                        {}
+                    ],
+                    "close_position": [
+                        {}
+                    ]
+                },
+                "market_structure": {
+                    "trend_counts": [
+                        {
+                            "window": 5
+                        }
+                    ],
+                    "swing_points": [
+                        {
+                            "window": 5
                         }
                     ]
                 }

@@ -15,7 +15,7 @@ import pickle
 import pandas as pd
 
 import utils
-from db.table_ops import drop_existing_open_times
+from db.table_ops import drop_existing_open_times, ensure_table_columns
 
 # =============================================================================
 # sync_predictions(start_time: str, end_time: str | None = None) -> None
@@ -56,14 +56,25 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
         paths      = model_meta["paths"]
         model_dir  = paths["model_dir"]
         feat_file  = paths["features_file"]
+        model_file = paths["model_file"]
         resolved_model_dir = utils._resolve_path(model_dir)
         features_path      = os.path.join(resolved_model_dir, feat_file)
+        model_path         = os.path.join(resolved_model_dir, model_file)
+
         with open(features_path, "r", encoding="utf-8") as f:
             features_data = json.load(f)
-        feature_list = features_data["features"] if isinstance(features_data, dict) else features_data
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+
+        feature_list = _feature_list_for_prediction(
+            features_data = features_data,
+            model         = model,
+            trainer       = model_meta.get("trainer", ""),
+        )
         active_meta[model_id] = {
             "model_meta": model_meta,
             "model_dir": model_dir,
+            "model": model,
             "features": feature_list,
         }
         all_features.extend(feature_list)
@@ -101,20 +112,14 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
 
     for model_id in active_models:
         meta           = active_meta[model_id]["model_meta"]
-        model_dir      = meta["paths"]["model_dir"]
-        model_file     = meta["paths"]["model_file"]
+        model          = active_meta[model_id]["model"]
         feature_list   = active_meta[model_id]["features"]
         trainer        = meta.get("trainer", "")
         predict_cfg    = meta.get("predict", {})
         predict_method = predict_cfg.get("method", "predict")
 
-        resolved_model_dir = utils._resolve_path(model_dir)
-        model_path = os.path.join(resolved_model_dir, model_file)
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
-
         X = df[feature_list].fillna(0)
-        if trainer == "statsmodels" and "const" not in X.columns:
+        if trainer.startswith("statsmodels") and "const" not in X.columns:
             X.insert(0, "const", 1.0)
 
         if predict_method == "predict_proba":
@@ -127,6 +132,7 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
         pred_col = f"{model_id}_p"
         df_out[pred_col] = pd.to_numeric(proba, errors="coerce").astype(float)
 
+    ensure_table_columns(db_path, table_pred, df_out)
     df_out = drop_existing_open_times(df_out, db_path, table_pred)
     if df_out.empty:
         print(f"No new prediction rows to insert into '{table_pred}'")
@@ -136,6 +142,48 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
         df_out.to_sql(table_pred, conn, index=False, if_exists="append")
 
     print(f"Inserted {len(df_out)} predictions into '{table_pred}' ({', '.join([f'{mid}_p' for mid in active_models])})")
+
+
+# =============================================================================
+# _feature_list_for_prediction(features_data: dict | list, model, trainer: str = "") -> list[str]
+# =============================================================================
+# Purpose:
+#  - Resolve the exact feature columns required by a saved model artifact
+# =============================================================================
+def _feature_list_for_prediction(features_data, model, trainer: str = "") -> list[str]:
+    payload_features = _features_from_payload(features_data)
+    if trainer.startswith("statsmodels"):
+        return payload_features
+
+    input_features = (
+        features_data.get("input_features")
+        if isinstance(features_data, dict)
+        else None
+    )
+    if input_features:
+        return list(input_features)
+
+    feature_names_in = getattr(model, "feature_names_in_", None)
+    if feature_names_in is not None and len(feature_names_in) > 0:
+        return list(feature_names_in)
+
+    feature_name = getattr(model, "feature_name_", None)
+    if feature_name is not None and len(feature_name) > 0:
+        return list(feature_name)
+
+    return payload_features
+
+
+# =============================================================================
+# _features_from_payload(features_data: dict | list) -> list[str]
+# =============================================================================
+# Purpose:
+#  - Read legacy list-style and newer dict-style features.json artifacts
+# =============================================================================
+def _features_from_payload(features_data) -> list[str]:
+    if isinstance(features_data, dict):
+        return list(features_data["features"])
+    return list(features_data)
 
 
 

@@ -38,6 +38,41 @@ def table_columns(db_path: str, table_name: str) -> list[str]:
 
 
 # =============================================================================
+# ensure_table_columns(db_path: str, table_name: str, df: pd.DataFrame) -> None
+# =============================================================================
+# Purpose:
+#  - Add missing SQLite columns before appending a widened DataFrame
+# =============================================================================
+def ensure_table_columns(db_path: str, table_name: str, df: pd.DataFrame) -> None:
+    if df.empty or not table_exists(db_path, table_name):
+        return
+
+    existing_columns = set(table_columns(db_path, table_name))
+    missing_columns = [col for col in df.columns if col not in existing_columns]
+    if not missing_columns:
+        return
+
+    with sqlite3.connect(db_path) as conn:
+        for col in missing_columns:
+            conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{col}" {_sqlite_type(df[col])}')
+        conn.commit()
+
+
+# =============================================================================
+# _sqlite_type(series: pd.Series) -> str
+# =============================================================================
+# Purpose:
+#  - Map pandas dtypes to simple SQLite storage classes
+# =============================================================================
+def _sqlite_type(series: pd.Series) -> str:
+    if pd.api.types.is_integer_dtype(series):
+        return "INTEGER"
+    if pd.api.types.is_float_dtype(series):
+        return "REAL"
+    return "TEXT"
+
+
+# =============================================================================
 # drop_existing_open_times(...) -> pd.DataFrame
 # =============================================================================
 # Purpose:

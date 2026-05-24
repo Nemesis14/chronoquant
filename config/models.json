@@ -4,7 +4,7 @@
             "target_name": "trg_l_rw_240_prc_09",
             "family": "logreg",
             "variant": "base",
-            "trainer": "statsmodels",
+            "trainer": "statsmodels_pvalue_logreg",
             "paths": {
                 "model_dir": "models/lg_l_rw240_p90_base_sm",
                 "model_file": "model.pkl",
@@ -14,13 +14,29 @@
                 "method": "predict",
                 "proba": true
             },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "p_threshold": 0.01,
+                "pvalue_rounds": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "row_stride": 60,
+                "max_fit_iter": 100,
+                "min_features": 1,
+                "verbose": true
+            },
             "active": true
         },
         "lg_s_rw240_p90_base_sm": {
             "target_name": "trg_s_rw_240_prc_01",
             "family": "logreg",
             "variant": "base",
-            "trainer": "statsmodels",
+            "trainer": "statsmodels_pvalue_logreg",
             "paths": {
                 "model_dir": "models/lg_s_rw240_p90_base_sm",
                 "model_file": "model.pkl",
@@ -30,7 +46,159 @@
                 "method": "predict",
                 "proba": true
             },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "p_threshold": 0.01,
+                "pvalue_rounds": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "row_stride": 60,
+                "max_fit_iter": 100,
+                "min_features": 1,
+                "verbose": true
+            },
             "active": true
+        },
+        "lg_l_rw240_p90_lasso_v1": {
+            "target_name": "trg_l_rw_240_prc_09",
+            "family": "logreg",
+            "variant": "lasso_v1",
+            "trainer": "sklearn_lasso_logreg",
+            "paths": {
+                "model_dir": "models/lg_l_rw240_p90_lasso_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "alphas": [
+                    30.0,
+                    60.0,
+                    100.0,
+                    150.0,
+                    220.0,
+                    330.0,
+                    500.0,
+                    750.0,
+                    1000.0
+                ],
+                "class_weight": null,
+                "solver": "liblinear",
+                "row_stride": 60,
+                "max_iter": 300,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
+        },
+        "lg_s_rw240_p90_lasso_v1": {
+            "target_name": "trg_s_rw_240_prc_01",
+            "family": "logreg",
+            "variant": "lasso_v1",
+            "trainer": "sklearn_lasso_logreg",
+            "paths": {
+                "model_dir": "models/lg_s_rw240_p90_lasso_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "alphas": [
+                    30.0,
+                    60.0,
+                    100.0,
+                    150.0,
+                    220.0,
+                    330.0,
+                    500.0,
+                    750.0,
+                    1000.0
+                ],
+                "class_weight": null,
+                "solver": "liblinear",
+                "row_stride": 60,
+                "max_iter": 300,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
+        },
+        "lgbm_l_rw240_p90_stable_v1": {
+            "target_name": "trg_l_rw_240_prc_09",
+            "family": "lightgbm",
+            "variant": "stable_v1",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_l_rw240_p90_stable_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "param_profile": "lightgbm_binary_stable_v1",
+                "tuning_param": "num_leaves",
+                "tuning_values": [
+                    7,
+                    15,
+                    31,
+                    63
+                ],
+                "row_stride": 60,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
+        },
+        "lgbm_s_rw240_p90_stable_v1": {
+            "target_name": "trg_s_rw_240_prc_01",
+            "family": "lightgbm",
+            "variant": "stable_v1",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_s_rw240_p90_stable_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_rw240_dev",
+                "sample_dir": "samples/base_rw240_dev",
+                "param_profile": "lightgbm_binary_stable_v1",
+                "tuning_param": "num_leaves",
+                "tuning_values": [
+                    7,
+                    15,
+                    31,
+                    63
+                ],
+                "row_stride": 60,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
         },
         "xgb_l_rw240_p90_v1": {
             "target_name": "trg_l_rw_240_prc_09",

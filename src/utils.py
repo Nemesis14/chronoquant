@@ -68,6 +68,9 @@ def load_features_config() -> dict:
 def load_models_config() -> dict:
     return _load_json("models.json")
 
+def load_model_params_config() -> dict:
+    return _load_json("model_params.json")
+
 def load_env_config() -> dict:
     return _load_json("env.json")
 

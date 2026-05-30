@@ -13,8 +13,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from app import settings
 from db.maintenance import rebuild_derived_tables
+
+INIT_START_DATE = "2017-01-01 00:00:00"
 
 
 # =============================================================================
@@ -29,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--start",
-        default = settings.INIT_START_DATE,
+        default = INIT_START_DATE,
         help    = "Start time, format: YYYY-MM-DD HH:MM:SS",
     )
     parser.add_argument(

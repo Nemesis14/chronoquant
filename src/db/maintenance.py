@@ -7,10 +7,8 @@
 #  - Update live prediction signal columns
 # =============================================================================
 
-import sqlite3
-
 import utils
-from db.table_ops import table_columns
+from db.table_ops import sqlite_connect, table_columns
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
 
@@ -25,7 +23,7 @@ from data_pipeline.sync_predictions import sync_predictions
 #  - table_name: table to drop
 # =============================================================================
 def drop_table(db_path: str, table_name: str) -> None:
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         conn.execute(f"DROP TABLE IF EXISTS {table_name}")
         conn.commit()
     print(f"Dropped table '{table_name}'")
@@ -53,7 +51,7 @@ def update_prediction_signals(db_path: str, table_name: str) -> None:
     prediction_col = live_cols["prediction"]
     columns = table_columns(db_path, table_name)
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         if "signal" not in columns:
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN signal TEXT")
 
@@ -82,7 +80,7 @@ def update_prediction_signals(db_path: str, table_name: str) -> None:
 #  - table_name: table to validate
 # =============================================================================
 def print_table_check(db_path: str, table_name: str) -> None:
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         row_count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
         unique_count = conn.execute(
             f"SELECT COUNT(*) FROM (SELECT open_time FROM {table_name} GROUP BY open_time)"

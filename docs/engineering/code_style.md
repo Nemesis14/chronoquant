@@ -23,8 +23,8 @@ Use heavy separator blocks at the top of each module to document purpose:
 
 **Examples:**
 - `sync_ohlcv.py`: "Fetch and sync OHLCV data from Binance"
-- `features.py`: "Compute technical indicators and target variable for feature engineering"
-- `worker.py`: "WORKER LOOP: runs the sync/predict cycle and streams output via a queue"
+- `sync_features.py`: "Compute technical indicators and target variables"
+- `streamlit_app/data.py`: "Streamlit dashboard data access"
 
 ### Function Documentation
 Document function purpose, parameters, and behavior:
@@ -134,7 +134,7 @@ def sync_features(
 
 parser.add_argument(
     "--start",
-    default = settings.INIT_START_DATE,
+    default = INIT_START_DATE,
     help    = "Start time, format: YYYY-MM-DD HH:MM:SS",
 )
 
@@ -148,7 +148,7 @@ def sync_features(
 
 parser.add_argument(
     "--start",
-    default=settings.INIT_START_DATE,
+    default=INIT_START_DATE,
     help="Start time, format: YYYY-MM-DD HH:MM:SS",
 )
 ```
@@ -216,7 +216,7 @@ rolling_win  # Rolling window size (integer)
 ### Function Names
 - **snake_case** with descriptive verb-first action:
   - `sync_features()` - fetch and sync
-  - `fetch_predictions_df()` - retrieve data
+  - `prediction_history()` - retrieve dashboard prediction data
   - `get_last_timestamp()` - retrieve single value
   - `load_db_config()` - load configuration
   - `_resolve_path()` - private helper (leading underscore)
@@ -397,7 +397,7 @@ When writing code for ChronoQuant:
 - [ ] Use f-strings for formatting
 - [ ] Use emoji in console output for clarity
 - [ ] Follow config -> logic -> error flow
-- [ ] Keep main_app.py minimal for PyInstaller
+- [ ] Keep Streamlit UI read-only unless a later plan explicitly adds controls
 
 
 

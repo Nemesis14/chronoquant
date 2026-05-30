@@ -56,8 +56,10 @@ src/
   evaluation/
     cutoff.py
     backtest.py
-  plotting/
-    prediction_view.py
+  streamlit_app/
+    main.py
+    data.py
+    pages/
 scripts/
   rebuild_derived_tables.py
   train_model.py

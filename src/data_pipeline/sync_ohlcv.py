@@ -10,12 +10,11 @@
 
 import json
 import os
-import sqlite3
 import pandas as pd
 from binance.client import Client
 
 import utils
-from db.table_ops import drop_existing_open_times
+from db.table_ops import drop_existing_open_times, sqlite_connect
 
 # =============================================================================
 # sync_ohlcv(open_time_ms_from: int) -> None
@@ -55,6 +54,7 @@ def sync_ohlcv(open_time_ms_from: int) -> None:
     limit    = 1000
     start_ms = int(open_time_ms_from)
     inserted_total = 0
+    batch_count = 0
 
     while True:
         rows = client.get_klines(
@@ -94,12 +94,21 @@ def sync_ohlcv(open_time_ms_from: int) -> None:
                 break
             continue
 
-        with sqlite3.connect(db_path) as conn:
+        with sqlite_connect(db_path) as conn:
             df.to_sql(table_name, conn, index=False, if_exists="append")
 
         inserted_total += len(df)
+        batch_count += 1
 
         last_open_ms = int(rows[-1][0])
+        if batch_count == 1 or batch_count % 10 == 0 or len(rows) < limit:
+            print(
+                "OHLCV progress: "
+                f"batches={batch_count}, inserted={inserted_total}, "
+                f"latest={utils.ms_to_utc_str(last_open_ms)}",
+                flush=True,
+            )
+
         next_start = last_open_ms + 60000
         if next_start <= start_ms:
             break

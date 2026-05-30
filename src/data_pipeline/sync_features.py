@@ -9,14 +9,13 @@
 # =============================================================================
 
 from datetime import timedelta
-import sqlite3
 
 import numpy as np
 import pandas as pd
 import ta
 
 import utils
-from db.table_ops import drop_existing_open_times, ensure_table_columns
+from db.table_ops import drop_existing_open_times, ensure_table_columns, sqlite_connect
 
 
 # =============================================================================
@@ -363,7 +362,7 @@ def sync_features(start_time: str, lookback_bars: int = 240, end_time: str | Non
         pd.to_datetime(start_time) - timedelta(minutes=lookback_bars)
     ).strftime("%Y-%m-%d %H:%M:%S")
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         df = pd.read_sql_query(
             f"""
             SELECT open_time, open, high, low, close, volume
@@ -445,7 +444,7 @@ def sync_features(start_time: str, lookback_bars: int = 240, end_time: str | Non
         print(f"No new feature rows to insert into '{table_feat}'")
         return
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         df_final.to_sql(table_feat, conn, index=False, if_exists="append")
 
     print(f"OK: Computed {len(df_final)} feature rows into '{table_feat}'")

@@ -11,6 +11,22 @@ import sqlite3
 import pandas as pd
 
 
+SQLITE_TIMEOUT_SECONDS = 60
+SQLITE_BUSY_TIMEOUT_MS = SQLITE_TIMEOUT_SECONDS * 1000
+
+
+# =============================================================================
+# sqlite_connect(db_path: str) -> sqlite3.Connection
+# =============================================================================
+# Purpose:
+#  - Open SQLite connections with enough wait time for dashboard/sync overlap
+# =============================================================================
+def sqlite_connect(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path, timeout=SQLITE_TIMEOUT_SECONDS)
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+    return conn
+
+
 # =============================================================================
 # table_exists(db_path: str, table_name: str) -> bool
 # =============================================================================
@@ -18,7 +34,7 @@ import pandas as pd
 #  - Check whether a SQLite table exists
 # =============================================================================
 def table_exists(db_path: str, table_name: str) -> bool:
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         row = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
             (table_name,),
@@ -33,7 +49,7 @@ def table_exists(db_path: str, table_name: str) -> bool:
 #  - Return SQLite table column names in storage order
 # =============================================================================
 def table_columns(db_path: str, table_name: str) -> list[str]:
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         return [row[1] for row in conn.execute(f"PRAGMA table_info({table_name})")]
 
 
@@ -52,7 +68,7 @@ def ensure_table_columns(db_path: str, table_name: str, df: pd.DataFrame) -> Non
     if not missing_columns:
         return
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         for col in missing_columns:
             conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{col}" {_sqlite_type(df[col])}')
         conn.commit()
@@ -90,7 +106,7 @@ def drop_existing_open_times(
     min_time = df["open_time"].min()
     max_time = df["open_time"].max()
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         existing = pd.read_sql_query(
             f"""
             SELECT open_time FROM {table_name}

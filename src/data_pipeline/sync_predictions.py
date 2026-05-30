@@ -10,12 +10,11 @@
 
 import os
 import json
-import sqlite3
 import pickle
 import pandas as pd
 
 import utils
-from db.table_ops import drop_existing_open_times, ensure_table_columns
+from db.table_ops import drop_existing_open_times, ensure_table_columns, sqlite_connect
 
 # =============================================================================
 # sync_predictions(start_time: str, end_time: str | None = None) -> None
@@ -73,7 +72,7 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
     select_cols = list(dict.fromkeys(select_cols))
     cols_str = ", ".join([f'"{c}"' for c in select_cols])
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         df = pd.read_sql_query(
             f"""
             SELECT {cols_str} FROM {table_feat}
@@ -120,7 +119,7 @@ def sync_predictions(start_time: str, end_time: str | None = None) -> None:
         print(f"No new prediction rows to insert into '{table_pred}'")
         return
 
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         df_out.to_sql(table_pred, conn, index=False, if_exists="append")
 
     print(f"Inserted {len(df_out)} predictions into '{table_pred}' ({model_id} -> prediction)")

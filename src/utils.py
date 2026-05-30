@@ -237,6 +237,30 @@ def now_utc_str() -> str:
 
 
 # -------------------------------------------------------------------------
+# utc_str_to_ms(s: str)
+# -------------------------------------------------------------------------
+# Purpose:
+#  - Convert a UTC datetime string to epoch milliseconds
+#  - Accept common ISO formats with optional timezone suffix
+# -------------------------------------------------------------------------
+def utc_str_to_ms(s: str) -> int:
+    if s is None:
+        raise ValueError("utc_str_to_ms: s must be a datetime string")
+
+    value = str(s).strip()
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+
+    return int(dt.timestamp() * 1000)
+
+
+# -------------------------------------------------------------------------
 # ms_to_utc_str(ms: int)
 # -------------------------------------------------------------------------
 # Purpose:

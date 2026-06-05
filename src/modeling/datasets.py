@@ -51,8 +51,9 @@ def load_modeling_dataset(
     dropna_features: bool = False,
     db_path: str | None = None,
     table_name: str | None = None,
+    asset_id: str | None = None,
 ) -> ModelingDataset:
-    db_cfg = utils.load_db_config()["database"]
+    db_cfg = utils.load_asset_config(asset_id)["database"]
     db_path = db_path or db_cfg["db_path"]
     table_name = table_name or db_cfg["tables"]["features"]
     if row_stride < 1:

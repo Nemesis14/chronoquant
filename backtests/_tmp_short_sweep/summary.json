@@ -1,0 +1,31 @@
+{
+    "initial_equity": 10000.0,
+    "final_equity": 9850.116034659914,
+    "profit": -149.88396534008643,
+    "total_return": -0.01498839653400863,
+    "trade_count": 27,
+    "winning_trades": 12,
+    "losing_trades": 15,
+    "win_rate": 0.4444444444444444,
+    "avg_net_return": -0.00047516701437775476,
+    "median_net_return": -0.012076794540103686,
+    "best_trade": 0.014026867392779918,
+    "worst_trade": -0.012076794540104019,
+    "profit_factor": 0.929178175298111,
+    "max_drawdown": -0.07030794296464027,
+    "avg_hold_minutes": 7.074074074074074,
+    "median_hold_minutes": 3.0,
+    "avg_minutes_between_entries": 35798.730769230766,
+    "median_minutes_between_entries": 8843.5,
+    "exposure_pct": 0.00018144854841161271,
+    "exit_reasons": {
+        "stop_loss": 15,
+        "take_profit": 12
+    },
+    "strategy_id": "_sweep",
+    "asset_id": "solusdt_fw60",
+    "model_id": "lgbm_solusdt_s_fw60_q10_stable_v1",
+    "start": "2024-01-01 00:00:00",
+    "end": "2026-01-01 00:00:00",
+    "output_dir": "D:\\repos\\chronoquant\\backtests\\_tmp_short_sweep"
+}

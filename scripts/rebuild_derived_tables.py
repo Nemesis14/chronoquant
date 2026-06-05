@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         action = "store_true",
         help   = "Rebuild only the PREDICTIONS table",
     )
+    parser.add_argument(
+        "--asset-id",
+        default = None,
+        help    = "Asset ID from config/assets.json (e.g. solusdt_fw60); omit for BCH default",
+    )
     return parser.parse_args()
 
 
@@ -70,6 +75,7 @@ def main() -> None:
         drop             = args.drop,
         features_only    = args.features_only,
         predictions_only = args.predictions_only,
+        asset_id         = args.asset_id,
     )
 
 

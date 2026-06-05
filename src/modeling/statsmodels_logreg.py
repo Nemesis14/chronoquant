@@ -44,6 +44,7 @@ def train_statsmodels_pvalue_logreg(
     max_fit_iter: int = 100,
     min_features: int = 1,
     verbose: bool = False,
+    asset_id: str | None = None,
 ) -> dict:
     pvalue_rounds = pvalue_rounds or [0, 1, 2, 3, 4]
     output_dir = Path(output_dir)
@@ -58,6 +59,7 @@ def train_statsmodels_pvalue_logreg(
         end=sample["data"]["end"],
         row_stride=row_stride,
         dropna_features=True,
+        asset_id=asset_id,
     )
     if len(dataset.y) == 0:
         raise ValueError("Training dataset is empty")

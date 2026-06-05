@@ -215,6 +215,170 @@
                 "proba": true
             },
             "active": false
+        },
+        "logit_solusdt_l_fw60_q90_pval_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_l_fw60_q90",
+            "family": "logreg",
+            "variant": "base",
+            "trainer": "statsmodels_pvalue_logreg",
+            "paths": {
+                "model_dir": "models/logit_solusdt_l_fw60_q90_pval_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "p_threshold": 0.01,
+                "pvalue_rounds": [0, 1, 2, 3, 4],
+                "row_stride": 60,
+                "max_fit_iter": 100,
+                "min_features": 1,
+                "verbose": true
+            },
+            "active": false
+        },
+        "logit_solusdt_l_fw60_q90_l1_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_l_fw60_q90",
+            "family": "logreg",
+            "variant": "lasso_v1",
+            "trainer": "sklearn_lasso_logreg",
+            "paths": {
+                "model_dir": "models/logit_solusdt_l_fw60_q90_l1_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "alphas": [30.0, 60.0, 100.0, 150.0, 220.0, 330.0, 500.0, 750.0, 1000.0],
+                "class_weight": null,
+                "solver": "liblinear",
+                "row_stride": 60,
+                "max_iter": 300,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
+        },
+        "lgbm_solusdt_l_fw60_q90_stable_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_l_fw60_q90",
+            "family": "lightgbm",
+            "variant": "stable_v1",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_solusdt_l_fw60_q90_stable_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "param_profile": "lightgbm_binary_stable_v1",
+                "tuning_param": "num_leaves",
+                "tuning_values": [7, 15, 31, 63],
+                "row_stride": 60,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": true
+        },
+        "logit_solusdt_s_fw60_q10_pval_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_s_fw60_q10",
+            "family": "logreg",
+            "variant": "base",
+            "trainer": "statsmodels_pvalue_logreg",
+            "paths": {
+                "model_dir": "models/logit_solusdt_s_fw60_q10_pval_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "p_threshold": 0.01,
+                "pvalue_rounds": [0, 1, 2, 3, 4],
+                "row_stride": 60,
+                "max_fit_iter": 100,
+                "min_features": 1,
+                "verbose": true
+            },
+            "active": false
+        },
+        "logit_solusdt_s_fw60_q10_l1_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_s_fw60_q10",
+            "family": "logreg",
+            "variant": "lasso_v1",
+            "trainer": "sklearn_lasso_logreg",
+            "paths": {
+                "model_dir": "models/logit_solusdt_s_fw60_q10_l1_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "alphas": [30.0, 60.0, 100.0, 150.0, 220.0, 330.0, 500.0, 750.0, 1000.0],
+                "class_weight": null,
+                "solver": "liblinear",
+                "row_stride": 60,
+                "max_iter": 300,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": false
+        },
+        "lgbm_solusdt_s_fw60_q10_stable_v1": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_s_fw60_q10",
+            "family": "lightgbm",
+            "variant": "stable_v1",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_solusdt_s_fw60_q10_stable_v1",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": {
+                "method": "predict_proba",
+                "proba": true
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "param_profile": "lightgbm_binary_stable_v1",
+                "tuning_param": "num_leaves",
+                "tuning_values": [7, 15, 31, 63],
+                "row_stride": 60,
+                "random_state": 42,
+                "verbose": true
+            },
+            "active": true
         }
     }
 }

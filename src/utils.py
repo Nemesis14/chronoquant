@@ -2,6 +2,7 @@
 # import modules
 # =============================================================================
 
+import copy
 import json
 import os
 import sys
@@ -62,8 +63,82 @@ def load_db_config() -> dict:
         db_cfg["db_path"] = db_paths[active_env]
     return cfg
 
-def load_features_config() -> dict:
-    return _load_json("features.json")
+def load_assets_config() -> dict:
+    return _load_json("assets.json")
+
+def default_asset_id(assets_cfg: dict | None = None) -> str:
+    assets_cfg = assets_cfg or load_assets_config()
+    return assets_cfg.get("default_asset_id", "bchusdt_fw240")
+
+def resolve_asset_id(asset_id: str | None = None) -> str:
+    return asset_id or default_asset_id()
+
+def load_asset_config(asset_id: str | None = None) -> dict:
+    if asset_id is None:
+        cfg = load_db_config()
+        db_cfg = cfg.get("database", {})
+        db_cfg.setdefault("asset_id", "bchusdt_fw240")
+        db_cfg.setdefault("features_profile", "bchusdt_fw240")
+        return cfg
+
+    assets_cfg = load_assets_config()
+    assets = assets_cfg.get("assets", {})
+    if asset_id not in assets:
+        raise ValueError(f"Asset not found in config/assets.json: {asset_id}")
+
+    base_db_cfg = load_db_config().get("database", {})
+    active_env = base_db_cfg.get("active_env", "dev")
+    asset_cfg = assets[asset_id]
+    db_paths = asset_cfg.get("db_paths", {})
+    db_path = db_paths.get(active_env, asset_cfg.get("db_path"))
+    if not db_path:
+        raise ValueError(f"No database path configured for asset {asset_id} env {active_env}")
+
+    return {
+        "database": {
+            "active_env": active_env,
+            "asset_id": asset_id,
+            "db_path": db_path,
+            "db_paths": dict(db_paths),
+            "symbol": asset_cfg.get("symbol"),
+            "interval": asset_cfg.get("interval", "1m"),
+            "tables": dict(asset_cfg.get("tables", {})),
+            "features_profile": asset_cfg.get("features_profile", asset_id),
+        }
+    }
+
+def load_features_config(asset_id: str | None = None) -> dict:
+    cfg = _load_json("features.json")
+    profile_id = feature_profile_id(asset_id)
+    return apply_feature_profile(cfg, profile_id)
+
+def feature_profile_id(asset_id: str | None = None) -> str | None:
+    db_cfg = load_asset_config(asset_id).get("database", {})
+    return db_cfg.get("features_profile")
+
+def apply_feature_profile(features_cfg: dict, profile_id: str | None) -> dict:
+    if not profile_id:
+        return features_cfg
+
+    profiles = features_cfg.get("profiles", {})
+    if not profiles:
+        return features_cfg
+    if profile_id not in profiles:
+        raise ValueError(f"Feature profile not found in config/features.json: {profile_id}")
+
+    cfg = copy.deepcopy(features_cfg)
+    feature_cfg = cfg.setdefault("database", {}).setdefault("features", {})
+    profile = profiles[profile_id]
+
+    if "targets" in profile:
+        feature_cfg["targets"] = copy.deepcopy(profile["targets"])
+    if "indicators" in profile:
+        feature_cfg["indicators"] = copy.deepcopy(profile["indicators"])
+
+    feature_cfg["profile_id"] = profile_id
+    if profile.get("description"):
+        feature_cfg["profile_description"] = profile["description"]
+    return cfg
 
 def load_models_config() -> dict:
     return _load_json("models.json")
@@ -104,12 +179,25 @@ def live_prediction_columns() -> dict[str, str]:
     return {**defaults, **columns}
 
 
-def live_model_id(model_cfg: dict | None = None, env_cfg: dict | None = None) -> str:
+def live_model_id(
+    model_cfg: dict | None = None,
+    env_cfg: dict | None = None,
+    asset_id: str | None = None,
+) -> str:
     model_cfg = model_cfg or load_models_config()
-    env_cfg = env_cfg or load_env_config()
-    models = model_cfg.get("models", {})
-    model_id = env_cfg.get("runtime", {}).get("model_id")
+    env_cfg   = env_cfg   or load_env_config()
+    models    = model_cfg.get("models", {})
+    runtime   = env_cfg.get("runtime", {})
 
+    if asset_id:
+        per_asset = runtime.get("models", {})
+        model_id  = per_asset.get(asset_id)
+        if model_id:
+            if model_id not in models:
+                raise ValueError(f"Runtime model not found in config/models.json: {model_id}")
+            return model_id
+
+    model_id = runtime.get("model_id")
     if model_id:
         if model_id not in models:
             raise ValueError(f"Runtime model not found in config/models.json: {model_id}")
@@ -121,9 +209,13 @@ def live_model_id(model_cfg: dict | None = None, env_cfg: dict | None = None) ->
     return active_ids[0]
 
 
-def live_model_meta(model_cfg: dict | None = None, env_cfg: dict | None = None) -> tuple[str, dict]:
+def live_model_meta(
+    model_cfg: dict | None = None,
+    env_cfg: dict | None = None,
+    asset_id: str | None = None,
+) -> tuple[str, dict]:
     model_cfg = model_cfg or load_models_config()
-    model_id = live_model_id(model_cfg=model_cfg, env_cfg=env_cfg)
+    model_id  = live_model_id(model_cfg=model_cfg, env_cfg=env_cfg, asset_id=asset_id)
     return model_id, model_cfg["models"][model_id]
 
 

@@ -42,6 +42,7 @@ def train_lightgbm_binary(
     row_stride: int = 1,
     random_state: int = 42,
     verbose: bool = False,
+    asset_id: str | None = None,
 ) -> dict:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -60,6 +61,7 @@ def train_lightgbm_binary(
         start=sample["data"]["start"],
         end=sample["data"]["end"],
         row_stride=row_stride,
+        asset_id=asset_id,
     )
     if len(dataset.y) == 0:
         raise ValueError("Training dataset is empty")

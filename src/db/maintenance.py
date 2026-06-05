@@ -39,11 +39,15 @@ def drop_table(db_path: str, table_name: str) -> None:
 #  - db_path: SQLite database path
 #  - table_name: predictions table
 # =============================================================================
-def update_prediction_signals(db_path: str, table_name: str) -> None:
-    model_cfg = utils.load_models_config()
+def update_prediction_signals(
+    db_path: str,
+    table_name: str,
+    asset_id: str | None = None,
+) -> None:
+    model_cfg       = utils.load_models_config()
     predictions_cfg = utils.load_predictions_config()
-    _, model_meta = utils.live_model_meta(model_cfg)
-    target_name = model_meta["target_name"]
+    _, model_meta   = utils.live_model_meta(model_cfg, asset_id=asset_id)
+    target_name     = model_meta["target_name"]
     direction = utils.target_direction_from_name(target_name)
     threshold = utils.signal_probability_threshold(predictions_cfg)
     signal_value = "LONG" if direction == "long" else "SHORT"
@@ -107,6 +111,7 @@ def print_table_check(db_path: str, table_name: str) -> None:
 #  - drop: whether to drop derived tables first
 #  - features_only: rebuild only FEATURES
 #  - predictions_only: rebuild only PREDICTIONS
+#  - asset_id: optional asset id from config/assets.json
 # =============================================================================
 def rebuild_derived_tables(
     start: str,
@@ -114,8 +119,9 @@ def rebuild_derived_tables(
     drop: bool = False,
     features_only: bool = False,
     predictions_only: bool = False,
+    asset_id: str | None = None,
 ) -> None:
-    db_cfg     = utils.load_db_config()["database"]
+    db_cfg     = utils.load_asset_config(asset_id)["database"]
     db_path    = db_cfg["db_path"]
     table_feat = db_cfg["tables"]["features"]
     table_pred = db_cfg["tables"]["predictions"]
@@ -136,12 +142,12 @@ def rebuild_derived_tables(
             drop_table(db_path, table_pred)
 
     if not predictions_only:
-        sync_features(start, end_time=end)
+        sync_features(start, end_time=end, asset_id=asset_id)
         print_table_check(db_path, table_feat)
 
     if not features_only:
-        sync_predictions(start, end_time=end)
-        update_prediction_signals(db_path, table_pred)
+        sync_predictions(start, end_time=end, asset_id=asset_id)
+        update_prediction_signals(db_path, table_pred, asset_id=asset_id)
         print_table_check(db_path, table_pred)
 
     print("=" * 80)

@@ -65,12 +65,22 @@ def ensure_table_columns(db_path: str, table_name: str, df: pd.DataFrame) -> Non
 
     existing_columns = set(table_columns(db_path, table_name))
     missing_columns = [col for col in df.columns if col not in existing_columns]
-    if not missing_columns:
-        return
 
     with sqlite_connect(db_path) as conn:
         for col in missing_columns:
             conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{col}" {_sqlite_type(df[col])}')
+        conn.commit()
+
+    if "open_time" in df.columns:
+        ensure_open_time_index(db_path, table_name)
+
+
+def ensure_open_time_index(db_path: str, table_name: str) -> None:
+    index_name = f"idx_{table_name}_open_time"
+    with sqlite_connect(db_path) as conn:
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS "{index_name}" ON "{table_name}" (open_time)'
+        )
         conn.commit()
 
 

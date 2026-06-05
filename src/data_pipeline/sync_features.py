@@ -331,7 +331,7 @@ def _clean_feature_values(df: pd.DataFrame, prefix: str) -> None:
 
 
 # =============================================================================
-# sync_features(start_time: str, lookback_bars: int = 240, end_time: str | None = None) -> None
+# sync_features(...) -> None
 # =============================================================================
 # Purpose:
 #  - Fetch raw OHLCV data from [start_time - lookback, end]
@@ -342,13 +342,19 @@ def _clean_feature_values(df: pd.DataFrame, prefix: str) -> None:
 #  - start_time: "YYYY-MM-DD HH:MM:SS" (UTC)
 #  - lookback_bars: minutes to look back for feature computation
 #  - end_time: optional "YYYY-MM-DD HH:MM:SS" upper bound for controlled rebuilds
+#  - asset_id: optional asset id from config/assets.json
 # =============================================================================
-def sync_features(start_time: str, lookback_bars: int = 240, end_time: str | None = None) -> None:
+def sync_features(
+    start_time: str,
+    lookback_bars: int = 240,
+    end_time: str | None = None,
+    asset_id: str | None = None,
+) -> None:
     # -------------------------------------------------------------------------
     # Load configuration
     # -------------------------------------------------------------------------
-    db_cfg      = utils.load_db_config()
-    feat_cfg    = utils.load_features_config()
+    db_cfg      = utils.load_asset_config(asset_id)
+    feat_cfg    = utils.load_features_config(asset_id=asset_id)
     db_path     = db_cfg["database"]["db_path"]
     table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
     table_feat  = db_cfg["database"]["tables"]["features"]
@@ -445,6 +451,6 @@ def sync_features(start_time: str, lookback_bars: int = 240, end_time: str | Non
         return
 
     with sqlite_connect(db_path) as conn:
-        df_final.to_sql(table_feat, conn, index=False, if_exists="append")
+        df_final.to_sql(table_feat, conn, index=False, if_exists="append", chunksize=50_000)
 
     print(f"OK: Computed {len(df_final)} feature rows into '{table_feat}'")

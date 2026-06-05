@@ -55,9 +55,9 @@ class _LoggerWriter(io.StringIO):
             self._logger.info(line)
 
 
-def run_database_sync() -> SyncResult:
+def run_database_sync(asset_id: str | None = None) -> SyncResult:
     logger = get_dashboard_logger()
-    db_cfg = utils.load_db_config()["database"]
+    db_cfg = utils.load_asset_config(asset_id)["database"]
     db_path = db_cfg["db_path"]
     tables = db_cfg["tables"]
     table_ohlcv = tables["ohlcv"]
@@ -73,7 +73,7 @@ def run_database_sync() -> SyncResult:
     start_ms = _utc_str_to_ms(start_time)
 
     logger.info("OHLCV sync from Binance started at %s", start_time)
-    _run_with_logged_stdout(sync_ohlcv, start_ms, logger=logger)
+    _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
 
     rows_after = _row_count(db_path, table_ohlcv)
     latest_open_time = _latest_open_time(db_path, table_ohlcv)
@@ -85,13 +85,25 @@ def run_database_sync() -> SyncResult:
         return SyncResult(start_time, latest_open_time, rows_before, rows_after)
 
     logger.info("Feature sync started: %s -> %s", start_time, latest_open_time)
-    _run_with_logged_stdout(sync_features, start_time, end_time=latest_open_time, logger=logger)
+    _run_with_logged_stdout(
+        sync_features,
+        start_time,
+        end_time=latest_open_time,
+        asset_id=asset_id,
+        logger=logger,
+    )
 
     logger.info("Prediction sync started: %s -> %s", start_time, latest_open_time)
-    _run_with_logged_stdout(sync_predictions, start_time, end_time=latest_open_time, logger=logger)
+    _run_with_logged_stdout(
+        sync_predictions,
+        start_time,
+        end_time=latest_open_time,
+        asset_id=asset_id,
+        logger=logger,
+    )
 
     logger.info("Signal update started")
-    _run_with_logged_stdout(update_prediction_signals, db_path, table_pred, logger=logger)
+    _run_with_logged_stdout(update_prediction_signals, db_path, table_pred, asset_id=asset_id, logger=logger)
 
     logger.info("Database sync complete")
     return SyncResult(start_time, latest_open_time, rows_before, rows_after)

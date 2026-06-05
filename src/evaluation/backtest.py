@@ -45,6 +45,7 @@ def run_configured_strategy(strategy_id: str) -> dict:
 #  - Save standard backtest artifacts
 # =============================================================================
 def run_strategy_backtest(strategy_id: str, strategy_cfg: dict) -> dict:
+    asset_id = strategy_cfg.get("asset_id")
     output_dir = Path(utils._resolve_path(strategy_cfg["output_dir"]))
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -52,11 +53,13 @@ def run_strategy_backtest(strategy_id: str, strategy_cfg: dict) -> dict:
         model_id=strategy_cfg["model_id"],
         start=strategy_cfg["start"],
         end=strategy_cfg["end"],
+        asset_id=asset_id,
     )
     trades_df, equity_df, summary = simulate_long_probability_strategy(frame, strategy_cfg)
     summary.update(
         {
             "strategy_id": strategy_id,
+            "asset_id": asset_id,
             "model_id": strategy_cfg["model_id"],
             "start": strategy_cfg["start"],
             "end": strategy_cfg["end"],
@@ -76,14 +79,24 @@ def run_strategy_backtest(strategy_id: str, strategy_cfg: dict) -> dict:
 
 
 # =============================================================================
-# build_backtest_frame(model_id: str, start: str, end: str) -> pd.DataFrame
+# build_backtest_frame(...) -> pd.DataFrame
 # =============================================================================
 # Purpose:
 #  - Generate model probabilities and join them to OHLCV bars for simulation
 # =============================================================================
-def build_backtest_frame(model_id: str, start: str, end: str) -> pd.DataFrame:
-    predictions = model_prediction_frame(model_id=model_id, start=start, end=end)
-    ohlcv = load_ohlcv_frame(start=start, end=end)
+def build_backtest_frame(
+    model_id: str,
+    start: str,
+    end: str,
+    asset_id: str | None = None,
+) -> pd.DataFrame:
+    predictions = model_prediction_frame(
+        model_id=model_id,
+        start=start,
+        end=end,
+        asset_id=asset_id,
+    )
+    ohlcv = load_ohlcv_frame(start=start, end=end, asset_id=asset_id)
     frame = ohlcv.merge(
         predictions[["open_time", "target", "prediction"]],
         on="open_time",
@@ -94,13 +107,18 @@ def build_backtest_frame(model_id: str, start: str, end: str) -> pd.DataFrame:
 
 
 # =============================================================================
-# model_prediction_frame(model_id: str, start: str, end: str) -> pd.DataFrame
+# model_prediction_frame(...) -> pd.DataFrame
 # =============================================================================
 # Purpose:
 #  - Load a saved model artifact and compute probabilities from features table
 # =============================================================================
-def model_prediction_frame(model_id: str, start: str, end: str) -> pd.DataFrame:
-    db_cfg = utils.load_db_config()["database"]
+def model_prediction_frame(
+    model_id: str,
+    start: str,
+    end: str,
+    asset_id: str | None = None,
+) -> pd.DataFrame:
+    db_cfg = utils.load_asset_config(asset_id)["database"]
     model_cfg = utils.load_models_config()
     model_meta = model_cfg["models"][model_id]
     db_path = db_cfg["db_path"]
@@ -152,13 +170,13 @@ def model_prediction_frame(model_id: str, start: str, end: str) -> pd.DataFrame:
 
 
 # =============================================================================
-# load_ohlcv_frame(start: str, end: str) -> pd.DataFrame
+# load_ohlcv_frame(start: str, end: str, asset_id: str | None = None) -> pd.DataFrame
 # =============================================================================
 # Purpose:
 #  - Load OHLCV bars needed by execution simulation
 # =============================================================================
-def load_ohlcv_frame(start: str, end: str) -> pd.DataFrame:
-    db_cfg = utils.load_db_config()["database"]
+def load_ohlcv_frame(start: str, end: str, asset_id: str | None = None) -> pd.DataFrame:
+    db_cfg = utils.load_asset_config(asset_id)["database"]
     db_path = db_cfg["db_path"]
     table_ohlcv = db_cfg["tables"]["ohlcv"]
 
@@ -190,8 +208,11 @@ def simulate_long_probability_strategy(
     frame: pd.DataFrame,
     strategy_cfg: dict,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    if strategy_cfg.get("side", "long") != "long":
-        raise ValueError("Only long strategies are currently supported")
+    side = strategy_cfg.get("side", "long")
+    if side not in ("long", "short"):
+        raise ValueError(f"Unsupported strategy side: {side!r}")
+    if side == "short":
+        return _simulate_short_probability_strategy(frame, strategy_cfg)
     if frame.empty:
         raise ValueError("Backtest frame is empty")
 
@@ -324,6 +345,180 @@ def simulate_long_probability_strategy(
         exit_price = exit_raw * (1.0 - slippage)
         net_return = (exit_price * (1.0 - fee)) / (position["entry_price"] * (1.0 + fee)) - 1.0
         gross_return = (exit_raw / position["entry_raw_price"]) - 1.0
+        equity *= 1.0 + net_return
+        trades.append(
+            {
+                "entry_time": position["entry_time"].strftime("%Y-%m-%d %H:%M:%S"),
+                "entry_signal_time": position["entry_signal_time"].strftime("%Y-%m-%d %H:%M:%S"),
+                "exit_time": exit_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "exit_reason": "end_of_backtest",
+                "hold_minutes": int((exit_time - position["entry_time"]).total_seconds() // 60),
+                "entry_price": position["entry_price"],
+                "exit_price": exit_price,
+                "entry_prediction": position["entry_prediction"],
+                "entry_target": position["entry_target"],
+                "gross_return": gross_return,
+                "net_return": net_return,
+                "equity_after": equity,
+            }
+        )
+        equity_rows.append({"open_time": exit_time, "equity": equity})
+
+    trades_df = pd.DataFrame(trades)
+    equity_df = pd.DataFrame(equity_rows)
+    summary = summarize_trades(
+        trades_df=trades_df,
+        equity_df=equity_df,
+        initial_equity=float(strategy_cfg.get("initial_equity", 10000.0)),
+        start_time=pd.Timestamp(times[0]),
+        end_time=pd.Timestamp(times[-1]),
+    )
+    return trades_df, equity_df, summary
+
+
+# =============================================================================
+# _simulate_short_probability_strategy(...) -> tuple[df, df, dict]
+# =============================================================================
+# Purpose:
+#  - Mirror of the long simulator for SHORT/FLAT strategies.
+#    P&L is positive when price falls after entry.
+# =============================================================================
+def _simulate_short_probability_strategy(
+    frame: pd.DataFrame,
+    strategy_cfg: dict,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    if frame.empty:
+        raise ValueError("Backtest frame is empty")
+
+    df = frame.copy().reset_index(drop=True)
+    df["open_time"] = pd.to_datetime(df["open_time"])
+    times = df["open_time"].to_numpy()
+    opens = df["open"].astype(float).to_numpy()
+    highs = df["high"].astype(float).to_numpy()
+    lows = df["low"].astype(float).to_numpy()
+    closes = df["close"].astype(float).to_numpy()
+    targets = df["target"].astype(float).to_numpy()
+    predictions = df["prediction"].astype(float).to_numpy()
+
+    entry_threshold = float(strategy_cfg["entry_threshold"])
+    rearm_threshold = float(strategy_cfg.get("rearm_threshold", entry_threshold))
+    exit_threshold = float(strategy_cfg.get("exit_threshold", -1.0))
+    min_hold_minutes = int(strategy_cfg.get("min_hold_minutes", 0))
+    max_hold_minutes = int(strategy_cfg.get("max_hold_minutes", 240))
+    take_profit_pct = float(strategy_cfg.get("take_profit_pct", 0.0))
+    stop_loss_pct = float(strategy_cfg.get("stop_loss_pct", 0.0))
+    trailing_activation_pct = float(strategy_cfg.get("trailing_activation_pct", 0.0))
+    trailing_stop_pct = float(strategy_cfg.get("trailing_stop_pct", 0.0))
+    cooldown_minutes = int(strategy_cfg.get("cooldown_minutes", 0))
+    fee = float(strategy_cfg.get("fee_bps_per_side", 0.0)) / 10000.0
+    slippage = float(strategy_cfg.get("slippage_bps_per_side", 0.0)) / 10000.0
+
+    equity = float(strategy_cfg.get("initial_equity", 10000.0))
+    trades = []
+    equity_rows = [{"open_time": pd.Timestamp(times[0]), "equity": equity}]
+    position = None
+    armed = True
+    cooldown_until = pd.Timestamp(times[0])
+
+    for i in range(1, len(df)):
+        now = pd.Timestamp(times[i])
+        prev_time = pd.Timestamp(times[i - 1])
+        prev_prediction = float(predictions[i - 1])
+        prev_target = float(targets[i - 1])
+
+        if position is None:
+            if not armed and now >= cooldown_until and prev_prediction <= rearm_threshold:
+                armed = True
+
+            if armed and now >= cooldown_until and prev_prediction >= entry_threshold:
+                entry_raw = float(opens[i])
+                entry_price = entry_raw * (1.0 - slippage)
+                position = {
+                    "entry_time": now,
+                    "entry_signal_time": prev_time,
+                    "entry_price": entry_price,
+                    "entry_raw_price": entry_raw,
+                    "entry_prediction": prev_prediction,
+                    "entry_target": prev_target if pd.notna(prev_target) else None,
+                    "lowest_price": entry_price,
+                    "trailing_cover_price": None,
+                }
+                armed = False
+
+        if position is None:
+            continue
+
+        exit_raw = None
+        exit_reason = None
+        entry_price = position["entry_price"]
+        hold_minutes = int((now - position["entry_time"]).total_seconds() // 60)
+        high = float(highs[i])
+        low = float(lows[i])
+        close = float(closes[i])
+
+        hard_stop = entry_price * (1.0 + stop_loss_pct) if stop_loss_pct > 0 else None
+        take_profit = entry_price * (1.0 - take_profit_pct) if take_profit_pct > 0 else None
+
+        if hard_stop is not None and high >= hard_stop:
+            exit_raw = hard_stop
+            exit_reason = "stop_loss"
+        elif take_profit is not None and low <= take_profit:
+            exit_raw = take_profit
+            exit_reason = "take_profit"
+        else:
+            position["lowest_price"] = min(position["lowest_price"], low)
+            if (
+                trailing_stop_pct > 0
+                and trailing_activation_pct > 0
+                and position["lowest_price"] <= entry_price * (1.0 - trailing_activation_pct)
+            ):
+                candidate = position["lowest_price"] * (1.0 + trailing_stop_pct)
+                current = position["trailing_cover_price"]
+                position["trailing_cover_price"] = candidate if current is None else min(current, candidate)
+
+            trailing_cover = position["trailing_cover_price"]
+            if trailing_cover is not None and high >= trailing_cover:
+                exit_raw = trailing_cover
+                exit_reason = "trailing_stop"
+            elif hold_minutes >= max_hold_minutes:
+                exit_raw = close
+                exit_reason = "max_hold"
+            elif hold_minutes >= min_hold_minutes and prev_prediction <= exit_threshold:
+                exit_raw = float(opens[i])
+                exit_reason = "probability_exit"
+
+        if exit_raw is None:
+            continue
+
+        exit_price = float(exit_raw) * (1.0 + slippage)
+        net_return = (entry_price * (1.0 - fee)) / (exit_price * (1.0 + fee)) - 1.0
+        gross_return = (position["entry_raw_price"] - float(exit_raw)) / position["entry_raw_price"]
+        equity *= 1.0 + net_return
+        trade = {
+            "entry_time": position["entry_time"].strftime("%Y-%m-%d %H:%M:%S"),
+            "entry_signal_time": position["entry_signal_time"].strftime("%Y-%m-%d %H:%M:%S"),
+            "exit_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "exit_reason": exit_reason,
+            "hold_minutes": hold_minutes,
+            "entry_price": position["entry_price"],
+            "exit_price": exit_price,
+            "entry_prediction": position["entry_prediction"],
+            "entry_target": position["entry_target"],
+            "gross_return": gross_return,
+            "net_return": net_return,
+            "equity_after": equity,
+        }
+        trades.append(trade)
+        equity_rows.append({"open_time": now, "equity": equity})
+        position = None
+        cooldown_until = now + pd.Timedelta(minutes=cooldown_minutes)
+
+    if position is not None:
+        exit_time = pd.Timestamp(times[-1])
+        exit_raw = float(closes[-1])
+        exit_price = exit_raw * (1.0 + slippage)
+        net_return = (position["entry_price"] * (1.0 - fee)) / (exit_price * (1.0 + fee)) - 1.0
+        gross_return = (position["entry_raw_price"] - exit_raw) / position["entry_raw_price"]
         equity *= 1.0 + net_return
         trades.append(
             {

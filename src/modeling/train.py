@@ -29,6 +29,7 @@ def train_model(model_id: str) -> dict:
     trainer = meta.get("trainer")
     paths = meta["paths"]
     training_cfg = meta.get("training", {})
+    asset_id = meta.get("asset_id")
 
     output_dir = Path(utils._resolve_path(paths["model_dir"]))
     sample_dir = Path(training_cfg.get("sample_dir", f"samples/{training_cfg['sample_id']}"))
@@ -46,6 +47,7 @@ def train_model(model_id: str) -> dict:
             max_iter     = training_cfg.get("max_iter", 300),
             random_state = training_cfg.get("random_state", 42),
             verbose      = training_cfg.get("verbose", True),
+            asset_id     = asset_id,
         )
 
     if trainer == "lightgbm_binary":
@@ -60,6 +62,7 @@ def train_model(model_id: str) -> dict:
             row_stride    = training_cfg.get("row_stride", 1),
             random_state  = training_cfg.get("random_state", 42),
             verbose       = training_cfg.get("verbose", True),
+            asset_id      = asset_id,
         )
 
     if trainer == "statsmodels_pvalue_logreg":
@@ -74,6 +77,7 @@ def train_model(model_id: str) -> dict:
             max_fit_iter   = training_cfg.get("max_fit_iter", 100),
             min_features   = training_cfg.get("min_features", 1),
             verbose        = training_cfg.get("verbose", True),
+            asset_id       = asset_id,
         )
 
     raise ValueError(f"Unsupported trainer for train_model: {trainer}")

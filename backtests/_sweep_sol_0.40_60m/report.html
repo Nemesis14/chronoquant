@@ -1,0 +1,847 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>solusdt_long_fw60_q90_managed_v1 backtest report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 32px; color: #222; }
+        table { border-collapse: collapse; margin: 12px 0 28px 0; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+        th:first-child, td:first-child { text-align: left; }
+        th { background: #f3f5f7; }
+    </style>
+</head>
+<body>
+    <h1>solusdt_long_fw60_q90_managed_v1 backtest report</h1>
+    <h2>Strategy config</h2>
+    <pre>{
+    "description": "LONG/FLAT strategy for SOLUSDT 1h long signals. Thresholds are initial defaults scaled to 60-minute horizon; tune after model comparison.",
+    "asset_id": "solusdt_fw60",
+    "model_id": "lgbm_solusdt_l_fw60_q90_stable_v1",
+    "side": "long",
+    "start": "2024-01-01 00:00:00",
+    "end": "2026-01-01 00:00:00",
+    "initial_equity": 10000.0,
+    "entry_threshold": 0.4,
+    "rearm_threshold": 0.148,
+    "exit_threshold": 0.105,
+    "min_hold_minutes": 10,
+    "max_hold_minutes": 60,
+    "take_profit_pct": 0.016,
+    "stop_loss_pct": 0.0,
+    "trailing_activation_pct": 0.0,
+    "trailing_stop_pct": 0.0,
+    "cooldown_minutes": 60,
+    "fee_bps_per_side": 10.0,
+    "slippage_bps_per_side": 2.0,
+    "output_dir": "backtests/_sweep_sol_0.40_60m"
+}</pre>
+    <h2>Summary</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>initial_equity</th>
+      <th>final_equity</th>
+      <th>profit</th>
+      <th>total_return</th>
+      <th>trade_count</th>
+      <th>winning_trades</th>
+      <th>losing_trades</th>
+      <th>win_rate</th>
+      <th>avg_net_return</th>
+      <th>median_net_return</th>
+      <th>best_trade</th>
+      <th>worst_trade</th>
+      <th>profit_factor</th>
+      <th>max_drawdown</th>
+      <th>avg_hold_minutes</th>
+      <th>median_hold_minutes</th>
+      <th>avg_minutes_between_entries</th>
+      <th>median_minutes_between_entries</th>
+      <th>exposure_pct</th>
+      <th>exit_reasons</th>
+      <th>strategy_id</th>
+      <th>asset_id</th>
+      <th>model_id</th>
+      <th>start</th>
+      <th>end</th>
+      <th>output_dir</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>10000.000000</td>
+      <td>14122.849257</td>
+      <td>4122.849257</td>
+      <td>0.412285</td>
+      <td>223</td>
+      <td>143</td>
+      <td>80</td>
+      <td>0.641256</td>
+      <td>0.001694</td>
+      <td>0.013767</td>
+      <td>0.013767</td>
+      <td>-0.081136</td>
+      <td>1.276463</td>
+      <td>-0.218460</td>
+      <td>35.690583</td>
+      <td>40.000000</td>
+      <td>4639.932432</td>
+      <td>1187.000000</td>
+      <td>0.007561</td>
+      <td>{'take_profit': 117, 'max_hold': 90, 'probability_exit': 16}</td>
+      <td>solusdt_long_fw60_q90_managed_v1</td>
+      <td>solusdt_fw60</td>
+      <td>lgbm_solusdt_l_fw60_q90_stable_v1</td>
+      <td>2024-01-01 00:00:00</td>
+      <td>2026-01-01 00:00:00</td>
+      <td>D:\repos\chronoquant\backtests\_sweep_sol_0.40_60m</td>
+    </tr>
+  </tbody>
+</table>
+    <h2>Exit reasons</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>exit_reason</th>
+      <th>count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>take_profit</td>
+      <td>117</td>
+    </tr>
+    <tr>
+      <td>max_hold</td>
+      <td>90</td>
+    </tr>
+    <tr>
+      <td>probability_exit</td>
+      <td>16</td>
+    </tr>
+  </tbody>
+</table>
+    <h2>Recent trades</h2>
+    <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>entry_time</th>
+      <th>entry_signal_time</th>
+      <th>exit_time</th>
+      <th>exit_reason</th>
+      <th>hold_minutes</th>
+      <th>entry_price</th>
+      <th>exit_price</th>
+      <th>entry_prediction</th>
+      <th>entry_target</th>
+      <th>gross_return</th>
+      <th>net_return</th>
+      <th>equity_after</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2025-03-11 00:36:00</td>
+      <td>2025-03-11 00:35:00</td>
+      <td>2025-03-11 00:59:00</td>
+      <td>take_profit</td>
+      <td>23</td>
+      <td>113.952786</td>
+      <td>115.752875</td>
+      <td>0.440737</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14133.863076</td>
+    </tr>
+    <tr>
+      <td>2025-03-11 13:28:00</td>
+      <td>2025-03-11 13:27:00</td>
+      <td>2025-03-11 14:28:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>125.825160</td>
+      <td>120.225950</td>
+      <td>0.409798</td>
+      <td>0.000000</td>
+      <td>-0.044118</td>
+      <td>-0.046409</td>
+      <td>13477.924419</td>
+    </tr>
+    <tr>
+      <td>2025-03-12 12:32:00</td>
+      <td>2025-03-12 12:31:00</td>
+      <td>2025-03-12 13:21:00</td>
+      <td>probability_exit</td>
+      <td>49</td>
+      <td>130.866168</td>
+      <td>128.134368</td>
+      <td>0.407725</td>
+      <td>0.000000</td>
+      <td>-0.020483</td>
+      <td>-0.022831</td>
+      <td>13170.209180</td>
+    </tr>
+    <tr>
+      <td>2025-04-02 20:15:00</td>
+      <td>2025-04-02 20:14:00</td>
+      <td>2025-04-02 20:16:00</td>
+      <td>take_profit</td>
+      <td>1</td>
+      <td>133.726740</td>
+      <td>135.839195</td>
+      <td>0.461642</td>
+      <td>0.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13351.526558</td>
+    </tr>
+    <tr>
+      <td>2025-04-02 22:13:00</td>
+      <td>2025-04-02 22:12:00</td>
+      <td>2025-04-02 23:13:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>121.764348</td>
+      <td>118.786238</td>
+      <td>0.415484</td>
+      <td>0.000000</td>
+      <td>-0.024068</td>
+      <td>-0.026407</td>
+      <td>12998.951261</td>
+    </tr>
+    <tr>
+      <td>2025-04-04 15:14:00</td>
+      <td>2025-04-04 15:13:00</td>
+      <td>2025-04-04 16:14:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>120.024000</td>
+      <td>119.866022</td>
+      <td>0.418721</td>
+      <td>0.000000</td>
+      <td>-0.000917</td>
+      <td>-0.003312</td>
+      <td>12955.904034</td>
+    </tr>
+    <tr>
+      <td>2025-04-06 18:22:00</td>
+      <td>2025-04-06 18:21:00</td>
+      <td>2025-04-06 19:22:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>108.671730</td>
+      <td>107.768442</td>
+      <td>0.433848</td>
+      <td>0.000000</td>
+      <td>-0.007915</td>
+      <td>-0.010293</td>
+      <td>12822.542780</td>
+    </tr>
+    <tr>
+      <td>2025-04-07 03:45:00</td>
+      <td>2025-04-07 03:44:00</td>
+      <td>2025-04-07 04:02:00</td>
+      <td>probability_exit</td>
+      <td>17</td>
+      <td>102.450486</td>
+      <td>103.479300</td>
+      <td>0.431734</td>
+      <td>0.000000</td>
+      <td>0.010446</td>
+      <td>0.008024</td>
+      <td>12925.430795</td>
+    </tr>
+    <tr>
+      <td>2025-04-07 06:46:00</td>
+      <td>2025-04-07 06:45:00</td>
+      <td>2025-04-07 07:46:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>97.939584</td>
+      <td>98.040388</td>
+      <td>0.412874</td>
+      <td>0.000000</td>
+      <td>0.001430</td>
+      <td>-0.000971</td>
+      <td>12912.882636</td>
+    </tr>
+    <tr>
+      <td>2025-04-07 13:37:00</td>
+      <td>2025-04-07 13:36:00</td>
+      <td>2025-04-07 13:50:00</td>
+      <td>take_profit</td>
+      <td>13</td>
+      <td>101.660328</td>
+      <td>103.266236</td>
+      <td>0.441606</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13090.657338</td>
+    </tr>
+    <tr>
+      <td>2025-04-09 17:22:00</td>
+      <td>2025-04-09 17:21:00</td>
+      <td>2025-04-09 17:23:00</td>
+      <td>take_profit</td>
+      <td>1</td>
+      <td>110.962188</td>
+      <td>112.715035</td>
+      <td>0.510599</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13270.879507</td>
+    </tr>
+    <tr>
+      <td>2025-05-09 08:45:00</td>
+      <td>2025-05-09 08:44:00</td>
+      <td>2025-05-09 09:41:00</td>
+      <td>probability_exit</td>
+      <td>56</td>
+      <td>165.393072</td>
+      <td>165.886816</td>
+      <td>0.425908</td>
+      <td>0.000000</td>
+      <td>0.003387</td>
+      <td>0.000981</td>
+      <td>13283.902348</td>
+    </tr>
+    <tr>
+      <td>2025-05-09 11:28:00</td>
+      <td>2025-05-09 11:27:00</td>
+      <td>2025-05-09 12:27:00</td>
+      <td>probability_exit</td>
+      <td>59</td>
+      <td>173.134620</td>
+      <td>171.485696</td>
+      <td>0.437017</td>
+      <td>0.000000</td>
+      <td>-0.009128</td>
+      <td>-0.011503</td>
+      <td>13131.098753</td>
+    </tr>
+    <tr>
+      <td>2025-05-11 00:30:00</td>
+      <td>2025-05-11 00:29:00</td>
+      <td>2025-05-11 00:36:00</td>
+      <td>take_profit</td>
+      <td>6</td>
+      <td>173.314656</td>
+      <td>176.052473</td>
+      <td>0.441975</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13311.877688</td>
+    </tr>
+    <tr>
+      <td>2025-05-12 14:29:00</td>
+      <td>2025-05-12 14:28:00</td>
+      <td>2025-05-12 15:29:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>176.275248</td>
+      <td>176.184756</td>
+      <td>0.437514</td>
+      <td>0.000000</td>
+      <td>-0.000113</td>
+      <td>-0.002510</td>
+      <td>13278.460448</td>
+    </tr>
+    <tr>
+      <td>2025-05-23 11:52:00</td>
+      <td>2025-05-23 11:51:00</td>
+      <td>2025-05-23 12:52:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>178.915776</td>
+      <td>176.634666</td>
+      <td>0.493845</td>
+      <td>0.000000</td>
+      <td>-0.012355</td>
+      <td>-0.014722</td>
+      <td>13082.972848</td>
+    </tr>
+    <tr>
+      <td>2025-05-30 00:59:00</td>
+      <td>2025-05-30 00:58:00</td>
+      <td>2025-05-30 01:03:00</td>
+      <td>take_profit</td>
+      <td>4</td>
+      <td>160.392072</td>
+      <td>162.925753</td>
+      <td>0.472091</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13263.089223</td>
+    </tr>
+    <tr>
+      <td>2025-06-13 00:35:00</td>
+      <td>2025-06-13 00:34:00</td>
+      <td>2025-06-13 01:35:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>143.748744</td>
+      <td>142.991396</td>
+      <td>0.437057</td>
+      <td>0.000000</td>
+      <td>-0.004871</td>
+      <td>-0.007256</td>
+      <td>13166.851859</td>
+    </tr>
+    <tr>
+      <td>2025-06-20 17:21:00</td>
+      <td>2025-06-20 17:20:00</td>
+      <td>2025-06-20 18:10:00</td>
+      <td>probability_exit</td>
+      <td>49</td>
+      <td>136.757346</td>
+      <td>138.682258</td>
+      <td>0.489483</td>
+      <td>1.000000</td>
+      <td>0.014481</td>
+      <td>0.012049</td>
+      <td>13325.502656</td>
+    </tr>
+    <tr>
+      <td>2025-06-21 21:32:00</td>
+      <td>2025-06-21 21:31:00</td>
+      <td>2025-06-21 21:32:00</td>
+      <td>take_profit</td>
+      <td>0</td>
+      <td>131.076210</td>
+      <td>133.146795</td>
+      <td>0.469072</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13508.957996</td>
+    </tr>
+    <tr>
+      <td>2025-06-30 15:31:00</td>
+      <td>2025-06-30 15:30:00</td>
+      <td>2025-06-30 15:46:00</td>
+      <td>take_profit</td>
+      <td>15</td>
+      <td>155.661126</td>
+      <td>158.120074</td>
+      <td>0.423121</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13694.939008</td>
+    </tr>
+    <tr>
+      <td>2025-08-14 12:33:00</td>
+      <td>2025-08-14 12:32:00</td>
+      <td>2025-08-14 13:33:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>198.259644</td>
+      <td>193.231346</td>
+      <td>0.467824</td>
+      <td>0.000000</td>
+      <td>-0.024972</td>
+      <td>-0.027310</td>
+      <td>13320.936873</td>
+    </tr>
+    <tr>
+      <td>2025-08-22 14:06:00</td>
+      <td>2025-08-22 14:05:00</td>
+      <td>2025-08-22 14:13:00</td>
+      <td>take_profit</td>
+      <td>7</td>
+      <td>186.187230</td>
+      <td>189.128392</td>
+      <td>0.459952</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13504.329354</td>
+    </tr>
+    <tr>
+      <td>2025-08-24 19:38:00</td>
+      <td>2025-08-24 19:37:00</td>
+      <td>2025-08-24 19:39:00</td>
+      <td>take_profit</td>
+      <td>1</td>
+      <td>203.170626</td>
+      <td>206.380072</td>
+      <td>0.452484</td>
+      <td>0.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13690.246643</td>
+    </tr>
+    <tr>
+      <td>2025-08-27 20:27:00</td>
+      <td>2025-08-27 20:26:00</td>
+      <td>2025-08-27 20:32:00</td>
+      <td>take_profit</td>
+      <td>5</td>
+      <td>205.041000</td>
+      <td>208.279992</td>
+      <td>0.448776</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13878.723499</td>
+    </tr>
+    <tr>
+      <td>2025-08-29 14:07:00</td>
+      <td>2025-08-29 14:06:00</td>
+      <td>2025-08-29 14:20:00</td>
+      <td>take_profit</td>
+      <td>13</td>
+      <td>207.071406</td>
+      <td>210.342472</td>
+      <td>0.452006</td>
+      <td>0.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14069.795160</td>
+    </tr>
+    <tr>
+      <td>2025-09-22 06:01:00</td>
+      <td>2025-09-22 06:00:00</td>
+      <td>2025-09-22 06:39:00</td>
+      <td>probability_exit</td>
+      <td>38</td>
+      <td>223.034598</td>
+      <td>224.964998</td>
+      <td>0.443181</td>
+      <td>0.000000</td>
+      <td>0.009059</td>
+      <td>0.006640</td>
+      <td>14163.216692</td>
+    </tr>
+    <tr>
+      <td>2025-10-03 17:01:00</td>
+      <td>2025-10-03 17:00:00</td>
+      <td>2025-10-03 17:09:00</td>
+      <td>take_profit</td>
+      <td>8</td>
+      <td>229.185828</td>
+      <td>232.806231</td>
+      <td>0.429578</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14358.205039</td>
+    </tr>
+    <tr>
+      <td>2025-10-10 15:31:00</td>
+      <td>2025-10-10 15:30:00</td>
+      <td>2025-10-10 16:25:00</td>
+      <td>probability_exit</td>
+      <td>54</td>
+      <td>211.572306</td>
+      <td>211.927606</td>
+      <td>0.418913</td>
+      <td>0.000000</td>
+      <td>0.002080</td>
+      <td>-0.000322</td>
+      <td>14353.581323</td>
+    </tr>
+    <tr>
+      <td>2025-10-10 20:56:00</td>
+      <td>2025-10-10 20:55:00</td>
+      <td>2025-10-10 21:56:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>202.550502</td>
+      <td>194.891014</td>
+      <td>0.460854</td>
+      <td>0.000000</td>
+      <td>-0.037430</td>
+      <td>-0.039738</td>
+      <td>13783.203755</td>
+    </tr>
+    <tr>
+      <td>2025-10-11 21:08:00</td>
+      <td>2025-10-11 21:07:00</td>
+      <td>2025-10-11 21:17:00</td>
+      <td>take_profit</td>
+      <td>9</td>
+      <td>173.374668</td>
+      <td>176.113433</td>
+      <td>0.401118</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>13972.960374</td>
+    </tr>
+    <tr>
+      <td>2025-10-12 14:52:00</td>
+      <td>2025-10-12 14:51:00</td>
+      <td>2025-10-12 15:05:00</td>
+      <td>take_profit</td>
+      <td>13</td>
+      <td>186.267246</td>
+      <td>189.209672</td>
+      <td>0.508299</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14165.329416</td>
+    </tr>
+    <tr>
+      <td>2025-10-12 16:48:00</td>
+      <td>2025-10-12 16:47:00</td>
+      <td>2025-10-12 17:09:00</td>
+      <td>take_profit</td>
+      <td>21</td>
+      <td>192.468486</td>
+      <td>195.508872</td>
+      <td>0.427575</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14360.346849</td>
+    </tr>
+    <tr>
+      <td>2025-10-14 06:48:00</td>
+      <td>2025-10-14 06:47:00</td>
+      <td>2025-10-14 06:53:00</td>
+      <td>take_profit</td>
+      <td>5</td>
+      <td>192.638520</td>
+      <td>195.681592</td>
+      <td>0.461073</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14558.049132</td>
+    </tr>
+    <tr>
+      <td>2025-10-14 16:21:00</td>
+      <td>2025-10-14 16:20:00</td>
+      <td>2025-10-14 17:21:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>205.251042</td>
+      <td>203.549282</td>
+      <td>0.401561</td>
+      <td>0.000000</td>
+      <td>-0.007894</td>
+      <td>-0.010273</td>
+      <td>14408.500825</td>
+    </tr>
+    <tr>
+      <td>2025-10-16 09:35:00</td>
+      <td>2025-10-16 09:34:00</td>
+      <td>2025-10-16 09:44:00</td>
+      <td>take_profit</td>
+      <td>9</td>
+      <td>186.877368</td>
+      <td>189.829432</td>
+      <td>0.453118</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14606.866056</td>
+    </tr>
+    <tr>
+      <td>2025-10-29 18:40:00</td>
+      <td>2025-10-29 18:39:00</td>
+      <td>2025-10-29 18:50:00</td>
+      <td>take_profit</td>
+      <td>10</td>
+      <td>190.428078</td>
+      <td>193.436232</td>
+      <td>0.520561</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14807.962227</td>
+    </tr>
+    <tr>
+      <td>2025-11-03 15:28:00</td>
+      <td>2025-11-03 15:27:00</td>
+      <td>2025-11-03 16:28:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>168.533700</td>
+      <td>168.476298</td>
+      <td>0.412131</td>
+      <td>0.000000</td>
+      <td>0.000059</td>
+      <td>-0.002338</td>
+      <td>14773.342425</td>
+    </tr>
+    <tr>
+      <td>2025-11-04 05:32:00</td>
+      <td>2025-11-04 05:31:00</td>
+      <td>2025-11-04 06:32:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>159.111816</td>
+      <td>159.778038</td>
+      <td>0.451888</td>
+      <td>0.000000</td>
+      <td>0.004589</td>
+      <td>0.002181</td>
+      <td>14805.559584</td>
+    </tr>
+    <tr>
+      <td>2025-11-04 17:11:00</td>
+      <td>2025-11-04 17:10:00</td>
+      <td>2025-11-04 17:22:00</td>
+      <td>take_profit</td>
+      <td>11</td>
+      <td>154.000794</td>
+      <td>156.433514</td>
+      <td>0.453992</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>15009.391216</td>
+    </tr>
+    <tr>
+      <td>2025-11-04 20:18:00</td>
+      <td>2025-11-04 20:17:00</td>
+      <td>2025-11-04 20:25:00</td>
+      <td>take_profit</td>
+      <td>7</td>
+      <td>149.339862</td>
+      <td>151.698954</td>
+      <td>0.572968</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>15216.029047</td>
+    </tr>
+    <tr>
+      <td>2025-11-14 04:40:00</td>
+      <td>2025-11-14 04:39:00</td>
+      <td>2025-11-14 04:44:00</td>
+      <td>take_profit</td>
+      <td>4</td>
+      <td>139.107816</td>
+      <td>141.305274</td>
+      <td>0.467901</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>15425.511709</td>
+    </tr>
+    <tr>
+      <td>2025-11-17 14:37:00</td>
+      <td>2025-11-17 14:36:00</td>
+      <td>2025-11-17 15:37:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>141.798354</td>
+      <td>137.652464</td>
+      <td>0.494796</td>
+      <td>0.000000</td>
+      <td>-0.028850</td>
+      <td>-0.031178</td>
+      <td>14944.582631</td>
+    </tr>
+    <tr>
+      <td>2025-11-20 02:13:00</td>
+      <td>2025-11-20 02:12:00</td>
+      <td>2025-11-20 02:53:00</td>
+      <td>probability_exit</td>
+      <td>40</td>
+      <td>143.618718</td>
+      <td>143.021390</td>
+      <td>0.492906</td>
+      <td>0.000000</td>
+      <td>-0.003761</td>
+      <td>-0.006149</td>
+      <td>14852.691147</td>
+    </tr>
+    <tr>
+      <td>2025-11-20 16:15:00</td>
+      <td>2025-11-20 16:14:00</td>
+      <td>2025-11-20 17:15:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>134.196834</td>
+      <td>132.023590</td>
+      <td>0.447329</td>
+      <td>0.000000</td>
+      <td>-0.015801</td>
+      <td>-0.018160</td>
+      <td>14582.964849</td>
+    </tr>
+    <tr>
+      <td>2025-11-21 07:34:00</td>
+      <td>2025-11-21 07:33:00</td>
+      <td>2025-11-21 07:40:00</td>
+      <td>take_profit</td>
+      <td>6</td>
+      <td>125.905176</td>
+      <td>127.894075</td>
+      <td>0.447614</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14783.731967</td>
+    </tr>
+    <tr>
+      <td>2025-12-10 20:23:00</td>
+      <td>2025-12-10 20:22:00</td>
+      <td>2025-12-10 21:23:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>139.847964</td>
+      <td>137.922410</td>
+      <td>0.426884</td>
+      <td>0.000000</td>
+      <td>-0.013374</td>
+      <td>-0.015739</td>
+      <td>14551.044874</td>
+    </tr>
+    <tr>
+      <td>2025-12-17 15:00:00</td>
+      <td>2025-12-17 14:59:00</td>
+      <td>2025-12-17 16:00:00</td>
+      <td>max_hold</td>
+      <td>60</td>
+      <td>132.646524</td>
+      <td>127.014592</td>
+      <td>0.419719</td>
+      <td>0.000000</td>
+      <td>-0.042075</td>
+      <td>-0.044371</td>
+      <td>13905.395143</td>
+    </tr>
+    <tr>
+      <td>2025-12-18 17:24:00</td>
+      <td>2025-12-18 17:23:00</td>
+      <td>2025-12-18 17:41:00</td>
+      <td>take_profit</td>
+      <td>17</td>
+      <td>121.254246</td>
+      <td>123.169675</td>
+      <td>0.442350</td>
+      <td>1.000000</td>
+      <td>0.016203</td>
+      <td>0.013767</td>
+      <td>14096.833999</td>
+    </tr>
+    <tr>
+      <td>2025-12-18 19:41:00</td>
+      <td>2025-12-18 19:40:00</td>
+      <td>2025-12-18 20:20:00</td>
+      <td>probability_exit</td>
+      <td>39</td>
+      <td>117.593514</td>
+      <td>118.046386</td>
+      <td>0.516497</td>
+      <td>0.000000</td>
+      <td>0.004253</td>
+      <td>0.001845</td>
+      <td>14122.849257</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

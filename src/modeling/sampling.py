@@ -101,13 +101,14 @@ def create_sample_definition_from_db(
     sample_id: str,
     db_path: str | None = None,
     table_name: str | None = None,
+    asset_id: str | None = None,
     target_horizon_minutes: int = 240,
     min_train_days: int = 730,
     valid_days: int = 180,
     step_days: int = 180,
     test_days: int = 365,
 ) -> dict:
-    db_cfg = utils.load_db_config()["database"]
+    db_cfg = utils.load_asset_config(asset_id)["database"]
     db_path = db_path or db_cfg["db_path"]
     table_name = table_name or db_cfg["tables"]["features"]
     data_start, data_end = features_time_range(db_path, table_name)
@@ -123,6 +124,7 @@ def create_sample_definition_from_db(
         test_days=test_days,
     )
     sample["source"] = {
+        "asset_id": db_cfg.get("asset_id"),
         "db_path": db_path,
         "table_name": table_name,
     }

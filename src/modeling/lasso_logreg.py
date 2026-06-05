@@ -46,6 +46,7 @@ def train_lasso_logreg(
     max_iter: int = 300,
     random_state: int = 42,
     verbose: bool = False,
+    asset_id: str | None = None,
 ) -> dict:
     alphas = alphas or [0.001, 0.003, 0.01, 0.03, 0.10]
     output_dir = Path(output_dir)
@@ -59,6 +60,7 @@ def train_lasso_logreg(
         start=sample["data"]["start"],
         end=sample["data"]["end"],
         row_stride=row_stride,
+        asset_id=asset_id,
     )
     if len(dataset.y) == 0:
         raise ValueError("Training dataset is empty")

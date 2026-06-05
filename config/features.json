@@ -191,5 +191,41 @@
                 }
             }
         }
+    },
+    "profiles": {
+        "bchusdt_fw240": {
+            "description": "Existing BCHUSDT 240 minute long/short target profile.",
+            "targets": [
+                {
+                    "direction": "long",
+                    "name": "trg_l_fw240_q90",
+                    "rolling_window": 240,
+                    "percentile": 0.9
+                },
+                {
+                    "direction": "short",
+                    "name": "trg_s_fw240_q10",
+                    "rolling_window": 240,
+                    "percentile": 0.1
+                }
+            ]
+        },
+        "solusdt_fw60": {
+            "description": "SOLUSDT 60 minute long/short target profile using the shared indicator set.",
+            "targets": [
+                {
+                    "direction": "long",
+                    "name": "trg_l_fw60_q90",
+                    "rolling_window": 60,
+                    "percentile": 0.9
+                },
+                {
+                    "direction": "short",
+                    "name": "trg_s_fw60_q10",
+                    "rolling_window": 60,
+                    "percentile": 0.1
+                }
+            ]
+        }
     }
 }

@@ -128,3 +128,50 @@ def test_sync_features_expanded_columns_and_idempotency(tmp_path, monkeypatch) -
     assert df["open_time"].is_unique
     assert len(df) == 121
     assert df[list(expected_features)].notna().sum().sum() > 0
+
+
+def test_sync_features_uses_sol_feature_profile(tmp_path, monkeypatch) -> None:
+    db_path     = tmp_path / "sol_features_test.db"
+    table_ohlcv = "solusdt_1m"
+    table_feat  = "solusdt_1m_features"
+
+    with sqlite3.connect(db_path) as conn:
+        _build_ohlcv().to_sql(table_ohlcv, conn, index=False, if_exists="replace")
+
+    def load_asset_config(asset_id: str | None = None) -> dict:
+        assert asset_id == "solusdt_fw60"
+        return {
+            "database": {
+                "active_env": "test",
+                "asset_id": "solusdt_fw60",
+                "db_path": str(db_path),
+                "symbol": "SOLUSDT",
+                "interval": "1m",
+                "tables": {
+                    "ohlcv": table_ohlcv,
+                    "features": table_feat,
+                    "predictions": "solusdt_1m_predictions",
+                },
+                "features_profile": "solusdt_fw60",
+            }
+        }
+
+    monkeypatch.setattr(sync_features_module.utils, "load_asset_config", load_asset_config)
+
+    sync_features_module.sync_features(
+        start_time = "2024-01-01 00:00:00",
+        end_time   = "2024-01-01 01:00:00",
+        asset_id   = "solusdt_fw60",
+    )
+
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql_query(f"SELECT * FROM {table_feat}", conn)
+
+    assert "trg_l_fw60_q90" in df.columns
+    assert "trg_l_fw240_q90" not in df.columns
+    assert "trg_s_fw240_q10" not in df.columns
+    assert "feat_rsi_14" in df.columns
+    assert df["open_time"].is_unique
+    assert len(df) == 61
+    assert set(df["trg_l_fw60_q90"].unique()).issubset({0, 1})
+    assert df["trg_l_fw60_q90"].sum() > 0

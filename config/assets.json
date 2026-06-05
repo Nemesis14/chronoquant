@@ -1,0 +1,34 @@
+{
+    "schema_version": 1,
+    "default_asset_id": "bchusdt_fw240",
+    "assets": {
+        "bchusdt_fw240": {
+            "symbol": "BCHUSDT",
+            "interval": "1m",
+            "db_paths": {
+                "dev": "D:/repos/chronoquant/database/bchusdt_data_dev.db",
+                "prod": "D:/repos/chronoquant/database/bchusdt_data_prod.db"
+            },
+            "tables": {
+                "ohlcv": "bchusdt_1m",
+                "features": "bchusdt_1m_features",
+                "predictions": "bchusdt_1m_predictions"
+            },
+            "features_profile": "bchusdt_fw240"
+        },
+        "solusdt_fw60": {
+            "symbol": "SOLUSDT",
+            "interval": "1m",
+            "db_paths": {
+                "dev": "D:/repos/chronoquant/database/solusdt_data_dev.db",
+                "prod": "D:/repos/chronoquant/database/solusdt_data_prod.db"
+            },
+            "tables": {
+                "ohlcv": "solusdt_1m",
+                "features": "solusdt_1m_features",
+                "predictions": "solusdt_1m_predictions"
+            },
+            "features_profile": "solusdt_fw60"
+        }
+    }
+}

@@ -213,6 +213,100 @@
                 "active": false,
                 "role": "placeholder"
             }
+        },
+        "logit_solusdt_l_fw60_q90_pval_v1": {
+            "display_name": "SOL Long q90 p-value logistic baseline",
+            "description": "Statsmodels logistic regression for SOLUSDT top-decile forward 60 minute target, with iterative p-value feature filtering.",
+            "artifact_dir": "models/logit_solusdt_l_fw60_q90_pval_v1",
+            "prediction_column": "logit_solusdt_l_fw60_q90_pval_v1_p",
+            "metrics_path": "models/logit_solusdt_l_fw60_q90_pval_v1/metrics.json",
+            "asset_id": "solusdt_fw60",
+            "target": {
+                "direction": "long",
+                "horizon_minutes": 60,
+                "quantile": 0.9,
+                "column": "trg_l_fw60_q90"
+            },
+            "model": {
+                "family": "logit",
+                "implementation": "statsmodels",
+                "trainer": "statsmodels_pvalue_logreg",
+                "variant": "pval_v1",
+                "regularization": "iterative p-value feature filtering"
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "primary_tuning_parameter": "pvalue_rounds",
+                "fixed_regularization": {
+                    "p_threshold": 0.01
+                }
+            },
+            "status": {
+                "active": false,
+                "role": "candidate"
+            }
+        },
+        "logit_solusdt_l_fw60_q90_l1_v1": {
+            "display_name": "SOL Long q90 L1 logistic candidate",
+            "description": "Sklearn logistic regression for SOLUSDT top-decile forward 60 minute target, with L1 feature selection.",
+            "artifact_dir": "models/logit_solusdt_l_fw60_q90_l1_v1",
+            "prediction_column": "logit_solusdt_l_fw60_q90_l1_v1_p",
+            "metrics_path": "models/logit_solusdt_l_fw60_q90_l1_v1/metrics.json",
+            "asset_id": "solusdt_fw60",
+            "target": {
+                "direction": "long",
+                "horizon_minutes": 60,
+                "quantile": 0.9,
+                "column": "trg_l_fw60_q90"
+            },
+            "model": {
+                "family": "logit",
+                "implementation": "sklearn",
+                "trainer": "sklearn_lasso_logreg",
+                "variant": "l1_v1",
+                "regularization": "L1 logistic regression"
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "primary_tuning_parameter": "alpha"
+            },
+            "status": {
+                "active": false,
+                "role": "candidate"
+            }
+        },
+        "lgbm_solusdt_l_fw60_q90_stable_v1": {
+            "display_name": "SOL Long q90 LightGBM stable candidate",
+            "description": "LightGBM binary classifier for SOLUSDT top-decile forward 60 minute target, with conservative fixed regularization and num_leaves tuning.",
+            "artifact_dir": "models/lgbm_solusdt_l_fw60_q90_stable_v1",
+            "prediction_column": "lgbm_solusdt_l_fw60_q90_stable_v1_p",
+            "metrics_path": "models/lgbm_solusdt_l_fw60_q90_stable_v1/metrics.json",
+            "asset_id": "solusdt_fw60",
+            "target": {
+                "direction": "long",
+                "horizon_minutes": 60,
+                "quantile": 0.9,
+                "column": "trg_l_fw60_q90"
+            },
+            "model": {
+                "family": "lgbm",
+                "implementation": "lightgbm",
+                "trainer": "lightgbm_binary",
+                "variant": "stable_v1",
+                "regularization": "fixed stable parameter profile plus num_leaves tuning"
+            },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "primary_tuning_parameter": "num_leaves",
+                "param_profile": "lightgbm_binary_stable_v1"
+            },
+            "status": {
+                "active": false,
+                "role": "candidate"
+            }
         }
     }
 }

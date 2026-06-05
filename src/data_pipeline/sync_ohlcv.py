@@ -17,7 +17,7 @@ import utils
 from db.table_ops import drop_existing_open_times, sqlite_connect
 
 # =============================================================================
-# sync_ohlcv(open_time_ms_from: int) -> None
+# sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None
 # =============================================================================
 # Purpose:
 #  - Fetch klines from Binance starting at open_time_ms_from (epoch ms)
@@ -25,12 +25,13 @@ from db.table_ops import drop_existing_open_times, sqlite_connect
 #  - Insert rows into database OHLCV table
 # Parameters:
 #  - open_time_ms_from: epoch milliseconds (UTC)
+#  - asset_id: optional asset id from config/assets.json
 # =============================================================================
-def sync_ohlcv(open_time_ms_from: int) -> None:
+def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     # -------------------------------------------------------------------------
     # Load configuration
     # -------------------------------------------------------------------------
-    db_cfg       = utils.load_db_config()
+    db_cfg       = utils.load_asset_config(asset_id)
     env_cfg      = utils.load_env_config()
     db_path      = db_cfg["database"]["db_path"]
     symbol       = db_cfg["database"]["symbol"]

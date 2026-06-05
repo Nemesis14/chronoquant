@@ -69,6 +69,11 @@ def parse_args() -> argparse.Namespace:
         default = "samples",
         help    = "Root directory for generated sample definitions",
     )
+    parser.add_argument(
+        "--asset-id",
+        default = None,
+        help    = "Asset ID from config/assets.json (e.g. solusdt_fw60); omit for BCH default",
+    )
     return parser.parse_args()
 
 
@@ -82,6 +87,7 @@ def main() -> None:
     args = parse_args()
     sample = create_sample_definition_from_db(
         sample_id              = args.sample_id,
+        asset_id               = args.asset_id,
         target_horizon_minutes = args.target_horizon_minutes,
         min_train_days         = args.min_train_days,
         valid_days             = args.valid_days,

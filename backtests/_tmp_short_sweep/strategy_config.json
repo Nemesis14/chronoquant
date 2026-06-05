@@ -1,0 +1,21 @@
+{
+    "asset_id": "solusdt_fw60",
+    "model_id": "lgbm_solusdt_s_fw60_q10_stable_v1",
+    "side": "short",
+    "start": "2024-01-01 00:00:00",
+    "end": "2026-01-01 00:00:00",
+    "initial_equity": 10000.0,
+    "rearm_threshold": 0.148,
+    "exit_threshold": 0.105,
+    "min_hold_minutes": 10,
+    "take_profit_pct": 0.016,
+    "trailing_activation_pct": 0.0,
+    "trailing_stop_pct": 0.0,
+    "cooldown_minutes": 60,
+    "fee_bps_per_side": 10.0,
+    "slippage_bps_per_side": 2.0,
+    "output_dir": "backtests/_tmp_short_sweep",
+    "entry_threshold": 0.55,
+    "max_hold_minutes": 30,
+    "stop_loss_pct": 0.01
+}

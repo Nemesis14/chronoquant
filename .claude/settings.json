@@ -2,6 +2,7 @@
   "enabledMcpjsonServers": ["language-server"],
   "permissions": {
     "allow": [
+      "Bash(*)",
       "Bash(python scripts/rebuild_derived_tables.py*)",
       "Bash(python scripts/create_sample_splits.py*)",
       "Bash(python scripts/train_model.py*)",
@@ -10,8 +11,12 @@
       "Bash(pytest*)",
       "Bash(ls*)",
       "Bash(dir*)",
+      "Edit(*)",
+      "Edit(**/*)",
       "Edit(config/*)",
       "Edit(src/*)",
+      "Write(*)",
+      "Write(**/*)",
       "Write(config/*)",
       "Write(src/*)"
     ]

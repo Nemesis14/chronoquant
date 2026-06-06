@@ -388,14 +388,15 @@ When writing code for ChronoQuant:
 - [ ] Follow PEP 8
 - [ ] Use 4 spaces for indentation
 - [ ] Do not use tabs
-- [ ] Do not vertically align assignments or function parameters
+- [ ] Align related assignment blocks and multi-line keyword calls only where the
+      guide explicitly allows it
 - [ ] Use snake_case for all names
 - [ ] Prefix configs: `*_cfg`
 - [ ] Prefix features: `feat_*`
 - [ ] Prefix targets: `trg_*`
 - [ ] Add type hints on all functions
 - [ ] Use f-strings for formatting
-- [ ] Use emoji in console output for clarity
+- [ ] Use plain ASCII status prefixes in console output; avoid emojis in runtime logs
 - [ ] Follow config -> logic -> error flow
 - [ ] Keep Streamlit UI read-only unless a later plan explicitly adds controls
 

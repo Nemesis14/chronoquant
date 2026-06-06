@@ -10,6 +10,19 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+CHART_LOAD_LOOKBACK_HOURS = 8
+CHART_INITIAL_FOCUS_HOURS = 2
+
+_BG    = "#0b0e11"
+_PANEL = "#111418"
+_GRID  = "#2b3139"
+_TEXT  = "#eaecef"
+_MUTED = "#848e9c"
+_GREEN = "#0ecb81"
+_RED   = "#f6465d"
+_GOLD  = "#f0b90b"
+
+
 def prediction_price_figure(
     df: pd.DataFrame,
     entry_threshold: float | None = None,
@@ -18,6 +31,7 @@ def prediction_price_figure(
     short_entry_threshold: float | None = None,
     short_rearm_threshold: float | None = None,
     short_exit_threshold: float | None = None,
+    active_trade: dict | None = None,
 ):
     fig = make_subplots(
         rows=3,
@@ -28,25 +42,34 @@ def prediction_price_figure(
     )
 
     if df.empty:
-        fig.add_annotation(text="No prediction data", x=0.5, y=0.90, xref="paper", yref="paper", showarrow=False)
-        fig.add_annotation(text="No price data",      x=0.5, y=0.50, xref="paper", yref="paper", showarrow=False)
-        fig.add_annotation(text="No prediction data", x=0.5, y=0.10, xref="paper", yref="paper", showarrow=False)
-        return _style_price_figure(fig)
+        _ann(fig, "No prediction data", 0.90)
+        _ann(fig, "No price data",      0.50)
+        _ann(fig, "No prediction data", 0.10)
+        return _style_figure(fig)
 
     plot_df = df.copy()
     plot_df["open_time"] = pd.to_datetime(plot_df["open_time"], errors="coerce")
-    for col in ["open", "high", "low", "close"]:
+    for col in ("open", "high", "low", "close"):
         if col in plot_df.columns:
             plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
-    for col in ["prediction", "short_prediction"]:
+    for col in ("prediction", "short_prediction"):
         if col in plot_df.columns:
             plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
-    plot_df = plot_df.dropna(subset=["open_time"]).reset_index(drop=True)
+    plot_df = (
+        plot_df.dropna(subset=["open_time"])
+        .sort_values("open_time")
+        .drop_duplicates(subset=["open_time"])
+        .reset_index(drop=True)
+    )
     if plot_df.empty:
-        fig.add_annotation(text="No valid timestamps", x=0.5, y=0.50, xref="paper", yref="paper", showarrow=False)
-        return _style_price_figure(fig)
+        _ann(fig, "No valid timestamps", 0.50)
+        return _style_figure(fig)
 
-    # --- Row 1: Long prediction panel ---
+    latest_ts = plot_df["open_time"].max()
+    x_end     = latest_ts + pd.Timedelta(minutes=2)
+    x_start   = latest_ts - pd.Timedelta(hours=CHART_INITIAL_FOCUS_HOURS)
+
+    # --- Row 1: Long prediction ---
     if "prediction" in plot_df.columns and not plot_df["prediction"].dropna().empty:
         fig.add_trace(
             go.Scatter(
@@ -54,40 +77,39 @@ def prediction_price_figure(
                 y=plot_df["prediction"],
                 mode="lines",
                 name="long prediction",
-                line={"color": "#2563eb", "width": 1.9},
+                line={"color": "#5b8af5", "width": 1.9},
                 hovertemplate="long pred<br>%{x}<br>%{y:.4f}<extra></extra>",
                 showlegend=False,
             ),
             row=1, col=1,
         )
     else:
-        fig.add_annotation(text="No long prediction data", x=0.5, y=0.90, xref="paper", yref="paper", showarrow=False)
+        _ann(fig, "No long prediction data", 0.90)
 
-    _add_threshold_trace(fig, plot_df, entry_threshold, "entry", "#16a34a", row=1)
-    _add_threshold_trace(fig, plot_df, rearm_threshold,  "rearm",  "#64748b", row=1)
-    _add_threshold_trace(fig, plot_df, exit_threshold,   "exit",   "#dc2626", row=1)
-    _add_threshold_panel_legend(
+    _add_threshold_trace(fig, plot_df, entry_threshold, "entry", _GREEN, row=1)
+    _add_threshold_trace(fig, plot_df, rearm_threshold, "rearm", _MUTED, row=1)
+    _add_threshold_trace(fig, plot_df, exit_threshold,  "exit",  _RED,   row=1)
+    _threshold_legend(
         fig,
-        [(entry_threshold, "entry", "#16a34a"), (rearm_threshold, "rearm", "#64748b"), (exit_threshold, "exit", "#dc2626")],
-        y_domain_ref="y domain",
+        [(entry_threshold, "entry", _GREEN), (rearm_threshold, "rearm", _MUTED), (exit_threshold, "exit", _RED)],
+        "y domain",
     )
 
     # --- Row 2: Candlestick / price ---
-    has_ohlc = _has_ohlc(plot_df)
-    if has_ohlc:
-        candle_df = plot_df.dropna(subset=["open", "high", "low", "close"]).copy()
+    if _has_ohlc(plot_df):
+        cdf = plot_df.dropna(subset=["open", "high", "low", "close"]).copy()
         fig.add_trace(
             go.Candlestick(
-                x=candle_df["open_time"],
-                open=candle_df["open"],
-                high=candle_df["high"],
-                low=candle_df["low"],
-                close=candle_df["close"],
+                x=cdf["open_time"],
+                open=cdf["open"],
+                high=cdf["high"],
+                low=cdf["low"],
+                close=cdf["close"],
                 name="OHLC",
-                increasing_line_color="#0ECB81",
-                increasing_fillcolor="#0ECB81",
-                decreasing_line_color="#F6465D",
-                decreasing_fillcolor="#F6465D",
+                increasing_line_color=_GREEN,
+                increasing_fillcolor=_GREEN,
+                decreasing_line_color=_RED,
+                decreasing_fillcolor=_RED,
                 whiskerwidth=0.45,
                 showlegend=False,
             ),
@@ -100,19 +122,21 @@ def prediction_price_figure(
                 y=plot_df["close"],
                 mode="lines",
                 name="close",
-                line={"color": "#111827", "width": 1.8},
+                line={"color": _TEXT, "width": 1.8},
                 showlegend=False,
             ),
             row=2, col=1,
         )
 
-    # Entry signal triangles on the candle chart
+    if active_trade:
+        _add_trade_overlay(fig, plot_df, active_trade)
+
     high_col = plot_df["high"] if "high" in plot_df.columns else plot_df.get("close")
     if high_col is not None:
-        _add_long_signal_markers(fig, plot_df, high_col, entry_threshold)
-        _add_short_signal_markers(fig, plot_df, high_col, short_entry_threshold)
+        _long_signal_markers(fig, plot_df, high_col, entry_threshold)
+        _short_signal_markers(fig, plot_df, high_col, short_entry_threshold)
 
-    # --- Row 3: Short prediction panel ---
+    # --- Row 3: Short prediction ---
     if "short_prediction" in plot_df.columns and not plot_df["short_prediction"].dropna().empty:
         fig.add_trace(
             go.Scatter(
@@ -120,25 +144,64 @@ def prediction_price_figure(
                 y=plot_df["short_prediction"],
                 mode="lines",
                 name="short prediction",
-                line={"color": "#dc2626", "width": 1.9},
+                line={"color": _RED, "width": 1.9},
                 hovertemplate="short pred<br>%{x}<br>%{y:.4f}<extra></extra>",
                 showlegend=False,
             ),
             row=3, col=1,
         )
     else:
-        fig.add_annotation(text="No short prediction data", x=0.5, y=0.10, xref="paper", yref="paper", showarrow=False)
+        _ann(fig, "No short prediction data", 0.10)
 
-    _add_threshold_trace(fig, plot_df, short_entry_threshold, "entry", "#16a34a", row=3)
-    _add_threshold_trace(fig, plot_df, short_rearm_threshold,  "rearm",  "#64748b", row=3)
-    _add_threshold_trace(fig, plot_df, short_exit_threshold,   "exit",   "#dc2626", row=3)
-    _add_threshold_panel_legend(
+    _add_threshold_trace(fig, plot_df, short_entry_threshold, "entry", _GREEN, row=3)
+    _add_threshold_trace(fig, plot_df, short_rearm_threshold, "rearm", _MUTED, row=3)
+    _add_threshold_trace(fig, plot_df, short_exit_threshold,  "exit",  _RED,   row=3)
+    _threshold_legend(
         fig,
-        [(short_entry_threshold, "entry", "#16a34a"), (short_rearm_threshold, "rearm", "#64748b"), (short_exit_threshold, "exit", "#dc2626")],
-        y_domain_ref="y3 domain",
+        [(short_entry_threshold, "entry", _GREEN), (short_rearm_threshold, "rearm", _MUTED), (short_exit_threshold, "exit", _RED)],
+        "y3 domain",
     )
 
-    return _style_price_figure(fig)
+    if all(v is None for v in (short_entry_threshold, short_rearm_threshold, short_exit_threshold)):
+        fig.add_annotation(
+            x=0.01, y=0.15,
+            xref="paper", yref="y3 domain",
+            text="no strategy thresholds configured",
+            showarrow=False, xanchor="left", yanchor="bottom",
+            font={"color": _MUTED, "size": 10},
+        )
+
+    return _style_figure(fig, x_start=x_start, x_end=x_end)
+
+
+def _ann(fig, text: str, y: float) -> None:
+    fig.add_annotation(
+        text=text, x=0.5, y=y, xref="paper", yref="paper",
+        showarrow=False, font={"color": _MUTED, "size": 13},
+    )
+
+
+def _add_trade_overlay(fig, df: pd.DataFrame, trade: dict) -> None:
+    x0 = df["open_time"].min()
+    x1 = df["open_time"].max() + pd.Timedelta(minutes=30)
+
+    def _hline(val, color: str, label: str) -> None:
+        if val is None:
+            return
+        fig.add_trace(
+            go.Scatter(
+                x=[x0, x1], y=[float(val), float(val)],
+                mode="lines", name=label,
+                line={"color": color, "width": 1.5, "dash": "dash"},
+                hovertemplate=f"{label} %{{y:.4f}}<extra></extra>",
+                showlegend=False,
+            ),
+            row=2, col=1,
+        )
+
+    _hline(trade.get("entry_price"), _GOLD,  "Entry")
+    _hline(trade.get("stop_loss"),   _RED,   "SL")
+    _hline(trade.get("take_profit"), _GREEN, "TP")
 
 
 def _has_ohlc(df: pd.DataFrame) -> bool:
@@ -156,13 +219,12 @@ def _add_threshold_trace(
 ) -> None:
     if value is None or df.empty:
         return
-    threshold = float(value)
+    t = float(value)
     fig.add_trace(
         go.Scatter(
             x=[df["open_time"].min(), df["open_time"].max()],
-            y=[threshold, threshold],
-            mode="lines",
-            name=label,
+            y=[t, t],
+            mode="lines", name=label,
             line={"color": color, "width": 1.2, "dash": "dash"},
             hovertemplate=f"{label}<br>%{{y:.4f}}<extra></extra>",
             showlegend=False,
@@ -171,35 +233,27 @@ def _add_threshold_trace(
     )
 
 
-def _add_threshold_panel_legend(
+def _threshold_legend(
     fig,
     items: list[tuple[float | None, str, str]],
     y_domain_ref: str = "y domain",
 ) -> None:
-    valid_items = [(float(v), label, color) for v, label, color in items if v is not None]
-    if not valid_items:
+    valid = [(float(v), l, c) for v, l, c in items if v is not None]
+    if not valid:
         return
-    x_positions = [0.01, 0.22, 0.43]
-    for x_pos, (value, label, color) in zip(x_positions, valid_items):
+    for x_pos, (value, label, color) in zip([0.01, 0.22, 0.43], valid):
         fig.add_annotation(
-            x=x_pos,
-            y=0.97,
-            xref="paper",
-            yref=y_domain_ref,
+            x=x_pos, y=0.97,
+            xref="paper", yref=y_domain_ref,
             text=f"{label} {value:.3f}",
-            showarrow=False,
-            xanchor="left",
-            yanchor="top",
-            align="left",
+            showarrow=False, xanchor="left", yanchor="top",
             font={"color": color, "size": 11},
-            bgcolor="rgba(255, 255, 255, 0.86)",
-            bordercolor=color,
-            borderwidth=1,
-            borderpad=3,
+            bgcolor="rgba(17, 20, 24, 0.88)",
+            bordercolor=color, borderwidth=1, borderpad=3,
         )
 
 
-def _add_long_signal_markers(
+def _long_signal_markers(
     fig,
     df: pd.DataFrame,
     high_col: pd.Series,
@@ -208,30 +262,24 @@ def _add_long_signal_markers(
     if entry_threshold is None or "prediction" not in df.columns:
         return
     mask = df["prediction"].notna() & (df["prediction"] >= float(entry_threshold))
-    signals = df[mask]
-    if signals.empty:
+    sig = df[mask]
+    if sig.empty:
         return
     fig.add_trace(
         go.Scatter(
-            x=signals["open_time"],
+            x=sig["open_time"],
             y=high_col[mask] * 1.0015,
-            mode="markers",
-            name="long signal",
-            marker={
-                "symbol": "triangle-up",
-                "color": "#16a34a",
-                "size": 9,
-                "line": {"width": 0},
-            },
+            mode="markers", name="long signal",
+            marker={"symbol": "triangle-up", "color": _GREEN, "size": 9, "line": {"width": 0}},
             hovertemplate="long signal<br>p=%{customdata:.3f}<extra></extra>",
-            customdata=signals["prediction"].values,
+            customdata=sig["prediction"].values,
             showlegend=False,
         ),
         row=2, col=1,
     )
 
 
-def _add_short_signal_markers(
+def _short_signal_markers(
     fig,
     df: pd.DataFrame,
     high_col: pd.Series,
@@ -240,110 +288,85 @@ def _add_short_signal_markers(
     if short_entry_threshold is None or "short_prediction" not in df.columns:
         return
     mask = df["short_prediction"].notna() & (df["short_prediction"] >= float(short_entry_threshold))
-    signals = df[mask]
-    if signals.empty:
+    sig = df[mask]
+    if sig.empty:
         return
     fig.add_trace(
         go.Scatter(
-            x=signals["open_time"],
+            x=sig["open_time"],
             y=high_col[mask] * 1.0015,
-            mode="markers",
-            name="short signal",
-            marker={
-                "symbol": "triangle-down",
-                "color": "#dc2626",
-                "size": 9,
-                "line": {"width": 0},
-            },
+            mode="markers", name="short signal",
+            marker={"symbol": "triangle-down", "color": _RED, "size": 9, "line": {"width": 0}},
             hovertemplate="short signal<br>p=%{customdata:.3f}<extra></extra>",
-            customdata=signals["short_prediction"].values,
+            customdata=sig["short_prediction"].values,
             showlegend=False,
         ),
         row=2, col=1,
     )
 
 
-def _style_price_figure(fig):
+def _style_figure(fig, x_start=None, x_end=None):
+    xkw: dict = dict(
+        title_text="",
+        tickfont={"color": _MUTED, "size": 11},
+        linecolor=_GRID, linewidth=1, mirror=False,
+        showgrid=True, gridcolor=_GRID,
+        rangeslider={"visible": False},
+        nticks=9, tickformat="%H:%M<br>%m-%d",
+        showspikes=True, spikemode="across",
+        spikesnap="cursor", spikedash="dot", spikecolor=_MUTED,
+    )
+    if x_start is not None and x_end is not None:
+        xkw["range"] = [x_start.isoformat(), x_end.isoformat()]
+
     fig.update_layout(
-        template="plotly_white",
-        height=760,
-        margin={"l": 24, "r": 72, "t": 24, "b": 62},
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#fbfdff",
+        template="plotly_dark",
+        height=720,
+        margin={"l": 0, "r": 72, "t": 12, "b": 40},
+        paper_bgcolor=_BG,
+        plot_bgcolor=_PANEL,
         hovermode="x unified",
         dragmode="pan",
         uirevision="chronoquant-price-prediction-chart",
         showlegend=False,
+        font={"color": _TEXT},
         newshape={
-            "line": {"color": "#7c3aed", "width": 2},
-            "fillcolor": "rgba(124, 58, 237, 0.10)",
+            "line": {"color": _GOLD, "width": 2},
+            "fillcolor": "rgba(240,185,11,0.10)",
             "opacity": 0.85,
         },
     )
-    fig.update_xaxes(
-        title_text="",
-        tickfont={"color": "#111827", "size": 12},
-        linecolor="#111827",
-        linewidth=1.2,
-        mirror=True,
-        showgrid=True,
-        gridcolor="#e5eaf2",
-        rangeslider={"visible": False},
-        nticks=9,
-        tickformat="%H:%M<br>%m-%d",
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikedash="dot",
-        spikecolor="#64748b",
-    )
-    # Row 1 — long prediction y-axis
+    fig.update_xaxes(**xkw)
     fig.update_yaxes(
         title_text="Long",
-        title_font={"color": "#2563eb", "size": 12},
-        tickfont={"color": "#111827", "size": 11},
-        linecolor="#111827",
-        linewidth=1.2,
-        mirror=True,
-        side="right",
-        showgrid=True,
-        gridcolor="#e5eaf2",
-        zeroline=False,
-        range=[-0.02, 1.02],
-        tickformat=".2f",
-        fixedrange=False,
+        title_font={"color": "#5b8af5", "size": 11},
+        tickfont={"color": _MUTED, "size": 11},
+        linecolor=_GRID, linewidth=1,
+        mirror=False, side="right",
+        showgrid=True, gridcolor=_GRID,
+        zeroline=False, range=[-0.02, 1.02],
+        tickformat=".2f", fixedrange=False,
         row=1, col=1,
     )
-    # Row 2 — price y-axis
     fig.update_yaxes(
         title_text="",
-        tickfont={"color": "#111827", "size": 12},
-        linecolor="#111827",
-        linewidth=1.2,
-        mirror=True,
-        side="right",
-        showgrid=True,
-        gridcolor="#e5eaf2",
-        zeroline=False,
-        tickformat=",.2f",
+        tickfont={"color": _MUTED, "size": 12},
+        linecolor=_GRID, linewidth=1,
+        mirror=False, side="right",
+        showgrid=True, gridcolor=_GRID,
+        zeroline=False, tickformat=",.2f",
         fixedrange=False,
         row=2, col=1,
     )
-    # Row 3 — short prediction y-axis
     fig.update_yaxes(
         title_text="Short",
-        title_font={"color": "#dc2626", "size": 12},
-        tickfont={"color": "#111827", "size": 11},
-        linecolor="#111827",
-        linewidth=1.2,
-        mirror=True,
-        side="right",
-        showgrid=True,
-        gridcolor="#e5eaf2",
-        zeroline=False,
-        range=[-0.02, 1.02],
-        tickformat=".2f",
-        fixedrange=False,
+        title_font={"color": "#e05252", "size": 11},
+        tickfont={"color": _MUTED, "size": 11},
+        linecolor=_GRID, linewidth=1,
+        mirror=False, side="right",
+        showgrid=True, gridcolor=_GRID,
+        zeroline=False, range=[-0.02, 1.02],
+        tickformat=".2f", fixedrange=False,
         row=3, col=1,
     )
     return fig
@@ -377,7 +400,7 @@ def equity_figure(df: pd.DataFrame):
         fig.tight_layout()
         return fig
 
-    time_col = "open_time" if "open_time" in df.columns else df.columns[0]
+    time_col   = "open_time" if "open_time" in df.columns else df.columns[0]
     equity_col = "equity" if "equity" in df.columns else df.select_dtypes("number").columns[-1]
     ax.plot(pd.to_datetime(df[time_col]), pd.to_numeric(df[equity_col], errors="coerce"), color="#0f766e")
     ax.set_title("Equity curve")

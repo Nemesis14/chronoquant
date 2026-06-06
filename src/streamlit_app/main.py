@@ -1,10 +1,6 @@
 # =============================================================================
 # ChronoQuant Streamlit dashboard
 # =============================================================================
-# Purpose:
-#  - Live monitoring for BCH 4h and SOL 1h long prediction pipelines
-#  - Per-asset sync state, background sync threads, and prediction charts
-# =============================================================================
 
 from __future__ import annotations
 
@@ -19,9 +15,12 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from streamlit_app import data
-from streamlit_app.components.charts import PLOTLY_CHART_CONFIG, prediction_price_figure
-from streamlit_app.components.formatting import number
+from streamlit_app import binance_data, data
+from streamlit_app.components.charts import (
+    CHART_LOAD_LOOKBACK_HOURS,
+    PLOTLY_CHART_CONFIG,
+    prediction_price_figure,
+)
 from streamlit_app.dashboard_logging import clear_logs, get_dashboard_logger, read_recent_logs
 from streamlit_app.sync_runner import (
     auto_sync_due_seconds,
@@ -32,6 +31,15 @@ from streamlit_app.sync_runner import (
     start_sync,
 )
 
+# Dark theme palette (matches charts.py)
+_BG    = "#0b0e11"
+_PANEL = "#111418"
+_GRID  = "#2b3139"
+_TEXT  = "#eaecef"
+_MUTED = "#848e9c"
+_GREEN = "#0ecb81"
+_RED   = "#f6465d"
+_GOLD  = "#f0b90b"
 
 st.set_page_config(
     page_title="ChronoQuant",
@@ -41,31 +49,37 @@ st.set_page_config(
 )
 
 st.markdown(
-    """
+    f"""
     <style>
-    .block-container { padding-top: 4.25rem; padding-bottom: 1rem; max-width: 100%; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 4.25rem; }
-    [data-testid="stMetricValue"] { font-size: 1.05rem; }
-    textarea { font-family: Consolas, monospace; font-size: 0.78rem; }
+    /* Hide Streamlit's built-in sticky header bar */
+    header[data-testid="stHeader"] {{ display: none; }}
+    /* Base font bump — Streamlit default is ~14px which feels small at wide layout */
+    html, body {{ font-size: 15px; }}
+    .stApp, .block-container {{ font-size: 15px; }}
+    p, span, div, label, .stCaption {{ font-size: 1rem; }}
+    .block-container {{ padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }}
+    [data-testid="stSidebar"] > div:first-child {{ padding-top: 1.5rem; }}
+    [data-testid="stPlotlyChart"] {{ border-radius: 6px; overflow: hidden; }}
+    /* Sidebar labels */
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {{ font-size: 0.95rem; }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# ─── Session init ─────────────────────────────────────────────────────────────
+if "active_asset_id" not in st.session_state:
+    st.session_state["active_asset_id"] = None  # None = BCH
+
 if "dashboard_started_logged" not in st.session_state:
     get_dashboard_logger().info("Dashboard started")
     st.session_state.dashboard_started_logged = True
 
-CHART_LOOKBACK_HOURS = 4
-
 
 # =============================================================================
-# _render_sync_controls(asset_id) — shared sync panel logic
+# Sync controls
 # =============================================================================
-# Purpose:
-#  - Render sync status, Sync/Stop buttons, and trigger chart refresh
-#    when a sync completes. Called from per-asset st.fragment wrappers.
-# =============================================================================
+
 def _render_sync_controls(asset_id: str | None) -> None:
     state   = ensure_sync_state(st.session_state, asset_id)
     running = is_sync_running(state, asset_id)
@@ -102,8 +116,7 @@ def _render_sync_controls(asset_id: str | None) -> None:
 
     if st.button("Sync", key=f"sync_{btn_key}", type="primary", width="stretch", disabled=running):
         enable_auto_sync(state)
-        started_ok = start_sync(state, asset_id)
-        if started_ok:
+        if start_sync(state, asset_id):
             logger.info("Sync requested from UI; live polling enabled")
         st.rerun(scope="app")
 
@@ -119,16 +132,6 @@ def _render_sync_controls(asset_id: str | None) -> None:
         st.rerun(scope="app")
 
 
-def _resolve_short_strategy(strategies_cfg: dict, asset_id: str | None) -> dict:
-    for scfg in strategies_cfg.get("strategies", {}).values():
-        if scfg.get("asset_id") != asset_id:
-            continue
-        model_id = scfg.get("model_id", "")
-        if "_s_" in model_id or "short" in model_id:
-            return scfg
-    return {}
-
-
 @st.fragment(run_every="2s")
 def _sync_panel_bch() -> None:
     _render_sync_controls(asset_id=None)
@@ -140,45 +143,54 @@ def _sync_panel_sol() -> None:
 
 
 # =============================================================================
-# render_asset_dashboard(asset_id, strategy_id) -> None
+# Chart area (left 60%)
 # =============================================================================
-# Purpose:
-#  - Render metrics row and prediction chart for one asset tab
-# =============================================================================
-def render_asset_dashboard(asset_id: str | None, strategy_id: str | None) -> None:
-    cfg      = data.load_dashboard_config(asset_id=asset_id)
-    strategy = cfg.get("strategy", {})
 
+def _resolve_short_strategy(strategies_cfg: dict, asset_id: str | None) -> dict:
+    for scfg in strategies_cfg.get("strategies", {}).values():
+        if scfg.get("asset_id") != asset_id:
+            continue
+        model_id = scfg.get("model_id", "")
+        if "_s_" in model_id or "short" in model_id:
+            return scfg
+    return {}
+
+
+def render_asset_chart(asset_id: str | None) -> None:
+    cfg            = data.load_dashboard_config(asset_id=asset_id)
+    strategy       = cfg.get("strategy", {})
     strategies_cfg = data.utils.load_strategies_config()
     short_strategy = _resolve_short_strategy(strategies_cfg, asset_id)
 
     sync_state   = ensure_sync_state(st.session_state, asset_id)
     sync_running = is_sync_running(sync_state, asset_id)
 
-    cache_latest  = f"dashboard_latest_{asset_id or 'default'}"
-    cache_history = f"dashboard_history_{asset_id or 'default'}"
+    cache_hist = f"chart_history_{asset_id or 'default'}"
+    cache_pos  = f"chart_position_{asset_id or 'default'}"
 
     if sync_running:
-        latest = st.session_state.get(cache_latest)
-        df     = st.session_state.get(cache_history, pd.DataFrame())
+        df       = st.session_state.get(cache_hist, pd.DataFrame())
+        position = st.session_state.get(cache_pos)
     else:
         try:
-            latest = data.latest_prediction(asset_id=asset_id)
-            df     = data.prediction_history(lookback_hours=CHART_LOOKBACK_HOURS, asset_id=asset_id)
-            st.session_state[cache_latest]  = latest
-            st.session_state[cache_history] = df
+            df       = data.prediction_history(lookback_hours=CHART_LOAD_LOOKBACK_HOURS, asset_id=asset_id)
+            position = data.active_position(asset_id=asset_id)
+            st.session_state[cache_hist] = df
+            st.session_state[cache_pos]  = position
         except sqlite3.OperationalError as exc:
             if "locked" not in str(exc).lower():
                 raise
-            get_dashboard_logger().warning("Dashboard DB read skipped because database is locked")
-            latest = st.session_state.get(cache_latest)
-            df     = st.session_state.get(cache_history, pd.DataFrame())
+            get_dashboard_logger().warning("Chart DB read skipped — database locked")
+            df       = st.session_state.get(cache_hist, pd.DataFrame())
+            position = st.session_state.get(cache_pos)
 
-    metric_cols = st.columns(4)
-    metric_cols[0].metric("Symbol",    cfg.get("symbol") or "n/a")
-    metric_cols[1].metric("Window",    f"{CHART_LOOKBACK_HOURS}h")
-    metric_cols[2].metric("Open time", str(latest.get("open_time")) if latest else "n/a")
-    metric_cols[3].metric("Close",     number(latest.get("close"), 2) if latest else "n/a")
+    active_trade = None
+    if position:
+        active_trade = {
+            "entry_price": position.get("entry_price") or position.get("open_price"),
+            "stop_loss":   position.get("stop_loss") or position.get("sl_price") or position.get("sl"),
+            "take_profit": position.get("take_profit") or position.get("tp_price") or position.get("tp"),
+        }
 
     fig = prediction_price_figure(
         df,
@@ -188,130 +200,227 @@ def render_asset_dashboard(asset_id: str | None, strategy_id: str | None) -> Non
         short_entry_threshold=short_strategy.get("entry_threshold"),
         short_rearm_threshold=short_strategy.get("rearm_threshold"),
         short_exit_threshold=short_strategy.get("exit_threshold"),
+        active_trade=active_trade,
     )
     st.plotly_chart(fig, config=PLOTLY_CHART_CONFIG, width="stretch")
 
 
 # =============================================================================
-# Log panel helpers
+# Trade panel helpers (right 40%)
 # =============================================================================
 
-_LOG_HEADER_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}")
-_DB_KEYWORDS = (
-    "sqlite",
-    "database",
-    " db",
-    "table",
-    "ohlcv",
-    "feature",
-    "prediction",
-    "signal",
-    "journal",
-    "inserted",
-    "synced",
-    "rows",
+_CARD = (
+    f"border:1px solid {_GRID}; border-radius:6px; "
+    f"padding:12px 14px; background:{_PANEL}; margin-bottom:10px;"
 )
+_LBL = f"color:{_MUTED}; font-size:13px;"
+_VAL = f"color:{_TEXT}; font-size:14px; font-weight:500;"
+_HDR = f"color:{_TEXT}; font-size:14px; font-weight:700; margin-bottom:10px;"
 
 
-def _render_log_html(lines: list[str]) -> None:
-    entries = _log_entries(lines)
-    body = "\n".join(_render_log_entry(entry) for entry in reversed(entries)) if entries else _empty_log_html()
-    st.iframe(
+def _fmt(val, digits: int = 4) -> str:
+    if val is None:
+        return "—"
+    try:
+        return f"{float(val):,.{digits}f}"
+    except (TypeError, ValueError):
+        return str(val)
+
+
+def _fmt_time(val) -> str:
+    if val is None:
+        return "—"
+    s = str(val)
+    return s[:16] if len(s) >= 16 else s
+
+
+def _render_active_trade_card(position: dict | None) -> None:
+    if not position:
+        st.markdown(
+            f'<div style="{_CARD}">'
+            f'<div style="{_HDR}">Active Trade</div>'
+            f'<div style="{_LBL}">No active trade</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    side      = str(position.get("side") or position.get("direction") or "LONG").upper()
+    entry     = position.get("entry_price") or position.get("open_price")
+    sl        = position.get("stop_loss") or position.get("sl_price") or position.get("sl")
+    tp        = position.get("take_profit") or position.get("tp_price") or position.get("tp")
+    open_time = position.get("entry_time") or position.get("open_time") or position.get("created_at")
+
+    side_color = _GREEN if "LONG" in side else _RED
+    arrow      = "▲" if "LONG" in side else "▼"
+
+    st.markdown(
         f"""
-        <style>
-        #cq-log-box {{
-            box-sizing: border-box;
-            height: 360px;
-            width: 100%;
-            overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            background: #f8fafc;
-            color: #0f172a;
-            font-family: Consolas, "Courier New", monospace;
-            font-size: 12px;
-            line-height: 1.35;
-        }}
-        .log-row {{
-            display: grid;
-            grid-template-columns: 118px 76px 54px minmax(0, 1fr);
-            gap: 8px;
-            align-items: start;
-            padding: 7px 9px;
-            margin-bottom: 6px;
-            border: 1px solid #e2e8f0;
-            border-left: 4px solid #64748b;
-            border-radius: 6px;
-            background: #ffffff;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-        }}
-        .log-row.info {{ border-left-color: #2563eb; }}
-        .log-row.warning {{ border-left-color: #f59e0b; background: #fffbeb; }}
-        .log-row.error, .log-row.critical {{ border-left-color: #dc2626; background: #fef2f2; }}
-        .log-row.debug {{ border-left-color: #64748b; }}
-        .log-row.sql {{ background: #eef6ff; border-color: #bfdbfe; }}
-        .time {{ color: #475569; white-space: nowrap; }}
-        .level {{
-            display: inline-block;
-            min-width: 52px;
-            padding: 2px 7px;
-            border-radius: 999px;
-            text-align: center;
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 11px;
-        }}
-        .level.info {{ background: #2563eb; }}
-        .level.warning {{ background: #d97706; }}
-        .level.error, .level.critical {{ background: #dc2626; }}
-        .level.debug {{ background: #64748b; }}
-        .tag {{
-            display: inline-block;
-            min-width: 28px;
-            padding: 2px 7px;
-            border-radius: 999px;
-            text-align: center;
-            background: #dbeafe;
-            color: #1d4ed8;
-            font-weight: 700;
-            font-size: 11px;
-        }}
-        .tag.empty {{ visibility: hidden; }}
-        .message {{
-            min-width: 0;
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-        }}
-        .details {{
-            grid-column: 4;
-            margin-top: 5px;
-            padding: 7px 9px;
-            border-radius: 5px;
-            background: rgba(15, 23, 42, 0.06);
-            color: #334155;
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-        }}
-        .empty-log {{
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #64748b;
-        }}
-        </style>
-        <div id="cq-log-box">{body}</div>
+        <div style="{_CARD}">
+            <div style="color:{side_color}; font-size:14px; font-weight:700; margin-bottom:10px;">
+                {arrow} {side} &nbsp; Active Trade
+            </div>
+            <div style="display:grid; grid-template-columns:90px 1fr; row-gap:7px; font-size:13px;">
+                <span style="{_LBL}">Entry</span>
+                <span style="{_VAL}">{_fmt(entry)}</span>
+                <span style="{_LBL}">Stop loss</span>
+                <span style="color:{_RED}; font-size:14px; font-weight:500;">{_fmt(sl)}</span>
+                <span style="{_LBL}">Take profit</span>
+                <span style="color:{_GREEN}; font-size:14px; font-weight:500;">{_fmt(tp)}</span>
+                <span style="{_LBL}">Opened</span>
+                <span style="{_VAL}">{_fmt_time(open_time)}</span>
+            </div>
+        </div>
         """,
-        width="stretch",
-        height=372,
+        unsafe_allow_html=True,
     )
 
 
-def _log_entries(lines: list[str]) -> list[dict[str, list[str] | str]]:
-    entries: list[dict[str, list[str] | str]] = []
-    current: dict[str, list[str] | str] | None = None
+def _group_trades_by_minute(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    df = df.copy()
+    df["time_min"] = pd.to_datetime(df["time"]).dt.floor("min")
+    rows = []
+    for (time_min, side), grp in df.groupby(["time_min", "side"], sort=False):
+        total_qty   = grp["qty"].sum()
+        total_quote = grp["quote_qty"].sum()
+        avg_price   = total_quote / total_qty if total_qty > 0 else grp["price"].mean()
+        pnl_sum     = grp["pnl"].sum() if grp["pnl"].notna().any() else None
+        comm_sum    = grp["commission"].sum() if grp["commission"].notna().any() else None
+        rows.append({
+            "time":       grp["time"].iloc[0],
+            "side":       side,
+            "price":      avg_price,
+            "qty":        total_qty,
+            "quote_qty":  total_quote,
+            "pnl":        pnl_sum,
+            "commission": comm_sum,
+            "source":     grp["source"].iloc[0],
+            "fills":      len(grp),
+        })
+    out = pd.DataFrame(rows)
+    return out.sort_values("time", ascending=False).reset_index(drop=True)
 
+
+def _binance_trade_row_html(row: dict) -> str:
+    side   = str(row.get("side") or "?").upper()
+    price  = _fmt(row.get("price"), 4)
+    fills  = int(row.get("fills") or 1)
+    qty    = _fmt(row.get("qty"), 4) + (f" <span style='color:{_MUTED};font-size:11px;'>×{fills}</span>" if fills > 1 else "")
+    pnl    = row.get("pnl")
+    ts     = row.get("time")
+    source = str(row.get("source", ""))
+
+    side_color = _GREEN if side == "BUY" else _RED if side == "SELL" else _MUTED
+    try:
+        pnl_val   = float(pnl) if pnl is not None else None
+        pnl_str   = f"{pnl_val:+.4f}" if pnl_val is not None else "—"
+        pnl_color = _GREEN if pnl_val and pnl_val > 0 else _RED if pnl_val and pnl_val < 0 else _MUTED
+    except (TypeError, ValueError):
+        pnl_str, pnl_color = "—", _MUTED
+
+    time_str = ts.strftime("%m-%d %H:%M") if hasattr(ts, "strftime") else _fmt_time(ts)
+    src_tag  = f' <span style="color:{_MUTED}; font-size:11px;">[{escape(source)}]</span>' if source else ""
+
+    return (
+        f'<div style="border-bottom:1px solid {_GRID}; padding:8px 0; font-size:13px;'
+        f' display:grid; grid-template-columns:46px 90px 80px 80px auto; gap:6px; align-items:center;">'
+        f'<span style="color:{side_color}; font-weight:600;">{side}</span>'
+        f'<span style="color:{_TEXT};">{price}</span>'
+        f'<span style="color:{_TEXT};">{qty}</span>'
+        f'<span style="color:{pnl_color};">{pnl_str}</span>'
+        f'<span style="color:{_TEXT}; font-size:12px; white-space:nowrap;">{time_str}{src_tag}</span>'
+        f'</div>'
+    )
+
+
+def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -> None:
+    is_binance = not trades_df.empty and "source" in trades_df.columns
+    header     = "Recent Trades (Binance)" if is_binance else "Recent Trades"
+    source_tag = ""
+    if not trades_df.empty and is_binance:
+        src = trades_df["source"].iloc[0] if "source" in trades_df.columns else ""
+        source_tag = f' <span style="color:{_MUTED}; font-size:12px;">[{escape(str(src))}]</span>'
+
+    if trades_df.empty:
+        st.markdown(
+            f'<div style="{_CARD}">'
+            f'<div style="{_HDR}">{header}</div>'
+            f'<div style="{_LBL}">No trade data available</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    col_hdr = (
+        f'<div style="display:grid; grid-template-columns:46px 90px 80px 80px auto; gap:6px;'
+        f' font-size:12px; color:{_MUTED}; padding-bottom:6px; border-bottom:1px solid {_GRID};">'
+        f'<span>Side</span><span>Price</span><span>Qty</span><span>PnL</span><span>Time</span>'
+        f'</div>'
+    )
+    grouped   = _group_trades_by_minute(trades_df)
+    rows_html = "".join(_binance_trade_row_html(r.to_dict()) for _, r in grouped.iterrows())
+    st.markdown(
+        f'<div style="{_CARD}">'
+        f'<div style="{_HDR}">{header}{source_tag}</div>'
+        f'<div style="max-height:400px; overflow-y:auto;">'
+        f'{col_hdr}{rows_html}'
+        f'</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_trade_panel(asset_id: str | None) -> None:
+    sync_state   = ensure_sync_state(st.session_state, asset_id)
+    sync_running = is_sync_running(sync_state, asset_id)
+
+    cache_pos    = f"trade_position_{asset_id or 'default'}"
+    cache_trades = f"trade_binance_{asset_id or 'default'}"
+
+    if sync_running:
+        position  = st.session_state.get(cache_pos)
+        trades_df = st.session_state.get(cache_trades, pd.DataFrame())
+    else:
+        try:
+            position  = data.active_position(asset_id=asset_id)
+            st.session_state[cache_pos] = position
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower():
+                raise
+            get_dashboard_logger().warning("Trade panel DB read skipped — database locked")
+            position = st.session_state.get(cache_pos)
+
+        cache_key = f"trade_binance_{asset_id or 'default'}"
+        if cache_key not in st.session_state:
+            trades_df = binance_data.recent_trades(asset_id=asset_id, limit=50)
+            st.session_state[cache_trades] = trades_df
+        else:
+            trades_df = st.session_state[cache_trades]
+
+    _render_active_trade_card(position)
+    _render_recent_trades_panel(trades_df, asset_id)
+
+
+# =============================================================================
+# Log panel — terminal style
+# =============================================================================
+
+_LOG_HEADER_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}")
+
+_LEVEL_COLORS = {
+    "INFO":     _TEXT,
+    "WARNING":  _GOLD,
+    "ERROR":    _RED,
+    "CRITICAL": _RED,
+    "DEBUG":    _MUTED,
+}
+
+
+def _log_entries(lines: list[str]) -> list[dict]:
+    entries: list[dict] = []
+    current: dict | None = None
     for line in lines:
         if _LOG_HEADER_RE.match(line):
             current = {"header": line, "details": []}
@@ -320,47 +429,72 @@ def _log_entries(lines: list[str]) -> list[dict[str, list[str] | str]]:
             current["details"].append(line)
         elif line:
             entries.append({"header": line, "details": []})
-
     return entries
 
 
-def _render_log_entry(entry: dict[str, list[str] | str]) -> str:
-    header      = str(entry["header"])
-    details     = [str(line) for line in entry.get("details", []) if str(line).strip()]
-    timestamp, level, message = _split_log_header(header)
-    level_class = level.lower()
-    detail_text = "\n".join(details)
-    is_db       = _is_db_log(message, detail_text)
-    row_class   = f"log-row {level_class} {'sql' if is_db else ''}".strip()
-    tag_class   = "tag" if is_db else "tag empty"
-    tag         = "DB" if is_db else "-"
-    details_html = f'<div class="details">{escape(detail_text)}</div>' if detail_text else ""
-
-    return f"""
-        <div class="{row_class}">
-            <div class="time">{escape(timestamp)}</div>
-            <div><span class="level {level_class}">{escape(level)}</span></div>
-            <div><span class="{tag_class}">{tag}</span></div>
-            <div class="message">{escape(message)}</div>
-            {details_html}
-        </div>
-    """
-
-
 def _split_log_header(line: str) -> tuple[str, str, str]:
-    parts = [part.strip() for part in line.split(" | ", 2)]
+    parts = [p.strip() for p in line.split(" | ", 2)]
     if len(parts) == 3 and _LOG_HEADER_RE.match(parts[0]):
         return parts[0][:16], parts[1], parts[2]
     return "", "INFO", line
 
 
-def _is_db_log(message: str, details: str = "") -> bool:
-    text = f"{message} {details}".lower()
-    return any(keyword in text for keyword in _DB_KEYWORDS)
+def _terminal_line_html(entry: dict) -> str:
+    header  = str(entry["header"])
+    details = [str(l) for l in entry.get("details", []) if str(l).strip()]
+    ts, level, message = _split_log_header(header)
+    color   = _LEVEL_COLORS.get(level.upper(), _TEXT)
+    abbr    = level[:4].upper()
+    detail_str = escape("\n" + "\n".join(details)) if details else ""
+    return (
+        f'<div style="padding:1px 0; white-space:pre-wrap; overflow-wrap:anywhere;">'
+        f'<span style="color:#4b5563; margin-right:6px;">{escape(ts)}</span>'
+        f'<span style="color:{color}; font-weight:600; margin-right:6px;">[{escape(abbr)}]</span>'
+        f'<span style="color:{color};">{escape(message)}{detail_str}</span>'
+        f'</div>\n'
+    )
 
 
-def _empty_log_html() -> str:
-    return '<div class="empty-log">No logs yet.</div>'
+def _render_log_terminal(lines: list[str]) -> None:
+    entries = _log_entries(lines)
+    if entries:
+        # oldest at top, newest at bottom (no reversing)
+        body = "".join(_terminal_line_html(e) for e in entries)
+    else:
+        body = f'<span style="color:{_MUTED};">No logs yet.</span>'
+
+    st.iframe(
+        f"""
+        <style>
+        body {{ margin:0; padding:0; background:{_BG}; }}
+        #term {{
+            box-sizing: border-box; width: 100%; height: 100vh;
+            overflow-y: auto; padding: 10px 14px;
+            background: {_BG}; color: {_TEXT};
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px; line-height: 1.6;
+        }}
+        </style>
+        <div id="term">{body}</div>
+        <script>
+        var el = document.getElementById('term');
+        el.scrollTop = el.scrollHeight;
+        </script>
+        """,
+        width="stretch",
+        height=210,
+    )
+
+
+@st.fragment(run_every="2s")
+def render_log_panel() -> None:
+    st.divider()
+    title_col, action_col = st.columns([1.0, 0.15])
+    title_col.caption("Log")
+    if action_col.button("Clear", width="stretch"):
+        clear_logs()
+        st.rerun(scope="fragment")
+    _render_log_terminal(read_recent_logs(350))
 
 
 # =============================================================================
@@ -368,44 +502,44 @@ def _empty_log_html() -> str:
 # =============================================================================
 
 with st.sidebar:
-    st.title("Menu")
-    st.metric("Chart window", f"{CHART_LOOKBACK_HOURS}h")
+    st.title("ChronoQuant")
+
+    asset_options = ["BCH 4h", "SOL 1h"]
+    current_idx   = 0 if st.session_state["active_asset_id"] is None else 1
+    selected      = st.radio("Asset", asset_options, index=current_idx)
+    new_asset_id  = None if selected == "BCH 4h" else "solusdt_fw60"
+
+    if new_asset_id != st.session_state["active_asset_id"]:
+        st.session_state["active_asset_id"] = new_asset_id
+
     st.divider()
-    st.caption("BCH 4h Long")
-    _sync_panel_bch()
-    st.divider()
-    st.caption("SOL 1h Long")
-    _sync_panel_sol()
+
+    if st.session_state["active_asset_id"] is None:
+        _sync_panel_bch()
+    else:
+        _sync_panel_sol()
 
 
 # =============================================================================
-# Main body
+# Main body — 60/40 layout
 # =============================================================================
 
-st.title("ChronoQuant")
+active_asset_id = st.session_state["active_asset_id"]
+asset_label     = "BCH / 4h" if active_asset_id is None else "SOL / 1h"
 
-tab_bch, tab_sol = st.tabs(["BCH 4h Long", "SOL 1h Long"])
+st.markdown(
+    f'<div style="padding:6px 0 12px 0; border-bottom:1px solid {_GRID}; margin-bottom:12px;">'
+    f'<span style="color:{_TEXT}; font-size:20px; font-weight:700; letter-spacing:0.5px;">ChronoQuant</span>'
+    f'<span style="color:{_MUTED}; font-size:14px; margin-left:14px;">{asset_label}</span>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
-with tab_bch:
-    render_asset_dashboard(asset_id=None, strategy_id="lasso_long_fw240_q90_managed_v1")
+col_chart, col_trade = st.columns([3, 2])
 
-with tab_sol:
-    render_asset_dashboard(asset_id="solusdt_fw60", strategy_id="solusdt_long_fw60_q90_managed_v1")
+with col_chart:
+    render_asset_chart(active_asset_id)
+    render_log_panel()
 
-
-# =============================================================================
-# Log panel (shared across both assets)
-# =============================================================================
-
-@st.fragment(run_every="2s")
-def render_log_panel() -> None:
-    st.divider()
-    title_col, action_col = st.columns([1.0, 0.22])
-    title_col.subheader("Log")
-    if action_col.button("Clear log", width="stretch"):
-        clear_logs()
-        st.rerun(scope="fragment")
-    _render_log_html(read_recent_logs(350))
-
-
-render_log_panel()
+with col_trade:
+    render_trade_panel(active_asset_id)

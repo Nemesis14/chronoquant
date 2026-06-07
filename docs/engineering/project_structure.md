@@ -35,6 +35,10 @@ files directly.
 ## Documentation
 
 - `docs/engineering/`: code style, commands, tooling, testing, workflow, structure.
+  - `workflow.md`: high-level engineering flow.
+  - `sampling.md`: data range, sample, split, and holdout rules.
+  - `lgbm_model_development.md`: LightGBM-specific model workflow.
+  - `strategy_evaluation.md`: trigger sweep, backtest, and strategy evaluation rules.
 - `docs/architecture/`: stable architecture documentation.
 - `docs/plans/active/`: currently active implementation plans.
 - `docs/plans/completed/`: completed plans.

@@ -50,7 +50,7 @@ def main() -> None:
                         help="Show top N results (default: 20)")
     args = parser.parse_args()
 
-    print(f"Loading prediction frame: {args.model_id}  {args.start} → {args.end}")
+    print(f"Loading prediction frame: {args.model_id}  {args.start} to {args.end}")
     frame = build_backtest_frame(
         model_id=args.model_id,
         start=args.start,

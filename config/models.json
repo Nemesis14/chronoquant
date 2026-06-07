@@ -420,7 +420,7 @@
                 "random_state": 42,
                 "verbose": true
             },
-            "active": true
+            "active": false
         },
         "lgbm_solusdt_l_fw60_q90_local_v2": {
             "asset_id": "solusdt_fw60",
@@ -452,7 +452,7 @@
                 "random_state": 42,
                 "verbose": true
             },
-            "active": true
+            "active": false
         },
         "lgbm_solusdt_s_fw60_q10_local_v2": {
             "asset_id": "solusdt_fw60",
@@ -485,6 +485,44 @@
                 "verbose": true
             },
             "active": false
+        },
+        "lgbm_solusdt_l_fw60_q90_local_v3": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_l_fw60_q90",
+            "family": "lightgbm",
+            "variant": "local_v3",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_solusdt_l_fw60_q90_local_v3",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": { "method": "predict_proba", "proba": true },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "row_stride": 60
+            },
+            "active": true
+        },
+        "lgbm_solusdt_s_fw60_q10_local_v3": {
+            "asset_id": "solusdt_fw60",
+            "target_name": "trg_s_fw60_q10",
+            "family": "lightgbm",
+            "variant": "local_v3",
+            "trainer": "lightgbm_binary",
+            "paths": {
+                "model_dir": "models/lgbm_solusdt_s_fw60_q10_local_v3",
+                "model_file": "model.pkl",
+                "features_file": "features.json"
+            },
+            "predict": { "method": "predict_proba", "proba": true },
+            "training": {
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "row_stride": 60
+            },
+            "active": true
         }
     }
 }

@@ -372,40 +372,46 @@ def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -
     )
 
 
-_SOL_MODEL_STATS = {
-    "long": {
-        "model_id":   "lgbm_solusdt_l_fw60_q90_stable_v1",
-        "train_auc":  0.410,
-        "test_auc":   0.157,
-        "n_features": 47,
-        "backtest": {
-            "period":       "2024-01-01 – 2026-01-01",
-            "trades":       165,
-            "wins":         122,
-            "losses":       43,
-            "win_rate":     73.9,
-            "total_return": "+124.5%",
-            "final_equity": "22,454.30",
-            "max_dd":       "-13.8%",
-        },
-    },
-    "short": {
-        "model_id":   "lgbm_solusdt_s_fw60_q10_stable_v1",
-        "train_auc":  0.392,
-        "test_auc":   0.144,
-        "n_features": 47,
-        "backtest": {
-            "period":       "2024-01-01 – 2026-01-01",
-            "trades":       8,
-            "wins":         6,
-            "losses":       2,
-            "win_rate":     75.0,
-            "total_return": "+6.1%",
-            "final_equity": "10,613.72",
-            "max_dd":       "-1.8%",
-        },
-    },
-}
+def _load_sol_model_stats() -> dict[str, dict]:
+    """Load model card data from models/<model_id>/model_card.json for active solusdt_fw60 models."""
+    import json
+    import utils as _utils
+
+    model_cfg = _utils.load_models_config()
+    result: dict[str, dict] = {}
+
+    for model_id, meta in model_cfg.get("models", {}).items():
+        if not meta.get("active"):
+            continue
+        if meta.get("asset_id") != "solusdt_fw60":
+            continue
+        model_dir = Path(_utils._resolve_path(meta["paths"]["model_dir"]))
+        card_path = model_dir / "model_card.json"
+        if not card_path.exists():
+            continue
+        card = json.loads(card_path.read_text(encoding="utf-8"))
+        side = card.get("side")
+        if side in ("long", "short"):
+            result[side] = {
+                "model_id":   card["model_id"],
+                "train_auc":  card.get("train_prauc", 0),
+                "test_auc":   card.get("valid_prauc", 0),
+                "n_features": card.get("n_features", 0),
+                "backtest": {
+                    "period":       card["holdout"]["period"],
+                    "trades":       card["holdout"]["trades"],
+                    "wins":         card["holdout"]["wins"],
+                    "losses":       card["holdout"]["losses"],
+                    "win_rate":     card["holdout"]["win_rate"],
+                    "total_return": card["holdout"]["total_return"],
+                    "final_equity": card["holdout"]["final_equity"],
+                    "max_dd":       card["holdout"]["max_dd"],
+                },
+            }
+    return result
+
+
+_SOL_MODEL_STATS = _load_sol_model_stats()
 
 
 def _render_model_stats_panel(side: str, stats: dict) -> None:

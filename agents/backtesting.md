@@ -10,6 +10,7 @@ comparison workflows after prediction generation.
 - `docs/architecture/overview.md`
 - `docs/engineering/code_style.md`
 - `docs/engineering/commands.md`
+- `docs/engineering/strategy_evaluation.md`
 
 ## Primary Scope
 

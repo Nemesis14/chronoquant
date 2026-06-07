@@ -279,6 +279,7 @@ dependencies = [
     { name = "statsmodels" },
     { name = "streamlit" },
     { name = "ta" },
+    { name = "taew" },
 ]
 
 [package.dev-dependencies]
@@ -299,6 +300,7 @@ requires-dist = [
     { name = "statsmodels" },
     { name = "streamlit", specifier = ">=1.40.0" },
     { name = "ta" },
+    { name = "taew", specifier = ">=0.0.3" },
 ]
 
 [package.metadata.requires-dev]
@@ -2005,6 +2007,15 @@ dependencies = [
     { name = "pandas" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e0/9a/37d92a6b470dc9088612c2399a68f1a9ac22872d4e1eff416818e22ab11b/ta-0.11.0.tar.gz", hash = "sha256:de86af43418420bd6b088a2ea9b95483071bf453c522a8441bc2f12bcf8493fd", size = 25308, upload-time = "2023-11-02T13:53:35.434Z" }
+
+[[package]]
+name = "taew"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/1c/6e19b15a19d2b3d01f19ff8e0145bd0e65f02829f2aedd81a1598ae28809/taew-0.0.3.tar.gz", hash = "sha256:e1bbb3b089a06eaf83455589dfd55ede984efc693d84c1615a599d871033322e", size = 8464, upload-time = "2021-05-08T08:49:40.439Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/cc/1c54de607c26d03ff6b65f5218a153862328906ff09e0857b2125c2275aa/taew-0.0.3-py3-none-any.whl", hash = "sha256:59b5df68cfae098418003bcc6608b94cadbebd86e6531e40d8e75f361aedd463", size = 9457, upload-time = "2021-05-08T08:49:38.359Z" },
+]
 
 [[package]]
 name = "tenacity"

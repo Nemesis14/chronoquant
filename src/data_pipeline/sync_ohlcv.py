@@ -14,7 +14,7 @@ import pandas as pd
 from binance.client import Client
 
 import utils
-from db.table_ops import drop_existing_open_times, sqlite_connect
+from db.table_ops import drop_existing_open_times, ensure_table_columns, sqlite_connect
 
 # =============================================================================
 # sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None
@@ -83,10 +83,13 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
         df["open_time_ms"] = pd.to_numeric(df["open_time"], errors="coerce").astype("int64")
         df["open_time"] = df["open_time_ms"].apply(lambda ms: utils.ms_to_utc_str(int(ms)))
 
-        for col in ["open", "high", "low", "close", "volume"]:
+        for col in ["open", "high", "low", "close", "volume",
+                    "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        df = df[["open_time", "open", "high", "low", "close", "volume"]]
+        df = df[["open_time", "open", "high", "low", "close", "volume",
+                 "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"]]
+        ensure_table_columns(db_path, table_name, df)
         df = drop_existing_open_times(df, db_path, table_name)
         if df.empty:
             last_open_ms = int(rows[-1][0])

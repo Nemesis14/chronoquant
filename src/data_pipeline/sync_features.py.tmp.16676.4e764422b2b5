@@ -1,0 +1,1139 @@
+# =============================================================================
+# Compute technical indicators and target variables for feature engineering
+# =============================================================================
+# Purpose:
+#  - Load raw OHLCV data from database
+#  - Compute configured target variables
+#  - Generate configured technical indicators with 'feat_' prefix
+#  - Insert feature rows into database idempotently by open_time
+# =============================================================================
+
+from datetime import timedelta
+
+import numpy as np
+import pandas as pd
+import ta
+
+import utils
+from db.table_ops import (
+    drop_existing_open_times,
+    ensure_table_columns,
+    sqlite_connect,
+    table_columns,
+    table_exists,
+)
+
+
+# =============================================================================
+# _safe_div(numerator: pd.Series, denominator: pd.Series) -> pd.Series
+# =============================================================================
+# Purpose:
+#  - Divide two series while converting zero denominators to missing values
+# =============================================================================
+def _safe_div(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
+    return numerator / denominator.replace(0, np.nan)
+
+
+# =============================================================================
+# _add_momentum_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Add configured momentum features in-place
+# =============================================================================
+def _add_momentum_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    momentum_cfg = indicators.get("momentum", {})
+
+    for rsi_cfg in momentum_cfg.get("rsi", []):
+        window = rsi_cfg["window"]
+        df[f"{prefix}rsi_{window}"] = ta.momentum.RSIIndicator(
+            close=df["close"],
+            window=window,
+        ).rsi()
+
+    for roc_cfg in momentum_cfg.get("roc", []):
+        window = roc_cfg["window"]
+        df[f"{prefix}roc_{window}"] = ta.momentum.ROCIndicator(
+            close=df["close"],
+            window=window,
+        ).roc()
+
+    for stoch_cfg in momentum_cfg.get("stochastic", []):
+        window        = stoch_cfg["window"]
+        smooth_window = stoch_cfg.get("smooth_window", 3)
+        stoch = ta.momentum.StochasticOscillator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+            smooth_window=smooth_window,
+        )
+        df[f"{prefix}stoch_k_{window}"] = stoch.stoch()
+        df[f"{prefix}stoch_d_{window}"] = stoch.stoch_signal()
+
+    for cci_cfg in momentum_cfg.get("cci", []):
+        window = cci_cfg["window"]
+        df[f"{prefix}cci_{window}"] = ta.trend.CCIIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+        ).cci()
+
+    for williams_cfg in momentum_cfg.get("williams_r", []):
+        window = williams_cfg["window"]
+        df[f"{prefix}williams_r_{window}"] = ta.momentum.WilliamsRIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            lbp=window,
+        ).williams_r()
+
+    for adx_cfg in momentum_cfg.get("adx", []):
+        window = adx_cfg["window"]
+        adx = ta.trend.ADXIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+        )
+        df[f"{prefix}adx_{window}"]     = adx.adx()
+        df[f"{prefix}adx_pos_{window}"] = adx.adx_pos()
+        df[f"{prefix}adx_neg_{window}"] = adx.adx_neg()
+
+
+# =============================================================================
+# _add_trend_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Add configured trend features in-place
+# =============================================================================
+def _add_trend_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    trend_cfg = indicators.get("trend", {})
+
+    for macd_cfg in trend_cfg.get("macd", []):
+        fast   = macd_cfg.get("fast", 12)
+        slow   = macd_cfg.get("slow", 26)
+        signal = macd_cfg.get("signal", 9)
+        macd = ta.trend.MACD(
+            close=df["close"],
+            window_fast=fast,
+            window_slow=slow,
+            window_sign=signal,
+        )
+        df[f"{prefix}macd_{fast}_{slow}"]          = macd.macd()
+        df[f"{prefix}macd_signal_{fast}_{slow}_{signal}"] = macd.macd_signal()
+        df[f"{prefix}macd_diff"]                   = macd.macd_diff()
+
+    for sma_cfg in trend_cfg.get("sma", []):
+        window = sma_cfg["window"]
+        sma = ta.trend.SMAIndicator(close=df["close"], window=window).sma_indicator()
+        df[f"{prefix}sma_ratio_{window}"] = _safe_div(df["close"], sma)
+
+    for ema_cfg in trend_cfg.get("ema", []):
+        window = ema_cfg["window"]
+        ema = ta.trend.EMAIndicator(close=df["close"], window=window).ema_indicator()
+        df[f"{prefix}ema_ratio_{window}"] = _safe_div(df["close"], ema)
+
+    for wma_cfg in trend_cfg.get("wma", []):
+        window = wma_cfg["window"]
+        wma = ta.trend.WMAIndicator(close=df["close"], window=window).wma()
+        df[f"{prefix}wma_ratio_{window}"] = _safe_div(df["close"], wma)
+
+    for kama_cfg in trend_cfg.get("kama", []):
+        window = kama_cfg.get("window", 10)
+        fast   = kama_cfg.get("fast", 2)
+        slow   = kama_cfg.get("slow", 30)
+        kama = ta.momentum.KAMAIndicator(
+            close=df["close"],
+            window=window,
+            pow1=fast,
+            pow2=slow,
+        ).kama()
+        df[f"{prefix}kama_ratio_{window}_{fast}_{slow}"] = _safe_div(df["close"], kama)
+
+
+# =============================================================================
+# _add_volatility_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Add configured volatility features in-place
+# =============================================================================
+def _add_volatility_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    volatility_cfg = indicators.get("volatility", {})
+
+    for bb_cfg in volatility_cfg.get("bollinger", []):
+        window     = bb_cfg["window"]
+        window_dev = bb_cfg.get("window_dev", 2)
+        bb = ta.volatility.BollingerBands(
+            close=df["close"],
+            window=window,
+            window_dev=window_dev,
+        )
+        upper = bb.bollinger_hband()
+        lower = bb.bollinger_lband()
+        df[f"{prefix}bb_width_{window}"]    = _safe_div(upper - lower, df["close"])
+        df[f"{prefix}bb_position_{window}"] = bb.bollinger_pband()
+
+    for atr_cfg in volatility_cfg.get("atr", []):
+        window = atr_cfg["window"]
+        atr = ta.volatility.AverageTrueRange(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            window=window,
+        ).average_true_range()
+        df[f"{prefix}atr_{window}"]  = atr
+        df[f"{prefix}natr_{window}"] = _safe_div(atr, df["close"])
+
+    returns_log = np.log(_safe_div(df["close"], df["close"].shift(1)))
+    for hist_vol_cfg in volatility_cfg.get("historical_vol", []):
+        window = hist_vol_cfg["window"]
+        df[f"{prefix}hist_vol_{window}"] = returns_log.rolling(window).std()
+
+
+# =============================================================================
+# _add_volume_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Add configured volume features in-place
+# =============================================================================
+def _add_volume_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    volume_cfg = indicators.get("volume", {})
+
+    for volume_sma_cfg in volume_cfg.get("volume_sma", []):
+        window = volume_sma_cfg["window"]
+        df[f"{prefix}volume_sma_{window}"] = df["volume"].rolling(window).mean()
+
+    for volume_ratio_cfg in volume_cfg.get("volume_ratio", []):
+        window = volume_ratio_cfg["window"]
+        volume_sma = df["volume"].rolling(window).mean()
+        df[f"{prefix}volume_ratio_{window}"] = _safe_div(df["volume"], volume_sma)
+
+    if volume_cfg.get("obv"):
+        df[f"{prefix}obv"] = ta.volume.OnBalanceVolumeIndicator(
+            close=df["close"],
+            volume=df["volume"],
+        ).on_balance_volume()
+
+    for obv_roc_cfg in volume_cfg.get("obv_roc", []):
+        window  = obv_roc_cfg["window"]
+        obv_col = f"{prefix}obv"
+        if obv_col not in df.columns:
+            df[obv_col] = ta.volume.OnBalanceVolumeIndicator(
+                close=df["close"],
+                volume=df["volume"],
+            ).on_balance_volume()
+        df[f"{prefix}obv_roc_{window}"] = df[obv_col].pct_change(periods=window)
+
+    for mfi_cfg in volume_cfg.get("mfi", []):
+        window = mfi_cfg["window"]
+        df[f"{prefix}mfi_{window}"] = ta.volume.MFIIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            window=window,
+        ).money_flow_index()
+
+    if volume_cfg.get("ad_line"):
+        df[f"{prefix}ad_line"] = ta.volume.AccDistIndexIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+        ).acc_dist_index()
+
+    for cmf_cfg in volume_cfg.get("cmf", []):
+        window = cmf_cfg["window"]
+        df[f"{prefix}cmf_{window}"] = ta.volume.ChaikinMoneyFlowIndicator(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            window=window,
+        ).chaikin_money_flow()
+
+
+# =============================================================================
+# _add_price_action_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Add configured price-action features in-place
+# =============================================================================
+def _add_price_action_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    price_cfg = indicators.get("price_action", {})
+
+    if price_cfg.get("returns"):
+        df[f"{prefix}returns_log"] = np.log(_safe_div(df["close"], df["close"].shift(1)))
+
+    returns_col = f"{prefix}returns_log"
+    if returns_col not in df.columns:
+        df[returns_col] = np.log(_safe_div(df["close"], df["close"].shift(1)))
+
+    for returns_sma_cfg in price_cfg.get("returns_sma", []):
+        window = returns_sma_cfg["window"]
+        df[f"{prefix}returns_sma_{window}"] = df[returns_col].rolling(window).mean()
+
+    for returns_std_cfg in price_cfg.get("returns_std", []):
+        window = returns_std_cfg["window"]
+        df[f"{prefix}returns_std_{window}"] = df[returns_col].rolling(window).std()
+
+    for returns_skew_cfg in price_cfg.get("returns_skew", []):
+        window = returns_skew_cfg["window"]
+        df[f"{prefix}returns_skew_{window}"] = df[returns_col].rolling(window).skew()
+
+    for returns_kurt_cfg in price_cfg.get("returns_kurt", []):
+        window = returns_kurt_cfg["window"]
+        df[f"{prefix}returns_kurt_{window}"] = df[returns_col].rolling(window).kurt()
+
+    if price_cfg.get("range_metrics"):
+        high_low       = df["high"] - df["low"]
+        open_close_avg = (df["open"] + df["close"]) / 2
+        df[f"{prefix}hml_range"]  = _safe_div(high_low, df["close"])
+        df[f"{prefix}ohlc_range"] = _safe_div(high_low, open_close_avg)
+
+    if price_cfg.get("close_position"):
+        high_low = df["high"] - df["low"]
+        df[f"{prefix}close_position"] = _safe_div(df["close"] - df["low"], high_low)
+
+
+# =============================================================================
+# _add_market_structure_features(...)
+# =============================================================================
+# Purpose:
+#  - Add configured market-structure features in-place
+# =============================================================================
+def _add_market_structure_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    market_cfg = indicators.get("market_structure", {})
+
+    for trend_cfg in market_cfg.get("trend_counts", []):
+        window      = trend_cfg["window"]
+        higher_high = (df["high"] > df["high"].shift(1)).astype(int)
+        higher_low  = (df["low"] > df["low"].shift(1)).astype(int)
+        lower_high  = (df["high"] < df["high"].shift(1)).astype(int)
+        lower_low   = (df["low"] < df["low"].shift(1)).astype(int)
+        df[f"{prefix}higher_high_count_{window}"] = higher_high.rolling(window).sum()
+        df[f"{prefix}higher_low_count_{window}"]  = higher_low.rolling(window).sum()
+        df[f"{prefix}lower_high_count_{window}"]  = lower_high.rolling(window).sum()
+        df[f"{prefix}lower_low_count_{window}"]   = lower_low.rolling(window).sum()
+
+    for swing_cfg in market_cfg.get("swing_points", []):
+        window       = swing_cfg["window"]
+        rolling_high = df["high"].rolling(window).max()
+        rolling_low  = df["low"].rolling(window).min()
+        df[f"{prefix}swing_high_{window}"] = (df["high"] >= rolling_high).astype(int)
+        df[f"{prefix}swing_low_{window}"]  = (df["low"] <= rolling_low).astype(int)
+
+
+# =============================================================================
+# _add_activity_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add kline activity ratio features using retained Binance fields
+#  - Skips silently if required columns (quote_volume, trades, etc.) are absent
+# =============================================================================
+def _add_activity_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    activity_cfg = indicators.get("activity", {})
+    if not activity_cfg:
+        return
+
+    has_quote   = "quote_volume" in df.columns and df["quote_volume"].notna().any()
+    has_trades  = "trades" in df.columns and df["trades"].notna().any()
+    has_tb_base = "taker_buy_base" in df.columns and df["taker_buy_base"].notna().any()
+    has_tb_quot = "taker_buy_quote" in df.columns and df["taker_buy_quote"].notna().any()
+
+    if has_quote:
+        for cfg in activity_cfg.get("quote_volume_ratio", []):
+            window = cfg["window"]
+            sma    = df["quote_volume"].rolling(window).mean()
+            df[f"{prefix}quote_volume_ratio_{window}"] = _safe_div(df["quote_volume"], sma)
+
+    if has_trades:
+        for cfg in activity_cfg.get("trade_count_ratio", []):
+            window = cfg["window"]
+            sma    = df["trades"].rolling(window).mean()
+            df[f"{prefix}trade_count_ratio_{window}"] = _safe_div(df["trades"], sma)
+
+    if has_quote and has_trades:
+        for cfg in activity_cfg.get("avg_trade_quote", []):
+            window       = cfg["window"]
+            rolling_qv   = df["quote_volume"].rolling(window).sum()
+            rolling_tr   = df["trades"].rolling(window).sum()
+            df[f"{prefix}avg_trade_quote_{window}"] = _safe_div(rolling_qv, rolling_tr)
+
+    if has_tb_base:
+        for cfg in activity_cfg.get("taker_buy_base_ratio", []):
+            window = cfg["window"]
+            rolling_tb   = df["taker_buy_base"].rolling(window).sum()
+            rolling_vol  = df["volume"].rolling(window).sum()
+            df[f"{prefix}taker_buy_base_ratio_{window}"] = _safe_div(rolling_tb, rolling_vol)
+
+    if has_tb_quot and has_quote:
+        for cfg in activity_cfg.get("taker_buy_quote_ratio", []):
+            window = cfg["window"]
+            rolling_tbq  = df["taker_buy_quote"].rolling(window).sum()
+            rolling_qv   = df["quote_volume"].rolling(window).sum()
+            df[f"{prefix}taker_buy_quote_ratio_{window}"] = _safe_div(rolling_tbq, rolling_qv)
+
+
+# =============================================================================
+# _add_return_distance_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add 1h-aware return and price-distance features
+# =============================================================================
+def _add_return_distance_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    rd_cfg = indicators.get("return_distance", {})
+    if not rd_cfg:
+        return
+
+    log_ret = np.log(_safe_div(df["close"], df["close"].shift(1)))
+
+    for cfg in rd_cfg.get("return", []):
+        window = cfg["window"]
+        df[f"{prefix}return_{window}"] = df["close"].pct_change(periods=window)
+
+    for cfg in rd_cfg.get("return_z", []):
+        window    = cfg["window"]
+        ret       = df["close"].pct_change(periods=1)
+        roll_std  = log_ret.rolling(window).std()
+        df[f"{prefix}return_z_{window}"] = _safe_div(ret, roll_std)
+
+    for cfg in rd_cfg.get("dist_rolling_high", []):
+        window  = cfg["window"]
+        rh      = df["high"].rolling(window).max()
+        df[f"{prefix}dist_rolling_high_{window}"] = _safe_div(df["close"], rh) - 1.0
+
+    for cfg in rd_cfg.get("dist_rolling_low", []):
+        window = cfg["window"]
+        rl     = df["low"].rolling(window).min()
+        df[f"{prefix}dist_rolling_low_{window}"] = _safe_div(df["close"], rl) - 1.0
+
+    for cfg in rd_cfg.get("rolling_drawdown", []):
+        window   = cfg["window"]
+        peak     = df["close"].rolling(window).max()
+        df[f"{prefix}rolling_drawdown_{window}"] = _safe_div(df["close"], peak) - 1.0
+
+
+# =============================================================================
+# _add_regime_rank_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add rolling percentile/rank features for volatility and activity regime
+# =============================================================================
+def _add_regime_rank_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    rr_cfg = indicators.get("regime_rank", {})
+    if not rr_cfg:
+        return
+
+    def _rolling_rank(series: pd.Series, window: int) -> pd.Series:
+        return series.rolling(window).rank(pct=True)
+
+    natr_col     = f"{prefix}natr_14"
+    hist_vol_col = f"{prefix}hist_vol_20"
+    bb_width_col = f"{prefix}bb_width_14"
+
+    for cfg in rr_cfg.get("natr_rank", []):
+        window = cfg["window"]
+        src    = df[natr_col] if natr_col in df.columns else _safe_div(
+            ta.volatility.AverageTrueRange(
+                high=df["high"], low=df["low"], close=df["close"], window=14
+            ).average_true_range(), df["close"]
+        )
+        df[f"{prefix}natr_rank_{window}"] = _rolling_rank(src, window)
+
+    for cfg in rr_cfg.get("hist_vol_rank", []):
+        window = cfg["window"]
+        src    = df[hist_vol_col] if hist_vol_col in df.columns else (
+            np.log(_safe_div(df["close"], df["close"].shift(1))).rolling(20).std()
+        )
+        df[f"{prefix}hist_vol_rank_{window}"] = _rolling_rank(src, window)
+
+    for cfg in rr_cfg.get("bb_width_rank", []):
+        window = cfg["window"]
+        src    = df[bb_width_col] if bb_width_col in df.columns else _safe_div(
+            ta.volatility.BollingerBands(
+                close=df["close"], window=14, window_dev=2
+            ).bollinger_hband() -
+            ta.volatility.BollingerBands(
+                close=df["close"], window=14, window_dev=2
+            ).bollinger_lband(),
+            df["close"]
+        )
+        df[f"{prefix}bb_width_rank_{window}"] = _rolling_rank(src, window)
+
+    for cfg in rr_cfg.get("range_expansion", []):
+        short  = cfg["short"]
+        medium = cfg["medium"]
+        rng_s  = (df["high"] - df["low"]).rolling(short).mean()
+        rng_m  = (df["high"] - df["low"]).rolling(medium).mean()
+        df[f"{prefix}range_expansion_{short}_{medium}"] = _safe_div(rng_s, rng_m)
+
+    for cfg in rr_cfg.get("volume_rank", []):
+        window = cfg["window"]
+        df[f"{prefix}volume_rank_{window}"] = _rolling_rank(df["volume"], window)
+
+    has_quote  = "quote_volume" in df.columns and df["quote_volume"].notna().any()
+    has_trades = "trades" in df.columns and df["trades"].notna().any()
+
+    if has_quote:
+        for cfg in rr_cfg.get("quote_volume_rank", []):
+            window = cfg["window"]
+            df[f"{prefix}quote_volume_rank_{window}"] = _rolling_rank(df["quote_volume"], window)
+
+    if has_trades:
+        for cfg in rr_cfg.get("trade_count_rank", []):
+            window = cfg["window"]
+            df[f"{prefix}trade_count_rank_{window}"] = _rolling_rank(df["trades"], window)
+
+    for cfg in rr_cfg.get("volume_accel", []):
+        short  = cfg["short"]
+        medium = cfg["medium"]
+        vol_s  = df["volume"].rolling(short).mean()
+        vol_m  = df["volume"].rolling(medium).mean()
+        df[f"{prefix}volume_accel_{short}_{medium}"] = _safe_div(vol_s, vol_m)
+
+    if has_trades:
+        for cfg in rr_cfg.get("trade_count_accel", []):
+            short  = cfg["short"]
+            medium = cfg["medium"]
+            tr_s   = df["trades"].rolling(short).mean()
+            tr_m   = df["trades"].rolling(medium).mean()
+            df[f"{prefix}trade_count_accel_{short}_{medium}"] = _safe_div(tr_s, tr_m)
+
+
+# =============================================================================
+# _add_candle_shape_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add candle body/wick decomposition features
+# =============================================================================
+def _add_candle_shape_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    cs_cfg = indicators.get("candle_shape", {})
+    if not cs_cfg:
+        return
+
+    high_low    = (df["high"] - df["low"]).replace(0, np.nan)
+    body        = (df["close"] - df["open"]).abs()
+    signed_body = df["close"] - df["open"]
+    upper_wick  = df["high"] - df[["close", "open"]].max(axis=1)
+    lower_wick  = df[["close", "open"]].min(axis=1) - df["low"]
+
+    if cs_cfg.get("raw"):
+        df[f"{prefix}body_ratio"]        = _safe_div(body, high_low)
+        df[f"{prefix}signed_body_ratio"] = _safe_div(signed_body, high_low)
+        df[f"{prefix}upper_wick_ratio"]  = _safe_div(upper_wick, high_low)
+        df[f"{prefix}lower_wick_ratio"]  = _safe_div(lower_wick, high_low)
+
+    body_ratio        = _safe_div(body, high_low)
+    signed_body_ratio = _safe_div(signed_body, high_low)
+    wick_imbalance    = lower_wick - upper_wick
+
+    for cfg in cs_cfg.get("body_ratio_sma", []):
+        window = cfg["window"]
+        df[f"{prefix}body_ratio_sma_{window}"] = body_ratio.rolling(window).mean()
+
+    for cfg in cs_cfg.get("signed_body_sma", []):
+        window = cfg["window"]
+        df[f"{prefix}signed_body_sma_{window}"] = signed_body_ratio.rolling(window).mean()
+
+    for cfg in cs_cfg.get("wick_imbalance_sma", []):
+        window = cfg["window"]
+        df[f"{prefix}wick_imbalance_sma_{window}"] = _safe_div(wick_imbalance, high_low).rolling(window).mean()
+
+
+# =============================================================================
+# _add_trend_slope_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add EMA slope and directional agreement features
+# =============================================================================
+def _add_trend_slope_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    ts_cfg = indicators.get("trend_slope", {})
+    if not ts_cfg:
+        return
+
+    for cfg in ts_cfg.get("ema_slope", []):
+        window = cfg["window"]
+        ema    = ta.trend.EMAIndicator(close=df["close"], window=window).ema_indicator()
+        # Normalized slope: 1-bar EMA change relative to close
+        df[f"{prefix}ema_slope_{window}"] = _safe_div(ema - ema.shift(1), df["close"])
+
+    for cfg in ts_cfg.get("directional_agreement", []):
+        short  = cfg["short"]
+        medium = cfg["medium"]
+        ret_s  = df["close"].pct_change(periods=short)
+        ret_m  = df["close"].pct_change(periods=medium)
+        df[f"{prefix}directional_agreement_{short}_{medium}"] = (
+            np.sign(ret_s) * np.sign(ret_m)
+        ).astype(float)
+
+
+# =============================================================================
+# _add_interaction_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add momentum-change and vol/volume-adjusted interaction features
+# =============================================================================
+def _add_interaction_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    int_cfg = indicators.get("interaction", {})
+    if not int_cfg:
+        return
+
+    log_ret    = np.log(_safe_div(df["close"], df["close"].shift(1)))
+    has_trades = "trades" in df.columns and df["trades"].notna().any()
+    has_tb_b   = "taker_buy_base" in df.columns and df["taker_buy_base"].notna().any()
+
+    rsi_col = f"{prefix}rsi_14"
+    roc_col = f"{prefix}roc_14"
+
+    for cfg in int_cfg.get("rsi_delta", []):
+        window = cfg["window"]
+        src    = df[rsi_col] if rsi_col in df.columns else ta.momentum.RSIIndicator(
+            close=df["close"], window=14
+        ).rsi()
+        df[f"{prefix}rsi_delta_{window}"] = src - src.shift(window)
+
+    for cfg in int_cfg.get("roc_delta", []):
+        window = cfg["window"]
+        src    = df[roc_col] if roc_col in df.columns else ta.momentum.ROCIndicator(
+            close=df["close"], window=14
+        ).roc()
+        df[f"{prefix}roc_delta_{window}"] = src - src.shift(window)
+
+    for cfg in int_cfg.get("vol_adj_return", []):
+        window   = cfg["window"]
+        ret      = df["close"].pct_change(periods=1)
+        roll_std = log_ret.rolling(window).std()
+        df[f"{prefix}vol_adj_return_{window}"] = _safe_div(ret, roll_std)
+
+    for cfg in int_cfg.get("volume_confirmed_return", []):
+        window   = cfg["window"]
+        ret      = df["close"].pct_change(periods=1)
+        vol_rank = df["volume"].rolling(window).rank(pct=True)
+        df[f"{prefix}volume_confirmed_return_{window}"] = ret * vol_rank
+
+    if has_tb_b:
+        for cfg in int_cfg.get("taker_flow_confirmed_return", []):
+            window   = cfg["window"]
+            ret      = df["close"].pct_change(periods=1)
+            tb_ratio = _safe_div(
+                df["taker_buy_base"].rolling(window).sum(),
+                df["volume"].rolling(window).sum(),
+            )
+            df[f"{prefix}taker_flow_confirmed_return_{window}"] = ret * tb_ratio
+
+
+# =============================================================================
+# _add_time_session_features(df, indicators, prefix) -> None
+# =============================================================================
+# Purpose:
+#  - Add deterministic UTC calendar and trading-session features
+# =============================================================================
+def _add_time_session_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("time_session"):
+        return
+
+    # open_time is the DataFrame index (datetime) at this point
+    if hasattr(df.index, "hour"):
+        dt = df.index
+    else:
+        dt = pd.to_datetime(df.index)
+
+    hour = dt.hour
+    dow  = dt.dayofweek  # 0=Monday, 6=Sunday
+
+    # Assign all time/session columns at once to avoid DataFrame fragmentation
+    new_cols = {
+        f"{prefix}hour_sin":       np.sin(2 * np.pi * hour / 24),
+        f"{prefix}hour_cos":       np.cos(2 * np.pi * hour / 24),
+        f"{prefix}dayofweek_sin":  np.sin(2 * np.pi * dow / 7),
+        f"{prefix}dayofweek_cos":  np.cos(2 * np.pi * dow / 7),
+        f"{prefix}weekend":        (dow >= 5).astype(float),
+        f"{prefix}session_asia":   ((hour >= 0) & (hour < 8)).astype(float),
+        f"{prefix}session_europe": ((hour >= 7) & (hour < 16)).astype(float),
+        f"{prefix}session_us":     ((hour >= 13) & (hour < 22)).astype(float),
+    }
+    for col, val in new_cols.items():
+        df[col] = val
+
+
+# =============================================================================
+# _add_gk_volatility_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_gk_volatility_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("gk_volatility"):
+        return
+
+    log_hl = np.log(_safe_div(df["high"], df["low"]))
+    log_co = np.log(_safe_div(df["close"], df["open"]))
+
+    pk_sq = log_hl ** 2 / (4 * np.log(2))
+    gk_sq = (0.5 * log_hl ** 2) - ((2 * np.log(2) - 1) * log_co ** 2)
+
+    for w in (10, 30, 60):
+        df[f"{prefix}parkinson_vol_{w}"] = pk_sq.rolling(w).mean().clip(lower=0).pow(0.5)
+        df[f"{prefix}gk_vol_{w}"]        = gk_sq.rolling(w).mean().clip(lower=0).pow(0.5)
+
+
+# =============================================================================
+# _add_autocorr_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_autocorr_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("autocorr"):
+        return
+
+    ret = df["close"].pct_change()
+
+    for lag in (1, 5):
+        for w in (30, 60):
+            df[f"{prefix}return_autocorr_lag{lag}_{w}"] = ret.rolling(w).corr(ret.shift(lag))
+
+    ret_10 = df["close"].pct_change(10)
+    var_1  = ret.rolling(60).var(ddof=0)
+    var_10 = ret_10.rolling(60).var(ddof=0)
+    df[f"{prefix}variance_ratio_10_60"] = _safe_div(var_10, 10.0 * var_1).clip(0, 5)
+
+
+# =============================================================================
+# _add_drawdown_timing_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_drawdown_timing_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("drawdown_timing"):
+        return
+
+    for w in (10, 30, 60):
+        rh  = df["close"].rolling(w).max()
+        rl  = df["close"].rolling(w).min()
+        rng = (rh - rl).replace(0, np.nan)
+
+        df[f"{prefix}recovery_ratio_{w}"] = _safe_div(df["close"] - rl, rng)
+        df[f"{prefix}max_drawdown_{w}"]   = _safe_div(rh - rl, rh)
+
+        df[f"{prefix}time_since_high_{w}"] = df["close"].rolling(w).apply(
+            lambda x: (len(x) - 1 - int(np.argmax(x))) / len(x), raw=True
+        )
+        df[f"{prefix}time_since_low_{w}"] = df["close"].rolling(w).apply(
+            lambda x: (len(x) - 1 - int(np.argmin(x))) / len(x), raw=True
+        )
+
+
+# =============================================================================
+# _add_pattern_flags(df, indicators, prefix) -> None
+# =============================================================================
+def _add_pattern_flags(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("pattern_flags"):
+        return
+
+    o, h, l, c = df["open"], df["high"], df["low"], df["close"]
+    rng       = (h - l).replace(0, np.nan)
+    body      = (c - o).abs()
+    hi_end    = pd.concat([c, o], axis=1).max(axis=1)
+    lo_end    = pd.concat([c, o], axis=1).min(axis=1)
+    upper_wick = h - hi_end
+    lower_wick = lo_end - l
+
+    df[f"{prefix}doji"]          = (_safe_div(body, rng) < 0.1).astype(float)
+    df[f"{prefix}hammer"]        = (
+        (_safe_div(lower_wick, rng) > 0.6) & (_safe_div(body, rng) < 0.3) & (c > o)
+    ).astype(float)
+    df[f"{prefix}shooting_star"] = (
+        (_safe_div(upper_wick, rng) > 0.6) & (_safe_div(body, rng) < 0.3) & (c < o)
+    ).astype(float)
+    df[f"{prefix}inside_bar"]  = ((h < h.shift(1)) & (l > l.shift(1))).astype(float)
+    df[f"{prefix}outside_bar"] = ((h > h.shift(1)) & (l < l.shift(1))).astype(float)
+    df[f"{prefix}engulf_bull"] = (
+        (c.shift(1) < o.shift(1)) & (o < c.shift(1)) & (c > o.shift(1))
+    ).astype(float)
+    df[f"{prefix}engulf_bear"] = (
+        (c.shift(1) > o.shift(1)) & (o > c.shift(1)) & (c < o.shift(1))
+    ).astype(float)
+
+    bull_bar = (c > o).astype(float)
+    for w in (10, 30, 60):
+        df[f"{prefix}bull_bars_ratio_{w}"] = bull_bar.rolling(w).mean()
+
+
+# =============================================================================
+# _add_gap_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_gap_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("gap"):
+        return
+
+    prev_close = df["close"].shift(1)
+    gap_open   = _safe_div(df["open"] - prev_close, prev_close)
+
+    df[f"{prefix}gap_open"] = gap_open
+    for w in (10, 30):
+        df[f"{prefix}gap_open_abs_sma_{w}"] = gap_open.abs().rolling(w).mean()
+
+
+# =============================================================================
+# _add_efficiency_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_efficiency_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("efficiency"):
+        return
+
+    ret_1 = df["close"].pct_change().abs()
+    for w in (10, 30, 60):
+        net_move   = df["close"].pct_change(w).abs()
+        total_path = ret_1.rolling(w).sum()
+        df[f"{prefix}efficiency_ratio_{w}"] = _safe_div(net_move, total_path).clip(0, 1)
+
+
+# =============================================================================
+# _add_sr_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_sr_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("sr_levels"):
+        return
+
+    atr_col  = f"{prefix}atr_14"
+    atr      = df[atr_col].copy() if atr_col in df.columns else (df["high"] - df["low"])
+    atr_safe = atr.clip(lower=1e-10)
+
+    for w in (10, 30, 60):
+        rh = df["high"].rolling(w).max()
+        rl = df["low"].rolling(w).min()
+        df[f"{prefix}atr_dist_high_{w}"] = _safe_div(rh - df["close"], atr_safe)
+        df[f"{prefix}atr_dist_low_{w}"]  = _safe_div(df["close"] - rl, atr_safe)
+
+    if isinstance(df.index, pd.DatetimeIndex):
+        day             = df.index.floor("D")
+        daily_high      = df.groupby(day)["high"].transform("max")
+        daily_low       = df.groupby(day)["low"].transform("min")
+        prev_daily_high = daily_high.shift(1440)
+        prev_daily_low  = daily_low.shift(1440)
+        df[f"{prefix}prev_session_high_dist"] = _safe_div(
+            prev_daily_high - df["close"], atr_safe
+        )
+        df[f"{prefix}prev_session_low_dist"] = _safe_div(
+            df["close"] - prev_daily_low, atr_safe
+        )
+
+
+# =============================================================================
+# _add_tail_risk_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_tail_risk_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("tail_risk"):
+        return
+
+    ret     = df["close"].pct_change()
+    pos_ret = ret.clip(lower=0)
+    neg_ret = ret.clip(upper=0).abs()
+
+    for w in (10, 30, 60):
+        pm = pos_ret.rolling(w).mean()
+        nm = neg_ret.rolling(w).mean()
+        df[f"{prefix}pos_return_mean_{w}"]  = pm
+        df[f"{prefix}neg_return_mean_{w}"]  = nm
+        df[f"{prefix}return_asymmetry_{w}"] = _safe_div(pm, nm.replace(0, np.nan))
+
+
+# =============================================================================
+# _add_extended_accel_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_extended_accel_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("accel_extended"):
+        return
+
+    rsi_col = f"{prefix}rsi_14"
+    roc_col = f"{prefix}roc_14"
+    rsi_src = df[rsi_col] if rsi_col in df.columns else ta.momentum.RSIIndicator(
+        close=df["close"], window=14
+    ).rsi()
+    roc_src = df[roc_col] if roc_col in df.columns else ta.momentum.ROCIndicator(
+        close=df["close"], window=14
+    ).roc()
+    ret_10 = df["close"].pct_change(10)
+
+    for w in (10, 30):
+        df[f"{prefix}rsi_delta_{w}"]             = rsi_src - rsi_src.shift(w)
+        df[f"{prefix}roc_delta_{w}"]             = roc_src - roc_src.shift(w)
+        df[f"{prefix}return_momentum_delta_{w}"] = ret_10 - ret_10.shift(w)
+
+
+# =============================================================================
+# _add_ichimoku_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_ichimoku_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("ichimoku"):
+        return
+
+    h, l, c = df["high"], df["low"], df["close"]
+
+    def _midpoint(window: int) -> pd.Series:
+        return (h.rolling(window).max() + l.rolling(window).min()) / 2
+
+    tenkan   = _midpoint(9)
+    kijun    = _midpoint(26)
+    senkou_b = _midpoint(52)
+    senkou_a = (tenkan + kijun) / 2
+
+    df[f"{prefix}tenkan_ratio"]             = _safe_div(tenkan, c) - 1
+    df[f"{prefix}kijun_ratio"]              = _safe_div(kijun, c) - 1
+    df[f"{prefix}senkou_b_ratio"]           = _safe_div(senkou_b, c) - 1
+    df[f"{prefix}tenkan_kijun_delta"]       = _safe_div(tenkan - kijun, c)
+    df[f"{prefix}price_vs_tenkan"]          = _safe_div(c - tenkan, c)
+    df[f"{prefix}price_vs_kijun"]           = _safe_div(c - kijun, c)
+    df[f"{prefix}ichimoku_cloud_thickness"] = _safe_div(senkou_a - senkou_b, c)
+
+
+# =============================================================================
+# _add_donchian_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_donchian_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("donchian"):
+        return
+
+    for w in (10, 30, 60):
+        rh  = df["high"].rolling(w).max()
+        rl  = df["low"].rolling(w).min()
+        rng = (rh - rl).replace(0, np.nan)
+
+        df[f"{prefix}donchian_width_{w}"]    = _safe_div(rh - rl, df["close"])
+        df[f"{prefix}donchian_position_{w}"] = _safe_div(df["close"] - rl, rng)
+        df[f"{prefix}donchian_breakout_{w}"] = (df["close"] >= rh).astype(float)
+
+
+# =============================================================================
+# _rolling_lr_slope(series, window) -> pd.Series
+# =============================================================================
+def _rolling_lr_slope(series: pd.Series, window: int) -> pd.Series:
+    """Vectorized rolling OLS slope via convolution (O(n) in C)."""
+    t     = np.arange(window, dtype=float) - (window - 1) / 2.0
+    w_arr = t / (t ** 2).sum()
+    y     = series.values.astype(float)
+    raw   = np.convolve(y, w_arr[::-1], mode="valid")
+    result = np.full(len(y), np.nan)
+    result[window - 1:] = raw
+    return pd.Series(result, index=series.index)
+
+
+# =============================================================================
+# _add_lr_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_lr_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("lr"):
+        return
+
+    c = df["close"]
+    for w in (10, 30, 60):
+        t     = np.arange(w, dtype=float) - (w - 1) / 2.0
+        var_t = (t ** 2).mean()      # constant for this window
+        t_now = (w - 1) / 2.0       # centered position of last (current) bar
+
+        slope      = _rolling_lr_slope(c, w)
+        roll_mean  = c.rolling(w).mean()
+        roll_var_y = c.rolling(w).var(ddof=0).clip(lower=1e-20)
+        r2         = (slope ** 2 * var_t / roll_var_y).clip(0, 1)
+        y_hat      = roll_mean + slope * t_now
+        residual   = _safe_div(c - y_hat, c)
+
+        df[f"{prefix}lr_slope_{w}"]    = _safe_div(slope, c)
+        df[f"{prefix}lr_r2_{w}"]       = r2
+        df[f"{prefix}lr_residual_{w}"] = residual
+
+
+# =============================================================================
+# _add_session_relative_features(df, indicators, prefix) -> None
+# =============================================================================
+def _add_session_relative_features(df: pd.DataFrame, indicators: dict, prefix: str) -> None:
+    if not indicators.get("session_relative"):
+        return
+    if not isinstance(df.index, pd.DatetimeIndex):
+        return
+
+    dt  = df.index
+    day = dt.floor("D")
+
+    day_open  = df["open"].groupby(day).transform("first")
+    df[f"{prefix}day_open_return"] = _safe_div(df["close"] - day_open, day_open)
+
+    day_high  = df["high"].groupby(day).transform("max")
+    day_low   = df["low"].groupby(day).transform("min")
+    day_range = (day_high - day_low).replace(0, np.nan)
+    df[f"{prefix}day_range_position"] = _safe_div(df["close"] - day_low, day_range)
+
+    bar_num = df.groupby(day).cumcount()
+    df[f"{prefix}bars_into_session_norm"] = (bar_num / 1440.0).clip(0, 1)
+
+    monday    = (dt - pd.to_timedelta(dt.dayofweek, unit="D")).floor("D")
+    week_open = df["open"].groupby(monday).transform("first")
+    df[f"{prefix}weekly_open_return"] = _safe_div(df["close"] - week_open, week_open)
+
+
+# =============================================================================
+# _clean_feature_values(df: pd.DataFrame, prefix: str) -> None
+# =============================================================================
+# Purpose:
+#  - Replace infinite feature values with missing values in-place
+# =============================================================================
+def _clean_feature_values(df: pd.DataFrame, prefix: str) -> None:
+    feat_cols = [col for col in df.columns if col.startswith(prefix)]
+    df[feat_cols] = df[feat_cols].replace([np.inf, -np.inf], np.nan)
+
+
+# =============================================================================
+# sync_features(...) -> None
+# =============================================================================
+# Purpose:
+#  - Fetch raw OHLCV data from [start_time - lookback, end]
+#  - Compute configured target variables
+#  - Generate all configured technical indicators with 'feat_' prefix
+#  - Insert rows into features table
+# Parameters:
+#  - start_time: "YYYY-MM-DD HH:MM:SS" (UTC)
+#  - lookback_bars: minutes to look back for feature computation
+#  - end_time: optional "YYYY-MM-DD HH:MM:SS" upper bound for controlled rebuilds
+#  - asset_id: optional asset id from config/assets.json
+# =============================================================================
+def sync_features(
+    start_time: str,
+    lookback_bars: int = 240,
+    end_time: str | None = None,
+    asset_id: str | None = None,
+) -> None:
+    # -------------------------------------------------------------------------
+    # Load configuration
+    # -------------------------------------------------------------------------
+    db_cfg      = utils.load_asset_config(asset_id)
+    feat_cfg    = utils.load_features_config(asset_id=asset_id)
+    db_path     = db_cfg["database"]["db_path"]
+    table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
+    table_feat  = db_cfg["database"]["tables"]["features"]
+    cfg_feat    = feat_cfg["database"]["features"]
+    targets_cfg = cfg_feat.get("targets", [])
+
+    # -------------------------------------------------------------------------
+    # Detect available activity columns in the OHLCV table
+    # -------------------------------------------------------------------------
+    activity_source_cols = ["quote_volume", "trades", "taker_buy_base", "taker_buy_quote"]
+    if table_exists(db_path, table_ohlcv):
+        ohlcv_table_cols = table_columns(db_path, table_ohlcv)
+        available_activity = [c for c in activity_source_cols if c in ohlcv_table_cols]
+    else:
+        available_activity = []
+
+    base_cols   = ["open_time", "open", "high", "low", "close", "volume"]
+    select_cols = ", ".join(base_cols + available_activity)
+
+    # -------------------------------------------------------------------------
+    # Fetch raw OHLCV data
+    # -------------------------------------------------------------------------
+    fetch_start = (
+        pd.to_datetime(start_time) - timedelta(minutes=lookback_bars)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
+    with sqlite_connect(db_path) as conn:
+        df = pd.read_sql_query(
+            f"""
+            SELECT {select_cols}
+            FROM {table_ohlcv}
+            WHERE open_time >= ?
+                AND (? IS NULL OR open_time <= ?)
+            ORDER BY open_time ASC
+            """,
+            conn,
+            params=(fetch_start, end_time, end_time),
+        )
+
+    if df.empty:
+        print(f"No OHLCV rows found since {fetch_start}")
+        return
+
+    df["open_time"] = pd.to_datetime(df["open_time"])
+    for col in ["open", "high", "low", "close", "volume"] + available_activity:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df.set_index("open_time", inplace=True)
+
+    # -------------------------------------------------------------------------
+    # Compute target variables
+    # -------------------------------------------------------------------------
+    for target_cfg in targets_cfg:
+        direction   = target_cfg["direction"]
+        rolling_win = target_cfg["rolling_window"]
+        percentile  = target_cfg["percentile"]
+        target_col  = utils.target_name_from_config(target_cfg)
+
+        if direction == "long":
+            rolling_max    = df["close"][::-1].rolling(rolling_win, min_periods=1).max()[::-1]
+            ratio_long     = _safe_div(rolling_max, df["close"])
+            threshold      = ratio_long.quantile(percentile)
+            df[target_col] = (ratio_long >= threshold).astype(int)
+
+        elif direction == "short":
+            rolling_min    = df["close"][::-1].rolling(rolling_win, min_periods=1).min()[::-1]
+            ratio_short    = _safe_div(rolling_min, df["close"])
+            threshold      = ratio_short.quantile(percentile)
+            df[target_col] = (ratio_short <= threshold).astype(int)
+
+        else:
+            raise ValueError(f"Unknown target direction: {direction}")
+
+    # -------------------------------------------------------------------------
+    # Generate technical indicators with 'feat_' prefix
+    # -------------------------------------------------------------------------
+    indicators  = cfg_feat["indicators"]
+    feat_prefix = "feat_"
+
+    _add_momentum_features(df, indicators, feat_prefix)
+    _add_trend_features(df, indicators, feat_prefix)
+    _add_volatility_features(df, indicators, feat_prefix)
+    _add_volume_features(df, indicators, feat_prefix)
+    _add_price_action_features(df, indicators, feat_prefix)
+    _add_market_structure_features(df, indicators, feat_prefix)
+    # Defragment after legacy feature groups to avoid PerformanceWarning
+    df = df.copy()
+    _add_activity_features(df, indicators, feat_prefix)
+    _add_return_distance_features(df, indicators, feat_prefix)
+    _add_regime_rank_features(df, indicators, feat_prefix)
+    _add_candle_shape_features(df, indicators, feat_prefix)
+    _add_trend_slope_features(df, indicators, feat_prefix)
+    _add_interaction_features(df, indicators, feat_prefix)
+    _add_time_session_features(df, indicators, feat_prefix)
+    _add_gk_volatility_features(df, indicators, feat_prefix)
+    _add_autocorr_features(df, indicators, feat_prefix)
+    _add_drawdown_timing_features(df, indicators, feat_prefix)
+    _add_pattern_flags(df, indicators, feat_prefix)
+    _add_gap_features(df, indicators, feat_prefix)
+    _add_efficiency_features(df, indicators, feat_prefix)
+    _add_sr_features(df, indicators, feat_prefix)
+    _add_tail_risk_features(df, indicators, feat_prefix)
+    _add_extended_accel_features(df, indicators, feat_prefix)
+    _add_ichimoku_features(df, indicators, feat_prefix)
+    _add_donchian_features(df, indicators, feat_prefix)
+    _add_lr_features(df, indicators, feat_prefix)
+    _add_session_relative_features(df, indicators, feat_prefix)
+    _clean_feature_values(df, feat_prefix)
+    df = df.copy()
+
+    # -------------------------------------------------------------------------
+    # Prepare and insert into database
+    # -------------------------------------------------------------------------
+    df_reset = df.reset_index()
+    start_dt = pd.to_datetime(start_time)
+    df_reset = df_reset[df_reset["open_time"] >= start_dt].copy()
+    if end_time is not None:
+        end_dt   = pd.to_datetime(end_time)
+        df_reset = df_reset[df_reset["open_time"] <= end_dt].copy()
+    df_reset["open_time"] = df_reset["open_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    feat_cols    = [col for col in df_reset.columns if col.startswith(feat_prefix)]
+    target_cols  = utils.target_columns_from_config(feat_cfg)
+    cols_to_keep = ["open_time", "close"] + target_cols + feat_cols
+    df_final     = df_reset[cols_to_keep].copy()
+    ensure_table_columns(db_path, table_feat, df_final)
+    df_final     = drop_existing_open_times(df_final, db_path, table_feat)
+
+    if df_final.empty:
+        print(f"No new feature rows to insert into '{table_feat}'")
+        return
+
+    with sqlite_connect(db_path) as conn:
+        df_final.to_sql(table_feat, conn, index=False, if_exists="append", chunksize=50_000)
+
+    print(f"OK: Computed {len(df_final)} feature rows into '{table_feat}'")

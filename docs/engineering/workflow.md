@@ -19,3 +19,7 @@
 2. Train candidates as inactive models first.
 3. Generate model comparison artifacts outside the live predictions table.
 4. Promote runtime models only after validation and comparison.
+
+New models use LightGBM only (`lgbm_search.py` + `sweep_strategy.py`).
+Logistic regression trainers (lasso, p-value) are legacy — do not start new development with them.
+See `docs/engineering/lgbm_model_development.md` for the full workflow.

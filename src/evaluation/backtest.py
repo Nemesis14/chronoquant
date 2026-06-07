@@ -89,12 +89,14 @@ def build_backtest_frame(
     start: str,
     end: str,
     asset_id: str | None = None,
+    chunk_size: int = 50_000,
 ) -> pd.DataFrame:
-    predictions = model_prediction_frame(
+    predictions = model_prediction_frame_chunked(
         model_id=model_id,
         start=start,
         end=end,
         asset_id=asset_id,
+        chunk_size=chunk_size,
     )
     ohlcv = load_ohlcv_frame(start=start, end=end, asset_id=asset_id)
     frame = ohlcv.merge(
@@ -148,7 +150,7 @@ def model_prediction_frame(
 
     trainer = model_meta.get("trainer", "")
     predict_method = model_meta.get("predict", {}).get("method", "predict")
-    X = df[feature_list].fillna(0)
+    X = df[feature_list].apply(pd.to_numeric, errors="coerce").fillna(0)
     if trainer.startswith("statsmodels") and "const" not in X.columns:
         X.insert(0, "const", 1.0)
 
@@ -167,6 +169,75 @@ def model_prediction_frame(
             "prediction": pd.to_numeric(prediction, errors="coerce"),
         }
     )
+
+
+# =============================================================================
+# model_prediction_frame_chunked(...) -> pd.DataFrame
+# =============================================================================
+# Purpose:
+#  - Memory-safe variant: reads features in chunks, applies model per chunk,
+#    concatenates only the slim output (open_time, close, target, prediction)
+# =============================================================================
+def model_prediction_frame_chunked(
+    model_id: str,
+    start: str,
+    end: str,
+    asset_id: str | None = None,
+    chunk_size: int = 50_000,
+) -> pd.DataFrame:
+    db_cfg = utils.load_asset_config(asset_id)["database"]
+    model_cfg = utils.load_models_config()
+    model_meta = model_cfg["models"][model_id]
+    db_path = db_cfg["db_path"]
+    table_feat = db_cfg["tables"]["features"]
+
+    model, feature_list = _load_model_and_features(model_meta)
+    target_col = model_meta["target_name"]
+    trainer = model_meta.get("trainer", "")
+    predict_method = model_meta.get("predict", {}).get("method", "predict")
+
+    select_cols = ["open_time", "close", target_col] + feature_list
+    select_cols = list(dict.fromkeys(select_cols))
+    cols_sql = ", ".join(_quote_identifier(col) for col in select_cols)
+
+    query = f"""
+        SELECT {cols_sql}
+        FROM {_quote_identifier(table_feat)}
+        WHERE open_time >= ?
+            AND open_time <= ?
+        ORDER BY open_time ASC
+        LIMIT ? OFFSET ?
+    """
+
+    results = []
+    offset = 0
+    with sqlite3.connect(db_path) as conn:
+        while True:
+            chunk = pd.read_sql_query(query, conn, params=(start, end, chunk_size, offset))
+            if chunk.empty:
+                break
+            X = chunk[feature_list].apply(pd.to_numeric, errors="coerce").fillna(0)
+            if trainer.startswith("statsmodels") and "const" not in X.columns:
+                X.insert(0, "const", 1.0)
+            if predict_method == "predict_proba":
+                pred = model.predict_proba(X)
+                if hasattr(pred, "shape") and len(pred.shape) == 2:
+                    pred = pred[:, 1]
+            else:
+                pred = model.predict(X)
+            results.append(pd.DataFrame({
+                "open_time":  chunk["open_time"],
+                "close":      pd.to_numeric(chunk["close"], errors="coerce"),
+                "target":     pd.to_numeric(chunk[target_col], errors="coerce"),
+                "prediction": pd.to_numeric(pred, errors="coerce"),
+            }))
+            offset += chunk_size
+            if len(chunk) < chunk_size:
+                break
+
+    if not results:
+        raise ValueError(f"No feature rows found for backtest interval: {start} -> {end}")
+    return pd.concat(results, ignore_index=True)
 
 
 # =============================================================================

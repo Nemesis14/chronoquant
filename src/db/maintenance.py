@@ -7,6 +7,8 @@
 #  - Update live prediction signal columns
 # =============================================================================
 
+from datetime import datetime, timedelta
+
 import utils
 from db.table_ops import sqlite_connect, table_columns
 from data_pipeline.sync_features import sync_features
@@ -113,6 +115,37 @@ def print_table_check(db_path: str, table_name: str) -> None:
 #  - predictions_only: rebuild only PREDICTIONS
 #  - asset_id: optional asset id from config/assets.json
 # =============================================================================
+# _chunk_date_ranges(start, end, chunk_months) -> list[tuple[str, str]]
+# =============================================================================
+# Purpose:
+#  - Split a date range into sequential monthly chunks to limit peak memory
+# =============================================================================
+def _chunk_date_ranges(
+    start: str,
+    end: str | None,
+    chunk_months: int,
+) -> list[tuple[str, str | None]]:
+    end_dt    = datetime.fromisoformat(end) if end else datetime.utcnow()
+    start_dt  = datetime.fromisoformat(start)
+    chunks    = []
+    chunk_s   = start_dt
+
+    while chunk_s < end_dt:
+        # Advance by chunk_months months
+        month  = chunk_s.month - 1 + chunk_months
+        year   = chunk_s.year + month // 12
+        month  = month % 12 + 1
+        chunk_e = chunk_s.replace(year=year, month=month) - timedelta(seconds=1)
+        if chunk_e >= end_dt:
+            chunks.append((chunk_s.strftime("%Y-%m-%d %H:%M:%S"), end))
+            break
+        chunks.append((chunk_s.strftime("%Y-%m-%d %H:%M:%S"), chunk_e.strftime("%Y-%m-%d %H:%M:%S")))
+        chunk_s = chunk_e + timedelta(seconds=1)
+
+    return chunks
+
+
+# =============================================================================
 def rebuild_derived_tables(
     start: str,
     end: str | None = None,
@@ -120,6 +153,7 @@ def rebuild_derived_tables(
     features_only: bool = False,
     predictions_only: bool = False,
     asset_id: str | None = None,
+    chunk_months: int = 6,
 ) -> None:
     db_cfg     = utils.load_asset_config(asset_id)["database"]
     db_path    = db_cfg["db_path"]
@@ -142,7 +176,11 @@ def rebuild_derived_tables(
             drop_table(db_path, table_pred)
 
     if not predictions_only:
-        sync_features(start, end_time=end, asset_id=asset_id)
+        chunks = _chunk_date_ranges(start, end, chunk_months)
+        print(f"INFO: Rebuilding features in {len(chunks)} chunk(s) of {chunk_months} months each")
+        for i, (chunk_start, chunk_end) in enumerate(chunks, 1):
+            print(f"  Chunk {i}/{len(chunks)}: {chunk_start} -> {chunk_end or '(latest)'}", flush=True)
+            sync_features(chunk_start, end_time=chunk_end, asset_id=asset_id)
         print_table_check(db_path, table_feat)
 
     if not features_only:

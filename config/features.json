@@ -225,7 +225,152 @@
                     "rolling_window": 60,
                     "percentile": 0.1
                 }
-            ]
+            ],
+            "indicators_extend": {
+                "activity": {
+                    "quote_volume_ratio": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "trade_count_ratio": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "avg_trade_quote": [
+                        {"window": 30}
+                    ],
+                    "taker_buy_base_ratio": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "taker_buy_quote_ratio": [
+                        {"window": 10},
+                        {"window": 30}
+                    ]
+                },
+                "return_distance": {
+                    "return": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "return_z": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "dist_rolling_high": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "dist_rolling_low": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ],
+                    "rolling_drawdown": [
+                        {"window": 10},
+                        {"window": 30},
+                        {"window": 60}
+                    ]
+                },
+                "regime_rank": {
+                    "natr_rank": [
+                        {"window": 20},
+                        {"window": 60}
+                    ],
+                    "hist_vol_rank": [
+                        {"window": 20},
+                        {"window": 60}
+                    ],
+                    "bb_width_rank": [
+                        {"window": 20},
+                        {"window": 60}
+                    ],
+                    "range_expansion": [
+                        {"short": 10, "medium": 30}
+                    ],
+                    "volume_rank": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "quote_volume_rank": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "trade_count_rank": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "volume_accel": [
+                        {"short": 10, "medium": 30}
+                    ],
+                    "trade_count_accel": [
+                        {"short": 10, "medium": 30}
+                    ]
+                },
+                "candle_shape": {
+                    "raw": true,
+                    "body_ratio_sma": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "signed_body_sma": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "wick_imbalance_sma": [
+                        {"window": 10},
+                        {"window": 30}
+                    ]
+                },
+                "trend_slope": {
+                    "ema_slope": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "directional_agreement": [
+                        {"short": 10, "medium": 30}
+                    ]
+                },
+                "interaction": {
+                    "rsi_delta": [
+                        {"window": 5}
+                    ],
+                    "roc_delta": [
+                        {"window": 5}
+                    ],
+                    "vol_adj_return": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "volume_confirmed_return": [
+                        {"window": 10},
+                        {"window": 30}
+                    ],
+                    "taker_flow_confirmed_return": [
+                        {"window": 10},
+                        {"window": 30}
+                    ]
+                },
+                "time_session": true,
+                "gk_volatility": true,
+                "autocorr": true,
+                "drawdown_timing": true,
+                "pattern_flags": true,
+                "gap": true,
+                "efficiency": true,
+                "sr_levels": true,
+                "tail_risk": true,
+                "accel_extended": true,
+                "ichimoku": true,
+                "donchian": true,
+                "lr": true,
+                "session_relative": true
+            }
         }
     }
 }

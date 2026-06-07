@@ -134,6 +134,11 @@ def apply_feature_profile(features_cfg: dict, profile_id: str | None) -> dict:
         feature_cfg["targets"] = copy.deepcopy(profile["targets"])
     if "indicators" in profile:
         feature_cfg["indicators"] = copy.deepcopy(profile["indicators"])
+    if "indicators_extend" in profile:
+        # Merge new top-level indicator groups without replacing existing ones
+        base = feature_cfg.setdefault("indicators", {})
+        for group, group_cfg in profile["indicators_extend"].items():
+            base[group] = copy.deepcopy(group_cfg)
 
     feature_cfg["profile_id"] = profile_id
     if profile.get("description"):

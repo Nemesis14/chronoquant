@@ -126,7 +126,7 @@ def _sync_single_model(
     trainer        = model_meta.get("trainer", "")
     predict_method = model_meta.get("predict", {}).get("method", "predict")
 
-    X = df[feature_list].fillna(0)
+    X = df[feature_list].apply(pd.to_numeric, errors="coerce").fillna(0)
     if trainer.startswith("statsmodels") and "const" not in X.columns:
         X.insert(0, "const", 1.0)
 

@@ -372,6 +372,108 @@ def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -
     )
 
 
+_SOL_MODEL_STATS = {
+    "long": {
+        "model_id":   "lgbm_solusdt_l_fw60_q90_stable_v1",
+        "train_auc":  0.410,
+        "test_auc":   0.157,
+        "n_features": 47,
+        "backtest": {
+            "period":       "2024-01-01 – 2026-01-01",
+            "trades":       165,
+            "wins":         122,
+            "losses":       43,
+            "win_rate":     73.9,
+            "total_return": "+124.5%",
+            "final_equity": "22,454.30",
+            "max_dd":       "-13.8%",
+        },
+    },
+    "short": {
+        "model_id":   "lgbm_solusdt_s_fw60_q10_stable_v1",
+        "train_auc":  0.392,
+        "test_auc":   0.144,
+        "n_features": 47,
+        "backtest": {
+            "period":       "2024-01-01 – 2026-01-01",
+            "trades":       8,
+            "wins":         6,
+            "losses":       2,
+            "win_rate":     75.0,
+            "total_return": "+6.1%",
+            "final_equity": "10,613.72",
+            "max_dd":       "-1.8%",
+        },
+    },
+}
+
+
+def _render_model_stats_panel(side: str, stats: dict) -> None:
+    bt        = stats["backtest"]
+    is_long   = side == "long"
+    side_color = _GREEN if is_long else _RED
+    side_label = "Long" if is_long else "Short"
+    arrow      = "▲" if is_long else "▼"
+
+    model_short = stats["model_id"].replace("lgbm_solusdt_", "").replace("_stable_v1", "")
+
+    st.markdown(
+        f"""
+        <div style="{_CARD}">
+            <div style="color:{side_color}; font-size:13px; font-weight:700; margin-bottom:8px;">
+                {arrow} {side_label} Champion
+            </div>
+            <div style="color:{_MUTED}; font-size:11px; margin-bottom:8px; word-break:break-all;">
+                {escape(stats["model_id"])}
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
+                <div>
+                    <div style="{_LBL}">Train AUC</div>
+                    <div style="{_VAL}">{stats["train_auc"]:.3f}</div>
+                </div>
+                <div>
+                    <div style="{_LBL}">Test AUC</div>
+                    <div style="{_VAL}">{stats["test_auc"]:.3f}</div>
+                </div>
+                <div>
+                    <div style="{_LBL}">Features</div>
+                    <div style="{_VAL}">{stats["n_features"]}</div>
+                </div>
+            </div>
+            <div style="border-top:1px solid {_GRID}; padding-top:8px;">
+                <div style="color:{_MUTED}; font-size:11px; margin-bottom:6px;">
+                    Backtest &nbsp; {escape(bt["period"])}
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; font-size:12px;">
+                    <div>
+                        <span style="{_LBL}">Trades </span>
+                        <span style="{_VAL}">{bt["trades"]}</span>
+                        <span style="color:{_MUTED}; font-size:11px;"> ({bt["wins"]}W / {bt["losses"]}L)</span>
+                    </div>
+                    <div>
+                        <span style="{_LBL}">Win rate </span>
+                        <span style="{_VAL}">{bt["win_rate"]}%</span>
+                    </div>
+                    <div>
+                        <span style="{_LBL}">Return </span>
+                        <span style="color:{_GREEN}; font-size:14px; font-weight:500;">{escape(bt["total_return"])}</span>
+                    </div>
+                    <div>
+                        <span style="{_LBL}">Max DD </span>
+                        <span style="color:{_RED}; font-size:14px; font-weight:500;">{escape(bt["max_dd"])}</span>
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <span style="{_LBL}">Final equity </span>
+                        <span style="{_VAL}">{escape(bt["final_equity"])}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_trade_panel(asset_id: str | None) -> None:
     sync_state   = ensure_sync_state(st.session_state, asset_id)
     sync_running = is_sync_running(sync_state, asset_id)
@@ -401,6 +503,10 @@ def render_trade_panel(asset_id: str | None) -> None:
 
     _render_active_trade_card(position)
     _render_recent_trades_panel(trades_df, asset_id)
+
+    if asset_id == "solusdt_fw60":
+        _render_model_stats_panel("long",  _SOL_MODEL_STATS["long"])
+        _render_model_stats_panel("short", _SOL_MODEL_STATS["short"])
 
 
 # =============================================================================

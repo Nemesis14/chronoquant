@@ -140,8 +140,10 @@ def prediction_price_figure(
     if active_trade:
         _add_trade_overlay(fig, plot_df, active_trade)
 
-    _long_signal_markers(fig, plot_df, entry_threshold)
-    _short_signal_markers(fig, plot_df, short_entry_threshold)
+    high_col = plot_df["high"] if "high" in plot_df.columns else plot_df.get("close")
+    if high_col is not None:
+        _long_signal_markers(fig, plot_df, high_col, entry_threshold)
+        _short_signal_markers(fig, plot_df, high_col, short_entry_threshold)
 
     # --- Row 3: Short prediction ---
     if "short_prediction" in plot_df.columns and not plot_df["short_prediction"].dropna().empty:
@@ -178,7 +180,7 @@ def prediction_price_figure(
             font={"color": _MUTED, "size": 10},
         )
 
-    return _style_figure(fig, x_start=x_start, x_end=x_end, y2_range=y2_range)
+    return _style_figure(fig, x_start=x_start, x_end=x_end)
 
 
 def _ann(fig, text: str, y: float) -> None:
@@ -263,6 +265,7 @@ def _threshold_legend(
 def _long_signal_markers(
     fig,
     df: pd.DataFrame,
+    high_col: pd.Series,
     entry_threshold: float | None,
 ) -> None:
     if entry_threshold is None or "prediction" not in df.columns:
@@ -271,20 +274,24 @@ def _long_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, pred in zip(sig["open_time"], sig["prediction"]):
-        fig.add_annotation(
-            x=ts, y=0.99,
-            xref="x", yref="y2 domain",
-            text="▲",
-            showarrow=False,
-            font={"color": _GREEN, "size": 13},
-            xanchor="center", yanchor="top",
-        )
+    fig.add_trace(
+        go.Scatter(
+            x=sig["open_time"],
+            y=high_col[mask] * 1.0015,
+            mode="markers", name="long signal",
+            marker={"symbol": "triangle-up", "color": _GREEN, "size": 9, "line": {"width": 0}},
+            hovertemplate="long signal<br>p=%{customdata:.3f}<extra></extra>",
+            customdata=sig["prediction"].values,
+            showlegend=False,
+        ),
+        row=2, col=1,
+    )
 
 
 def _short_signal_markers(
     fig,
     df: pd.DataFrame,
+    high_col: pd.Series,
     short_entry_threshold: float | None,
 ) -> None:
     if short_entry_threshold is None or "short_prediction" not in df.columns:
@@ -293,18 +300,21 @@ def _short_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, pred in zip(sig["open_time"], sig["short_prediction"]):
-        fig.add_annotation(
-            x=ts, y=0.01,
-            xref="x", yref="y2 domain",
-            text="▼",
-            showarrow=False,
-            font={"color": _RED, "size": 13},
-            xanchor="center", yanchor="bottom",
-        )
+    fig.add_trace(
+        go.Scatter(
+            x=sig["open_time"],
+            y=high_col[mask] * 1.0015,
+            mode="markers", name="short signal",
+            marker={"symbol": "triangle-down", "color": _RED, "size": 9, "line": {"width": 0}},
+            hovertemplate="short signal<br>p=%{customdata:.3f}<extra></extra>",
+            customdata=sig["short_prediction"].values,
+            showlegend=False,
+        ),
+        row=2, col=1,
+    )
 
 
-def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
+def _style_figure(fig, x_start=None, x_end=None):
     xkw: dict = dict(
         title_text="",
         tickfont={"color": _MUTED, "size": 11},
@@ -347,7 +357,7 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
         tickformat=".2f", fixedrange=False,
         row=1, col=1,
     )
-    y2_kw: dict = dict(
+    fig.update_yaxes(
         title_text="",
         tickfont={"color": _MUTED, "size": 12},
         linecolor=_GRID, linewidth=1,
@@ -355,10 +365,8 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
         showgrid=True, gridcolor=_GRID,
         zeroline=False, tickformat=",.2f",
         fixedrange=False,
+        row=2, col=1,
     )
-    if y2_range is not None:
-        y2_kw["range"] = y2_range
-    fig.update_yaxes(**y2_kw, row=2, col=1)
     fig.update_yaxes(
         title_text="Short",
         title_font={"color": "#e05252", "size": 11},

@@ -69,7 +69,7 @@ st.markdown(
 
 # ─── Session init ─────────────────────────────────────────────────────────────
 if "active_asset_id" not in st.session_state:
-    st.session_state["active_asset_id"] = None  # None = BCH
+    st.session_state["active_asset_id"] = "solusdt_fw60"
 
 if "dashboard_started_logged" not in st.session_state:
     get_dashboard_logger().info("Dashboard started")
@@ -616,8 +616,8 @@ def render_log_panel() -> None:
 with st.sidebar:
     st.title("ChronoQuant")
 
-    asset_options = ["BCH 4h", "SOL 1h"]
-    current_idx   = 0 if st.session_state["active_asset_id"] is None else 1
+    asset_options = ["SOL 1h", "BCH 4h"]
+    current_idx   = 1 if st.session_state["active_asset_id"] is None else 0
     selected      = st.radio("Asset", asset_options, index=current_idx)
     new_asset_id  = None if selected == "BCH 4h" else "solusdt_fw60"
 

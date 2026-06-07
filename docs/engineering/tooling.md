@@ -48,3 +48,58 @@ Codex-specific local notes can live in `.codex/settings.md`.
 Prefer the existing project tooling and lock files. This repo currently includes
 `pyproject.toml` and `uv.lock`, so package changes should be made in a way that
 keeps those files consistent.
+
+## Remote Training (Google Colab)
+
+Use Google Colab for compute-heavy phases. See `docs/engineering/workflow.md` for
+which phases require it.
+
+### How It Works
+
+The workflow is fully agent-driven — the user only presses Run All in Colab:
+
+1. Claude generates or updates the notebook under `notebooks/`.
+2. Claude exports the required data (parquet) locally and copies it to
+   `F:\My Drive\chronoquant\` (Google Drive desktop app at `F:\`).
+3. Claude commits and pushes the notebook to GitHub.
+4. Claude opens the Colab URL in the browser:
+   `https://colab.research.google.com/github/Nemesis14/chronoquant/blob/main/notebooks/<notebook>.ipynb`
+5. User presses **Ctrl+F9** (Run All). No other manual steps needed.
+
+### Notebook Responsibilities
+
+Each Colab notebook must:
+
+- Mount Google Drive (`/content/drive`).
+- Clone or update the repo from GitHub into `/content/chronoquant`.
+- Read input data from `/content/drive/My Drive/chronoquant/`.
+- Install dependencies via `pip` (not `uv`).
+- Write output artifacts (models, search results) back to Drive.
+
+### Data Flow
+
+```
+Local SQLite  →  export_sample_parquet.py  →  samples/<id>/dataset.parquet
+                                                        ↓
+                                            F:\My Drive\chronoquant\samples\
+                                                        ↓
+                                            Colab reads from /content/drive/...
+                                                        ↓
+                                            Artifacts written back to Drive
+                                                        ↓
+                                            Claude copies artifacts back to repo
+```
+
+### Drive Path Convention
+
+| Local path | Colab path |
+|---|---|
+| `F:\My Drive\chronoquant\samples\` | `/content/drive/My Drive/chronoquant/samples/` |
+| `F:\My Drive\chronoquant\models\` | `/content/drive/My Drive/chronoquant/models/` |
+
+### Notebooks
+
+| Notebook | Purpose |
+|---|---|
+| `notebooks/colab_hello.ipynb` | Workflow connectivity test |
+| `notebooks/colab_training.ipynb` | LightGBM hyperparameter search _(planned)_ |

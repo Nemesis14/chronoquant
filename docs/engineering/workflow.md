@@ -19,20 +19,25 @@ rules in the domain guides:
 
 ## End-to-End Flow
 
+Steps marked **[COLAB]** are compute-heavy and should run on Google Colab.
+See `docs/engineering/tooling.md` for the full Colab workflow mechanics.
+
 1. **Data audit:** verify the asset data range, row counts, required columns,
    gaps, duplicate `open_time` values, and target/feature null rates.
 2. **Sample and split:** create or reuse a deterministic `sample_id` with
    train/validation folds and a final holdout according to `sampling.md`.
-3. **Model search:** train inactive candidates and store model-comparison
-   artifacts outside the live predictions table.
+3. **Model search** **[COLAB]:** train inactive candidates and store model-comparison
+   artifacts outside the live predictions table. Explore (60+ trials) and refine
+   stages are too slow for local execution.
 4. **Model validation:** compare validation folds, guardrails, calibration,
    lift, and final holdout behavior.
 5. **Promotion fit:** after a candidate passes review, refit the production
    artifact on the approved data range using the selected features and params.
 6. **Prediction sync:** write only the runtime model predictions needed by the
    application; keep candidate evaluation outputs separate.
-7. **Strategy evaluation:** select robust triggers outside the untouched holdout,
-   then report unchanged trigger behavior on the holdout.
+7. **Strategy evaluation** **[COLAB]:** select robust triggers outside the untouched holdout,
+   then report unchanged trigger behavior on the holdout. Threshold sweeps over
+   long date ranges are compute-heavy.
 8. **Model card:** generate `models/<model_id>/model_card.json` for each
    promoted model using `scripts/generate_model_card.py`. This writes CV
    metrics, feature count, and holdout backtest results in a structured file

@@ -160,6 +160,9 @@ def load_predictions_config() -> dict:
 def load_strategies_config() -> dict:
     return _load_json("strategies.json")
 
+def load_trading_config() -> dict:
+    return _load_json("trading.json")
+
 def load_env_config() -> dict:
     return _load_json("env.json")
 

@@ -30,6 +30,7 @@ from streamlit_app.sync_runner import (
     is_sync_running,
     start_sync,
 )
+from streamlit_app import trading_runner
 
 # Dark theme palette (matches charts.py)
 _BG    = "#0b0e11"
@@ -480,6 +481,102 @@ def _render_model_stats_panel(side: str, stats: dict) -> None:
     )
 
 
+def _render_trading_status_card() -> None:
+    status = trading_runner.get_trading_status()
+    running = trading_runner.is_trading_running()
+
+    if not running and status is None:
+        return
+
+    mode = (status or {}).get("mode", "—")
+    mode_color = _GOLD if mode == "dry_run" else _RED if mode == "live" else _MUTED
+    service_dot = f'<span style="color:{_GREEN};">●</span>' if running else f'<span style="color:{_MUTED};">○</span>'
+
+    open_pos = (status or {}).get("open_position")
+    last_sig = (status or {}).get("last_signal")
+
+    pos_html = ""
+    if open_pos:
+        side = open_pos.get("side", "?")
+        side_color = _GREEN if side == "LONG" else _RED
+        arrow = "▲" if side == "LONG" else "▼"
+        pos_html = (
+            f'<div style="margin-top:8px; border-top:1px solid {_GRID}; padding-top:8px;">'
+            f'<span style="color:{side_color}; font-weight:700;">{arrow} {side}</span>'
+            f'&nbsp; entry <span style="color:{_TEXT};">{_fmt(open_pos.get("entry_price"))}</span>'
+            f'&nbsp; qty <span style="color:{_TEXT};">{_fmt(open_pos.get("quantity"), 2)}</span>'
+            f'</div>'
+        )
+
+    sig_html = ""
+    if last_sig:
+        dec = last_sig.get("decision", "")
+        dec_color = _GREEN if "ENTER" in dec else _RED if "EXIT" in dec else _MUTED
+        sig_html = (
+            f'<div style="margin-top:6px; font-size:12px;">'
+            f'<span style="{_LBL}">Last signal </span>'
+            f'<span style="color:{dec_color}; font-weight:600;">{dec}</span>'
+            f'<span style="color:{_MUTED}; font-size:11px;"> {_fmt_time(last_sig.get("processed_at"))}</span>'
+            f'</div>'
+            f'<div style="font-size:11px; color:{_MUTED};">{escape(last_sig.get("reason",""))}</div>'
+        )
+
+    started = _fmt_time((status or {}).get("started_at"))
+    st.markdown(
+        f'<div style="{_CARD}">'
+        f'<div style="{_HDR}">{service_dot} Auto Trading'
+        f'&nbsp;<span style="color:{mode_color}; font-size:12px; font-weight:400;">[{mode}]</span>'
+        f'</div>'
+        f'<div style="font-size:12px; color:{_MUTED};">Started: {started}</div>'
+        f'{pos_html}{sig_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_trading_positions_card() -> None:
+    positions = trading_runner.get_recent_positions(limit=10)
+    if not positions:
+        return
+
+    rows_html = ""
+    for p in positions:
+        side = p.get("side", "?")
+        side_color = _GREEN if side == "LONG" else _RED
+        pnl = p.get("pnl_usdt")
+        status = p.get("status", "")
+        try:
+            pnl_val = float(pnl) if pnl is not None else None
+            pnl_str = f"{pnl_val:+.2f}" if pnl_val is not None else "open"
+            pnl_color = _GREEN if pnl_val and pnl_val > 0 else _RED if pnl_val and pnl_val < 0 else _MUTED
+        except (TypeError, ValueError):
+            pnl_str, pnl_color = "—", _MUTED
+
+        entry_t = _fmt_time(p.get("entry_time"))
+        reason = p.get("exit_reason") or "open"
+        rows_html += (
+            f'<div style="border-bottom:1px solid {_GRID}; padding:5px 0; font-size:12px;'
+            f' display:grid; grid-template-columns:46px 70px 70px auto; gap:4px; align-items:center;">'
+            f'<span style="color:{side_color}; font-weight:600;">{side}</span>'
+            f'<span style="color:{_TEXT};">{_fmt(p.get("entry_price"), 2)}</span>'
+            f'<span style="color:{pnl_color}; font-weight:600;">{pnl_str}</span>'
+            f'<span style="color:{_MUTED}; font-size:11px;">{entry_t} · {escape(reason)}</span>'
+            f'</div>'
+        )
+
+    st.markdown(
+        f'<div style="{_CARD}">'
+        f'<div style="{_HDR}">Auto Trades</div>'
+        f'<div style="display:grid; grid-template-columns:46px 70px 70px auto; gap:4px;'
+        f' font-size:11px; color:{_MUTED}; padding-bottom:4px; border-bottom:1px solid {_GRID};">'
+        f'<span>Side</span><span>Entry</span><span>PnL</span><span>Time · Reason</span>'
+        f'</div>'
+        f'{rows_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_trade_panel(asset_id: str | None) -> None:
     sync_state   = ensure_sync_state(st.session_state, asset_id)
     sync_running = is_sync_running(sync_state, asset_id)
@@ -506,6 +603,10 @@ def render_trade_panel(asset_id: str | None) -> None:
             st.session_state[cache_trades] = trades_df
         else:
             trades_df = st.session_state[cache_trades]
+
+    if asset_id == "solusdt_fw60":
+        _render_trading_status_card()
+        _render_trading_positions_card()
 
     _render_active_trade_card(position)
     _render_recent_trades_panel(trades_df, asset_id)
@@ -613,6 +714,42 @@ def render_log_panel() -> None:
 # Sidebar
 # =============================================================================
 
+def _render_trading_controls() -> None:
+    st.subheader("Live Trading")
+
+    running = trading_runner.is_trading_running()
+    current_mode = trading_runner.get_trading_mode()
+
+    if running:
+        mode_label = current_mode or "dry_run"
+        color = _GOLD if mode_label == "dry_run" else _RED
+        st.markdown(
+            f'<div style="color:{color}; font-size:13px; font-weight:600; margin-bottom:8px;">'
+            f'● {mode_label.upper()} fut</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("⏹ Leállítás", key="trading_stop", width="stretch"):
+            trading_runner.stop_trading()
+            get_dashboard_logger().info("Trading service stop requested from UI")
+            st.rerun(scope="app")
+    else:
+        mode = st.selectbox(
+            "Mód", ["dry_run", "live"], key="trading_mode_select",
+            help="dry_run: nincs valós order | live: Binance Futures",
+        )
+        if st.button("▶ Kereskedés indítása", key="trading_start",
+                     type="primary", width="stretch"):
+            if mode == "live":
+                st.warning("⚠ Live mód valós ordereket küld Binance Futures-ra!")
+            ok = trading_runner.start_trading(mode=mode)
+            if ok:
+                get_dashboard_logger().info("Trading service started (mode=%s)", mode)
+            else:
+                err = trading_runner.get_last_error() or "ismeretlen hiba"
+                get_dashboard_logger().error("Trading service failed to start: %s", err)
+            st.rerun(scope="app")
+
+
 with st.sidebar:
     st.title("ChronoQuant")
 
@@ -630,6 +767,9 @@ with st.sidebar:
         _sync_panel_bch()
     else:
         _sync_panel_sol()
+
+    st.divider()
+    _render_trading_controls()
 
 
 # =============================================================================

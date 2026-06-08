@@ -1,0 +1,422 @@
+from __future__ import annotations
+
+import logging
+import sqlite3
+import threading
+import time
+import traceback
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Optional
+
+import utils
+from trading import journal, strategy
+from trading.exchange import BinanceFuturesClient
+from trading.state import TradingState, FLAT, LONG, SHORT, COOLDOWN
+
+_logger = logging.getLogger("chronoquant.trading")
+
+
+# =============================================================================
+# TradingService
+# =============================================================================
+
+class TradingService:
+    """
+    Main trading service loop.
+
+    Runs in a background thread. Each cycle (every ~60s):
+      1. Sync OHLCV + features + predictions via existing pipeline.
+      2. Read latest closed bar predictions for both models.
+      3. Evaluate strategy → decision.
+      4. Execute: open/close position via exchange client.
+      5. Persist signal + position + order to trading.db.
+      6. Sleep until next 1-minute bar closes.
+
+    Exactly mirrors the simulation logic in src/evaluation/backtest.py.
+    """
+
+    def __init__(self, config: dict):
+        self.config = config
+        self.mode = config["mode"]
+        self.asset_id = config["asset_id"]
+        self.db_path = utils._resolve_path(config["db_path"])
+        self.risk_cfg = config.get("risk", {})
+        self.journal_cfg = config.get("journal", {})
+        self._stop_event = threading.Event()
+        self.state: Optional[TradingState] = None
+        self.run_id: Optional[str] = None
+
+        # Load strategy configs once
+        strategies = utils.load_strategies_config()["strategies"]
+        self.long_cfg = strategies[config["long_strategy_id"]]
+        self.short_cfg = strategies[config["short_strategy_id"]]
+
+        # Prediction column names from model IDs
+        self.long_pred_col = utils.prediction_col_name(self.long_cfg["model_id"])
+        self.short_pred_col = utils.prediction_col_name(self.short_cfg["model_id"])
+
+        # Exchange client
+        self.exchange = BinanceFuturesClient(
+            symbol=utils.load_asset_config(self.asset_id)["database"]["symbol"],
+            leverage=config["leverage"],
+            quote_order_qty=config["quote_order_qty"],
+            mode=self.mode,
+        )
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def start(self) -> None:
+        self._stop_event.clear()
+        t = threading.Thread(target=self._run, name="chronoquant-trading", daemon=True)
+        t.start()
+        _logger.info("Trading service started (mode=%s)", self.mode)
+
+    def stop(self) -> None:
+        _logger.info("Trading service stop requested")
+        self._stop_event.set()
+
+    def is_running(self) -> bool:
+        return not self._stop_event.is_set()
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
+
+    def _run(self) -> None:
+        try:
+            self._startup()
+            while not self._stop_event.is_set():
+                try:
+                    self._cycle()
+                except Exception as exc:
+                    self._handle_error("cycle", exc)
+                    if self.state:
+                        self.state.consecutive_errors += 1
+                    if self._consecutive_errors_exceeded():
+                        _logger.error("Max consecutive errors reached — stopping service")
+                        break
+                self._sleep_until_next_bar()
+        except Exception as exc:
+            _logger.exception("Trading service fatal error: %s", exc)
+        finally:
+            self._shutdown()
+
+    def _startup(self) -> None:
+        journal.ensure_tables(self.db_path)
+
+        self.run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        journal.insert_run(
+            self.db_path, self.run_id, self.mode, self.asset_id,
+            self.config["long_strategy_id"], self.config["short_strategy_id"],
+            self.config,
+        )
+
+        # Reconcile: restore state from DB if there was an open position
+        open_pos = journal.get_open_position(self.db_path)
+        self.state = TradingState.from_db(self.run_id, open_pos)
+
+        if open_pos:
+            _logger.info(
+                "Reconcile: found open %s position from %s, price=%.4f qty=%s",
+                open_pos["side"], open_pos["entry_time"],
+                open_pos.get("entry_price", 0), open_pos.get("quantity", 0),
+            )
+        else:
+            _logger.info("Reconcile: no open position — starting FLAT armed=True")
+
+        self.exchange.set_leverage()
+        _logger.info("Service ready (run_id=%s)", self.run_id)
+
+    def _cycle(self) -> None:
+        # 1. Sync data
+        self._sync_data()
+
+        # 2. Read latest closed bar
+        bar = self._read_latest_bar()
+        if bar is None:
+            _logger.warning("No prediction data available — skipping cycle")
+            return
+
+        bar_open_time, pred_long, pred_short, bar_close = bar
+
+        # 3. Evaluate cooldown / rearm transitions before strategy decision
+        now = datetime.now(timezone.utc)
+        self._apply_cooldown_rearm(pred_long, pred_short, now)
+
+        # 4. Evaluate strategy
+        decision, reason = strategy.evaluate(
+            self.state, pred_long, pred_short,
+            self.long_cfg, self.short_cfg, now,
+        )
+        state_before = self.state.status
+        _logger.debug(
+            "Bar %s | long=%.3f short=%.3f | state=%s → %s (%s)",
+            bar_open_time, pred_long, pred_short, state_before, decision, reason,
+        )
+
+        # 5. Execute
+        self._execute(decision, reason, bar_open_time, bar_close, now)
+
+        # 6. Persist signal
+        journal.insert_signal(
+            self.db_path, self.run_id, bar_open_time,
+            pred_long, pred_short, state_before, decision, reason,
+        )
+
+        # 7. Reset error counter on successful cycle
+        self.state.consecutive_errors = 0
+
+    def _apply_cooldown_rearm(self, pred_long: float, pred_short: float,
+                               now: datetime) -> None:
+        """Handle COOLDOWN → FLAT transition and armed flag."""
+        if self.state.status != COOLDOWN:
+            return
+
+        if self.state.cooldown_until and now < self.state.cooldown_until:
+            return
+
+        # Cooldown elapsed — rearm when both predictions are below their thresholds
+        if (pred_long <= self.long_cfg["rearm_threshold"]
+                and pred_short <= self.short_cfg["rearm_threshold"]):
+            self.state.armed = True
+            self.state.status = FLAT
+            _logger.info("Rearmed — entering FLAT long=%.3f short=%.3f", pred_long, pred_short)
+
+    def _execute(self, decision: str, reason: str, bar_open_time: str,
+                 bar_close: float, now: datetime) -> None:
+        from trading.strategy import HOLD, ENTER_LONG, ENTER_SHORT, EXIT_LONG, EXIT_SHORT
+
+        if decision == HOLD:
+            return
+
+        try:
+            mark_price = self.exchange.get_mark_price() or bar_close
+
+            if decision == ENTER_LONG:
+                self._open_position("LONG", mark_price, bar_open_time, reason)
+
+            elif decision == ENTER_SHORT:
+                self._open_position("SHORT", mark_price, bar_open_time, reason)
+
+            elif decision == EXIT_LONG:
+                self._close_position(mark_price, reason, now)
+
+            elif decision == EXIT_SHORT:
+                self._close_position(mark_price, reason, now)
+
+        except Exception as exc:
+            self._handle_error("execute", exc)
+            self.state.consecutive_errors += 1
+
+    def _open_position(self, side: str, mark_price: float, bar_open_time: str,
+                       reason: str) -> None:
+        if not self._daily_limits_ok():
+            _logger.warning("Daily limits reached — skipping entry")
+            return
+
+        if side == "LONG":
+            response = self.exchange.open_long(mark_price)
+        else:
+            response = self.exchange.open_short(mark_price)
+
+        filled_qty = float(response.get("executedQty", 0))
+        avg_price = float(response.get("avgPrice", mark_price))
+        if avg_price == 0:
+            avg_price = mark_price
+
+        position_id = f"pos_{uuid.uuid4().hex[:12]}"
+        order_id = f"ord_{uuid.uuid4().hex[:12]}"
+        entry_time = utils.now_utc_str()
+
+        journal.insert_position(
+            self.db_path, position_id, self.run_id, side,
+            entry_time, avg_price, filled_qty, order_id,
+        )
+        journal.insert_order(
+            self.db_path, order_id, self.run_id, position_id,
+            side, "MARKET", response.get("status", "FILLED"),
+            response.get("clientOrderId"), str(response.get("orderId", "")),
+            None, filled_qty, avg_price, None, response,
+        )
+
+        self.state.status = side
+        self.state.position_id = position_id
+        self.state.side = side
+        self.state.entry_time = datetime.now(timezone.utc)
+        self.state.entry_price = avg_price
+        self.state.quantity = filled_qty
+        self.state.armed = False
+
+        _logger.info(
+            "Opened %s | price=%.4f qty=%s reason=%s",
+            side, avg_price, filled_qty, reason,
+        )
+
+    def _close_position(self, mark_price: float, reason: str, now: datetime) -> None:
+        if self.state.quantity is None or self.state.quantity <= 0:
+            _logger.warning("close_position called but quantity is None/0 — skipping")
+            return
+
+        side = self.state.side
+        if side == "LONG":
+            response = self.exchange.close_long(self.state.quantity, mark_price)
+        else:
+            response = self.exchange.close_short(self.state.quantity, mark_price)
+
+        avg_price = float(response.get("avgPrice", mark_price))
+        if avg_price == 0:
+            avg_price = mark_price
+
+        # PnL calculation (notional, before leverage cost — leverage already amplifies gain)
+        entry = self.state.entry_price or mark_price
+        qty = self.state.quantity
+        if side == "LONG":
+            pnl_usdt = (avg_price - entry) * qty
+        else:
+            pnl_usdt = (entry - avg_price) * qty
+
+        exit_time = utils.now_utc_str()
+        order_id = f"ord_{uuid.uuid4().hex[:12]}"
+
+        journal.close_position(
+            self.db_path, self.state.position_id, exit_time,
+            avg_price, pnl_usdt, reason, order_id,
+        )
+        journal.insert_order(
+            self.db_path, order_id, self.run_id, self.state.position_id,
+            "SELL" if side == "LONG" else "BUY", "MARKET",
+            response.get("status", "FILLED"),
+            response.get("clientOrderId"), str(response.get("orderId", "")),
+            None, qty, avg_price, None, response,
+        )
+
+        self.state.record_trade_result(pnl_usdt)
+        cooldown_min = max(
+            self.long_cfg.get("cooldown_minutes", 60),
+            self.short_cfg.get("cooldown_minutes", 60),
+        )
+        self.state.cooldown_until = datetime.now(timezone.utc).replace(
+            microsecond=0
+        ) + timedelta(minutes=cooldown_min)
+        self.state.status = COOLDOWN
+        self.state.clear_position()
+
+        _logger.info(
+            "Closed %s | exit=%.4f pnl=%.4f USDT reason=%s cooldown=%dmin",
+            side, avg_price, pnl_usdt, reason, cooldown_min,
+        )
+
+    # ------------------------------------------------------------------
+    # Data sync + prediction read
+    # ------------------------------------------------------------------
+
+    def _sync_data(self) -> None:
+        try:
+            from streamlit_app.sync import run_database_sync
+            run_database_sync(asset_id=self.asset_id)
+        except Exception as exc:
+            _logger.warning("Data sync failed: %s", exc)
+            raise
+
+    def _read_latest_bar(self) -> Optional[tuple[str, float, float, float]]:
+        """
+        Read the latest safely closed 1-minute bar's predictions.
+        Returns (bar_open_time, pred_long, pred_short, close_price) or None.
+        """
+        db_cfg = utils.load_asset_config(self.asset_id)["database"]
+        db_path = db_cfg["db_path"]
+        table_pred = db_cfg["tables"]["predictions"]
+        table_ohlcv = db_cfg["tables"]["ohlcv"]
+
+        # Latest closed bar = at most 1 minute before now
+        cutoff = datetime.now(timezone.utc)
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            with sqlite3.connect(db_path, timeout=10) as conn:
+                row = conn.execute(
+                    f"""
+                    SELECT p.open_time,
+                           p."{self.long_pred_col}" AS pred_long,
+                           p."{self.short_pred_col}" AS pred_short,
+                           o.close
+                    FROM "{table_pred}" p
+                    JOIN "{table_ohlcv}" o ON o.open_time = p.open_time
+                    WHERE p.open_time < ?
+                      AND p."{self.long_pred_col}" IS NOT NULL
+                      AND p."{self.short_pred_col}" IS NOT NULL
+                    ORDER BY p.open_time DESC
+                    LIMIT 1
+                    """,
+                    (cutoff_str,),
+                ).fetchone()
+        except Exception as exc:
+            _logger.error("Failed to read predictions: %s", exc)
+            return None
+
+        if row is None:
+            return None
+
+        return row[0], float(row[1]), float(row[2]), float(row[3])
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _daily_limits_ok(self) -> bool:
+        max_trades = self.risk_cfg.get("max_daily_trades", 20)
+        max_loss = self.risk_cfg.get("max_daily_loss_usdt", 30.0)
+        if self.state.daily_trade_count >= max_trades:
+            _logger.warning("Daily trade limit reached (%d)", max_trades)
+            return False
+        if self.state.daily_loss_usdt >= max_loss:
+            _logger.warning("Daily loss limit reached (%.2f USDT)", max_loss)
+            return False
+        return True
+
+    def _consecutive_errors_exceeded(self) -> bool:
+        max_err = self.risk_cfg.get("max_consecutive_errors", 3)
+        return (self.state.consecutive_errors if self.state else 0) >= max_err
+
+    def _handle_error(self, component: str, exc: Exception) -> None:
+        msg = str(exc)
+        tb = traceback.format_exc()
+        _logger.error("[%s] %s: %s", component, type(exc).__name__, msg)
+        try:
+            journal.insert_error(
+                self.db_path, self.run_id, component, type(exc).__name__, msg, tb
+            )
+        except Exception:
+            pass
+
+    def _sleep_until_next_bar(self) -> None:
+        """Sleep until 5 seconds after the next 1-minute boundary."""
+        now = time.time()
+        next_boundary = (now // 60 + 1) * 60 + 5
+        sleep_sec = max(1.0, next_boundary - now)
+        _logger.debug("Sleeping %.1fs until next bar", sleep_sec)
+        self._stop_event.wait(timeout=sleep_sec)
+
+    def _shutdown(self) -> None:
+        _logger.info("Trading service shutting down (run_id=%s)", self.run_id)
+        if self.run_id:
+            try:
+                journal.mark_run_stopped(self.db_path, self.run_id)
+            except Exception:
+                pass
+
+        if self.journal_cfg.get("export_on_stop") and self.run_id:
+            try:
+                journal.export_run(
+                    self.db_path, self.run_id,
+                    self.journal_cfg.get("report_dir", "trading_reports"),
+                )
+                _logger.info("Run exported to trading_reports/%s/", self.run_id)
+            except Exception as exc:
+                _logger.warning("Export failed: %s", exc)
+
+        _logger.info("Trading service stopped")

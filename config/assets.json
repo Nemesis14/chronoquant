@@ -5,6 +5,7 @@
         "bchusdt_fw240": {
             "symbol": "BCHUSDT",
             "interval": "1m",
+            "market": "spot",
             "db_paths": {
                 "dev": "D:/repos/chronoquant/database/bchusdt_data_dev.db",
                 "prod": "D:/repos/chronoquant/database/bchusdt_data_prod.db"
@@ -19,6 +20,7 @@
         "solusdt_fw60": {
             "symbol": "SOLUSDT",
             "interval": "1m",
+            "market": "futures",
             "db_paths": {
                 "dev": "D:/repos/chronoquant/database/solusdt_data_dev.db",
                 "prod": "D:/repos/chronoquant/database/solusdt_data_prod.db"

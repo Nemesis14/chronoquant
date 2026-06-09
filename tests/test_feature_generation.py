@@ -173,5 +173,8 @@ def test_sync_features_uses_sol_feature_profile(tmp_path, monkeypatch) -> None:
     assert "feat_rsi_14" in df.columns
     assert df["open_time"].is_unique
     assert len(df) == 61
-    assert set(df["trg_l_fw60_q90"].unique()).issubset({0, 1})
-    assert df["trg_l_fw60_q90"].sum() > 0
+    # Edge-nulling: the last rolling_win (60) rows should be NaN; only the first row can be 0 or 1
+    non_null = df["trg_l_fw60_q90"].dropna()
+    assert set(non_null.unique()).issubset({0, 1})
+    # With 61 rows and rolling_win=60, only the first row is non-null
+    assert df["trg_l_fw60_q90"].isna().sum() == 60

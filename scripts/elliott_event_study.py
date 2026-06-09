@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # =============================================================================
 # Run SOLUSDT Elliott event study
 # =============================================================================
@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from analysis.elliott_event_study import EVENT_TABLE, run_event_study
+from elliott_waves.elliott_event_study import EVENT_TABLE, run_event_study
 
 
 def parse_args() -> argparse.Namespace:

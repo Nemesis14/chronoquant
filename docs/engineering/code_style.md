@@ -335,7 +335,7 @@ different encodings.
 
 ```python
 print("OK: Computed 1,234 feature rows into 'FEATURES'")
-print("INFO: Fetching BCHUSDT klines from Binance...")
+print("INFO: Fetching SOLUSDT klines from Binance...")
 print("ERROR: No feature rows found since 2026-05-16")
 ```
 

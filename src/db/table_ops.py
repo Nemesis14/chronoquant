@@ -78,8 +78,14 @@ def ensure_table_columns(db_path: str, table_name: str, df: pd.DataFrame) -> Non
 def ensure_open_time_index(db_path: str, table_name: str) -> None:
     index_name = f"idx_{table_name}_open_time"
     with sqlite_connect(db_path) as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+            (index_name,),
+        ).fetchone()
+        if exists:
+            return
         conn.execute(
-            f'CREATE INDEX IF NOT EXISTS "{index_name}" ON "{table_name}" (open_time)'
+            f'CREATE UNIQUE INDEX "{index_name}" ON "{table_name}" (open_time)'
         )
         conn.commit()
 

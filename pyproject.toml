@@ -19,6 +19,8 @@ dependencies = [
     "streamlit>=1.40.0",
     "plotly>=5.24.0",
     "taew>=0.0.3",
+    "mplfinance>=0.12.10b0",
+    "seaborn>=0.13.2",
 ]
 
 [tool.setuptools.packages.find]

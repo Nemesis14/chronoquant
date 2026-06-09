@@ -61,6 +61,25 @@ python scripts/sweep_strategy.py \
     --side long --top-n 20
 ```
 
+## Elliott Wave
+
+```bash
+# 1212 setup plot (legfrissebb 5m chart, top 3 setup)
+python scripts/plot_elliott.py --tf 5m --pattern 1212 --top 3
+
+# Impulse scan — 15m, top 5, mentés PNG-be
+python scripts/plot_elliott.py --tf 15m --pattern IMPULSE --top 5 --out docs/elliott_waves/latest_impulse.png
+
+# Wave3 scan — 1m, bearish
+python scripts/plot_elliott.py --tf 1m --pattern WAVE3 --direction -1
+
+# Multi-TF walk-forward backtest
+python scripts/backtest_elliott.py --tfs 5m,15m --mode walkforward
+
+# Param sweep 1m+5m-en
+python scripts/backtest_elliott.py --tfs 1m,5m --mode sweep --out results/elliott_sweep.csv
+```
+
 ## Model Promotion (lasd docs/engineering/lgbm_model_development.md)
 
 ```bash

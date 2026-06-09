@@ -75,6 +75,31 @@ def active_strategy(
 
 
 # =============================================================================
+# load_long_short_strategies(asset_id: str | None = None) -> tuple[dict, dict]
+# =============================================================================
+# Purpose:
+#  - Return (long_strategy_cfg, short_strategy_cfg) for the given asset
+#  - Reads thresholds from config/strategies.json (not predictions.json)
+# =============================================================================
+def load_long_short_strategies(
+    asset_id: str | None = None,
+) -> tuple[dict, dict]:
+    strategies_cfg = utils.load_strategies_config()
+    strategies     = strategies_cfg.get("strategies", {})
+    long_cfg  = {}
+    short_cfg = {}
+    for scfg in strategies.values():
+        if scfg.get("asset_id") != asset_id:
+            continue
+        side = scfg.get("side", "")
+        if side == "long" and not long_cfg:
+            long_cfg = scfg
+        elif side == "short" and not short_cfg:
+            short_cfg = scfg
+    return long_cfg, short_cfg
+
+
+# =============================================================================
 # table_exists(...) -> bool
 # =============================================================================
 # Purpose:
@@ -158,44 +183,54 @@ def prediction_history(
     limit = max(60, int(lookback_hours) * 60 + 5)
     ohlcv_table = cfg["tables"].get("ohlcv")
     if _has_ohlcv_columns(ohlcv_table, asset_id=asset_id):
-        base_close = f"base.{_quote_identifier('close')}" if "close" in select_cols else "NULL"
+        latest_prediction_time = _scalar(
+            f"SELECT MAX({_quote_identifier('open_time')}) FROM {_quote_identifier(table_name)}",
+            asset_id=asset_id,
+        )
+        if not latest_prediction_time:
+            return pd.DataFrame()
+
+        pred_cols = [col for col in select_cols if col not in {"open_time", "close"}]
         extra_cols = [
-            f"base.{_quote_identifier(col)} AS {_quote_identifier(col)}"
-            for col in select_cols
-            if col not in {"open_time", "close"}
+            f"pred.{_quote_identifier(col)} AS {_quote_identifier(col)}"
+            for col in pred_cols
         ]
         outer_cols = [
-            f"base.{_quote_identifier('open_time')} AS {_quote_identifier('open_time')}",
+            f"ohlcv.{_quote_identifier('open_time')} AS {_quote_identifier('open_time')}",
             f"ohlcv.{_quote_identifier('open')} AS {_quote_identifier('open')}",
             f"ohlcv.{_quote_identifier('high')} AS {_quote_identifier('high')}",
             f"ohlcv.{_quote_identifier('low')} AS {_quote_identifier('low')}",
-            f"COALESCE(ohlcv.{_quote_identifier('close')}, {base_close}) AS {_quote_identifier('close')}",
+            f"ohlcv.{_quote_identifier('close')} AS {_quote_identifier('close')}",
             *extra_cols,
         ]
         query = f"""
             SELECT {", ".join(outer_cols)}
             FROM (
-                SELECT {", ".join(_quote_identifier(col) for col in select_cols)}
-                FROM {_quote_identifier(table_name)}
-                ORDER BY rowid DESC
+                SELECT open_time, open, high, low, close
+                FROM {_quote_identifier(ohlcv_table)}
+                WHERE {_quote_identifier('open_time')} <= ?
+                ORDER BY {_quote_identifier('open_time')} DESC
                 LIMIT ?
-            ) AS base
-            LEFT JOIN {_quote_identifier(ohlcv_table)} AS ohlcv
-                ON ohlcv.{_quote_identifier('open_time')} = base.{_quote_identifier('open_time')}
-            ORDER BY base.{_quote_identifier('open_time')} ASC
+            ) AS ohlcv
+            LEFT JOIN {_quote_identifier(table_name)} AS pred
+                ON pred.{_quote_identifier('open_time')} = ohlcv.{_quote_identifier('open_time')}
+            ORDER BY ohlcv.{_quote_identifier('open_time')} ASC
         """
+        params = (latest_prediction_time, limit)
     else:
         query = f"""
             SELECT *
             FROM (
                 SELECT {", ".join(_quote_identifier(col) for col in select_cols)}
                 FROM {_quote_identifier(table_name)}
-                ORDER BY rowid DESC
+                ORDER BY {_quote_identifier('open_time')} DESC
                 LIMIT ?
             )
             ORDER BY open_time ASC
         """
-    df = _coerce_prediction_frame(_read_sql(query, params=(limit,), asset_id=asset_id))
+        params = (limit,)
+
+    df = _coerce_prediction_frame(_read_sql(query, params=params, asset_id=asset_id))
     if df.empty:
         return df
     if short_pred_col and short_pred_col in df.columns:
@@ -217,25 +252,32 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     if not table_name or not table_exists(table_name, asset_id=asset_id):
         return None
 
-    columns = table_columns(table_name, asset_id=asset_id)
+    columns   = table_columns(table_name, asset_id=asset_id)
     live_cols = utils.live_prediction_columns()
-    select_cols = [
+    models_cfg = utils.load_models_config()
+    _, short_pred_col = _resolve_long_short_pred_cols(models_cfg, asset_id, columns)
+
+    base_select = [
         col
         for col in ["open_time", "close", live_cols["target"], live_cols["prediction"], live_cols["signal"]]
         if col in columns
     ]
-    if "open_time" not in select_cols:
+    if short_pred_col and short_pred_col not in base_select:
+        base_select.append(short_pred_col)
+    if "open_time" not in base_select:
         return None
 
     query = f"""
-        SELECT {", ".join(_quote_identifier(col) for col in select_cols)}
+        SELECT {", ".join(_quote_identifier(col) for col in base_select)}
         FROM {_quote_identifier(table_name)}
-        ORDER BY rowid DESC
+        ORDER BY {_quote_identifier('open_time')} DESC
         LIMIT 1
     """
     df = _read_sql(query, asset_id=asset_id)
     if df.empty:
         return None
+    if short_pred_col and short_pred_col in df.columns:
+        df = df.rename(columns={short_pred_col: "short_prediction"})
     row = _coerce_prediction_frame(df).iloc[0].to_dict()
     return {key: _json_safe(value) for key, value in row.items()}
 
@@ -253,7 +295,7 @@ def active_position(asset_id: str | None = None) -> dict | None:
 
     columns = table_columns(table_name, asset_id=asset_id)
     status_col = "status" if "status" in columns else None
-    where = "WHERE status IN ('OPEN', 'LONG', 'LONG_OPEN')" if status_col else ""
+    where = "WHERE status IN ('OPEN', 'LONG', 'LONG_OPEN', 'SHORT', 'SHORT_OPEN')" if status_col else ""
     order_col = "entry_time" if "entry_time" in columns else columns[0]
     query = f"""
         SELECT *

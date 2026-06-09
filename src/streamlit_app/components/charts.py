@@ -10,8 +10,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-CHART_LOAD_LOOKBACK_HOURS = 8
-CHART_INITIAL_FOCUS_HOURS = 2
+CHART_LOAD_LOOKBACK_HOURS = 24
+CHART_INITIAL_FOCUS_HOURS = 24
 
 _BG    = "#0b0e11"
 _PANEL = "#111418"
@@ -32,6 +32,7 @@ def prediction_price_figure(
     short_rearm_threshold: float | None = None,
     short_exit_threshold: float | None = None,
     active_trade: dict | None = None,
+    focus_hours: int | None = None,
 ):
     fig = make_subplots(
         rows=3,
@@ -67,7 +68,8 @@ def prediction_price_figure(
 
     latest_ts  = plot_df["open_time"].max()
     x_end      = latest_ts + pd.Timedelta(minutes=2)
-    x_start    = latest_ts - pd.Timedelta(hours=CHART_INITIAL_FOCUS_HOURS)
+    _focus     = focus_hours if focus_hours is not None else CHART_INITIAL_FOCUS_HOURS
+    x_start    = latest_ts - pd.Timedelta(hours=_focus)
     focus_df   = plot_df[plot_df["open_time"] >= x_start]
     if _has_ohlc(focus_df) and not focus_df.empty:
         _yl, _yh = focus_df["low"].min(), focus_df["high"].max()
@@ -107,23 +109,7 @@ def prediction_price_figure(
     # --- Row 2: Candlestick / price ---
     if _has_ohlc(plot_df):
         cdf = plot_df.dropna(subset=["open", "high", "low", "close"]).copy()
-        fig.add_trace(
-            go.Candlestick(
-                x=cdf["open_time"],
-                open=cdf["open"],
-                high=cdf["high"],
-                low=cdf["low"],
-                close=cdf["close"],
-                name="OHLC",
-                increasing_line_color=_GREEN,
-                increasing_fillcolor=_GREEN,
-                decreasing_line_color=_RED,
-                decreasing_fillcolor=_RED,
-                whiskerwidth=0.45,
-                showlegend=False,
-            ),
-            row=2, col=1,
-        )
+        _add_price_candles(fig, cdf, focus_hours=_focus)
     elif "close" in plot_df.columns:
         fig.add_trace(
             go.Scatter(
@@ -214,6 +200,42 @@ def _add_trade_overlay(fig, df: pd.DataFrame, trade: dict) -> None:
 def _has_ohlc(df: pd.DataFrame) -> bool:
     required = {"open", "high", "low", "close"}
     return required.issubset(df.columns) and not df[list(required)].dropna(how="any").empty
+
+
+def _resample_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
+    return (
+        df.set_index("open_time")
+        .resample(freq)
+        .agg(open=("open", "first"), high=("high", "max"), low=("low", "min"), close=("close", "last"))
+        .dropna()
+        .reset_index()
+    )
+
+
+def _add_price_candles(fig, df: pd.DataFrame, focus_hours: int = 24) -> None:
+    if focus_hours > 8:
+        plot_df = _resample_ohlcv(df, "5min")   # 24h → ~288 candles @ ~3.9px
+    elif focus_hours > 4:
+        plot_df = _resample_ohlcv(df, "2min")   # 8h  → ~240 candles @ ~3.75px
+    else:
+        plot_df = df                             # 4h  → 240 candles @ ~3.75px
+    fig.add_trace(
+        go.Candlestick(
+            x=plot_df["open_time"],
+            open=plot_df["open"],
+            high=plot_df["high"],
+            low=plot_df["low"],
+            close=plot_df["close"],
+            increasing_line_color=_GREEN,
+            increasing_fillcolor=_GREEN,
+            decreasing_line_color=_RED,
+            decreasing_fillcolor=_RED,
+            line_width=1,
+            name="OHLC",
+            showlegend=False,
+        ),
+        row=2, col=1,
+    )
 
 
 def _add_threshold_trace(
@@ -320,7 +342,7 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
 
     fig.update_layout(
         template="plotly_dark",
-        height=720,
+        height=820,
         margin={"l": 0, "r": 72, "t": 12, "b": 40},
         paper_bgcolor=_BG,
         plot_bgcolor=_PANEL,

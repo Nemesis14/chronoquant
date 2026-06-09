@@ -14,7 +14,40 @@ import pandas as pd
 from binance.client import Client
 
 import utils
-from db.table_ops import drop_existing_open_times, ensure_table_columns, sqlite_connect
+from db.table_ops import ensure_table_columns, sqlite_connect, table_exists
+
+
+def _create_ohlcv_table_if_not_exists(db_path: str, table_name: str, df: pd.DataFrame) -> None:
+    if table_exists(db_path, table_name):
+        return
+    col_defs = []
+    for col in df.columns:
+        if df[col].dtype.kind == "f":
+            sql_type = "REAL"
+        elif df[col].dtype.kind in ("i", "u"):
+            sql_type = "INTEGER"
+        else:
+            sql_type = "TEXT"
+        col_defs.append(f'"{col}" {sql_type}')
+    ddl = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join(col_defs)})'
+    with sqlite_connect(db_path) as conn:
+        conn.execute(ddl)
+        conn.commit()
+
+
+def _upsert_ohlcv(conn, table_name: str, df: "pd.DataFrame") -> int:
+    cols          = ", ".join(f'"{c}"' for c in df.columns)
+    placeholders  = ", ".join("?" for _ in df.columns)
+    update_cols   = [c for c in df.columns if c != "open_time"]
+    update_clause = ", ".join(f'"{c}" = excluded."{c}"' for c in update_cols)
+    stmt          = (
+        f'INSERT INTO "{table_name}" ({cols}) VALUES ({placeholders}) '
+        f'ON CONFLICT("open_time") DO UPDATE SET {update_clause}'
+    )
+    cursor       = conn.executemany(stmt, df.itertuples(index=False, name=None))
+    conn.commit()
+    return cursor.rowcount
+
 
 # =============================================================================
 # sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None
@@ -35,6 +68,7 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     env_cfg      = utils.load_env_config()
     db_path      = db_cfg["database"]["db_path"]
     symbol       = db_cfg["database"]["symbol"]
+    market       = db_cfg["database"].get("market", "spot")
     table_name   = db_cfg["database"]["tables"]["ohlcv"]
     binance_keys = env_cfg["api"]["binance_keys_path"]
 
@@ -51,19 +85,28 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     # -------------------------------------------------------------------------
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    client   = Client(api_key, api_secret)
-    limit    = 1000
-    start_ms = int(open_time_ms_from)
+    client       = Client(api_key, api_secret)
+    server_ms    = int(client.get_server_time()["serverTime"])
+    limit        = 1000
+    start_ms     = int(open_time_ms_from)
     inserted_total = 0
     batch_count = 0
 
     while True:
-        rows = client.get_klines(
-            symbol    = symbol,
-            interval  = Client.KLINE_INTERVAL_1MINUTE,
-            startTime = start_ms,
-            limit     = limit,
-        )
+        if market == "futures":
+            rows = client.futures_klines(
+                symbol    = symbol,
+                interval  = Client.KLINE_INTERVAL_1MINUTE,
+                startTime = start_ms,
+                limit     = limit,
+            )
+        else:
+            rows = client.get_klines(
+                symbol    = symbol,
+                interval  = Client.KLINE_INTERVAL_1MINUTE,
+                startTime = start_ms,
+                limit     = limit,
+            )
 
         if not rows:
             break
@@ -80,7 +123,12 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
             ],
         )
 
-        df["open_time_ms"] = pd.to_numeric(df["open_time"], errors="coerce").astype("int64")
+        df["open_time_ms"]  = pd.to_numeric(df["open_time"], errors="coerce").astype("int64")
+        df["close_time_ms"] = pd.to_numeric(df["close_time"], errors="coerce").astype("int64")
+        df = df[df["close_time_ms"] < server_ms].copy()
+        if df.empty:
+            break
+
         df["open_time"] = df["open_time_ms"].apply(lambda ms: utils.ms_to_utc_str(int(ms)))
 
         for col in ["open", "high", "low", "close", "volume",
@@ -89,17 +137,11 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
 
         df = df[["open_time", "open", "high", "low", "close", "volume",
                  "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"]]
+        _create_ohlcv_table_if_not_exists(db_path, table_name, df)
         ensure_table_columns(db_path, table_name, df)
-        df = drop_existing_open_times(df, db_path, table_name)
-        if df.empty:
-            last_open_ms = int(rows[-1][0])
-            start_ms = last_open_ms + 60000
-            if len(rows) < limit:
-                break
-            continue
 
         with sqlite_connect(db_path) as conn:
-            df.to_sql(table_name, conn, index=False, if_exists="append")
+            _upsert_ohlcv(conn, table_name, df)
 
         inserted_total += len(df)
         batch_count += 1
@@ -126,6 +168,5 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
         return
 
     print(f"Synced {inserted_total} klines into '{table_name}'")
-
 
 

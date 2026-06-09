@@ -102,6 +102,7 @@ def load_asset_config(asset_id: str | None = None) -> dict:
             "db_paths": dict(db_paths),
             "symbol": asset_cfg.get("symbol"),
             "interval": asset_cfg.get("interval", "1m"),
+            "market": asset_cfg.get("market", "spot"),
             "tables": dict(asset_cfg.get("tables", {})),
             "features_profile": asset_cfg.get("features_profile", asset_id),
         }

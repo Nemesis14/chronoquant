@@ -17,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from streamlit_app import binance_data, data
 from streamlit_app.components.charts import (
-    CHART_LOAD_LOOKBACK_HOURS,
     PLOTLY_CHART_CONFIG,
     prediction_price_figure,
 )
@@ -73,8 +72,18 @@ if "active_asset_id" not in st.session_state:
     st.session_state["active_asset_id"] = "solusdt_fw60"
 
 if "dashboard_started_logged" not in st.session_state:
-    get_dashboard_logger().info("Dashboard started")
+    _logger = get_dashboard_logger()
+    _logger.info("Dashboard started")
     st.session_state.dashboard_started_logged = True
+
+    _auto_state = ensure_sync_state(st.session_state, "solusdt_fw60")
+    enable_auto_sync(_auto_state)
+    if start_sync(_auto_state, "solusdt_fw60"):
+        _logger.info("Auto-start sync (asset=solusdt_fw60)")
+
+    if not trading_runner.is_trading_running():
+        if trading_runner.start_trading(mode="dry_run"):
+            _logger.info("Auto-start trading (mode=dry_run)")
 
 
 # =============================================================================
@@ -134,11 +143,6 @@ def _render_sync_controls(asset_id: str | None) -> None:
 
 
 @st.fragment(run_every="2s")
-def _sync_panel_bch() -> None:
-    _render_sync_controls(asset_id=None)
-
-
-@st.fragment(run_every="2s")
 def _sync_panel_sol() -> None:
     _render_sync_controls(asset_id="solusdt_fw60")
 
@@ -147,26 +151,30 @@ def _sync_panel_sol() -> None:
 # Chart area (left 60%)
 # =============================================================================
 
-def _resolve_short_strategy(strategies_cfg: dict, asset_id: str | None) -> dict:
-    for scfg in strategies_cfg.get("strategies", {}).values():
-        if scfg.get("asset_id") != asset_id:
-            continue
-        model_id = scfg.get("model_id", "")
-        if "_s_" in model_id or "short" in model_id:
-            return scfg
-    return {}
+_WINDOW_OPTIONS = {"24h": 24, "8h": 8, "4h": 4}
+_WINDOW_DEFAULT = "24h"
 
 
 def render_asset_chart(asset_id: str | None) -> None:
-    cfg            = data.load_dashboard_config(asset_id=asset_id)
-    strategy       = cfg.get("strategy", {})
-    strategies_cfg = data.utils.load_strategies_config()
-    short_strategy = _resolve_short_strategy(strategies_cfg, asset_id)
+    long_strategy, short_strategy = data.load_long_short_strategies(asset_id=asset_id)
 
     sync_state   = ensure_sync_state(st.session_state, asset_id)
     sync_running = is_sync_running(sync_state, asset_id)
 
-    cache_hist = f"chart_history_{asset_id or 'default'}"
+    # Time-window selector
+    win_key    = f"chart_window_{asset_id or 'default'}"
+    win_label  = st.radio(
+        "Időtáv",
+        options=list(_WINDOW_OPTIONS.keys()),
+        index=list(_WINDOW_OPTIONS.keys()).index(_WINDOW_DEFAULT),
+        horizontal=True,
+        key=win_key,
+        label_visibility="collapsed",
+    )
+    focus_hours   = _WINDOW_OPTIONS[win_label]
+    lookback_hours = max(focus_hours, focus_hours + 2)
+
+    cache_hist = f"chart_history_{asset_id or 'default'}_{win_label}"
     cache_pos  = f"chart_position_{asset_id or 'default'}"
 
     if sync_running:
@@ -174,7 +182,7 @@ def render_asset_chart(asset_id: str | None) -> None:
         position = st.session_state.get(cache_pos)
     else:
         try:
-            df       = data.prediction_history(lookback_hours=CHART_LOAD_LOOKBACK_HOURS, asset_id=asset_id)
+            df       = data.prediction_history(lookback_hours=lookback_hours, asset_id=asset_id)
             position = data.active_position(asset_id=asset_id)
             st.session_state[cache_hist] = df
             st.session_state[cache_pos]  = position
@@ -195,13 +203,14 @@ def render_asset_chart(asset_id: str | None) -> None:
 
     fig = prediction_price_figure(
         df,
-        entry_threshold=strategy.get("entry_threshold"),
-        rearm_threshold=strategy.get("rearm_threshold"),
-        exit_threshold=strategy.get("exit_threshold"),
-        short_entry_threshold=short_strategy.get("entry_threshold"),
-        short_rearm_threshold=short_strategy.get("rearm_threshold"),
-        short_exit_threshold=short_strategy.get("exit_threshold"),
-        active_trade=active_trade,
+        entry_threshold       = long_strategy.get("entry_threshold"),
+        rearm_threshold       = long_strategy.get("rearm_threshold"),
+        exit_threshold        = long_strategy.get("exit_threshold"),
+        short_entry_threshold = short_strategy.get("entry_threshold"),
+        short_rearm_threshold = short_strategy.get("rearm_threshold"),
+        short_exit_threshold  = short_strategy.get("exit_threshold"),
+        active_trade          = active_trade,
+        focus_hours           = focus_hours,
     )
     st.plotly_chart(fig, config=PLOTLY_CHART_CONFIG, width="stretch")
 
@@ -577,12 +586,108 @@ def _render_trading_positions_card() -> None:
     )
 
 
+def _render_signal_trigger_card(asset_id: str | None) -> None:
+    long_cfg, short_cfg = data.load_long_short_strategies(asset_id=asset_id)
+    if not long_cfg and not short_cfg:
+        return
+
+    latest = data.latest_prediction(asset_id=asset_id)
+    long_pred  = None
+    short_pred = None
+    if latest:
+        long_pred  = latest.get("prediction")
+        short_pred = latest.get("short_prediction")
+        if short_pred is None:
+            # look for any short prediction column
+            for k, v in latest.items():
+                if "short" in k and v is not None:
+                    try:
+                        short_pred = float(v)
+                    except (TypeError, ValueError):
+                        pass
+                    break
+
+    long_entry  = long_cfg.get("entry_threshold")
+    short_entry = short_cfg.get("entry_threshold")
+
+    def _trigger_html(label: str, pred, threshold, side_color: str, arrow: str) -> str:
+        if pred is None or threshold is None:
+            return (
+                f'<div style="display:grid; grid-template-columns:80px 1fr; gap:4px; font-size:13px; margin-bottom:6px;">'
+                f'<span style="color:{_MUTED};">{label}</span>'
+                f'<span style="color:{_MUTED};">—</span>'
+                f'</div>'
+            )
+        try:
+            pred_f = float(pred)
+            thr_f  = float(threshold)
+        except (TypeError, ValueError):
+            return ""
+        active     = pred_f >= thr_f
+        bar_pct    = min(100, int(pred_f * 100))
+        bar_color  = side_color if active else _MUTED
+        tag_text   = "AKTÍV" if active else "VÁRAKOZIK"
+        tag_color  = side_color if active else _MUTED
+        return (
+            f'<div style="margin-bottom:8px;">'
+            f'<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">'
+            f'<span style="color:{side_color}; font-weight:600;">{arrow} {label}</span>'
+            f'<span style="color:{tag_color}; font-weight:700; font-size:11px;">{tag_text}</span>'
+            f'</div>'
+            f'<div style="background:{_GRID}; border-radius:3px; height:6px; position:relative; margin-bottom:3px;">'
+            f'<div style="background:{bar_color}; width:{bar_pct}%; height:6px; border-radius:3px;"></div>'
+            f'<div style="position:absolute; left:{int(thr_f*100)}%; top:-3px; width:2px; height:12px; background:{_TEXT}; border-radius:1px;"></div>'
+            f'</div>'
+            f'<div style="display:flex; justify-content:space-between; font-size:11px; color:{_MUTED};">'
+            f'<span>score {pred_f:.3f}</span><span>entry {thr_f:.3f}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+    long_html  = _trigger_html("Long",  long_pred,  long_entry,  _GREEN, "▲")
+    short_html = _trigger_html("Short", short_pred, short_entry, _RED,   "▼")
+
+    last_signal_html = ""
+    signals = trading_runner.get_recent_signals(limit=1)
+    if signals:
+        sig       = signals[0]
+        dec       = sig.get("decision", "")
+        bar_ts    = str(sig.get("bar_open_time", ""))[:16]
+        reason    = str(sig.get("reason", ""))[:120]
+        dec_upper = dec.upper()
+        if "ENTER" in dec_upper:
+            dec_color = _GREEN if "LONG" in dec_upper else _RED
+        elif "EXIT" in dec_upper:
+            dec_color = _RED if "LONG" in dec_upper else _GREEN
+        else:
+            dec_color = _MUTED
+        last_signal_html = (
+            f'<div style="border-top:1px solid {_GRID}; padding-top:8px; margin-top:4px;">'
+            f'<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">'
+            f'<span style="color:{_MUTED};">Legutóbbi döntés</span>'
+            f'<span style="color:{_MUTED}; font-size:11px;">{escape(bar_ts)}</span>'
+            f'</div>'
+            f'<div style="font-size:13px; font-weight:700; color:{dec_color}; margin-bottom:2px;">{escape(dec)}</div>'
+            f'<div style="font-size:11px; color:{_MUTED}; word-break:break-word;">{escape(reason)}</div>'
+            f'</div>'
+        )
+
+    st.markdown(
+        f'<div style="{_CARD}">'
+        f'<div style="{_HDR}">Trigger állapot</div>'
+        f'{long_html}{short_html}{last_signal_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_trade_panel(asset_id: str | None) -> None:
     sync_state   = ensure_sync_state(st.session_state, asset_id)
     sync_running = is_sync_running(sync_state, asset_id)
 
-    cache_pos    = f"trade_position_{asset_id or 'default'}"
-    cache_trades = f"trade_binance_{asset_id or 'default'}"
+    cache_pos          = f"trade_position_{asset_id or 'default'}"
+    cache_trades       = f"trade_binance_{asset_id or 'default'}"
+    cache_sync_fin     = f"trade_last_sync_{asset_id or 'default'}"
 
     if sync_running:
         position  = st.session_state.get(cache_pos)
@@ -597,8 +702,12 @@ def render_trade_panel(asset_id: str | None) -> None:
             get_dashboard_logger().warning("Trade panel DB read skipped — database locked")
             position = st.session_state.get(cache_pos)
 
-        cache_key = f"trade_binance_{asset_id or 'default'}"
-        if cache_key not in st.session_state:
+        finished_at = sync_state.get("finished_at")
+        if finished_at and st.session_state.get(cache_sync_fin) != finished_at:
+            st.session_state.pop(cache_trades, None)
+            st.session_state[cache_sync_fin] = finished_at
+
+        if cache_trades not in st.session_state:
             trades_df = binance_data.recent_trades(asset_id=asset_id, limit=50)
             st.session_state[cache_trades] = trades_df
         else:
@@ -606,6 +715,7 @@ def render_trade_panel(asset_id: str | None) -> None:
 
     if asset_id == "solusdt_fw60":
         _render_trading_status_card()
+        _render_signal_trigger_card(asset_id)
         _render_trading_positions_card()
 
     _render_active_trade_card(position)
@@ -695,7 +805,7 @@ def _render_log_terminal(lines: list[str]) -> None:
         </script>
         """,
         width="stretch",
-        height=210,
+        height=118,
     )
 
 
@@ -753,31 +863,19 @@ def _render_trading_controls() -> None:
 with st.sidebar:
     st.title("ChronoQuant")
 
-    asset_options = ["SOL 1h", "BCH 4h"]
-    current_idx   = 1 if st.session_state["active_asset_id"] is None else 0
-    selected      = st.radio("Asset", asset_options, index=current_idx)
-    new_asset_id  = None if selected == "BCH 4h" else "solusdt_fw60"
-
-    if new_asset_id != st.session_state["active_asset_id"]:
-        st.session_state["active_asset_id"] = new_asset_id
-
     st.divider()
-
-    if st.session_state["active_asset_id"] is None:
-        _sync_panel_bch()
-    else:
-        _sync_panel_sol()
+    _sync_panel_sol()
 
     st.divider()
     _render_trading_controls()
 
 
 # =============================================================================
-# Main body — 60/40 layout
+# Main body - 80/20 layout
 # =============================================================================
 
-active_asset_id = st.session_state["active_asset_id"]
-asset_label     = "BCH / 4h" if active_asset_id is None else "SOL / 1h"
+active_asset_id = "solusdt_fw60"
+asset_label     = "SOL / 1m"
 
 st.markdown(
     f'<div style="padding:6px 0 12px 0; border-bottom:1px solid {_GRID}; margin-bottom:12px;">'
@@ -787,7 +885,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-col_chart, col_trade = st.columns([3, 2])
+col_chart, col_trade = st.columns([4, 1])
 
 with col_chart:
     render_asset_chart(active_asset_id)

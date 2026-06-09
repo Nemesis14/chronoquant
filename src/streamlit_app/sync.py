@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import io
 import logging
 from datetime import datetime, timedelta, timezone
+import threading
 
 import pandas as pd
 
@@ -18,6 +19,23 @@ from streamlit_app.dashboard_logging import get_dashboard_logger
 
 
 INITIAL_SYNC_START = "2017-01-01 00:00:00"
+
+_ASSET_SYNC_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS_MUTEX = threading.Lock()
+
+
+# =============================================================================
+# get_sync_lock(asset_id: str | None = None) -> threading.Lock
+# =============================================================================
+# Purpose:
+#  - Return the per-asset sync lock shared by dashboard and trading service
+# =============================================================================
+def get_sync_lock(asset_id: str | None = None) -> threading.Lock:
+    key = asset_id or "default"
+    with _LOCKS_MUTEX:
+        if key not in _ASSET_SYNC_LOCKS:
+            _ASSET_SYNC_LOCKS[key] = threading.Lock()
+        return _ASSET_SYNC_LOCKS[key]
 
 
 @dataclass(frozen=True)
@@ -63,6 +81,32 @@ def run_database_sync(asset_id: str | None = None) -> SyncResult:
     table_ohlcv = tables["ohlcv"]
     table_pred = tables["predictions"]
 
+    lock = get_sync_lock(asset_id)
+    if not lock.acquire(blocking=False):
+        logger.info("Sync already running for asset_id=%s — skipped", asset_id)
+        rows = _row_count(db_path, table_ohlcv)
+        return SyncResult(
+            start_time         = "",
+            end_time           = None,
+            ohlcv_rows_before  = rows,
+            ohlcv_rows_after   = rows,
+        )
+
+    try:
+        return _run_database_sync_locked(
+            asset_id, logger, db_path, table_ohlcv, table_pred
+        )
+    finally:
+        lock.release()
+
+
+def _run_database_sync_locked(
+    asset_id: str | None,
+    logger: logging.Logger,
+    db_path: str,
+    table_ohlcv: str,
+    table_pred: str,
+) -> SyncResult:
     logger.info("Database sync started")
     logger.info("Active DB: %s", db_path)
     _prepare_database(db_path, logger)

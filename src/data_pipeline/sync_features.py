@@ -1046,6 +1046,7 @@ def sync_features(
         return
 
     df["open_time"] = pd.to_datetime(df["open_time"])
+    df = df.drop_duplicates(subset=["open_time"], keep="last")
     for col in ["open", "high", "low", "close", "volume"] + available_activity:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df.set_index("open_time", inplace=True)
@@ -1073,6 +1074,10 @@ def sync_features(
 
         else:
             raise ValueError(f"Unknown target direction: {direction}")
+
+        # Edge-nulling: the last rolling_win rows have no forward data yet
+        if len(df) >= rolling_win:
+            df.loc[df.index[-rolling_win:], target_col] = np.nan
 
     # -------------------------------------------------------------------------
     # Generate technical indicators with 'feat_' prefix

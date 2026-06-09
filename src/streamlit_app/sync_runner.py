@@ -15,29 +15,18 @@ import time
 from typing import Any
 
 from streamlit_app.dashboard_logging import get_dashboard_logger
-from streamlit_app.sync import SyncResult, run_database_sync
+from streamlit_app.sync import SyncResult, get_sync_lock, run_database_sync
 
 
 _STATE_KEY_PREFIX        = "database_sync_state"
 AUTO_SYNC_INTERVAL_SECONDS = 30
 
-_SYNC_LOCKS: dict[str, threading.Lock] = {}
-_LOCKS_MUTEX = threading.Lock()
-
 
 # =============================================================================
-# _state_key / _get_lock  — per-asset helpers
+# _state_key  — per-asset helper
 # =============================================================================
 def _state_key(asset_id: str | None) -> str:
     return f"{_STATE_KEY_PREFIX}_{asset_id or 'default'}"
-
-
-def _get_lock(asset_id: str | None) -> threading.Lock:
-    key = asset_id or "default"
-    with _LOCKS_MUTEX:
-        if key not in _SYNC_LOCKS:
-            _SYNC_LOCKS[key] = threading.Lock()
-        return _SYNC_LOCKS[key]
 
 
 # =============================================================================
@@ -81,7 +70,7 @@ def ensure_sync_state(session_state, asset_id: str | None = None) -> dict[str, A
 # =============================================================================
 def is_sync_running(state: dict[str, Any], asset_id: str | None = None) -> bool:
     thread = state.get("thread")
-    return bool(thread is not None and thread.is_alive()) or _get_lock(asset_id).locked()
+    return bool(thread is not None and thread.is_alive()) or get_sync_lock(asset_id).locked()
 
 
 # =============================================================================
@@ -151,17 +140,16 @@ def auto_sync_due_seconds(state: dict[str, Any], asset_id: str | None = None) ->
 # =============================================================================
 def _sync_worker(state: dict[str, Any], asset_id: str | None) -> None:
     logger = get_dashboard_logger()
-    with _get_lock(asset_id):
-        try:
-            result = run_database_sync(asset_id=asset_id)
-            state["result"] = _result_payload(result)
-        except Exception as exc:
-            state["error"] = str(exc)
-            logger.exception("Sync failed")
-        finally:
-            state["running"]             = False
-            state["finished_at"]         = _now_label()
-            state["finished_at_epoch"]   = _now_epoch()
+    try:
+        result = run_database_sync(asset_id=asset_id)
+        state["result"] = _result_payload(result)
+    except Exception as exc:
+        state["error"] = str(exc)
+        logger.exception("Sync failed")
+    finally:
+        state["running"]             = False
+        state["finished_at"]         = _now_label()
+        state["finished_at_epoch"]   = _now_epoch()
 
 
 def _result_payload(result: SyncResult) -> dict[str, Any]:

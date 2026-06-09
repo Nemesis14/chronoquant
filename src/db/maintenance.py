@@ -10,7 +10,7 @@
 from datetime import datetime, timedelta
 
 import utils
-from db.table_ops import sqlite_connect, table_columns
+from db.table_ops import sqlite_connect, table_columns, table_exists
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
 
@@ -191,4 +191,111 @@ def rebuild_derived_tables(
     print("=" * 80)
     print("Rebuild complete")
     print("=" * 80)
+
+
+# =============================================================================
+# _upgrade_to_unique_index(db_path: str, table_name: str) -> None
+# =============================================================================
+# Purpose:
+#  - Replace the existing non-unique open_time index with a UNIQUE one
+#  - No-op if the UNIQUE index is already in place
+# =============================================================================
+def _upgrade_to_unique_index(db_path: str, table_name: str) -> None:
+    index_name = f"idx_{table_name}_open_time"
+    with sqlite_connect(db_path) as conn:
+        for _seq, name, unique, _origin, _partial in conn.execute(
+            f'PRAGMA index_list("{table_name}")'
+        ).fetchall():
+            if name == index_name:
+                if unique:
+                    print(f"  '{table_name}': UNIQUE index already in place")
+                    return
+                break
+        conn.execute(f'DROP INDEX IF EXISTS "{index_name}"')
+        conn.execute(
+            f'CREATE UNIQUE INDEX "{index_name}" ON "{table_name}" (open_time)'
+        )
+        conn.commit()
+    print(f"  '{table_name}': upgraded to UNIQUE index on open_time")
+
+
+# =============================================================================
+# fix_ohlcv_duplicates(asset_id: str | None = None) -> None
+# =============================================================================
+# Purpose:
+#  - Remove duplicate open_time rows from the OHLCV table (keep newest rowid)
+#  - Delete features/predictions rows from the earliest affected time onwards
+#  - Upgrade all three tables to UNIQUE open_time index
+#  - Rebuild derived tables for the affected time range
+# =============================================================================
+def fix_ohlcv_duplicates(asset_id: str | None = None) -> None:
+    db_cfg      = utils.load_asset_config(asset_id)["database"]
+    db_path     = db_cfg["db_path"]
+    table_ohlcv = db_cfg["tables"]["ohlcv"]
+    table_feat  = db_cfg["tables"]["features"]
+    table_pred  = db_cfg["tables"]["predictions"]
+
+    print("=" * 60)
+    print("FIX OHLCV DUPLICATES")
+    print("=" * 60)
+    print(f"DB:    {db_path}")
+    print(f"Table: {table_ohlcv}")
+    print("=" * 60)
+
+    with sqlite_connect(db_path) as conn:
+        dup_rows = conn.execute(
+            f"""
+            SELECT open_time, COUNT(*) AS cnt
+            FROM {table_ohlcv}
+            GROUP BY open_time
+            HAVING cnt > 1
+            ORDER BY open_time
+            """
+        ).fetchall()
+
+    min_dup_time = None
+    if dup_rows:
+        min_dup_time = dup_rows[0][0]
+        print(f"Found {len(dup_rows)} duplicate open_time(s)")
+        print(f"  Earliest: {min_dup_time}")
+        print(f"  Latest:   {dup_rows[-1][0]}")
+
+        with sqlite_connect(db_path) as conn:
+            deleted = conn.execute(
+                f"""
+                DELETE FROM {table_ohlcv}
+                WHERE rowid NOT IN (
+                    SELECT MAX(rowid) FROM {table_ohlcv} GROUP BY open_time
+                )
+                """
+            ).rowcount
+            conn.commit()
+        print(f"Deleted {deleted} duplicate row(s) from '{table_ohlcv}' (kept newest)")
+
+        for tbl in [table_feat, table_pred]:
+            if not table_exists(db_path, tbl):
+                print(f"  '{tbl}': table does not exist, skipping")
+                continue
+            with sqlite_connect(db_path) as conn:
+                deleted = conn.execute(
+                    f"DELETE FROM {tbl} WHERE open_time >= ?",
+                    (min_dup_time,),
+                ).rowcount
+                conn.commit()
+            print(f"Deleted {deleted} row(s) from '{tbl}' (>= {min_dup_time})")
+    else:
+        print(f"No duplicates found in '{table_ohlcv}'")
+
+    print("\nUpgrading indexes to UNIQUE...")
+    for tbl in [table_ohlcv, table_feat, table_pred]:
+        if table_exists(db_path, tbl):
+            _upgrade_to_unique_index(db_path, tbl)
+
+    if min_dup_time:
+        print(f"\nRebuilding derived tables from {min_dup_time}...")
+        rebuild_derived_tables(start=min_dup_time, asset_id=asset_id)
+
+    print("=" * 60)
+    print("Done")
+    print("=" * 60)
 

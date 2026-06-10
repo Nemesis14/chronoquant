@@ -1,0 +1,22 @@
+{
+    "sample_id": "base_solusdt_fw60_futures_v1",
+    "split_type": "expanding_window",
+    "target_horizon_minutes": 60,
+    "embargo_minutes": 60,
+    "data": {
+        "start": "2020-09-14 07:00:00",
+        "end": "2026-06-10 05:07:00"
+    },
+    "parameters": {
+        "min_train_days": 730,
+        "valid_days": 180,
+        "step_days": 180,
+        "test_days": 365
+    },
+    "source": {
+        "asset_id": "solusdt_fw60",
+        "db_path": "D:/repos/chronoquant/database/solusdt_data_dev.db",
+        "table_name": "solusdt_1m_features"
+    },
+    "n_folds": 5
+}

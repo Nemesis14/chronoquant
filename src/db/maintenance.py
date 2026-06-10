@@ -4,15 +4,52 @@
 # Purpose:
 #  - Provide reusable database maintenance operations for scripts and tests
 #  - Rebuild derived tables from existing OHLCV data
-#  - Update live prediction signal columns
 # =============================================================================
 
 from datetime import datetime, timedelta
 
 import utils
-from db.table_ops import sqlite_connect, table_columns, table_exists
+from db.table_ops import sqlite_connect, table_exists
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
+
+
+# =============================================================================
+# backfill_predictions(start, end, asset_id, chunk_months) -> None
+# =============================================================================
+# Purpose:
+#  - Backfill solusdt_1m_predictions for all active models over a date range,
+#    processing in monthly chunks to limit peak memory usage.
+#  - Safe to re-run: existing rows are updated, new rows are inserted.
+# =============================================================================
+def backfill_predictions(
+    start: str,
+    end: str | None = None,
+    asset_id: str | None = None,
+    chunk_months: int = 3,
+) -> None:
+    db_cfg     = utils.load_asset_config(asset_id)["database"]
+    db_path    = db_cfg["db_path"]
+    table_pred = db_cfg["tables"]["predictions"]
+
+    print("=" * 80)
+    print("BACKFILL PREDICTIONS")
+    print("=" * 80)
+    print(f"DB:    {db_path}")
+    print(f"Start: {start}")
+    print(f"End:   {end or '(latest)'}")
+    print("=" * 80)
+
+    chunks = _chunk_date_ranges(start, end, chunk_months)
+    print(f"INFO: Backfilling predictions in {len(chunks)} chunk(s) of {chunk_months} months each")
+    for i, (chunk_start, chunk_end) in enumerate(chunks, 1):
+        print(f"  Chunk {i}/{len(chunks)}: {chunk_start} -> {chunk_end or '(latest)'}", flush=True)
+        sync_predictions(chunk_start, end_time=chunk_end, asset_id=asset_id)
+
+    print_table_check(db_path, table_pred)
+    print("=" * 80)
+    print("Backfill complete")
+    print("=" * 80)
 
 
 # =============================================================================
@@ -29,51 +66,6 @@ def drop_table(db_path: str, table_name: str) -> None:
         conn.execute(f"DROP TABLE IF EXISTS {table_name}")
         conn.commit()
     print(f"Dropped table '{table_name}'")
-
-
-# =============================================================================
-# update_prediction_signals(db_path: str, table_name: str) -> None
-# =============================================================================
-# Purpose:
-#  - Add signal column if missing
-#  - Recompute LONG/SHORT/NEUTRAL signal values from the generic live prediction
-# Parameters:
-#  - db_path: SQLite database path
-#  - table_name: predictions table
-# =============================================================================
-def update_prediction_signals(
-    db_path: str,
-    table_name: str,
-    asset_id: str | None = None,
-) -> None:
-    model_cfg       = utils.load_models_config()
-    predictions_cfg = utils.load_predictions_config()
-    _, model_meta   = utils.live_model_meta(model_cfg, asset_id=asset_id)
-    target_name     = model_meta["target_name"]
-    direction = utils.target_direction_from_name(target_name)
-    threshold = utils.signal_probability_threshold(predictions_cfg)
-    signal_value = "LONG" if direction == "long" else "SHORT"
-    live_cols = utils.live_prediction_columns()
-    prediction_col = live_cols["prediction"]
-    columns = table_columns(db_path, table_name)
-
-    with sqlite_connect(db_path) as conn:
-        if "signal" not in columns:
-            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN signal TEXT")
-
-        conn.execute(
-            f"""
-            UPDATE {table_name}
-            SET signal = CASE
-                WHEN {prediction_col} >= ? THEN ?
-                ELSE 'NEUTRAL'
-            END
-            """,
-            (threshold, signal_value),
-        )
-        conn.commit()
-
-    print(f"Updated signal column in '{table_name}' using {prediction_col} >= {threshold}")
 
 
 # =============================================================================
@@ -185,7 +177,6 @@ def rebuild_derived_tables(
 
     if not features_only:
         sync_predictions(start, end_time=end, asset_id=asset_id)
-        update_prediction_signals(db_path, table_pred, asset_id=asset_id)
         print_table_check(db_path, table_pred)
 
     print("=" * 80)

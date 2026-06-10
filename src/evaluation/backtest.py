@@ -10,16 +10,12 @@
 from __future__ import annotations
 
 import json
-import os
-import pickle
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
 import utils
-from data_pipeline.sync_predictions import _feature_list_for_prediction
 
 
 # =============================================================================
@@ -82,162 +78,64 @@ def run_strategy_backtest(strategy_id: str, strategy_cfg: dict) -> dict:
 # build_backtest_frame(...) -> pd.DataFrame
 # =============================================================================
 # Purpose:
-#  - Generate model probabilities and join them to OHLCV bars for simulation
+#  - Load pre-computed predictions from solusdt_1m_predictions and join to
+#    OHLCV bars for simulation. The predictions table is the single source of
+#    truth — run sync_predictions.py to backfill before running backtests.
 # =============================================================================
 def build_backtest_frame(
     model_id: str,
     start: str,
     end: str,
     asset_id: str | None = None,
-    chunk_size: int = 50_000,
-) -> pd.DataFrame:
-    predictions = model_prediction_frame_chunked(
-        model_id=model_id,
-        start=start,
-        end=end,
-        asset_id=asset_id,
-        chunk_size=chunk_size,
-    )
-    ohlcv = load_ohlcv_frame(start=start, end=end, asset_id=asset_id)
-    frame = ohlcv.merge(
-        predictions[["open_time", "target", "prediction"]],
-        on="open_time",
-        how="inner",
-    )
-    frame = frame.sort_values("open_time").drop_duplicates("open_time").reset_index(drop=True)
-    return frame
-
-
-# =============================================================================
-# model_prediction_frame(...) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Load a saved model artifact and compute probabilities from features table
-# =============================================================================
-def model_prediction_frame(
-    model_id: str,
-    start: str,
-    end: str,
-    asset_id: str | None = None,
 ) -> pd.DataFrame:
     db_cfg = utils.load_asset_config(asset_id)["database"]
     model_cfg = utils.load_models_config()
-    model_meta = model_cfg["models"][model_id]
-    db_path = db_cfg["db_path"]
-    table_feat = db_cfg["tables"]["features"]
+    model_meta = model_cfg["models"].get(model_id)
+    if model_meta is None:
+        raise ValueError(f"Model not found in config/models.json: {model_id!r}")
 
-    model, feature_list = _load_model_and_features(model_meta)
+    db_path    = db_cfg["db_path"]
+    table_pred = db_cfg["tables"]["predictions"]
+    pred_col   = utils.prediction_col_name(model_id)
     target_col = model_meta["target_name"]
-    select_cols = ["open_time", "close", target_col] + feature_list
-    select_cols = list(dict.fromkeys(select_cols))
-    cols_sql = ", ".join(_quote_identifier(col) for col in select_cols)
 
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(
+        existing_cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table_pred}")')}
+        missing = [c for c in [pred_col, target_col] if c not in existing_cols]
+        if missing:
+            raise ValueError(
+                f"Column(s) {missing!r} not found in '{table_pred}'. "
+                f"Run sync_predictions.py to backfill '{model_id}' for this date range."
+            )
+
+        predictions = pd.read_sql_query(
             f"""
-            SELECT {cols_sql}
-            FROM {_quote_identifier(table_feat)}
-            WHERE open_time >= ?
-                AND open_time <= ?
-            ORDER BY open_time ASC
+            SELECT open_time,
+                   {_quote_identifier(target_col)} AS target,
+                   {_quote_identifier(pred_col)}   AS prediction
+            FROM   {_quote_identifier(table_pred)}
+            WHERE  open_time >= ?
+               AND open_time <= ?
+            ORDER  BY open_time ASC
             """,
             conn,
             params=(start, end),
         )
 
-    if df.empty:
-        raise ValueError(f"No feature rows found for backtest interval: {start} -> {end}")
+    if predictions.empty:
+        raise ValueError(
+            f"No prediction rows for '{model_id}' in '{table_pred}' "
+            f"between {start} and {end}. "
+            f"Run sync_predictions.py to backfill this date range."
+        )
 
-    trainer = model_meta.get("trainer", "")
-    predict_method = model_meta.get("predict", {}).get("method", "predict")
-    X = df[feature_list].apply(pd.to_numeric, errors="coerce").fillna(0)
-    if trainer.startswith("statsmodels") and "const" not in X.columns:
-        X.insert(0, "const", 1.0)
+    predictions["target"]     = pd.to_numeric(predictions["target"],     errors="coerce")
+    predictions["prediction"] = pd.to_numeric(predictions["prediction"], errors="coerce")
 
-    if predict_method == "predict_proba":
-        prediction = model.predict_proba(X)
-        if hasattr(prediction, "shape") and len(prediction.shape) == 2:
-            prediction = prediction[:, 1]
-    else:
-        prediction = model.predict(X)
-
-    return pd.DataFrame(
-        {
-            "open_time": df["open_time"],
-            "close": pd.to_numeric(df["close"], errors="coerce"),
-            "target": pd.to_numeric(df[target_col], errors="coerce"),
-            "prediction": pd.to_numeric(prediction, errors="coerce"),
-        }
-    )
-
-
-# =============================================================================
-# model_prediction_frame_chunked(...) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Memory-safe variant: reads features in chunks, applies model per chunk,
-#    concatenates only the slim output (open_time, close, target, prediction)
-# =============================================================================
-def model_prediction_frame_chunked(
-    model_id: str,
-    start: str,
-    end: str,
-    asset_id: str | None = None,
-    chunk_size: int = 50_000,
-) -> pd.DataFrame:
-    db_cfg = utils.load_asset_config(asset_id)["database"]
-    model_cfg = utils.load_models_config()
-    model_meta = model_cfg["models"][model_id]
-    db_path = db_cfg["db_path"]
-    table_feat = db_cfg["tables"]["features"]
-
-    model, feature_list = _load_model_and_features(model_meta)
-    target_col = model_meta["target_name"]
-    trainer = model_meta.get("trainer", "")
-    predict_method = model_meta.get("predict", {}).get("method", "predict")
-
-    select_cols = ["open_time", "close", target_col] + feature_list
-    select_cols = list(dict.fromkeys(select_cols))
-    cols_sql = ", ".join(_quote_identifier(col) for col in select_cols)
-
-    query = f"""
-        SELECT {cols_sql}
-        FROM {_quote_identifier(table_feat)}
-        WHERE open_time >= ?
-            AND open_time <= ?
-        ORDER BY open_time ASC
-        LIMIT ? OFFSET ?
-    """
-
-    results = []
-    offset = 0
-    with sqlite3.connect(db_path) as conn:
-        while True:
-            chunk = pd.read_sql_query(query, conn, params=(start, end, chunk_size, offset))
-            if chunk.empty:
-                break
-            X = chunk[feature_list].apply(pd.to_numeric, errors="coerce").fillna(0)
-            if trainer.startswith("statsmodels") and "const" not in X.columns:
-                X.insert(0, "const", 1.0)
-            if predict_method == "predict_proba":
-                pred = model.predict_proba(X)
-                if hasattr(pred, "shape") and len(pred.shape) == 2:
-                    pred = pred[:, 1]
-            else:
-                pred = model.predict(X)
-            results.append(pd.DataFrame({
-                "open_time":  chunk["open_time"],
-                "close":      pd.to_numeric(chunk["close"], errors="coerce"),
-                "target":     pd.to_numeric(chunk[target_col], errors="coerce"),
-                "prediction": pd.to_numeric(pred, errors="coerce"),
-            }))
-            offset += chunk_size
-            if len(chunk) < chunk_size:
-                break
-
-    if not results:
-        raise ValueError(f"No feature rows found for backtest interval: {start} -> {end}")
-    return pd.concat(results, ignore_index=True)
+    ohlcv = load_ohlcv_frame(start=start, end=end, asset_id=asset_id)
+    frame = ohlcv.merge(predictions[["open_time", "target", "prediction"]], on="open_time", how="inner")
+    frame = frame.sort_values("open_time").drop_duplicates("open_time").reset_index(drop=True)
+    return frame
 
 
 # =============================================================================
@@ -730,31 +628,6 @@ def write_backtest_report(
 </html>
 """
     (output_dir / "report.html").write_text(html, encoding="utf-8")
-
-
-# =============================================================================
-# _load_model_and_features(model_meta: dict) -> tuple[Any, list[str]]
-# =============================================================================
-# Purpose:
-#  - Load saved model.pkl and resolve the exact feature list for prediction
-# =============================================================================
-def _load_model_and_features(model_meta: dict) -> tuple[Any, list[str]]:
-    paths = model_meta["paths"]
-    model_dir = utils._resolve_path(paths["model_dir"])
-    features_path = os.path.join(model_dir, paths["features_file"])
-    model_path = os.path.join(model_dir, paths["model_file"])
-
-    with open(features_path, "r", encoding="utf-8") as f:
-        features_data = json.load(f)
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
-
-    feature_list = _feature_list_for_prediction(
-        features_data=features_data,
-        model=model,
-        trainer=model_meta.get("trainer", ""),
-    )
-    return model, feature_list
 
 
 # =============================================================================

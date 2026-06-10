@@ -53,7 +53,7 @@ def prediction_price_figure(
     for col in ("open", "high", "low", "close"):
         if col in plot_df.columns:
             plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
-    for col in ("prediction", "short_prediction"):
+    for col in ("long_prediction", "short_prediction"):
         if col in plot_df.columns:
             plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
     plot_df = (
@@ -81,11 +81,11 @@ def prediction_price_figure(
     y2_range = [_yl - _pad, _yh + _pad] if _pad is not None else None
 
     # --- Row 1: Long prediction ---
-    if "prediction" in plot_df.columns and not plot_df["prediction"].dropna().empty:
+    if "long_prediction" in plot_df.columns and not plot_df["long_prediction"].dropna().empty:
         fig.add_trace(
             go.Scatter(
                 x=plot_df["open_time"],
-                y=plot_df["prediction"],
+                y=plot_df["long_prediction"],
                 mode="lines",
                 name="long prediction",
                 line={"color": "#5b8af5", "width": 1.9},
@@ -97,7 +97,7 @@ def prediction_price_figure(
     else:
         _ann(fig, "No long prediction data", 0.90)
 
-    _add_threshold_trace(fig, plot_df, entry_threshold, "entry", _GREEN, row=1)
+    _add_threshold_trace(fig, plot_df, entry_threshold,  "entry", _GREEN, row=1)
     _add_threshold_trace(fig, plot_df, rearm_threshold, "rearm", _MUTED, row=1)
     _add_threshold_trace(fig, plot_df, exit_threshold,  "exit",  _RED,   row=1)
     _threshold_legend(
@@ -287,9 +287,9 @@ def _long_signal_markers(
     df: pd.DataFrame,
     entry_threshold: float | None,
 ) -> None:
-    if entry_threshold is None or "prediction" not in df.columns:
+    if entry_threshold is None or "long_prediction" not in df.columns:
         return
-    mask = df["prediction"].notna() & (df["prediction"] >= float(entry_threshold))
+    mask = df["long_prediction"].notna() & (df["long_prediction"] >= float(entry_threshold))
     sig = df[mask]
     if sig.empty:
         return

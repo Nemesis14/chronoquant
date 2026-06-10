@@ -2,8 +2,7 @@
 # Asset configuration tests
 # =============================================================================
 # Purpose:
-#  - Verify asset-aware config helpers preserve the BCH default
-#  - Verify explicit SOLUSDT asset resolution uses dedicated paths and tables
+#  - Verify SOLUSDT asset config resolves correct paths, tables, and features
 # =============================================================================
 
 import sys
@@ -18,17 +17,7 @@ sys.path.insert(0, str(SRC))
 import utils
 
 
-def test_default_asset_config_matches_bch_db_config() -> None:
-    db_cfg = utils.load_db_config()["database"]
-    asset_cfg = utils.load_asset_config()["database"]
-
-    assert asset_cfg["asset_id"] == "bchusdt_fw240"
-    assert asset_cfg["db_path"] == db_cfg["db_path"]
-    assert asset_cfg["symbol"] == db_cfg["symbol"]
-    assert asset_cfg["tables"] == db_cfg["tables"]
-
-
-def test_explicit_sol_asset_config_resolves_dev_database() -> None:
+def test_sol_asset_config_resolves_dev_database() -> None:
     asset_cfg = utils.load_asset_config("solusdt_fw60")["database"]
 
     assert asset_cfg["asset_id"] == "solusdt_fw60"
@@ -48,18 +37,9 @@ def test_unknown_asset_id_raises_clear_error() -> None:
         utils.load_asset_config("unknown_asset")
 
 
-def test_feature_profiles_preserve_bch_and_add_sol_target() -> None:
-    bch_cfg = utils.load_features_config("bchusdt_fw240")
+def test_sol_feature_profile_has_correct_targets() -> None:
     sol_cfg = utils.load_features_config("solusdt_fw60")
-
-    bch_features = bch_cfg["database"]["features"]
     sol_features = sol_cfg["database"]["features"]
-
-    assert bch_features["profile_id"] == "bchusdt_fw240"
-    assert utils.target_columns_from_config(bch_cfg) == [
-        "trg_l_fw240_q90",
-        "trg_s_fw240_q10",
-    ]
 
     assert sol_features["profile_id"] == "solusdt_fw60"
     assert utils.target_columns_from_config(sol_cfg) == [
@@ -79,9 +59,15 @@ def test_feature_profiles_preserve_bch_and_add_sol_target() -> None:
         "percentile": 0.1,
     }
 
-    # SOL extends the shared BCH indicator set with new feature groups
-    bch_keys = set(bch_features["indicators"].keys())
-    sol_keys = set(sol_features["indicators"].keys())
-    assert bch_keys.issubset(sol_keys), f"SOL should contain all BCH indicator groups; missing: {bch_keys - sol_keys}"
-    new_sol_groups = {"activity", "return_distance", "regime_rank", "candle_shape", "trend_slope", "interaction", "time_session"}
-    assert new_sol_groups.issubset(sol_keys), f"SOL missing expected new groups: {new_sol_groups - sol_keys}"
+
+def test_sol_feature_profile_has_expected_indicator_groups() -> None:
+    sol_cfg = utils.load_features_config("solusdt_fw60")
+    sol_keys = set(sol_cfg["database"]["features"]["indicators"].keys())
+
+    expected_groups = {
+        "activity", "return_distance", "regime_rank",
+        "candle_shape", "trend_slope", "interaction", "time_session",
+    }
+    assert expected_groups.issubset(sol_keys), (
+        f"SOL missing expected feature groups: {expected_groups - sol_keys}"
+    )

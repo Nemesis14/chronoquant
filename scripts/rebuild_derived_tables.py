@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--asset-id",
         default = None,
-        help    = "Asset ID from config/assets.json (e.g. solusdt_fw60); omit for BCH default",
+        help    = "Asset ID from config/assets.json (e.g. solusdt_fw60)",
     )
     return parser.parse_args()
 

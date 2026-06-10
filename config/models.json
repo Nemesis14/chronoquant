@@ -17,7 +17,7 @@
                 "sample_dir": "samples/base_solusdt_fw60_futures_v1",
                 "row_stride": 60
             },
-            "active": false
+            "active": true
         },
         "lgbm_solusdt_s_fw60_q10_local_v4": {
             "asset_id": "solusdt_fw60",
@@ -36,7 +36,7 @@
                 "sample_dir": "samples/base_solusdt_fw60_futures_v1",
                 "row_stride": 60
             },
-            "active": false
+            "active": true
         },
         "lgbm_solusdt_l_fw60_q90_local_v3": {
             "asset_id": "solusdt_fw60",
@@ -55,7 +55,7 @@
                 "sample_dir": "samples/base_solusdt_fw60_dev",
                 "row_stride": 60
             },
-            "active": true
+            "active": false
         },
         "lgbm_solusdt_s_fw60_q10_local_v3": {
             "asset_id": "solusdt_fw60",
@@ -74,7 +74,7 @@
                 "sample_dir": "samples/base_solusdt_fw60_dev",
                 "row_stride": 60
             },
-            "active": true
+            "active": false
         }
     }
 }

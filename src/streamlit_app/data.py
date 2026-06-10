@@ -171,7 +171,9 @@ def prediction_history(
     models_cfg = utils.load_models_config()
     long_pred_col, short_pred_col = _resolve_long_short_pred_cols(models_cfg, asset_id, columns)
 
-    base_cols = [live_cols["target"], live_cols["prediction"], live_cols["signal"]]
+    base_cols = [live_cols["target"]]
+    if long_pred_col and long_pred_col not in base_cols:
+        base_cols.append(long_pred_col)
     if short_pred_col and short_pred_col not in base_cols:
         base_cols.append(short_pred_col)
 
@@ -232,8 +234,13 @@ def prediction_history(
     df = _coerce_prediction_frame(_read_sql(query, params=params, asset_id=asset_id))
     if df.empty:
         return df
+    rename_map = {}
+    if long_pred_col and long_pred_col in df.columns:
+        rename_map[long_pred_col] = "long_prediction"
     if short_pred_col and short_pred_col in df.columns:
-        df = df.rename(columns={short_pred_col: "short_prediction"})
+        rename_map[short_pred_col] = "short_prediction"
+    if rename_map:
+        df = df.rename(columns=rename_map)
     latest_ts = df["open_time"].max()
     start_ts = latest_ts - pd.Timedelta(hours=int(lookback_hours))
     return df[df["open_time"] >= start_ts].reset_index(drop=True)
@@ -251,16 +258,14 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     if not table_name or not table_exists(table_name, asset_id=asset_id):
         return None
 
-    columns   = table_columns(table_name, asset_id=asset_id)
-    live_cols = utils.live_prediction_columns()
+    columns    = table_columns(table_name, asset_id=asset_id)
+    live_cols  = utils.live_prediction_columns()
     models_cfg = utils.load_models_config()
-    _, short_pred_col = _resolve_long_short_pred_cols(models_cfg, asset_id, columns)
+    long_pred_col, short_pred_col = _resolve_long_short_pred_cols(models_cfg, asset_id, columns)
 
-    base_select = [
-        col
-        for col in ["open_time", "close", live_cols["target"], live_cols["prediction"], live_cols["signal"]]
-        if col in columns
-    ]
+    base_select = [col for col in ["open_time", "close", live_cols["target"]] if col in columns]
+    if long_pred_col and long_pred_col not in base_select:
+        base_select.append(long_pred_col)
     if short_pred_col and short_pred_col not in base_select:
         base_select.append(short_pred_col)
     if "open_time" not in base_select:
@@ -275,8 +280,13 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     df = _read_sql(query, asset_id=asset_id)
     if df.empty:
         return None
+    rename_map = {}
+    if long_pred_col and long_pred_col in df.columns:
+        rename_map[long_pred_col] = "long_prediction"
     if short_pred_col and short_pred_col in df.columns:
-        df = df.rename(columns={short_pred_col: "short_prediction"})
+        rename_map[short_pred_col] = "short_prediction"
+    if rename_map:
+        df = df.rename(columns=rename_map)
     row = _coerce_prediction_frame(df).iloc[0].to_dict()
     return {key: _json_safe(value) for key, value in row.items()}
 
@@ -504,7 +514,7 @@ def _coerce_prediction_frame(df: pd.DataFrame) -> pd.DataFrame:
         return df
     out = df.copy()
     out["open_time"] = pd.to_datetime(out["open_time"], errors="coerce")
-    for col in ["open", "high", "low", "close", "target", "prediction", "short_prediction"]:
+    for col in ["open", "high", "low", "close", "target", "long_prediction", "short_prediction"]:
         if col in out.columns:
             out[col] = pd.to_numeric(out[col], errors="coerce")
     return out

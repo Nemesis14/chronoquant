@@ -4,7 +4,6 @@
 # Purpose:
 #  - Load all active models for the asset and generate prediction columns
 #  - Each model writes to its own {model_id}_p column in the predictions table
-#  - The live/primary model also writes to the generic "prediction" column
 # =============================================================================
 
 import os
@@ -32,8 +31,6 @@ def sync_predictions(
         print(f"No active models found for asset_id={asset_id!r}")
         return
 
-    live_model_id = _resolve_live_model_id(model_cfg, asset_id)
-
     for model_id, model_meta in active_models.items():
         _sync_single_model(
             model_id=model_id,
@@ -43,7 +40,6 @@ def sync_predictions(
             table_pred=table_pred,
             start_time=start_time,
             end_time=end_time,
-            is_live=(model_id == live_model_id),
         )
 
 
@@ -59,13 +55,6 @@ def _active_models_for_asset(model_cfg: dict, asset_id: str | None) -> dict:
     return result
 
 
-def _resolve_live_model_id(model_cfg: dict, asset_id: str | None) -> str | None:
-    try:
-        return utils.live_model_id(model_cfg=model_cfg, asset_id=asset_id)
-    except ValueError:
-        return None
-
-
 def _sync_single_model(
     model_id: str,
     model_meta: dict,
@@ -74,7 +63,6 @@ def _sync_single_model(
     table_pred: str,
     start_time: str,
     end_time: str | None,
-    is_live: bool,
 ) -> None:
     target_col = model_meta["target_name"]
     paths      = model_meta["paths"]
@@ -137,19 +125,17 @@ def _sync_single_model(
     else:
         proba = model.predict(X)
 
-    pred_col = utils.prediction_col_name(model_id)
+    pred_col  = utils.prediction_col_name(model_id)
     live_cols = utils.live_prediction_columns()
 
     df_out = df[["open_time", "close"]].copy()
-    df_out[live_cols["target"]] = df[target_col]
+    df_out[live_cols["target"]] = df[target_col]  # generic "target" col for dashboard compat
+    df_out[target_col] = df[target_col]            # named col (e.g. trg_l_fw60_q90) for backtest
     df_out[pred_col] = pd.to_numeric(proba, errors="coerce").astype(float)
-    if is_live:
-        df_out[live_cols["prediction"]] = df_out[pred_col]
 
     ensure_table_columns(db_path, table_pred, df_out)
 
-    update_cols = [pred_col] + ([live_cols["prediction"]] if is_live else [])
-    new_count, updated_count = _write_predictions(db_path, table_pred, df_out, update_cols)
+    new_count, updated_count = _write_predictions(db_path, table_pred, df_out, [pred_col, target_col])
 
     if new_count:
         print(f"Inserted {new_count} predictions into '{table_pred}' ({model_id} -> {pred_col})")

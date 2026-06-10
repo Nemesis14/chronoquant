@@ -13,7 +13,6 @@ import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_ohlcv import sync_ohlcv
 from data_pipeline.sync_predictions import sync_predictions
-from db.maintenance import update_prediction_signals
 from db.table_ops import sqlite_connect, table_exists
 from streamlit_app.dashboard_logging import get_dashboard_logger
 
@@ -145,9 +144,6 @@ def _run_database_sync_locked(
         asset_id=asset_id,
         logger=logger,
     )
-
-    logger.info("Signal update started")
-    _run_with_logged_stdout(update_prediction_signals, db_path, table_pred, asset_id=asset_id, logger=logger)
 
     logger.info("Database sync complete")
     return SyncResult(start_time, latest_open_time, rows_before, rows_after)

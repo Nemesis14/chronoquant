@@ -42,8 +42,8 @@ def _build_ohlcv(rows: int = 500) -> pd.DataFrame:
 
 def test_sync_features_expanded_columns_and_idempotency(tmp_path, monkeypatch) -> None:
     db_path     = tmp_path / "features_test.db"
-    table_ohlcv = "bchusdt_1m"
-    table_feat  = "bchusdt_1m_features"
+    table_ohlcv = "solusdt_1m"
+    table_feat  = "solusdt_1m_features"
 
     with sqlite3.connect(db_path) as conn:
         _build_ohlcv().to_sql(table_ohlcv, conn, index=False, if_exists="replace")
@@ -52,8 +52,8 @@ def test_sync_features_expanded_columns_and_idempotency(tmp_path, monkeypatch) -
             CREATE TABLE {table_feat} (
                 open_time TEXT,
                 close REAL,
-                trg_l_fw240_q90 INTEGER,
-                trg_s_fw240_q10 INTEGER,
+                trg_l_fw60_q90 INTEGER,
+                trg_s_fw60_q10 INTEGER,
                 feat_rsi_14 REAL
             )
             """,
@@ -65,7 +65,7 @@ def test_sync_features_expanded_columns_and_idempotency(tmp_path, monkeypatch) -
             "tables": {
                 "ohlcv": table_ohlcv,
                 "features": table_feat,
-                "predictions": "bchusdt_1m_predictions",
+                "predictions": "solusdt_1m_predictions",
             },
         },
     }

@@ -595,7 +595,7 @@ def _render_signal_trigger_card(asset_id: str | None) -> None:
     long_pred  = None
     short_pred = None
     if latest:
-        long_pred  = latest.get("prediction")
+        long_pred  = latest.get("long_prediction")
         short_pred = latest.get("short_prediction")
         if short_pred is None:
             # look for any short prediction column

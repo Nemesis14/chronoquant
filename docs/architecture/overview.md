@@ -38,6 +38,8 @@ Important modules:
 - `sync_features.py`: compute configured indicators and targets.
 - `sync_predictions.py`: load model artifacts and write live predictions.
 
+Detailed data documentation lives under `docs/data/`.
+
 ## Modeling
 
 `src/modeling/` owns dataset loading, sampling, training, metrics, reports, and
@@ -46,16 +48,26 @@ L1 logistic regression, and LightGBM.
 
 Model artifacts are saved under `models/<model_id>/`.
 
+Modeling workflow documentation lives under `docs/modeling/`.
+
 ## Evaluation
 
 `src/evaluation/` owns model-independent strategy evaluation and backtesting.
 Backtest outputs include trades, equity curves, summaries, and reports.
+
+Evaluation workflow documentation lives under `docs/evaluation/`.
 
 ## Streamlit Dashboard
 
 `src/streamlit_app/` owns the live monitoring dashboard. It chains OHLCV,
 feature, and prediction sync at runtime and renders status, logs, price, and
 prediction charts.
+
+## Live Trading
+
+`src/trading/` owns trading decisions, runtime state, exchange integration, and
+journal persistence. Operational state is stored in `database/trading.db`; report
+exports are stored under `trading_reports/`.
 
 ## Time Handling
 

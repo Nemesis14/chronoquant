@@ -3,7 +3,7 @@
 # =============================================================================
 # Purpose:
 #  - Manage per-asset background sync threads and session state
-#  - Provide asset-scoped state keys and locks so BCH and SOL sync independently
+#  - Provide asset-scoped state keys and locks for independent sync per asset
 # =============================================================================
 
 from __future__ import annotations

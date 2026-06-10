@@ -1,6 +1,6 @@
 {
     "lightgbm_binary_stable_v1": {
-        "description": "Stable first-pass LightGBM binary classifier settings for the BCHUSDT 1m target workflow.",
+        "description": "Stable first-pass LightGBM binary classifier settings for SOLUSDT 1m target training.",
         "tuning": {
             "primary_param": "num_leaves",
             "values": [

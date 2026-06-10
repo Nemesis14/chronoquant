@@ -26,20 +26,16 @@ def load_full_config() -> dict:
     return config
 
 
-def resolve_db_path(env: str | None = None) -> str:
-    db_cfg    = utils.load_db_config()["database"]
-    db_paths  = db_cfg.get("db_paths", {})
-    active    = env or db_cfg.get("active_env", "dev")
-    db_path   = db_paths.get(active, db_cfg.get("db_path"))
-    return db_path
+def resolve_db_path() -> str:
+    return utils.load_db_config()["database"]["db_path"]
 
 
 # =============================================================================
 # BASIC QUERIES
 # =============================================================================
 
-def list_tables(env: str | None = None) -> list[str]:
-    db_path = resolve_db_path(env)
+def list_tables() -> list[str]:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
@@ -48,24 +44,23 @@ def list_tables(env: str | None = None) -> list[str]:
     return df["name"].tolist()
 
 
-def get_table_columns(table_name: str, env: str | None = None) -> list[str]:
-    db_path = resolve_db_path(env)
+def get_table_columns(table_name: str) -> list[str]:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     return [row[1] for row in rows]
 
 
-def table_exists(table_name: str, env: str | None = None) -> bool:
-    return table_name in list_tables(env)
+def table_exists(table_name: str) -> bool:
+    return table_name in list_tables()
 
 
-def column_exists(table_name: str, column_name: str, env: str | None = None) -> bool:
-    cols = get_table_columns(table_name, env)
-    return column_name in cols
+def column_exists(table_name: str, column_name: str) -> bool:
+    return column_name in get_table_columns(table_name)
 
 
-def get_row_count(table_name: str, env: str | None = None) -> int:
-    db_path = resolve_db_path(env)
+def get_row_count(table_name: str) -> int:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(
             f"SELECT COUNT(*) as cnt FROM {table_name}",
@@ -74,8 +69,8 @@ def get_row_count(table_name: str, env: str | None = None) -> int:
     return int(df["cnt"].iloc[0])
 
 
-def get_min_max_open_time(table_name: str, env: str | None = None) -> tuple[str | None, str | None]:
-    db_path = resolve_db_path(env)
+def get_min_max_open_time(table_name: str) -> tuple[str | None, str | None]:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(
             f"SELECT MIN(open_time) as min_time, MAX(open_time) as max_time FROM {table_name}",
@@ -91,53 +86,43 @@ def get_min_max_open_time(table_name: str, env: str | None = None) -> tuple[str 
 # =============================================================================
 
 def print_config_summary() -> None:
-    config                         = load_full_config()
-    db_cfg                          = config["database"]
-    active_env                      = db_cfg.get("active_env", "dev")
-    db_paths                        = db_cfg.get("db_paths", {})
-    db_path                         = db_paths.get(active_env, db_cfg.get("db_path"))
-    tables_config                   = db_cfg["tables"]
-    table_ohlcv                     = tables_config["ohlcv"]
-    table_features                  = tables_config["features"]
-    table_predictions               = tables_config["predictions"]
+    config        = load_full_config()
+    db_cfg        = config["database"]
+    db_path       = db_cfg.get("db_path")
+    tables_config = db_cfg["tables"]
 
     print("=" * 70)
     print("DATABASE CONFIGURATION")
     print("=" * 70)
-    print(f"\nActive env: {active_env}")
-    print(f"  Dev path:  {db_paths.get('dev')}")
-    print(f"  Prod path: {db_paths.get('prod')}")
-    print("\nActive DB Path:")
-    print(f"  {db_path}")
+    print(f"\nDB Path: {db_path}")
     print("\nTables:")
-    print(f"  [ohlcv]        {table_ohlcv}")
-    print(f"  [features]     {table_features}")
-    print(f"  [predictions]  {table_predictions}")
+    print(f"  [ohlcv]        {tables_config['ohlcv']}")
+    print(f"  [features]     {tables_config['features']}")
+    print(f"  [predictions]  {tables_config['predictions']}")
     print("\n" + "=" * 70 + "\n")
 
 
-def print_tables_summary(env: str | None = None) -> None:
-    env_name = env or utils.load_db_config()["database"].get("active_env", "dev")
-    tables   = list_tables(env)
+def print_tables_summary() -> None:
+    tables = list_tables()
 
     print("\n" + "=" * 80)
-    print(f"DATABASE TABLES SUMMARY (env={env_name})")
+    print("DATABASE TABLES SUMMARY")
     print("=" * 80)
     print(f"{'Table Name':<25} {'Rows':<12} {'Min Date':<20} {'Max Date':<20}")
     print("-" * 80)
 
     for table_name in tables:
-        row_count             = get_row_count(table_name, env)
-        min_time, max_time    = get_min_max_open_time(table_name, env)
-        min_time_str          = str(min_time) if min_time else "-"
-        max_time_str          = str(max_time) if max_time else "-"
+        row_count          = get_row_count(table_name)
+        min_time, max_time = get_min_max_open_time(table_name)
+        min_time_str       = str(min_time) if min_time else "-"
+        max_time_str       = str(max_time) if max_time else "-"
         print(f"{table_name:<25} {row_count:<12} {min_time_str:<20} {max_time_str:<20}")
 
     print("=" * 80 + "\n")
 
 
-def tail(table_name: str, n: int = 5, env: str | None = None) -> None:
-    db_path = resolve_db_path(env)
+def tail(table_name: str, n: int = 5) -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         count_df = pd.read_sql_query(
             f"SELECT COUNT(*) as cnt FROM {table_name}",
@@ -150,7 +135,7 @@ def tail(table_name: str, n: int = 5, env: str | None = None) -> None:
         )
 
     print("\n" + "=" * 80)
-    print(f"TABLE: {table_name} (env={env or 'active'})")
+    print(f"TABLE: {table_name}")
     print("=" * 80)
     print(f"Total rows: {total_rows}")
     print(f"\nLast {n} rows:")
@@ -163,8 +148,8 @@ def tail(table_name: str, n: int = 5, env: str | None = None) -> None:
 # VALIDATION / MAINTENANCE
 # =============================================================================
 
-def validate_open_time(table_name: str, env: str | None = None, max_issues: int = 10) -> None:
-    db_path = resolve_db_path(env)
+def validate_open_time(table_name: str, max_issues: int = 10) -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(
             f"SELECT open_time FROM {table_name} ORDER BY open_time ASC",
@@ -178,7 +163,7 @@ def validate_open_time(table_name: str, env: str | None = None, max_issues: int 
     open_times = df["open_time"].tolist()
 
     print("\n" + "=" * 70)
-    print(f"VALIDATING TABLE: {table_name} (env={env or 'active'})")
+    print(f"VALIDATING TABLE: {table_name}")
     print("=" * 70)
 
     unique_count = len(set(open_times))
@@ -222,21 +207,16 @@ def validate_open_time(table_name: str, env: str | None = None, max_issues: int 
     print("\n" + "=" * 70 + "\n")
 
 
-def drop_table(table_name: str, env: str | None = None) -> None:
-    db_path = resolve_db_path(env)
+def drop_table(table_name: str) -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         conn.execute(f"DROP TABLE IF EXISTS {table_name}")
         conn.commit()
-    print(f"Dropped table '{table_name}' (env={env or 'active'})")
+    print(f"Dropped table '{table_name}'")
 
 
-def rename_column(env: str, table_name: str, old_col: str, new_col: str) -> None:
-    db_cfg   = utils.load_db_config()["database"]
-    db_paths = db_cfg.get("db_paths", {})
-    db_path  = db_paths.get(env)
-    if not db_path:
-        raise ValueError(f"Unknown env: {env}")
-
+def rename_column(table_name: str, old_col: str, new_col: str) -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
         if table_name not in tables:
@@ -249,16 +229,11 @@ def rename_column(env: str, table_name: str, old_col: str, new_col: str) -> None
         conn.execute(f"ALTER TABLE {table_name} RENAME COLUMN {old_col} TO {new_col}")
         conn.commit()
 
-    print(f"[{env}] Renamed {table_name}.{old_col} -> {new_col}")
+    print(f"Renamed {table_name}.{old_col} -> {new_col}")
 
 
-def add_column(env: str, table_name: str, column_name: str, column_type: str) -> None:
-    db_cfg   = utils.load_db_config()["database"]
-    db_paths = db_cfg.get("db_paths", {})
-    db_path  = db_paths.get(env)
-    if not db_path:
-        raise ValueError(f"Unknown env: {env}")
-
+def add_column(table_name: str, column_name: str, column_type: str) -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
         if table_name not in tables:
@@ -269,24 +244,24 @@ def add_column(env: str, table_name: str, column_name: str, column_type: str) ->
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
         conn.commit()
 
-    print(f"[{env}] Added {table_name}.{column_name} ({column_type})")
+    print(f"Added {table_name}.{column_name} ({column_type})")
 
 
-def pragma_table_info(table_name: str, env: str | None = None) -> pd.DataFrame:
-    db_path = resolve_db_path(env)
+def pragma_table_info(table_name: str) -> pd.DataFrame:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         return pd.read_sql_query(f"PRAGMA table_info({table_name})", conn)
 
 
-def sqlite_integrity_check(env: str | None = None) -> str:
-    db_path = resolve_db_path(env)
+def sqlite_integrity_check() -> str:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         result = conn.execute("PRAGMA integrity_check").fetchone()
     return result[0] if result else "unknown"
 
 
-def vacuum(env: str | None = None) -> None:
-    db_path = resolve_db_path(env)
+def vacuum() -> None:
+    db_path = resolve_db_path()
     with sqlite3.connect(db_path) as conn:
         conn.execute("VACUUM")
         conn.commit()

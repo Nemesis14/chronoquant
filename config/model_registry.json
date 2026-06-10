@@ -9,303 +9,60 @@
         "target_column_pattern": "trg_<direction>_fw<horizon>_q<target_quantile>"
     },
     "models": {
-        "logit_l_fw240_q90_pval_v1": {
-            "display_name": "Long q90 p-value logistic baseline",
-            "description": "Statsmodels logistic regression for the top-decile forward 240 minute target, with iterative p-value feature filtering.",
-            "artifact_dir": "models/logit_l_fw240_q90_pval_v1",
-            "prediction_column": "logit_l_fw240_q90_pval_v1_p",
-            "metrics_path": "models/logit_l_fw240_q90_pval_v1/metrics.json",
+        "lgbm_solusdt_l_fw60_q90_local_v3": {
+            "display_name": "SOL Long q90 LightGBM local v3 (active)",
+            "description": "Active LightGBM long model for SOLUSDT fw60 target. Champion from Colab search.",
+            "artifact_dir": "models/lgbm_solusdt_l_fw60_q90_local_v3",
+            "prediction_column": "lgbm_solusdt_l_fw60_q90_local_v3_p",
+            "metrics_path": "models/lgbm_solusdt_l_fw60_q90_local_v3/metrics.json",
+            "asset_id": "solusdt_fw60",
             "target": {
                 "direction": "long",
-                "horizon_minutes": 240,
+                "horizon_minutes": 60,
                 "quantile": 0.9,
-                "column": "trg_l_fw240_q90"
+                "column": "trg_l_fw60_q90"
             },
             "model": {
-                "family": "logit",
-                "implementation": "statsmodels",
-                "trainer": "statsmodels_pvalue_logreg",
-                "variant": "pval_v1",
-                "regularization": "iterative p-value feature filtering"
+                "family": "lgbm",
+                "implementation": "lightgbm",
+                "trainer": "lightgbm_binary",
+                "variant": "local_v3"
             },
             "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "pvalue_rounds",
-                "fixed_regularization": {
-                    "p_threshold": 0.01
-                }
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev"
             },
             "status": {
                 "active": true,
-                "role": "baseline"
+                "role": "production"
             }
         },
-        "logit_s_fw240_q10_pval_v1": {
-            "display_name": "Short q10 p-value logistic baseline",
-            "description": "Statsmodels logistic regression for the bottom-decile forward 240 minute target, with iterative p-value feature filtering.",
-            "artifact_dir": "models/logit_s_fw240_q10_pval_v1",
-            "prediction_column": "logit_s_fw240_q10_pval_v1_p",
-            "metrics_path": "models/logit_s_fw240_q10_pval_v1/metrics.json",
+        "lgbm_solusdt_s_fw60_q10_local_v3": {
+            "display_name": "SOL Short q10 LightGBM local v3 (active)",
+            "description": "Active LightGBM short model for SOLUSDT fw60 target. Champion from Colab search.",
+            "artifact_dir": "models/lgbm_solusdt_s_fw60_q10_local_v3",
+            "prediction_column": "lgbm_solusdt_s_fw60_q10_local_v3_p",
+            "metrics_path": "models/lgbm_solusdt_s_fw60_q10_local_v3/metrics.json",
+            "asset_id": "solusdt_fw60",
             "target": {
                 "direction": "short",
-                "horizon_minutes": 240,
+                "horizon_minutes": 60,
                 "quantile": 0.1,
-                "column": "trg_s_fw240_q10"
+                "column": "trg_s_fw60_q10"
             },
             "model": {
-                "family": "logit",
-                "implementation": "statsmodels",
-                "trainer": "statsmodels_pvalue_logreg",
-                "variant": "pval_v1",
-                "regularization": "iterative p-value feature filtering"
+                "family": "lgbm",
+                "implementation": "lightgbm",
+                "trainer": "lightgbm_binary",
+                "variant": "local_v3"
             },
             "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "pvalue_rounds",
-                "fixed_regularization": {
-                    "p_threshold": 0.01
-                }
+                "sample_id": "base_solusdt_fw60_dev",
+                "sample_dir": "samples/base_solusdt_fw60_dev"
             },
             "status": {
                 "active": true,
-                "role": "baseline"
-            }
-        },
-        "logit_l_fw240_q90_l1_v1": {
-            "display_name": "Long q90 L1 logistic candidate",
-            "description": "Sklearn logistic regression for the top-decile forward 240 minute target, with L1 feature selection.",
-            "artifact_dir": "models/logit_l_fw240_q90_l1_v1",
-            "prediction_column": "logit_l_fw240_q90_l1_v1_p",
-            "metrics_path": "models/logit_l_fw240_q90_l1_v1/metrics.json",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 240,
-                "quantile": 0.9,
-                "column": "trg_l_fw240_q90"
-            },
-            "model": {
-                "family": "logit",
-                "implementation": "sklearn",
-                "trainer": "sklearn_lasso_logreg",
-                "variant": "l1_v1",
-                "regularization": "L1 logistic regression"
-            },
-            "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "alpha"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "logit_s_fw240_q10_l1_v1": {
-            "display_name": "Short q10 L1 logistic candidate",
-            "description": "Sklearn logistic regression for the bottom-decile forward 240 minute target, with L1 feature selection.",
-            "artifact_dir": "models/logit_s_fw240_q10_l1_v1",
-            "prediction_column": "logit_s_fw240_q10_l1_v1_p",
-            "metrics_path": "models/logit_s_fw240_q10_l1_v1/metrics.json",
-            "target": {
-                "direction": "short",
-                "horizon_minutes": 240,
-                "quantile": 0.1,
-                "column": "trg_s_fw240_q10"
-            },
-            "model": {
-                "family": "logit",
-                "implementation": "sklearn",
-                "trainer": "sklearn_lasso_logreg",
-                "variant": "l1_v1",
-                "regularization": "L1 logistic regression"
-            },
-            "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "alpha"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "lgbm_l_fw240_q90_stable_v1": {
-            "display_name": "Long q90 LightGBM stable candidate",
-            "description": "LightGBM binary classifier for the top-decile forward 240 minute target, with conservative fixed regularization and num_leaves tuning.",
-            "artifact_dir": "models/lgbm_l_fw240_q90_stable_v1",
-            "prediction_column": "lgbm_l_fw240_q90_stable_v1_p",
-            "metrics_path": "models/lgbm_l_fw240_q90_stable_v1/metrics.json",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 240,
-                "quantile": 0.9,
-                "column": "trg_l_fw240_q90"
-            },
-            "model": {
-                "family": "lgbm",
-                "implementation": "lightgbm",
-                "trainer": "lightgbm_binary",
-                "variant": "stable_v1",
-                "regularization": "fixed stable parameter profile plus num_leaves tuning"
-            },
-            "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "num_leaves",
-                "param_profile": "lightgbm_binary_stable_v1"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "lgbm_s_fw240_q10_stable_v1": {
-            "display_name": "Short q10 LightGBM stable candidate",
-            "description": "LightGBM binary classifier for the bottom-decile forward 240 minute target, with conservative fixed regularization and num_leaves tuning.",
-            "artifact_dir": "models/lgbm_s_fw240_q10_stable_v1",
-            "prediction_column": "lgbm_s_fw240_q10_stable_v1_p",
-            "metrics_path": "models/lgbm_s_fw240_q10_stable_v1/metrics.json",
-            "target": {
-                "direction": "short",
-                "horizon_minutes": 240,
-                "quantile": 0.1,
-                "column": "trg_s_fw240_q10"
-            },
-            "model": {
-                "family": "lgbm",
-                "implementation": "lightgbm",
-                "trainer": "lightgbm_binary",
-                "variant": "stable_v1",
-                "regularization": "fixed stable parameter profile plus num_leaves tuning"
-            },
-            "training": {
-                "sample_id": "base_fw240_dev",
-                "sample_dir": "samples/base_fw240_dev",
-                "primary_tuning_parameter": "num_leaves",
-                "param_profile": "lightgbm_binary_stable_v1"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "xgb_l_fw240_q90_v1": {
-            "display_name": "Long q90 XGBoost placeholder",
-            "description": "Reserved model id for a future XGBoost binary classifier on the top-decile forward 240 minute target.",
-            "artifact_dir": "models/xgb_l_fw240_q90_v1",
-            "prediction_column": "xgb_l_fw240_q90_v1_p",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 240,
-                "quantile": 0.9,
-                "column": "trg_l_fw240_q90"
-            },
-            "model": {
-                "family": "xgb",
-                "implementation": "xgboost",
-                "trainer": "xgboost",
-                "variant": "v1",
-                "regularization": "not defined yet"
-            },
-            "status": {
-                "active": false,
-                "role": "placeholder"
-            }
-        },
-        "logit_solusdt_l_fw60_q90_pval_v1": {
-            "display_name": "SOL Long q90 p-value logistic baseline",
-            "description": "Statsmodels logistic regression for SOLUSDT top-decile forward 60 minute target, with iterative p-value feature filtering.",
-            "artifact_dir": "models/logit_solusdt_l_fw60_q90_pval_v1",
-            "prediction_column": "logit_solusdt_l_fw60_q90_pval_v1_p",
-            "metrics_path": "models/logit_solusdt_l_fw60_q90_pval_v1/metrics.json",
-            "asset_id": "solusdt_fw60",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 60,
-                "quantile": 0.9,
-                "column": "trg_l_fw60_q90"
-            },
-            "model": {
-                "family": "logit",
-                "implementation": "statsmodels",
-                "trainer": "statsmodels_pvalue_logreg",
-                "variant": "pval_v1",
-                "regularization": "iterative p-value feature filtering"
-            },
-            "training": {
-                "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev",
-                "primary_tuning_parameter": "pvalue_rounds",
-                "fixed_regularization": {
-                    "p_threshold": 0.01
-                }
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "logit_solusdt_l_fw60_q90_l1_v1": {
-            "display_name": "SOL Long q90 L1 logistic candidate",
-            "description": "Sklearn logistic regression for SOLUSDT top-decile forward 60 minute target, with L1 feature selection.",
-            "artifact_dir": "models/logit_solusdt_l_fw60_q90_l1_v1",
-            "prediction_column": "logit_solusdt_l_fw60_q90_l1_v1_p",
-            "metrics_path": "models/logit_solusdt_l_fw60_q90_l1_v1/metrics.json",
-            "asset_id": "solusdt_fw60",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 60,
-                "quantile": 0.9,
-                "column": "trg_l_fw60_q90"
-            },
-            "model": {
-                "family": "logit",
-                "implementation": "sklearn",
-                "trainer": "sklearn_lasso_logreg",
-                "variant": "l1_v1",
-                "regularization": "L1 logistic regression"
-            },
-            "training": {
-                "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev",
-                "primary_tuning_parameter": "alpha"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
-            }
-        },
-        "lgbm_solusdt_l_fw60_q90_stable_v1": {
-            "display_name": "SOL Long q90 LightGBM stable candidate",
-            "description": "LightGBM binary classifier for SOLUSDT top-decile forward 60 minute target, with conservative fixed regularization and num_leaves tuning.",
-            "artifact_dir": "models/lgbm_solusdt_l_fw60_q90_stable_v1",
-            "prediction_column": "lgbm_solusdt_l_fw60_q90_stable_v1_p",
-            "metrics_path": "models/lgbm_solusdt_l_fw60_q90_stable_v1/metrics.json",
-            "asset_id": "solusdt_fw60",
-            "target": {
-                "direction": "long",
-                "horizon_minutes": 60,
-                "quantile": 0.9,
-                "column": "trg_l_fw60_q90"
-            },
-            "model": {
-                "family": "lgbm",
-                "implementation": "lightgbm",
-                "trainer": "lightgbm_binary",
-                "variant": "stable_v1",
-                "regularization": "fixed stable parameter profile plus num_leaves tuning"
-            },
-            "training": {
-                "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev",
-                "primary_tuning_parameter": "num_leaves",
-                "param_profile": "lightgbm_binary_stable_v1"
-            },
-            "status": {
-                "active": false,
-                "role": "candidate"
+                "role": "production"
             }
         }
     }

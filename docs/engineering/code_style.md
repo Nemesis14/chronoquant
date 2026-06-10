@@ -196,7 +196,7 @@ features_path      = os.path.join(resolved_model_dir, feat_file)
 - **snake_case** for all variables and functions
 - **Prefix config dicts** with domain: `db_cfg`, `feat_cfg`, `model_cfg`, `env_cfg`
 - **Prefix features** with `feat_`: `feat_rsi_14`, `feat_roc_140`, `feat_sma_ratio_14`
-- **Prefix targets** with `trg_`: `trg_l_fw240_q90`, `trg_s_fw240_q10`
+- **Prefix targets** with `trg_`: `trg_l_fw60_q90`, `trg_s_fw60_q10`
 
 **Examples:**
 ```python

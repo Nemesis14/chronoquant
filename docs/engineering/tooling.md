@@ -97,9 +97,20 @@ Local SQLite  →  export_sample_parquet.py  →  samples/<id>/dataset.parquet
 | `F:\My Drive\chronoquant\samples\` | `/content/drive/My Drive/chronoquant/samples/` |
 | `F:\My Drive\chronoquant\models\` | `/content/drive/My Drive/chronoquant/models/` |
 
+### Local Preparation Script
+
+Before running any Colab notebook, export the sample data locally:
+
+```bash
+python scripts/export_sample_parquet.py --sample-id <sample_id> --copy-to-drive
+```
+
+This writes `samples/<sample_id>/dataset.parquet` and copies it to
+`F:\My Drive\chronoquant\samples\<sample_id>\dataset.parquet`.
+
 ### Notebooks
 
 | Notebook | Purpose |
 |---|---|
 | `notebooks/colab_hello.ipynb` | Workflow connectivity test |
-| `notebooks/colab_training.ipynb` | LightGBM hyperparameter search _(planned)_ |
+| `notebooks/colab_training.ipynb` | LightGBM hyperparameter search (smoke + explore, long + short) |

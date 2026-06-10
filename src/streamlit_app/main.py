@@ -94,7 +94,7 @@ def _render_sync_controls(asset_id: str | None) -> None:
     state   = ensure_sync_state(st.session_state, asset_id)
     running = is_sync_running(state, asset_id)
     logger  = get_dashboard_logger()
-    btn_key = asset_id or "bch"
+    btn_key = asset_id or "sol"
 
     if state.get("auto_sync_enabled") and not running and auto_sync_due_seconds(state, asset_id) == 0:
         if start_sync(state, asset_id):
@@ -871,7 +871,7 @@ with st.sidebar:
 
 
 # =============================================================================
-# Main body - 80/20 layout
+# Main body - 75/25 layout
 # =============================================================================
 
 active_asset_id = "solusdt_fw60"
@@ -885,7 +885,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-col_chart, col_trade = st.columns([4, 1])
+col_chart, col_trade = st.columns([3, 1])
 
 with col_chart:
     render_asset_chart(active_asset_id)

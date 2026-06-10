@@ -10,9 +10,9 @@ artifacts, and model comparison.
 - `docs/architecture/overview.md`
 - `docs/engineering/code_style.md`
 - `docs/engineering/commands.md`
-- `docs/engineering/sampling.md`
-- `docs/engineering/lgbm_model_development.md`
-- `docs/plans/active/modeling_plan.md`
+- `docs/modeling/guide.md`
+- `docs/modeling/sampling.md`
+- `docs/modeling/lightgbm_development.md`
 
 ## Primary Scope
 

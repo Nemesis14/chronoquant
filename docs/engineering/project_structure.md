@@ -16,7 +16,8 @@
 - `src/modeling/`: dataset loading, sampling, trainers, metrics, artifacts, reports.
 - `src/evaluation/`: cutoff analysis and backtesting.
 - `src/streamlit_app/`: dashboard app, sync runner, data reads, chart components.
-- `src/elliott_waves/`: Elliott Wave detection system (M1–M7).
+- `src/trading/`: live/paper trading service, strategy decisions, state, exchange adapter, journal.
+- `src/elliott_waves/`: Elliott Wave detection system (M1-M7).
   - `elliott/config.py`, `elliott/data.py`: ElliottConfig, Pivot, PatternCandidate.
   - `elliott/pivots/`: ZigZag, Fractal, multi-degree pivot motors.
   - `elliott/indicators/`: ATR-14, EMA slope, range expansion, volume.
@@ -40,20 +41,25 @@ files directly.
 - `models/`: trained model artifacts under `models/<model_id>/`.
 - `samples/`: persisted modeling sample and fold definitions.
 - `backtests/`: backtest outputs.
+- `trading_reports/`: exported runtime trading reports.
 - `logs/`: runtime logs.
 
 ## Documentation
 
-- `docs/engineering/`: code style, commands, tooling, testing, workflow, structure.
-  - `workflow.md`: high-level engineering flow.
-  - `sampling.md`: data range, sample, split, and holdout rules.
-  - `lgbm_model_development.md`: LightGBM-specific model workflow.
-  - `strategy_evaluation.md`: trigger sweep, backtest, and strategy evaluation rules.
+- `docs/README.md`: documentation entry point and folder map.
+- `docs/business/`: business problem, trading strategy, risk assumptions, glossary.
+- `docs/concepts/`: target, feature, and market-pattern concepts.
+- `docs/data/`: databases, schemas, dictionaries, lineage, quality checks, datasets.
 - `docs/architecture/`: stable architecture documentation.
+- `docs/architecture/components/`: component-level architecture notes.
+- `docs/modeling/`: model workflow, sampling, validation, LightGBM guide, model cards.
+- `docs/evaluation/`: strategy evaluation, backtest engine, decision reports.
+- `docs/engineering/`: code style, commands, tooling, testing, workflow, structure, runbooks.
+- `docs/reference/`: config, artifact, and script reference.
 - `docs/plans/active/`: currently active implementation plans.
 - `docs/plans/completed/`: completed plans.
 - `docs/plans/backlog/`: future work.
-- `docs/elliott_waves/`: Elliott Wave research — specs, pivot definitions, example charts.
+- `docs/concepts/elliott_waves/`: Elliott Wave research, specs, studies, and examples.
 
 ## Agent Definitions
 

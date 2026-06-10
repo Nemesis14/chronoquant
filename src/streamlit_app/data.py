@@ -32,7 +32,6 @@ def load_dashboard_config(asset_id: str | None = None) -> dict:
     model_id = utils.live_model_id(model_cfg=models_cfg, asset_id=asset_id)
 
     return {
-        "active_env":       db_cfg.get("active_env"),
         "asset_id":         db_cfg.get("asset_id"),
         "db_path":          db_cfg.get("db_path"),
         "symbol":           db_cfg.get("symbol"),
@@ -331,7 +330,7 @@ def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame
         """
         return _read_sql(query, params=(int(limit),), asset_id=asset_id)
 
-    path = _repo_path("backtests/lasso_long_fw240_q90_managed_v1/trades.csv")
+    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/trades.csv")
     if not path.exists():
         return pd.DataFrame()
     df = pd.read_csv(path)
@@ -356,7 +355,7 @@ def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
         """
         return _read_sql(query, asset_id=asset_id)
 
-    path = _repo_path("backtests/lasso_long_fw240_q90_managed_v1/equity_curve.csv")
+    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/equity_curve.csv")
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path)
@@ -369,7 +368,7 @@ def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
 #  - Return the managed strategy summary before live trading tables exist
 # =============================================================================
 def backtest_summary(asset_id: str | None = None) -> dict:
-    path = _repo_path("backtests/lasso_long_fw240_q90_managed_v1/summary.json")
+    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/summary.json")
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))

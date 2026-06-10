@@ -55,20 +55,14 @@ def _load_json(path: str) -> dict:
         return json.load(f)
 
 def load_db_config() -> dict:
-    cfg        = _load_json("db.json")
-    db_cfg     = cfg.get("database", {})
-    db_paths   = db_cfg.get("db_paths", {})
-    active_env = db_cfg.get("active_env")
-    if active_env in db_paths:
-        db_cfg["db_path"] = db_paths[active_env]
-    return cfg
+    return _load_json("db.json")
 
 def load_assets_config() -> dict:
     return _load_json("assets.json")
 
 def default_asset_id(assets_cfg: dict | None = None) -> str:
     assets_cfg = assets_cfg or load_assets_config()
-    return assets_cfg.get("default_asset_id", "bchusdt_fw240")
+    return assets_cfg.get("default_asset_id", "solusdt_fw60")
 
 def resolve_asset_id(asset_id: str | None = None) -> str:
     return asset_id or default_asset_id()
@@ -77,8 +71,8 @@ def load_asset_config(asset_id: str | None = None) -> dict:
     if asset_id is None:
         cfg = load_db_config()
         db_cfg = cfg.get("database", {})
-        db_cfg.setdefault("asset_id", "bchusdt_fw240")
-        db_cfg.setdefault("features_profile", "bchusdt_fw240")
+        db_cfg.setdefault("asset_id", "solusdt_fw60")
+        db_cfg.setdefault("features_profile", "solusdt_fw60")
         return cfg
 
     assets_cfg = load_assets_config()
@@ -86,20 +80,15 @@ def load_asset_config(asset_id: str | None = None) -> dict:
     if asset_id not in assets:
         raise ValueError(f"Asset not found in config/assets.json: {asset_id}")
 
-    base_db_cfg = load_db_config().get("database", {})
-    active_env = base_db_cfg.get("active_env", "dev")
     asset_cfg = assets[asset_id]
-    db_paths = asset_cfg.get("db_paths", {})
-    db_path = db_paths.get(active_env, asset_cfg.get("db_path"))
+    db_path = asset_cfg.get("db_path")
     if not db_path:
-        raise ValueError(f"No database path configured for asset {asset_id} env {active_env}")
+        raise ValueError(f"No database path configured for asset {asset_id}")
 
     return {
         "database": {
-            "active_env": active_env,
             "asset_id": asset_id,
             "db_path": db_path,
-            "db_paths": dict(db_paths),
             "symbol": asset_cfg.get("symbol"),
             "interval": asset_cfg.get("interval", "1m"),
             "market": asset_cfg.get("market", "spot"),

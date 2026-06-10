@@ -27,15 +27,13 @@ python scripts/rebuild_derived_tables.py --features-only --asset-id solusdt_fw60
 ## Modeling
 
 ```bash
-python scripts/create_sample_splits.py --sample-id base_fw240_dev
-python scripts/create_sample_splits.py --sample-id base_solusdt_fw60_dev --asset-id solusdt_fw60 --target-horizon-minutes 60
-python scripts/train_model.py --model-id logit_l_fw240_q90_pval_v1
+python scripts/create_sample_splits.py --sample-id base_solusdt_fw60_futures_v1 --asset-id solusdt_fw60 --target-horizon-minutes 60
 ```
 
 ## Backtesting
 
 ```bash
-python scripts/backtest_strategy.py lasso_long_fw240_q90_managed_v1
+python scripts/backtest_strategy.py solusdt_long_fw60_q90_local_v3
 ```
 
 ## LightGBM Distribution Search
@@ -68,7 +66,7 @@ python scripts/sweep_strategy.py \
 python scripts/plot_elliott.py --tf 5m --pattern 1212 --top 3
 
 # Impulse scan — 15m, top 5, mentés PNG-be
-python scripts/plot_elliott.py --tf 15m --pattern IMPULSE --top 5 --out docs/elliott_waves/latest_impulse.png
+python scripts/plot_elliott.py --tf 15m --pattern IMPULSE --top 5 --out docs/concepts/elliott_waves/latest_impulse.png
 
 # Wave3 scan — 1m, bearish
 python scripts/plot_elliott.py --tf 1m --pattern WAVE3 --direction -1
@@ -80,7 +78,17 @@ python scripts/backtest_elliott.py --tfs 5m,15m --mode walkforward
 python scripts/backtest_elliott.py --tfs 1m,5m --mode sweep --out results/elliott_sweep.csv
 ```
 
-## Model Promotion (lasd docs/engineering/lgbm_model_development.md)
+## Parquet Export (Colab előkészítés)
+
+```bash
+# Parquet export a sample feature táblájából
+python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_futures_v1
+
+# Export + közvetlen másolás Google Drive-ra (F:\My Drive\chronoquant\samples\)
+python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_futures_v1 --copy-to-drive
+```
+
+## Model Promotion (lasd docs/modeling/lightgbm_development.md)
 
 ```bash
 # 1. Final fit manualis script (lasd doksit)

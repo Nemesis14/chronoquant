@@ -7,8 +7,8 @@
 #  - Save feat_*, trg_*, close, and open_time columns to Parquet
 #  - Optionally copy the Parquet to Google Drive for Colab access
 # Usage:
-#   python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_dev
-#   python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_dev --copy-to-drive
+#   python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_futures_v1
+#   python scripts/export_sample_parquet.py --sample-id base_solusdt_fw60_futures_v1 --copy-to-drive
 # =============================================================================
 
 import argparse

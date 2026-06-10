@@ -1,16 +1,12 @@
 {
     "database": {
-        "active_env": "dev",
-        "db_paths": {
-            "dev": "D:/repos/chronoquant/database/bchusdt_data_dev.db",
-            "prod": "D:/repos/chronoquant/database/bchusdt_data_prod.db"
-        },
-        "symbol": "BCHUSDT",
+        "db_path": "D:/repos/chronoquant/database/solusdt_data_dev.db",
+        "symbol": "SOLUSDT",
         "interval": "1m",
         "tables": {
-            "ohlcv": "bchusdt_1m",
-            "features": "bchusdt_1m_features",
-            "predictions": "bchusdt_1m_predictions"
+            "ohlcv": "solusdt_1m",
+            "features": "solusdt_1m_features",
+            "predictions": "solusdt_1m_predictions"
         }
     }
 }

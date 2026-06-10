@@ -4,6 +4,7 @@ This is the shared entry point for coding agents working in this repository.
 
 ## Session Startup Reading
 
+- `board.md`
 - `docs/engineering/code_style.md`
 - `docs/engineering/commands.md`
 - `docs/engineering/tooling.md`
@@ -25,6 +26,18 @@ Use the matching role file from `agents/` when the task clearly fits a role:
 Role files define task concepts, scope boundaries, and implementation rules.
 Before doing role-specific work, read the relevant role file and the docs listed
 in that role file's "Must Read" section.
+
+## Board and Backlog Management
+
+When a task is finished, always do both of these steps before closing the session:
+
+1. **Remove the task row from `board.md`.** Only active tasks belong there.
+2. **Move the backlog plan file** (if one exists) from `docs/plans/backlog/` to
+   `docs/plans/completed/`. If the task had no linked backlog file, skip this
+   step.
+
+Do not mark tasks as "done" or add status columns — delete the row. The board
+is a live list of open work, not a history log.
 
 ## Core Project Rules
 

@@ -13,7 +13,7 @@ import pickle
 import pandas as pd
 
 import utils
-from db.table_ops import ensure_table_columns, sqlite_connect
+from db.table_ops import ensure_table_columns, sqlite_connect, table_exists
 
 
 def sync_predictions(
@@ -167,14 +167,18 @@ def _write_predictions(
 ) -> tuple[int, int]:
     min_time = df["open_time"].min()
     max_time = df["open_time"].max()
-    with sqlite_connect(db_path) as conn:
-        existing = pd.read_sql_query(
-            f'SELECT open_time FROM "{table_name}" WHERE open_time BETWEEN ? AND ?',
-            conn,
-            params=(min_time, max_time),
-        )
 
-    existing_times = set(existing["open_time"].astype(str))
+    if table_exists(db_path, table_name):
+        with sqlite_connect(db_path) as conn:
+            existing = pd.read_sql_query(
+                f'SELECT open_time FROM "{table_name}" WHERE open_time BETWEEN ? AND ?',
+                conn,
+                params=(min_time, max_time),
+            )
+        existing_times = set(existing["open_time"].astype(str))
+    else:
+        existing_times = set()
+
     mask = df["open_time"].astype(str).isin(existing_times)
     df_new = df[~mask]
     df_update = df[mask]

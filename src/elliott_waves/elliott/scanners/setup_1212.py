@@ -15,7 +15,6 @@ from __future__ import annotations
 import pandas as pd
 
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import Pivot
 from elliott_waves.elliott.indicators.atr import atr14
 from elliott_waves.elliott.pivots.zigzag import detect_zigzag
 

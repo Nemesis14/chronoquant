@@ -9,9 +9,6 @@
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import numpy as np
 import pandas as pd
 
 from elliott_waves.elliott.data import PatternCandidate
@@ -40,7 +37,7 @@ class MultiWavePlot:
         candidates: list[PatternCandidate],
         df:         pd.DataFrame,
         top_n:      int = 5,
-    ) -> "MultiWavePlot":
+    ) -> MultiWavePlot:
         """
         Draw top_n candidates (by score) with score-based color coding.
         Strongest candidate (highest score) drawn last to appear on top.

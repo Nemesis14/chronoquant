@@ -61,33 +61,33 @@ class DiagonalValidator(PatternValidator):
         # -------------------------------------------------------------------------
         # Hard rule: Wave 2 cannot fully retrace Wave 1
         # -------------------------------------------------------------------------
-        if P2 <= P0 + eps:
+        if P0 + eps >= P2:
             return ValidationResult.fail("Wave 2 fully retraced Wave 1 in diagonal")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 3 must exceed Wave 1 end
         # -------------------------------------------------------------------------
-        if P3 <= P1 + eps:
+        if P1 + eps >= P3:
             return ValidationResult.fail("Wave 3 did not exceed Wave 1 end in diagonal")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 4 cannot fully retrace Wave 3
         # -------------------------------------------------------------------------
-        if P4 <= P2 + eps:
+        if P2 + eps >= P4:
             return ValidationResult.fail("Wave 4 fully retraced Wave 3 in diagonal")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 3 not shortest
         # -------------------------------------------------------------------------
         tol = cfg.shortest_tol
-        if W3 < W1 * (1.0 - tol) and W3 < W5 * (1.0 - tol):
+        if W1 * (1.0 - tol) > W3 and W5 * (1.0 - tol) > W3:
             return ValidationResult.fail("Wave 3 is shortest in diagonal")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 4 overlaps Wave 1 territory (required for ending diagonal)
         # Ending diagonal requires P4 <= P1 + overlap_eps
         # -------------------------------------------------------------------------
-        has_overlap = P4 <= P1 + ov_eps
+        has_overlap = P1 + ov_eps >= P4
         if self.diagonal_type == "ENDING" and not has_overlap:
             return ValidationResult.fail("Ending diagonal requires Wave 4 overlap with Wave 1")
 

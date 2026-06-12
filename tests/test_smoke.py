@@ -15,9 +15,10 @@ sys.path.insert(0, str(SRC))
 
 
 def test_core_imports() -> None:
+    from db.maintenance import rebuild_derived_tables
+
     from data_pipeline.sync_features import sync_features
     from data_pipeline.sync_predictions import sync_predictions
-    from db.maintenance import rebuild_derived_tables
     from streamlit_app.data import latest_prediction
 
     assert sync_features is not None

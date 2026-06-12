@@ -11,9 +11,7 @@
 from __future__ import annotations
 
 import json
-import os
 import pickle
-import sqlite3
 import sys
 from itertools import product
 from pathlib import Path
@@ -24,10 +22,10 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 import lightgbm as lgb
-import utils
-from modeling.datasets import load_modeling_dataset
+
 from data_pipeline.sync_predictions import sync_predictions
 from evaluation.backtest import build_backtest_frame, simulate_long_probability_strategy
+from modeling.datasets import load_modeling_dataset
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODEL_ID   = "lgbm_solusdt_l_fw60_q90_local_v2"
@@ -202,7 +200,7 @@ def step5_strategy_sweep() -> dict:
         }
         try:
             _, _, summary = simulate_long_probability_strategy(frame, cfg)
-        except Exception as e:
+        except Exception:
             continue
 
         if summary.get("trade_count", 0) < 15:
@@ -335,4 +333,4 @@ if __name__ == "__main__":
     print("PROMOTION COMPLETE")
     print("="*60)
     print(f"  Champion: {MODEL_ID}")
-    print(f"  Restart the Streamlit app to pick up the new model.")
+    print("  Restart the Streamlit app to pick up the new model.")

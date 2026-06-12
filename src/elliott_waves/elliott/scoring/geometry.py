@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from elliott_waves.elliott.data import Pivot, PivotKind
+from elliott_waves.elliott.data import Pivot
 
 
 def _line_y_at(p1: Pivot, p2: Pivot, direction: int, target_idx: int) -> float:

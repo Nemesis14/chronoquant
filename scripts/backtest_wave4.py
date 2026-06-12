@@ -14,16 +14,17 @@
 #  - Window  = --window bars forward from P4.confirmed_idx
 # =============================================================================
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd
+
 import utils
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import load_ohlcv, resample_ohlcv, PatternCandidate, PivotKind
+from elliott_waves.elliott.data import PatternCandidate, PivotKind, load_ohlcv, resample_ohlcv
 from elliott_waves.elliott.pivots.zigzag import detect_zigzag
 
 _TF_FREQ = {
@@ -266,7 +267,7 @@ def _run(asset_id: str, tf: str, window: int) -> None:
 
         df_ = df_.copy()
         df_["year"] = pd.to_datetime(df_["confirmed_time"]).dt.year
-        print(f"    By year:")
+        print("    By year:")
         for year, grp in df_.groupby("year"):
             yr_total  = len(grp)
             yr_target = grp["hit_target"].sum()

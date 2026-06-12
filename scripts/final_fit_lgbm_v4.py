@@ -100,7 +100,7 @@ def fit_model(model_id: str, target_col: str, asset_id: str, row_stride: int) ->
     gain = model.booster_.feature_importance(importance_type="gain")
     top25 = sorted(zip(features, gain), key=lambda x: -x[1])[:25]
     zero_gain = sum(1 for _, g in zip(features, gain) if g == 0)
-    print(f"\nTop 25 features by gain:")
+    print("\nTop 25 features by gain:")
     for feat, value in top25:
         print(f"  {feat:<50} {value:>12.1f}")
     print(f"\n  Zero-gain features: {zero_gain} / {len(features)}")

@@ -1,14 +1,19 @@
 """One-shot script: sync predictions for lgbm_solusdt_s_fw60_q10_local_v3 in chunks."""
 import os
+
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
-import sys, json, pickle
+import json
+import pickle
+import sys
+
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1] / 'src'))
 
 import pandas as pd
-import utils
 from db.table_ops import ensure_table_columns, sqlite_connect
+
+import utils
 from data_pipeline.sync_predictions import _feature_list_for_prediction, _write_predictions
 
 MODEL_ID   = 'lgbm_solusdt_s_fw60_q10_local_v3'

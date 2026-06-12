@@ -56,7 +56,7 @@ class ElliottConfig:
     wave3_buffer_atr: float = 0.10   # ATR multiplier for P1 + buffer trigger
 
     @classmethod
-    def for_timeframe(cls, tf: str) -> "ElliottConfig":
+    def for_timeframe(cls, tf: str) -> ElliottConfig:
         """Calibrated preset per timeframe."""
         presets: dict[str, dict] = {
             "1m":  dict(timeframe="1m",  candle_seconds=60,   zigzag_threshold=0.005, fractal_left=2, fractal_right=2),

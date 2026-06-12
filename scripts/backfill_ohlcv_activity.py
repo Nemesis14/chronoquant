@@ -19,9 +19,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd
 from binance.client import Client
+from db.table_ops import sqlite_connect
 
 import utils
-from db.table_ops import ensure_table_columns, sqlite_connect
 
 
 # =============================================================================
@@ -118,7 +118,7 @@ def backfill_ohlcv_activity(asset_id: str | None = None) -> None:
     try:
         binance_keys = env_cfg.get("api", {}).get("binance_keys_path")
         if binance_keys and os.path.exists(binance_keys):
-            with open(binance_keys, "r", encoding="utf-8") as f:
+            with open(binance_keys, encoding="utf-8") as f:
                 keys = json.load(f)
             api_key    = keys.get("api_key") or keys.get("key") or ""
             api_secret = keys.get("api_secret") or keys.get("secret") or ""

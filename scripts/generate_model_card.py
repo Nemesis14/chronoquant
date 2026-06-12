@@ -25,7 +25,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import utils
 from evaluation.backtest import build_backtest_frame, simulate_long_probability_strategy
 
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------

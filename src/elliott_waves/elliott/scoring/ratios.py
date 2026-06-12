@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 
-
 FIB_LEVELS = [0.236, 0.382, 0.500, 0.618, 0.786, 0.854, 1.000, 1.236, 1.382, 1.618, 2.618, 4.236]
 
 

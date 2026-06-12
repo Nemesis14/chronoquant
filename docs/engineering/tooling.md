@@ -2,7 +2,7 @@
 
 ## MCP
 
-The repository-level MCP configuration lives in `.mcp.json`.
+The shared agent MCP reference configuration lives in `.agent/.mcp.json`.
 
 Current configured server:
 
@@ -40,8 +40,9 @@ Permission enforcement is controlled by the active tool/runtime, not only by
 repository docs. If a tool asks for approval, update that tool's runtime settings
 or session launch options.
 
-Claude-specific allow rules live in `.claude/settings.json`.
-Codex-specific local notes can live in `.codex/settings.md`.
+Shared agent allow rules and local runtime references live under `.agent/`.
+Codex receives its active MCP tools from the current session environment; in
+this repo it should use the exposed language-server tools when available.
 
 ## Package Management
 

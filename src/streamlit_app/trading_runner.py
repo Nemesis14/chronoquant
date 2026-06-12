@@ -8,18 +8,16 @@ from __future__ import annotations
 #    so it survives Streamlit rerenders and page refreshes.
 #  - Provide read functions for the UI to display trading status from trading.db.
 # =============================================================================
-
 import logging
 import threading
 import traceback
-from typing import Optional
 
 _logger = logging.getLogger("chronoquant.trading")
 
 # Module-level singleton — survives Streamlit session rerenders
-_service_thread: Optional[threading.Thread] = None
+_service_thread: threading.Thread | None = None
 _service_instance = None  # TradingService instance
-_last_error: Optional[str] = None  # last startup error, shown in UI
+_last_error: str | None = None  # last startup error, shown in UI
 
 
 # =============================================================================
@@ -78,13 +76,13 @@ def is_trading_running() -> bool:
     return _service_thread is not None and _service_thread.is_alive()
 
 
-def get_trading_mode() -> Optional[str]:
+def get_trading_mode() -> str | None:
     if _service_instance is not None:
         return _service_instance.mode
     return None
 
 
-def get_last_error() -> Optional[str]:
+def get_last_error() -> str | None:
     return _last_error
 
 
@@ -92,11 +90,11 @@ def get_last_error() -> Optional[str]:
 # Status reads from trading.db (safe for Streamlit fragments)
 # =============================================================================
 
-def get_trading_status() -> Optional[dict]:
+def get_trading_status() -> dict | None:
     """Read current trading status from trading.db. Returns None if DB missing."""
     try:
         import os
-        import utils
+
         from trading.journal import get_current_run_status, trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
@@ -112,7 +110,9 @@ def get_trading_status() -> Optional[dict]:
 def get_recent_signals(limit: int = 10) -> list[dict]:
     try:
         import os
-        from trading.journal import get_recent_signals as _get, trading_db_path
+
+        from trading.journal import get_recent_signals as _get
+        from trading.journal import trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
             return []
@@ -124,7 +124,9 @@ def get_recent_signals(limit: int = 10) -> list[dict]:
 def get_recent_positions(limit: int = 20) -> list[dict]:
     try:
         import os
-        from trading.journal import get_recent_positions as _get, trading_db_path
+
+        from trading.journal import get_recent_positions as _get
+        from trading.journal import trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
             return []

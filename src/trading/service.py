@@ -6,14 +6,12 @@ import threading
 import time
 import traceback
 import uuid
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import utils
 from trading import journal, strategy
 from trading.exchange import BinanceFuturesClient
-from trading.state import TradingState, FLAT, LONG, SHORT, COOLDOWN
+from trading.state import COOLDOWN, FLAT, TradingState
 
 _logger = logging.getLogger("chronoquant.trading")
 
@@ -54,8 +52,8 @@ class TradingService:
         self.risk_cfg = config.get("risk", {})
         self.journal_cfg = config.get("journal", {})
         self._stop_event = threading.Event()
-        self.state: Optional[TradingState] = None
-        self.run_id: Optional[str] = None
+        self.state: TradingState | None = None
+        self.run_id: str | None = None
 
         # Load strategy configs once
         strategies = utils.load_strategies_config()["strategies"]
@@ -117,7 +115,7 @@ class TradingService:
     def _startup(self) -> None:
         journal.ensure_tables(self.db_path)
 
-        self.run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        self.run_id = f"run_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         journal.insert_run(
             self.db_path, self.run_id, self.mode, self.asset_id,
             self.config["long_strategy_id"], self.config["short_strategy_id"],
@@ -153,7 +151,7 @@ class TradingService:
         bar_open_time, pred_long, pred_short, bar_close = bar
 
         # 3. Evaluate cooldown / rearm transitions before strategy decision
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self._apply_cooldown_rearm(pred_long, pred_short, now)
 
         # 4. Evaluate strategy
@@ -201,7 +199,7 @@ class TradingService:
 
     def _execute(self, decision: str, reason: str, bar_open_time: str,
                  bar_close: float, now: datetime) -> None:
-        from trading.strategy import HOLD, ENTER_LONG, ENTER_SHORT, EXIT_LONG, EXIT_SHORT
+        from trading.strategy import ENTER_LONG, ENTER_SHORT, EXIT_LONG, EXIT_SHORT, HOLD
 
         if decision == HOLD:
             return
@@ -215,10 +213,7 @@ class TradingService:
             elif decision == ENTER_SHORT:
                 self._open_position("SHORT", mark_price, bar_open_time, reason)
 
-            elif decision == EXIT_LONG:
-                self._close_position(mark_price, reason, now)
-
-            elif decision == EXIT_SHORT:
+            elif decision == EXIT_LONG or decision == EXIT_SHORT:
                 self._close_position(mark_price, reason, now)
 
         except Exception as exc:
@@ -259,7 +254,7 @@ class TradingService:
         self.state.status = side
         self.state.position_id = position_id
         self.state.side = side
-        self.state.entry_time = datetime.now(timezone.utc)
+        self.state.entry_time = datetime.now(UTC)
         self.state.entry_price = avg_price
         self.state.quantity = filled_qty
         self.state.armed = False
@@ -316,7 +311,7 @@ class TradingService:
             self.long_cfg.get("cooldown_minutes", 60),
             self.short_cfg.get("cooldown_minutes", 60),
         )
-        self.state.cooldown_until = datetime.now(timezone.utc).replace(
+        self.state.cooldown_until = datetime.now(UTC).replace(
             microsecond=0
         ) + timedelta(minutes=cooldown_min)
         self.state.status = COOLDOWN
@@ -343,7 +338,7 @@ class TradingService:
             _logger.warning("Data sync failed: %s", exc)
             raise
 
-    def _read_latest_bar(self) -> Optional[tuple[str, float, float, float]]:
+    def _read_latest_bar(self) -> tuple[str, float, float, float] | None:
         """
         Read the latest safely closed 1-minute bar's predictions.
         Returns (bar_open_time, pred_long, pred_short, close_price) or None.
@@ -354,7 +349,7 @@ class TradingService:
         table_ohlcv = db_cfg["tables"]["ohlcv"]
 
         # Latest closed bar = at most 1 minute before now
-        cutoff = datetime.now(timezone.utc)
+        cutoff = datetime.now(UTC)
         cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
         try:

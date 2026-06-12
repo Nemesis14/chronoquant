@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections import deque
 import logging
+from collections import deque
 from pathlib import Path
 
 import utils
-
 
 LOGGER_NAME = "chronoquant.streamlit"
 LOG_FILENAME = "streamlit_dashboard.log"

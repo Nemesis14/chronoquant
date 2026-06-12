@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from dataclasses import dataclass
 import io
 import logging
-from datetime import datetime, timedelta, timezone
 import threading
+from contextlib import redirect_stdout
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
+from db.table_ops import sqlite_connect, table_exists
 
 import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_ohlcv import sync_ohlcv
 from data_pipeline.sync_predictions import sync_predictions
-from db.table_ops import sqlite_connect, table_exists
 from streamlit_app.dashboard_logging import get_dashboard_logger
-
 
 INITIAL_SYNC_START = "2017-01-01 00:00:00"
 
@@ -186,9 +185,9 @@ def _utc_str_to_ms(value: str) -> int:
 
     dt = datetime.fromisoformat(text)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     else:
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
     return int(dt.timestamp() * 1000)
 
 

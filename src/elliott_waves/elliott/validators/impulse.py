@@ -57,39 +57,39 @@ class ImpulseValidator(PatternValidator):
         # -------------------------------------------------------------------------
         # Hard rule: Wave 2 cannot retrace all of Wave 1
         # -------------------------------------------------------------------------
-        if P2 <= P0 + eps:
+        if P0 + eps >= P2:
             return ValidationResult.fail("Wave 2 fully retraced Wave 1")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 3 must exceed Wave 1 end
         # -------------------------------------------------------------------------
-        if P3 <= P1 + eps:
+        if P1 + eps >= P3:
             return ValidationResult.fail("Wave 3 did not exceed Wave 1 end")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 4 cannot retrace all of Wave 3
         # -------------------------------------------------------------------------
-        if P4 <= P2 + eps:
+        if P2 + eps >= P4:
             return ValidationResult.fail("Wave 4 fully retraced Wave 3")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 4 cannot overlap Wave 1 territory (normal impulse)
         # -------------------------------------------------------------------------
-        if P4 <= P1 - ov_eps:
+        if P1 - ov_eps >= P4:
             return ValidationResult.fail("Wave 4 overlaps Wave 1 territory")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 3 is not the shortest actionary wave
         # -------------------------------------------------------------------------
         tol = cfg.shortest_tol
-        if W3 < W1 * (1.0 - tol) and W3 < W5 * (1.0 - tol):
+        if W1 * (1.0 - tol) > W3 and W5 * (1.0 - tol) > W3:
             return ValidationResult.fail("Wave 3 is shortest actionary wave")
 
         # -------------------------------------------------------------------------
         # Hard rule: Wave 5 must make new high (truncation allowed if configured)
         # -------------------------------------------------------------------------
         truncation = False
-        if P5 <= P3 + eps:
+        if P3 + eps >= P5:
             if not cfg.allow_truncation:
                 return ValidationResult.fail("Wave 5 truncation not allowed")
             truncation = True

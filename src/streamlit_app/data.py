@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from db.table_ops import sqlite_connect
 
 import utils
-from db.table_ops import sqlite_connect
 
 
 # =============================================================================

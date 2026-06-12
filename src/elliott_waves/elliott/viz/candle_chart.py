@@ -9,12 +9,12 @@
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 # -------------------------------------------------------------------------
 # Dark theme constants
@@ -52,7 +52,7 @@ class CandleChart:
             self.ax.set_title(title, color=TEXT_COLOR, fontsize=11)
         self._n_candles = 0
 
-    def add_candles(self, df: pd.DataFrame) -> "CandleChart":
+    def add_candles(self, df: pd.DataFrame) -> CandleChart:
         """Draw candlestick bars from OHLCV DataFrame."""
         df = df.reset_index(drop=True)
         n  = len(df)
@@ -98,7 +98,7 @@ class CandleChart:
         self.ax.set_xlim(-1, n)
         return self
 
-    def save(self, path: str) -> "CandleChart":
+    def save(self, path: str) -> CandleChart:
         """Save figure to file."""
         self.fig.tight_layout()
         self.fig.savefig(path, dpi=150, facecolor=BG_COLOR)

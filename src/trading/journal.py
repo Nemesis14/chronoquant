@@ -5,10 +5,8 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 
 import utils
-
 
 # =============================================================================
 # Connection helper
@@ -139,7 +137,7 @@ def mark_run_stopped(db_path: str, run_id: str) -> None:
 # =============================================================================
 
 def insert_signal(db_path: str, run_id: str, bar_open_time: str,
-                  pred_long: Optional[float], pred_short: Optional[float],
+                  pred_long: float | None, pred_short: float | None,
                   state_before: str, decision: str, reason: str) -> None:
     with _connect(db_path) as conn:
         conn.execute(
@@ -157,7 +155,7 @@ def insert_signal(db_path: str, run_id: str, bar_open_time: str,
 
 def insert_position(db_path: str, position_id: str, run_id: str, side: str,
                     entry_time: str, entry_price: float, quantity: float,
-                    entry_order_id: Optional[str] = None) -> None:
+                    entry_order_id: str | None = None) -> None:
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_positions
@@ -169,7 +167,7 @@ def insert_position(db_path: str, position_id: str, run_id: str, side: str,
 
 def close_position(db_path: str, position_id: str, exit_time: str,
                    exit_price: float, pnl_usdt: float, exit_reason: str,
-                   exit_order_id: Optional[str] = None) -> None:
+                   exit_order_id: str | None = None) -> None:
     with _connect(db_path) as conn:
         conn.execute(
             """UPDATE trading_positions
@@ -180,7 +178,7 @@ def close_position(db_path: str, position_id: str, exit_time: str,
         )
 
 
-def get_open_position(db_path: str) -> Optional[dict]:
+def get_open_position(db_path: str) -> dict | None:
     with _connect(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM trading_positions WHERE status = 'OPEN' ORDER BY entry_time DESC LIMIT 1"
@@ -188,7 +186,7 @@ def get_open_position(db_path: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
-def get_latest_run(db_path: str) -> Optional[dict]:
+def get_latest_run(db_path: str) -> dict | None:
     with _connect(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM trading_runs ORDER BY started_at DESC LIMIT 1"
@@ -200,12 +198,12 @@ def get_latest_run(db_path: str) -> Optional[dict]:
 # trading_orders
 # =============================================================================
 
-def insert_order(db_path: str, order_id: str, run_id: str, position_id: Optional[str],
+def insert_order(db_path: str, order_id: str, run_id: str, position_id: str | None,
                  side: str, order_type: str, status: str,
-                 client_order_id: Optional[str], binance_order_id: Optional[str],
-                 requested_qty: Optional[float], filled_qty: Optional[float],
-                 avg_price: Optional[float], request_json: Optional[dict],
-                 response_json: Optional[dict]) -> None:
+                 client_order_id: str | None, binance_order_id: str | None,
+                 requested_qty: float | None, filled_qty: float | None,
+                 avg_price: float | None, request_json: dict | None,
+                 response_json: dict | None) -> None:
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_orders
@@ -225,8 +223,8 @@ def insert_order(db_path: str, order_id: str, run_id: str, position_id: Optional
 # trading_errors
 # =============================================================================
 
-def insert_error(db_path: str, run_id: Optional[str], component: str,
-                 error_type: str, message: str, traceback: Optional[str] = None) -> None:
+def insert_error(db_path: str, run_id: str | None, component: str,
+                 error_type: str, message: str, traceback: str | None = None) -> None:
     try:
         with _connect(db_path) as conn:
             conn.execute(
@@ -265,7 +263,7 @@ def get_recent_positions(db_path: str, limit: int = 50) -> list[dict]:
         return []
 
 
-def get_current_run_status(db_path: str) -> Optional[dict]:
+def get_current_run_status(db_path: str) -> dict | None:
     try:
         run = get_latest_run(db_path)
         if not run:

@@ -12,7 +12,7 @@ from __future__ import annotations
 import pandas as pd
 
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import PatternCandidate, Pivot, PivotKind
+from elliott_waves.elliott.data import PatternCandidate, Pivot
 from elliott_waves.elliott.validators._simple_corrective import validate_simple_corrective
 
 

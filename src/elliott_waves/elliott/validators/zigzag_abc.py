@@ -46,13 +46,13 @@ class ZigZagValidator(PatternValidator):
         # -------------------------------------------------------------------------
         # Hard rule: B does not exceed start of A
         # -------------------------------------------------------------------------
-        if Q2 >= Q0 + eps:
+        if Q0 + eps <= Q2:
             return ValidationResult.fail("Zigzag B exceeded start of A")
 
         # -------------------------------------------------------------------------
         # Hard rule: C must extend beyond A end (in normal zigzag)
         # -------------------------------------------------------------------------
-        if Q3 >= Q1 - eps:
+        if Q1 - eps <= Q3:
             return ValidationResult.fail("Zigzag C did not exceed A end")
 
         A_len = Q0 - Q1

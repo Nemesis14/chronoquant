@@ -16,7 +16,6 @@ import gc
 import hashlib
 import json
 import logging
-import os
 import time
 from pathlib import Path
 
@@ -299,7 +298,7 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
         "audit_sample_rows":       AUDIT_ROWS,
     }
     _write_json(search_dir / "features_search.json", result)
-    logger.info(f"[Stage 0] features_search.json written")
+    logger.info("[Stage 0] features_search.json written")
     return feature_cols
 
 
@@ -709,7 +708,7 @@ def _search_optuna(
         if guardrail_ok or champion_prauc is None:
             best = _update_best(search_dir, trial_record, best)
         else:
-            logger.info(f"  [GUARDRAIL FAIL] PR AUC below 5% floor")
+            logger.info("  [GUARDRAIL FAIL] PR AUC below 5% floor")
 
         return obj.get("objective_score", float("inf"))
 
@@ -729,7 +728,6 @@ def _search_optuna(
 
 
 def _suggest_optuna_params(trial, stage: str) -> dict:
-    import optuna
 
     leaves_hi  = 31 if stage == "smoke" else 63
     num_leaves = trial.suggest_int("num_leaves", 3, leaves_hi, log=True)
@@ -1002,11 +1000,11 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
         f"  mean_train_prauc = {_fmt(best.get('mean_train_prauc'))}"
     )
     logger.info(f"  elapsed_s       = {best.get('elapsed_s')}")
-    logger.info(f"\nBest parameters:")
+    logger.info("\nBest parameters:")
     for k, v in sorted(best.get("params", {}).items()):
         logger.info(f"  {k:<25} = {v}")
 
-    logger.info(f"\nPer-fold breakdown:")
+    logger.info("\nPer-fold breakdown:")
     for f in best.get("fold_summary", []):
         logger.info(
             f"  fold {f['fold']}  "

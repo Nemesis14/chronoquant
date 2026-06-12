@@ -1,26 +1,36 @@
 # Claude Entry Point
 
-Runtime settings and coding standards live under `.claude/`.
+Claude uses this file as its compatibility entry point. Shared agent rules,
+runtime reference files, and project standards live under `.agent/`.
 
 ## Session Startup
 
+You MUST read these files before starting any work in this session:
+
 - `board.md`
-- `.claude/coding_standards.md`
+- `.agent/general_agent_principles.md`
+- `.agent/board_workflow.md`
+- `.agent/coding_standards.md`
+- `.agent/documentation_standards.md`
+- `.agent/permission_rules.md`
+- `.agent/mcp_rules.md`
+- `.agent/ai_tools_setup.md`
 
-## Agent Definitions
+## Claude Role
 
-- later spec...
+Claude is the primary implementation agent. Use the shared `.agent/` rules as
+the source of truth for board handling, coding standards, documentation
+standards, MCP/tool usage, and validation.
 
 ## Board and Backlog Management
 
-When a task is finished:
-1. Remove the task row from `board.md` — do not mark done, delete the row.
-2. Move the backlog plan file from `docs/plans/backlog/` to `docs/plans/completed/` if one exists.
+See `.agent/board_workflow.md`.
 
 ## Task Approach
 
-Before implementing any task:
-1. Outline an execution plan — high-level steps, no exhaustive detail.
-2. Ask if anything critical is unclear before starting.
-3. Check for existing code that already covers the need — do not write redundant logic.
-4. Verify integrity: new code must not duplicate or contradict existing modules or conventions.
+See `.agent/general_agent_principles.md`.
+
+## Code Navigation Rules
+
+See `.agent/permission_rules.md`, `.agent/mcp_rules.md`, and
+`.agent/ai_tools_setup.md`.

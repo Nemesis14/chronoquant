@@ -8,15 +8,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import math
 import threading
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from streamlit_app.dashboard_logging import get_dashboard_logger
 from streamlit_app.sync import SyncResult, get_sync_lock, run_database_sync
-
 
 _STATE_KEY_PREFIX        = "database_sync_state"
 AUTO_SYNC_INTERVAL_SECONDS = 30
@@ -163,7 +162,7 @@ def _result_payload(result: SyncResult) -> dict[str, Any]:
 
 
 def _now_label() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def _now_epoch() -> float:

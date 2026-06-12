@@ -2,11 +2,10 @@
 
 ## Root
 
-- `AGENTS.md`: shared coding-agent entry point.
+- `AGENTS.md`: Codex entry point.
 - `CLAUDE.md`: Claude Code compatibility entry point.
-- `.mcp.json`: repository MCP server configuration.
-- `.claude/`: Claude-specific runtime settings.
-- `.codex/`: Codex-specific local notes or settings.
+- `.agent/`: shared AI-agent rules, standards, board workflow, MCP reference
+  config, and runtime notes.
 - `pyproject.toml`, `uv.lock`: Python project and dependency metadata.
 
 ## Source
@@ -61,10 +60,8 @@ files directly.
 - `docs/plans/backlog/`: future work.
 - `docs/concepts/elliott_waves/`: Elliott Wave research, specs, studies, and examples.
 
-## Agent Definitions
+## Agent Rules
 
-- `agents/`: role-specific agent definitions and development concepts.
-
-Use a role file when the task clearly belongs to that role. For example, model
-development should use `agents/modeling.md`, and dashboard work should use
-`agents/ui.md`.
+- `AGENTS.md`: Codex entry point.
+- `.agent/`: shared standards, workflow rules, and runtime references.
+- `CLAUDE.md`: Claude compatibility entry point that references `.agent/`.

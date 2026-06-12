@@ -2,17 +2,17 @@
 # Modeling dataset builder
 # =============================================================================
 # Purpose:
-#  - Load aligned model matrices from the features table
+#  - Load aligned model matrices from the features dataset
 #  - Keep dataset preparation independent from model family and feature selection
 # =============================================================================
 
 from dataclasses import dataclass
-import sqlite3
+from typing import cast
+from store.duckdb_query import dataset_columns, query_range
 
 import pandas as pd
 
 import utils
-from db.table_ops import table_columns
 
 
 # =============================================================================
@@ -38,92 +38,88 @@ class ModelingDataset:
 # load_modeling_dataset(...) -> ModelingDataset
 # =============================================================================
 # Purpose:
-#  - Load target and feature columns from the configured features table
+#  - Load target and feature columns from the configured features dataset
 #  - Apply optional time bounds and target-horizon embargo
 # =============================================================================
 def load_modeling_dataset(
-    target_col: str,
-    feature_cols: list[str] | None = None,
-    start: str | None = None,
-    end: str | None = None,
-    embargo_minutes: int = 0,
-    row_stride: int = 1,
-    dropna_features: bool = False,
-    db_path: str | None = None,
-    table_name: str | None = None,
-    asset_id: str | None = None,
+    target_col      : str,
+    feature_cols    : list[str] | None = None,
+    start           : str | None = None,
+    end             : str | None = None,
+    embargo_minutes : int = 0,
+    row_stride      : int = 1,
+    dropna_features : bool = False,
+    data_dir        : str | None = None,
+    asset_id        : str | None = None,
 ) -> ModelingDataset:
-    db_cfg = utils.load_asset_config(asset_id)["database"]
-    db_path = db_path or db_cfg["db_path"]
-    table_name = table_name or db_cfg["tables"]["features"]
+    """Load a model-ready dataset from the features Parquet partitions.
+
+    Args:
+        target_col      : Target column name (e.g. 'trg_l_fw60_q90').
+        feature_cols    : Feature columns to load. None = all feat_* columns.
+        start           : Optional lower bound (inclusive), YYYY-MM-DD HH:MM:SS.
+        end             : Optional upper bound (inclusive), YYYY-MM-DD HH:MM:SS.
+        embargo_minutes : Drop the last N minutes to avoid forward-looking leakage.
+        row_stride      : Take every N-th row (1 = all rows).
+        dropna_features : Drop rows where any feature is NaN.
+        data_dir        : Override data directory; uses asset config if None.
+        asset_id        : Asset key from config/assets.json.
+
+    Returns:
+        ModelingDataset with open_time, X, y, and metadata.
+
+    Raises:
+        ValueError: If target or feature columns are missing, or row_stride < 1.
+    """
+    resolved_dir: str = data_dir or utils.load_asset_config(asset_id)["database"]["data_dir"]
     if row_stride < 1:
         raise ValueError("row_stride must be >= 1")
 
-    columns = table_columns(db_path, table_name)
+    columns = dataset_columns(resolved_dir, "features")
     if target_col not in columns:
-        raise ValueError(f"Target column not found in {table_name}: {target_col}")
+        raise ValueError(f"Target column not found in features dataset: {target_col}")
 
     if feature_cols is None:
         feature_cols = [col for col in columns if col.startswith("feat_")]
 
     missing_features = [col for col in feature_cols if col not in columns]
     if missing_features:
-        raise ValueError(f"Feature columns not found in {table_name}: {missing_features}")
+        raise ValueError(f"Feature columns not found in features dataset: {missing_features}")
 
     select_cols = ["open_time", target_col] + feature_cols
-    query = f"""
-        SELECT {', '.join(_quote_identifier(col) for col in select_cols)}
-        FROM {table_name}
-        WHERE (? IS NULL OR open_time >= ?)
-            AND (? IS NULL OR open_time <= ?)
-            AND (
-                ? <= 1
-                OR rowid % ? = 0
-            )
-        ORDER BY open_time ASC
-    """
+    df = query_range(resolved_dir, "features", start=start, end=end, columns=select_cols)
 
-    with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(
-            query,
-            conn,
-            params=(start, start, end, end, row_stride, row_stride),
-        )
+    if row_stride > 1:
+        df = df.iloc[::row_stride].copy()
 
     if df.empty:
         return ModelingDataset(
-            open_time=pd.Series(dtype="datetime64[ns]"),
-            X=pd.DataFrame(columns=feature_cols),
-            y=pd.Series(dtype="float64"),
-            target_col=target_col,
-            feature_cols=feature_cols,
+            open_time    = pd.Series(dtype="datetime64[ns]"),
+            X            = pd.DataFrame(columns=feature_cols),
+            y            = pd.Series(dtype="float64"),
+            target_col   = target_col,
+            feature_cols = feature_cols,
         )
 
     df["open_time"] = pd.to_datetime(df["open_time"])
-    df = df.dropna(subset=[target_col]).copy()
+    df = df[df[target_col].notna()].copy()
 
     if embargo_minutes > 0 and not df.empty:
         max_time = df["open_time"].max()
-        cutoff = max_time - pd.Timedelta(minutes=embargo_minutes)
-        df = df[df["open_time"] <= cutoff].copy()
+        cutoff   = max_time - pd.Timedelta(minutes=embargo_minutes)
+        df       = df[df["open_time"] <= cutoff].copy()
 
     if dropna_features:
-        df = df.dropna(subset=feature_cols).copy()
+        df = df[pd.DataFrame(df[feature_cols]).notna().all(axis=1)].copy()
+
+    open_time_s = pd.Series(df["open_time"]).reset_index(drop=True)
+    X_df        = pd.DataFrame(df[feature_cols]).reset_index(drop=True)
+    y_s         = pd.Series(df[target_col]).reset_index(drop=True)
 
     return ModelingDataset(
-        open_time=df["open_time"].reset_index(drop=True),
-        X=df[feature_cols].reset_index(drop=True),
-        y=df[target_col].reset_index(drop=True),
-        target_col=target_col,
-        feature_cols=feature_cols,
+        open_time    = open_time_s,
+        X            = X_df,
+        y            = y_s,
+        target_col   = target_col,
+        feature_cols = feature_cols,
     )
-
-
-# =============================================================================
-# _quote_identifier(name: str) -> str
-# =============================================================================
-# Purpose:
-#  - Quote SQLite identifiers safely for known column names
-# =============================================================================
-def _quote_identifier(name: str) -> str:
-    return '"' + name.replace('"', '""') + '"'

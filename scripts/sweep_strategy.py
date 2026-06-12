@@ -26,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from evaluation.backtest import build_backtest_frame, simulate_long_probability_strategy
 
-
 _ENTRY_THRESHOLDS   = [0.30, 0.35, 0.38, 0.40, 0.42, 0.45, 0.48, 0.50, 0.55, 0.60]
 _MAX_HOLD_MINUTES   = [30, 45, 60, 90, 120]
 _TAKE_PROFIT_PCTS   = [0.0, 0.010, 0.015, 0.020]

@@ -19,7 +19,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
 METRIC_COLUMNS = [
     "roc_auc",
     "pr_auc",

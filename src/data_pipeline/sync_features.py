@@ -9,19 +9,17 @@
 # =============================================================================
 
 from datetime import timedelta
+import logging
+from store.duckdb_query import dataset_columns, dataset_exists, query_range
+from store.parquet_store import upsert_partition
 
 import numpy as np
 import pandas as pd
 import ta
 
 import utils
-from db.table_ops import (
-    drop_existing_open_times,
-    ensure_table_columns,
-    sqlite_connect,
-    table_columns,
-    table_exists,
-)
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -1000,49 +998,36 @@ def sync_features(
     # -------------------------------------------------------------------------
     # Load configuration
     # -------------------------------------------------------------------------
-    db_cfg      = utils.load_asset_config(asset_id)
-    feat_cfg    = utils.load_features_config(asset_id=asset_id)
-    db_path     = db_cfg["database"]["db_path"]
-    table_ohlcv = db_cfg["database"]["tables"]["ohlcv"]
-    table_feat  = db_cfg["database"]["tables"]["features"]
+    db_cfg   = utils.load_asset_config(asset_id)
+    feat_cfg = utils.load_features_config(asset_id=asset_id)
+    data_dir = db_cfg["database"]["data_dir"]
     cfg_feat    = feat_cfg["database"]["features"]
     targets_cfg = cfg_feat.get("targets", [])
 
     # -------------------------------------------------------------------------
-    # Detect available activity columns in the OHLCV table
+    # Detect available activity columns in the OHLCV dataset
     # -------------------------------------------------------------------------
     activity_source_cols = ["quote_volume", "trades", "taker_buy_base", "taker_buy_quote"]
-    if table_exists(db_path, table_ohlcv):
-        ohlcv_table_cols = table_columns(db_path, table_ohlcv)
-        available_activity = [c for c in activity_source_cols if c in ohlcv_table_cols]
+    if dataset_exists(data_dir, "ohlcv"):
+        ohlcv_cols         = dataset_columns(data_dir, "ohlcv")
+        available_activity = [c for c in activity_source_cols if c in ohlcv_cols]
     else:
         available_activity = []
 
     base_cols   = ["open_time", "open", "high", "low", "close", "volume"]
-    select_cols = ", ".join(base_cols + available_activity)
+    select_cols = base_cols + available_activity
 
     # -------------------------------------------------------------------------
-    # Fetch raw OHLCV data
+    # Fetch raw OHLCV data via DuckDB
     # -------------------------------------------------------------------------
     fetch_start = (
         pd.to_datetime(start_time) - timedelta(minutes=lookback_bars)
     ).strftime("%Y-%m-%d %H:%M:%S")
 
-    with sqlite_connect(db_path) as conn:
-        df = pd.read_sql_query(
-            f"""
-            SELECT {select_cols}
-            FROM {table_ohlcv}
-            WHERE open_time >= ?
-                AND (? IS NULL OR open_time <= ?)
-            ORDER BY open_time ASC
-            """,
-            conn,
-            params=(fetch_start, end_time, end_time),
-        )
+    df = query_range(data_dir, "ohlcv", start=fetch_start, end=end_time, columns=select_cols)
 
     if df.empty:
-        print(f"No OHLCV rows found since {fetch_start}")
+        logger.warning("Nincs OHLCV adat: fetch_start=%s", fetch_start)
         return
 
     df["open_time"] = pd.to_datetime(df["open_time"])
@@ -1119,7 +1104,7 @@ def sync_features(
     df = df.copy()
 
     # -------------------------------------------------------------------------
-    # Prepare and insert into database
+    # Prepare and write to Parquet
     # -------------------------------------------------------------------------
     df_reset = df.reset_index()
     start_dt = pd.to_datetime(start_time)
@@ -1127,20 +1112,15 @@ def sync_features(
     if end_time is not None:
         end_dt   = pd.to_datetime(end_time)
         df_reset = df_reset[df_reset["open_time"] <= end_dt].copy()
-    df_reset["open_time"] = df_reset["open_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
     feat_cols    = [col for col in df_reset.columns if col.startswith(feat_prefix)]
     target_cols  = utils.target_columns_from_config(feat_cfg)
     cols_to_keep = ["open_time", "close"] + target_cols + feat_cols
     df_final     = df_reset[cols_to_keep].copy()
-    ensure_table_columns(db_path, table_feat, df_final)
-    df_final     = drop_existing_open_times(df_final, db_path, table_feat)
 
     if df_final.empty:
-        print(f"No new feature rows to insert into '{table_feat}'")
+        logger.warning("Nincs uj feature sor az irashoz")
         return
 
-    with sqlite_connect(db_path) as conn:
-        df_final.to_sql(table_feat, conn, index=False, if_exists="append", chunksize=50_000)
-
-    print(f"OK: Computed {len(df_final)} feature rows into '{table_feat}'")
+    written = upsert_partition(data_dir, "features", df_final)
+    logger.info("OK: %d feature sor szamolva, %d sor a particiokban", len(df_final), written)

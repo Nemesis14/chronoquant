@@ -14,11 +14,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import numpy as np
 import pandas as pd
+from db.table_ops import sqlite_connect
 
 import utils
-from db.table_ops import sqlite_connect
 
 
 # =============================================================================
@@ -61,7 +60,7 @@ def audit_features(
     # -------------------------------------------------------------------------
     # Null rates
     # -------------------------------------------------------------------------
-    print(f"\n--- Null rates (feat_ columns) ---")
+    print("\n--- Null rates (feat_ columns) ---")
     null_rates = df[feat_cols].isna().mean().sort_values(ascending=False)
     high_null  = null_rates[null_rates > 0.01]
     if high_null.empty:
@@ -79,7 +78,7 @@ def audit_features(
     # -------------------------------------------------------------------------
     # Near-constant detection
     # -------------------------------------------------------------------------
-    print(f"\n--- Near-constant features (std < 0.001) ---")
+    print("\n--- Near-constant features (std < 0.001) ---")
     stds = df[feat_cols].std()
     near_const = stds[stds < 0.001].sort_values()
     if near_const.empty:
@@ -115,7 +114,7 @@ def audit_features(
     # -------------------------------------------------------------------------
     # Summary by feature group
     # -------------------------------------------------------------------------
-    print(f"\n--- Feature count by group ---")
+    print("\n--- Feature count by group ---")
     groups: dict[str, list[str]] = {}
     for c in feat_cols:
         # Extract group from column name (feat_<group>_...)

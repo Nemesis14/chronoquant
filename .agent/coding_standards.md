@@ -2,13 +2,21 @@
 
 ## Quality Gate
 
-Before committing, run:
+During coding — check a single file with CLI (fast, ~3s):
+
+```bash
+pyright src/foo.py
+```
+
+Before committing — run the full gate from repo root:
 
 ```bash
 ruff check . --fix
 pyright
 pytest
 ```
+
+Ruff always uses CLI (`--fix` auto-applies; MCP cannot do this).
 
 ## Language Rules
 
@@ -131,6 +139,48 @@ rebuild_derived_tables(
 )
 ```
 
+### Function Definition Parameter Alignment
+For multi-line function signatures, align `:` and `|` across parameters:
+
+```python
+def ensure_table_columns(
+    db_path    : str,
+    table_name : str,
+    df         : pd.DataFrame,
+) -> None:
+
+def live_model_meta(
+    model_cfg : dict | None = None,
+    env_cfg   : dict | None = None,
+    asset_id  : str  | None = None,
+) -> tuple[str, dict]:
+```
+
+Align so that `:` and `|` form vertical columns. Pad with spaces before `:` as needed.
+
+### Docstring Args Alignment
+In Google-style docstrings, align `:` across all parameter names in the Args block:
+
+```python
+def upsert_by_open_time(
+    conn       : sqlite3.Connection,
+    table_name : str,
+    df         : pd.DataFrame,
+) -> int:
+    """Insert rows, updating non-key columns on open_time conflict.
+
+    Args:
+        conn       : Open SQLite connection.
+        table_name : Target table with a unique open_time column.
+        df         : DataFrame with an open_time column as the conflict key.
+
+    Returns:
+        rowcount from executemany.
+    """
+```
+
+Align to the longest parameter name in the block. Single-param Args blocks need no padding.
+
 ---
 
 ## Naming Conventions
@@ -167,21 +217,52 @@ def sync_features(start_time: str, lookback_bars: int = 240) -> None:
 
 ---
 
+## Logging
+
+Every module uses the standard `logging` module. No `print()` for operational messages.
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+```
+
+Log levels:
+- `logger.debug(...)` — részletes belső állapot, csak fejlesztéskor
+- `logger.info(...)` — normál működés: sorok száma, batch progress
+- `logger.warning(...)` — nem fatális, de figyelmet igényel
+- `logger.error(...)` — hiba, a művelet nem sikerült
+- `logger.exception(...)` — hiba + automatikus stack trace (except blokkban)
+
+```python
+logger.info("OHLCV batches=%d, inserted=%d, latest=%s", batch_count, inserted_total, ts)
+logger.error("Binance API hiba: %s", e)
+logger.exception("Varatlan hiba sync_ohlcv kozben")
+```
+
+Handler-t csak a belépési pontban (CLI script, `__main__`) konfigurálunk — library kódban soha.
+
+---
+
 ## Error Handling
+
+Határfelületen (Binance API, SQLite, fájl I/O) `try/except`, a hibát `logger.exception`-nel jelezzük:
 
 ```python
 try:
-    with sqlite3.connect(db_path) as conn:
-        result = pd.read_sql_query(query, conn)
-    return result["max_time"].iloc[0]
-except Exception as e:
-    print(f"ERROR in sync_features: {str(e)}")
-    return None
+    rows = client.get_klines(...)
+except Exception:
+    logger.exception("Binance klines lehivas sikertelen")
+    raise
 ```
+
+Belső logikában (saját kód) nem kapjuk el a kivételeket — hagyjuk propagálni.
 
 ---
 
 ## Console Output
+
+`print()` csak interaktív CLI scriptekben megengedett (`__main__` blokk). Library kódban mindig `logger.*`.
 
 Plain ASCII prefixes only — no emojis (Windows encoding issues):
 
@@ -190,6 +271,45 @@ print("OK: Computed 1,234 feature rows into 'FEATURES'")
 print("INFO: Fetching SOLUSDT klines from Binance...")
 print("ERROR: No feature rows found since 2026-05-16")
 ```
+
+---
+
+## Code Navigation Tools
+
+### Eszköz-prioritás kereséshez
+
+| Feladat | Eszköz |
+|---------|--------|
+| Szimbólum definíciója, hivatkozások | `mcp__language-server__definition` / `__references` |
+| Típus, docstring lekérése | `mcp__language-server__hover` |
+| Típushibák egy fájlban | `mcp__language-server__diagnostics` |
+| Szintaxisfa-alapú mintakeresés | `ast-grep` CLI (`sg run`) |
+| Egyszerű string/regex keresés | `Grep` tool |
+| Fájlok listázása | `Glob` tool |
+
+### ast-grep (sg) — mikor és hogyan
+
+Használd `sg run` CLI-t (Bash toolon keresztül), ha:
+- Strukturális mintát keresel, nem szöveg-egyezést (pl. "minden `with sqlite3.connect(...)` blokk")
+- Refaktor előtt fel kell térképezni, hol van egy adott hívásforma
+- `Grep` túl sok zajt adna vissza
+
+Szintaxis:
+```bash
+# Minden függvényhívás adott névvel
+sg run --pattern 'utils.$METHOD($$$)' --lang python src/
+
+# Összes függvény-definíció
+sg run --pattern 'def $FUNC($$$): $$$' --lang python src/
+
+# Adott with-blokk
+sg run --pattern 'with sqlite3.connect($PATH) as $CONN: $$$' --lang python src/
+
+# Csak fájlnév lista
+sg run --pattern '...' --lang python src/ --json | python -c "import sys,json; [print(m['file']) for m in json.load(sys.stdin)['matches']]"
+```
+
+`sg lsp` az ast-grep rule-alapú szerkesztőhöz való (VS Code) — nem használjuk MCP-ként.
 
 ---
 

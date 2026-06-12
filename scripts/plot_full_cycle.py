@@ -7,18 +7,24 @@
 #  - Motive waves (1,3,5) in teal, corrective waves (2,4,A,B,C) in red
 # =============================================================================
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import utils
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import load_ohlcv, resample_ohlcv, PivotKind
-from elliott_waves.elliott.pivots.zigzag import detect_zigzag
+from elliott_waves.elliott.data import PivotKind, load_ohlcv, resample_ohlcv
 from elliott_waves.elliott.parser.dynamic_parser import DynamicParser
-from elliott_waves.elliott.viz.candle_chart import CandleChart, UP_COLOR, DN_COLOR, TEXT_COLOR, BG_COLOR
+from elliott_waves.elliott.pivots.zigzag import detect_zigzag
+from elliott_waves.elliott.viz.candle_chart import (
+    BG_COLOR,
+    DN_COLOR,
+    TEXT_COLOR,
+    UP_COLOR,
+    CandleChart,
+)
 
 _TF_FREQ = {
     "5m":  "5min",

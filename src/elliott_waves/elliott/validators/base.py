@@ -25,7 +25,7 @@ class ValidationResult:
     subpatterns:  list[Any]         = field(default_factory=list)
 
     @staticmethod
-    def fail(reason: str) -> "ValidationResult":
+    def fail(reason: str) -> ValidationResult:
         return ValidationResult(valid=False, reason=reason)
 
 

@@ -19,7 +19,6 @@ from modeling.metrics import binary_classification_metrics
 from modeling.reports import write_training_report
 from modeling.sampling import load_sample_definition, validate_sample_definition
 from modeling.training_windows import (
-    DatasetSplit,
     between,
     final_train_test_split,
     fold_sample_size_row,

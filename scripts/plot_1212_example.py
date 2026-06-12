@@ -8,7 +8,6 @@ from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import pandas as pd
 import seaborn as sns
 
@@ -60,6 +59,7 @@ window_df = df5.iloc[p0_idx:p4_idx + 1]
 # P1 = legmagasabb high P0 és P2 között → keressük meg a közbülső pontokat
 # újrafuttatjuk a pivot detektort a teljes adatra és kiemeljük a megfelelőt
 from elliott_waves.elliott_1212 import detect_pivots
+
 all_pivots = detect_pivots(df5, threshold=0.010)
 
 # megkeressük azt az 5-ös ablakot ahol p0 és p4 egyezik

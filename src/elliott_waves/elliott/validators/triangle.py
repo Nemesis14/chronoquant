@@ -59,17 +59,17 @@ class TriangleValidator(PatternValidator):
         # Subtype detection
         # -------------------------------------------------------------------------
         contracting = (
-            Q3 > Q1 + eps
-            and Q4 < Q2 - eps
-            and Q5 >= Q3 - eps
+            Q1 + eps < Q3
+            and Q2 - eps > Q4
+            and Q3 - eps <= Q5
         )
         barrier = (
             abs(Q4 - Q2) <= barrier_eps
-            and Q3 > Q1 + eps
+            and Q1 + eps < Q3
         )
         expanding = (
-            Q3 < Q1 - eps
-            and Q4 > Q2 + eps
+            Q1 - eps > Q3
+            and Q2 + eps < Q4
         )
 
         if contracting:

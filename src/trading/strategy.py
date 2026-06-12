@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from trading.state import TradingState, FLAT, LONG, SHORT, COOLDOWN
+from trading.state import COOLDOWN, FLAT, LONG, SHORT, TradingState
 
 HOLD = "HOLD"
 ENTER_LONG = "ENTER_LONG"
@@ -18,7 +17,7 @@ def evaluate(
     pred_short: float,
     long_cfg: dict,
     short_cfg: dict,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> tuple[str, str]:
     """
     Evaluate strategy for one closed bar. Mirrors simulate_long/short_probability_strategy
@@ -28,7 +27,7 @@ def evaluate(
     Does NOT mutate state — caller applies the result.
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
     if state.status == COOLDOWN:
         if state.cooldown_until and now < state.cooldown_until:

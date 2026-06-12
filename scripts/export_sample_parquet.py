@@ -119,21 +119,20 @@ def main() -> None:
     first_time = None
     last_time  = None
 
-    with sqlite3.connect(db_path) as conn:
-        with pq.ParquetWriter(out_path, arrow_schema) as writer:
-            for chunk in pd.read_sql_query(
-                f"SELECT {col_list} FROM {table_name} ORDER BY open_time ASC",
-                conn,
-                chunksize = CHUNK_SIZE,
-            ):
-                chunk = _cast_chunk(chunk)
-                table = pa.Table.from_pandas(chunk, schema=arrow_schema, preserve_index=False)
-                writer.write_table(table)
-                if first_time is None:
-                    first_time = chunk["open_time"].iloc[0]
-                total_rows += len(chunk)
-                last_time   = chunk["open_time"].iloc[-1]
-                print(f"  INFO: {total_rows:,} rows written...", end="\r")
+    with sqlite3.connect(db_path) as conn, pq.ParquetWriter(out_path, arrow_schema) as writer:
+        for chunk in pd.read_sql_query(
+            f"SELECT {col_list} FROM {table_name} ORDER BY open_time ASC",
+            conn,
+            chunksize = CHUNK_SIZE,
+        ):
+            chunk = _cast_chunk(chunk)
+            table = pa.Table.from_pandas(chunk, schema=arrow_schema, preserve_index=False)
+            writer.write_table(table)
+            if first_time is None:
+                first_time = chunk["open_time"].iloc[0]
+            total_rows += len(chunk)
+            last_time   = chunk["open_time"].iloc[-1]
+            print(f"  INFO: {total_rows:,} rows written...", end="\r")
 
     print(f"\nINFO: {total_rows} rows  [{first_time} -> {last_time}]")
 

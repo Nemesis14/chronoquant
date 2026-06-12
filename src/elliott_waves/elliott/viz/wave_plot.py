@@ -10,11 +10,10 @@
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from elliott_waves.elliott.data import PatternCandidate, Pivot, PivotKind
-from elliott_waves.elliott.viz.candle_chart import CandleChart, TEXT_COLOR, UP_COLOR, DN_COLOR
+from elliott_waves.elliott.viz.candle_chart import DN_COLOR, CandleChart
 
 PIVOT_HIGH_COLOR = "#ffd700"
 PIVOT_LOW_COLOR  = "#00bfff"
@@ -38,7 +37,7 @@ class WavePlot:
         pivots:     list[Pivot],
         df:         pd.DataFrame,
         labels:     list[str] | None = None,
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Plot pivot markers and optional labels on the candlestick chart."""
         df = df.reset_index(drop=True)
 
@@ -70,7 +69,7 @@ class WavePlot:
         pivots:    list[Pivot],
         color:     str = WAVE_LINE_COLOR,
         linewidth: float = 1.2,
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Draw lines connecting consecutive pivots."""
         for i in range(1, len(pivots)):
             p_prev = pivots[i - 1]
@@ -90,7 +89,7 @@ class WavePlot:
         self,
         pivot: Pivot,
         color: str = ZONE_COLOR,
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Shade the area between pivot bar and confirmation bar."""
         self.ax.axvspan(
             pivot.idx,
@@ -106,7 +105,7 @@ class WavePlot:
         price: float,
         label: str = "trigger",
         color: str = TRIGGER_COLOR,
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Draw horizontal trigger line at specified price."""
         self.ax.axhline(
             y         = price,
@@ -130,7 +129,7 @@ class WavePlot:
         self,
         target_zones: dict[str, float],
         color: str = "#80cbc4",
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Draw horizontal lines for each target zone."""
         for label, price in target_zones.items():
             self.ax.axhline(
@@ -156,7 +155,7 @@ class WavePlot:
         self,
         candidate: PatternCandidate,
         df:        pd.DataFrame,
-    ) -> "WavePlot":
+    ) -> WavePlot:
         """Plot a full PatternCandidate with pivots, lines, and target zones."""
         labels = _WAVE_LABELS[:len(candidate.pivots)]
         self.add_pivots(candidate.pivots, df, labels=labels)

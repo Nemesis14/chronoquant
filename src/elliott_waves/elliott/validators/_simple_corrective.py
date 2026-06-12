@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from elliott_waves.elliott.data import Pivot
 from elliott_waves.elliott.validators.base import ValidationResult
-from elliott_waves.elliott.validators.zigzag_abc import ZigZagValidator
 from elliott_waves.elliott.validators.flat import FlatValidator
 from elliott_waves.elliott.validators.triangle import TriangleValidator
+from elliott_waves.elliott.validators.zigzag_abc import ZigZagValidator
 
 _SIMPLE_VALIDATORS = [ZigZagValidator(), FlatValidator(), TriangleValidator()]
 

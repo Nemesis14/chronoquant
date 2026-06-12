@@ -9,7 +9,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-
 CHART_LOAD_LOOKBACK_HOURS = 24
 CHART_INITIAL_FOCUS_HOURS = 24
 

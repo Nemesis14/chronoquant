@@ -53,7 +53,7 @@ class FlatValidator(PatternValidator):
         # -------------------------------------------------------------------------
         # Subtype detection and hard rules
         # -------------------------------------------------------------------------
-        if 0.90 <= B_ret <= 1.05 and Q3 <= Q1 - eps:
+        if 0.90 <= B_ret <= 1.05 and Q1 - eps >= Q3:
             # Regular flat: B ~= A start, C slightly beyond A end
             pattern_type = "REGULAR_FLAT"
             score = 100.0 * (
@@ -62,7 +62,7 @@ class FlatValidator(PatternValidator):
                 + 0.30 * band_score(C_ext, (0.618, 1.382), [1.000, 1.236], fib)
             )
 
-        elif B_ret > 1.05 and Q2 > Q0 + eps and Q3 < Q1 - eps:
+        elif B_ret > 1.05 and Q0 + eps < Q2 and Q1 - eps > Q3:
             # Expanded flat: B exceeds A start, C strongly beyond A end
             if not cfg.allow_running_flat:
                 pass  # still allow expanded flat
@@ -74,7 +74,7 @@ class FlatValidator(PatternValidator):
                 + 0.10 * 0.5
             )
 
-        elif B_ret > 1.05 and Q2 > Q0 + eps and Q3 > Q1 - eps:
+        elif B_ret > 1.05 and Q0 + eps < Q2 and Q1 - eps < Q3:
             # Running flat: B exceeds A start, C does NOT reach A end
             if not cfg.allow_running_flat:
                 return ValidationResult.fail("Running flat not allowed by config")

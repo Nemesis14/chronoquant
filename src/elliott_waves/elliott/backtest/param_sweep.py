@@ -13,9 +13,9 @@ import itertools
 
 import pandas as pd
 
-from elliott_waves.elliott.config import ElliottConfig
 from elliott_waves.elliott.backtest.evaluator import BacktestEvaluator
 from elliott_waves.elliott.backtest.labels import LabelGenerator
+from elliott_waves.elliott.config import ElliottConfig
 from elliott_waves.elliott.pivots.zigzag import detect_zigzag
 from elliott_waves.elliott.scanners.wave3 import Wave3Scanner
 

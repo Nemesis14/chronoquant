@@ -173,7 +173,7 @@ def build_report(results: pd.DataFrame, df_1m: pd.DataFrame) -> str:
         "## Scope",
         "",
         f"- Window: `{window_start}` to `{window_end}` UTC",
-        f"- Timeframes: 5m, 10m, 15m, 30m",
+        "- Timeframes: 5m, 10m, 15m, 30m",
         f"- Retracement: `{MIN_RETRACE}` - `{MAX_RETRACE}`  |  Min leg: `{MIN_LEG_BARS}` bars",
         f"- Forward outcome: +`{RAW_UP_THRESHOLD*100:.0f}%` within 60 minutes",
         "- Setup: nested 1-2-1-2 only, time-bounded windows only",

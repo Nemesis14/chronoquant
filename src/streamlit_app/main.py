@@ -4,10 +4,10 @@
 
 from __future__ import annotations
 
-from html import escape
 import re
 import sqlite3
 import sys
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -15,7 +15,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from streamlit_app import binance_data, data
+from streamlit_app import binance_data, data, trading_runner
 from streamlit_app.components.charts import (
     PLOTLY_CHART_CONFIG,
     prediction_price_figure,
@@ -29,7 +29,6 @@ from streamlit_app.sync_runner import (
     is_sync_running,
     start_sync,
 )
-from streamlit_app import trading_runner
 
 # Dark theme palette (matches charts.py)
 _BG    = "#0b0e11"
@@ -49,19 +48,19 @@ st.set_page_config(
 )
 
 st.markdown(
-    f"""
+    """
     <style>
     /* Hide Streamlit's built-in sticky header bar */
-    header[data-testid="stHeader"] {{ display: none; }}
+    header[data-testid="stHeader"] { display: none; }
     /* Base font bump — Streamlit default is ~14px which feels small at wide layout */
-    html, body {{ font-size: 15px; }}
-    .stApp, .block-container {{ font-size: 15px; }}
-    p, span, div, label, .stCaption {{ font-size: 1rem; }}
-    .block-container {{ padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }}
-    [data-testid="stSidebar"] > div:first-child {{ padding-top: 1.5rem; }}
-    [data-testid="stPlotlyChart"] {{ border-radius: 6px; overflow: hidden; }}
+    html, body { font-size: 15px; }
+    .stApp, .block-container { font-size: 15px; }
+    p, span, div, label, .stCaption { font-size: 1rem; }
+    .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.5rem; }
+    [data-testid="stPlotlyChart"] { border-radius: 6px; overflow: hidden; }
     /* Sidebar labels */
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {{ font-size: 0.95rem; }}
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] span { font-size: 0.95rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -385,6 +384,7 @@ def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -
 def _load_sol_model_stats() -> dict[str, dict]:
     """Load model card data from models/<model_id>/model_card.json for active solusdt_fw60 models."""
     import json
+
     import utils as _utils
 
     model_cfg = _utils.load_models_config()

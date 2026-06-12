@@ -7,8 +7,8 @@
 #  - Supports Wave3 setup evaluation with confirmed_idx lookahead barrier
 # =============================================================================
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -16,10 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import pandas as pd
 
 import utils
+from elliott_waves.elliott.backtest.param_sweep import ParamSweep
+from elliott_waves.elliott.backtest.walkforward import WalkForwardEvaluator
 from elliott_waves.elliott.config import ElliottConfig
 from elliott_waves.elliott.data import load_ohlcv, resample_ohlcv
-from elliott_waves.elliott.backtest.walkforward import WalkForwardEvaluator
-from elliott_waves.elliott.backtest.param_sweep import ParamSweep
 
 # -------------------------------------------------------------------------
 # Timeframe → pandas resample frequency

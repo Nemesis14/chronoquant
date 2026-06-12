@@ -8,25 +8,24 @@
 #  - Output to file (--out) or interactive display
 # =============================================================================
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import utils
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import load_ohlcv, resample_ohlcv, Pivot, PivotKind
-from elliott_waves.elliott.indicators.atr import atr14
-from elliott_waves.elliott.pivots.zigzag import detect_zigzag
+from elliott_waves.elliott.data import PivotKind, load_ohlcv, resample_ohlcv
 from elliott_waves.elliott.parser.dynamic_parser import DynamicParser
+from elliott_waves.elliott.pivots.zigzag import detect_zigzag
+from elliott_waves.elliott.scanners.abc import ABCScanner
 from elliott_waves.elliott.scanners.setup_1212 import detect_1212
 from elliott_waves.elliott.scanners.wave3 import Wave3Scanner
 from elliott_waves.elliott.scanners.wave5 import Wave5Scanner
-from elliott_waves.elliott.scanners.abc import ABCScanner
-from elliott_waves.elliott.viz.candle_chart import CandleChart, DN_COLOR
-from elliott_waves.elliott.viz.wave_plot import WavePlot
+from elliott_waves.elliott.viz.candle_chart import DN_COLOR, CandleChart
 from elliott_waves.elliott.viz.multi_wave import MultiWavePlot
+from elliott_waves.elliott.viz.wave_plot import WavePlot
 
 # -------------------------------------------------------------------------
 # Timeframe → pandas resample frequency mapping
@@ -97,7 +96,6 @@ def _plot_1212(
     tf:       str,
     out:      str | None,
 ) -> None:
-    import pandas as pd
 
     setups = detect_1212(df, cfg)
     if setups.empty:

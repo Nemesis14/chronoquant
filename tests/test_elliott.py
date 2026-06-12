@@ -9,34 +9,30 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
-import pytest
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC  = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from elliott_waves.elliott.config import ElliottConfig
-from elliott_waves.elliott.data import Pivot, PivotKind, PatternCandidate
+from elliott_waves.elliott.data import PatternCandidate, Pivot, PivotKind
 from elliott_waves.elliott.indicators.atr import atr14
-from elliott_waves.elliott.indicators.momentum import ema, ema_slope, range_expansion
-from elliott_waves.elliott.pivots.zigzag import detect_zigzag
-from elliott_waves.elliott.pivots.fractal import detect_fractal
-from elliott_waves.elliott.pivots.multi_degree import build_multi_degree
-from elliott_waves.elliott.scoring.ratios import band_score, fib_score, retracement, extension
-from elliott_waves.elliott.validators.base import ValidationResult, eps_price
-from elliott_waves.elliott.validators.impulse import ImpulseValidator
-from elliott_waves.elliott.validators.diagonal import DiagonalValidator
-from elliott_waves.elliott.validators.zigzag_abc import ZigZagValidator
-from elliott_waves.elliott.validators.flat import FlatValidator
-from elliott_waves.elliott.validators.triangle import TriangleValidator
-from elliott_waves.elliott.validators.full_cycle import FullCycleValidator
+from elliott_waves.elliott.indicators.momentum import ema, ema_slope
 from elliott_waves.elliott.parser.candidate_store import CandidateStore
 from elliott_waves.elliott.parser.dynamic_parser import DynamicParser
+from elliott_waves.elliott.pivots.multi_degree import build_multi_degree
+from elliott_waves.elliott.pivots.zigzag import detect_zigzag
 from elliott_waves.elliott.scanners.setup_1212 import detect_1212
 from elliott_waves.elliott.scanners.wave3 import Wave3Scanner
-
+from elliott_waves.elliott.scoring.ratios import band_score, fib_score, retracement
+from elliott_waves.elliott.validators.diagonal import DiagonalValidator
+from elliott_waves.elliott.validators.flat import FlatValidator
+from elliott_waves.elliott.validators.full_cycle import FullCycleValidator
+from elliott_waves.elliott.validators.impulse import ImpulseValidator
+from elliott_waves.elliott.validators.triangle import TriangleValidator
+from elliott_waves.elliott.validators.zigzag_abc import ZigZagValidator
 
 # =============================================================================
 # Helpers

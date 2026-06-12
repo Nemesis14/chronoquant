@@ -16,7 +16,6 @@ keveredjen egyetlen nagy dokumentumba.
 | `evaluation/` | Strategy evaluation, backtest engine, eredmenyriportok |
 | `engineering/` | Code style, parancsok, tooling, testing, fejlesztoi workflow |
 | `reference/` | Config, artifact es script referencia |
-| `plans/` | Active/backlog/completed implementacios tervek |
 
 ## Recommended Reading Order
 
@@ -34,4 +33,6 @@ keveredjen egyetlen nagy dokumentumba.
 - Model-specific evidence belongs in `modeling/model_cards/`.
 - Backtest/strategy evidence belongs in `evaluation/reports/`.
 - How-to-run instructions belong in `engineering/`.
-
+- Rajzos, tobb modult magyarazo attekintok neve `map_<terulet>_<tema>.md`
+  legyen, es abba a kodmappaba keruljon, amelyikrol szol.
+- Implementacios specifikaciok a repo gyoker `backlog/` mappajaba kerulnek.

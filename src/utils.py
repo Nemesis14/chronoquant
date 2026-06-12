@@ -288,6 +288,52 @@ def signal_probability_threshold(predictions_cfg: dict | None = None) -> float:
     return float(signal_cfg.get("threshold", 0.5))
 
 
+def champion_models_for_asset(
+    model_cfg : dict,
+    asset_id  : str | None = None,
+) -> tuple[str, dict, str, dict]:
+    """Return (long_model_id, long_meta, short_model_id, short_meta) for an asset.
+
+    Resolves the default asset when asset_id is None. Long model is identified
+    by target_name starting with 'trg_l_'; short by 'trg_s_'.
+
+    Args:
+        model_cfg : Loaded models config dict.
+        asset_id  : Asset key; uses default_asset_id if None.
+
+    Returns:
+        Tuple of (long_model_id, long_meta, short_model_id, short_meta).
+
+    Raises:
+        ValueError: If a unique active long and short model cannot be resolved.
+    """
+    resolved = resolve_asset_id(asset_id)
+    models   = model_cfg.get("models", {})
+
+    long_id   : str  | None = None
+    long_meta : dict | None = None
+    short_id  : str  | None = None
+    short_meta: dict | None = None
+
+    for mid, meta in models.items():
+        if not meta.get("active", False):
+            continue
+        if meta.get("asset_id") != resolved:
+            continue
+        target = meta.get("target_name", "")
+        if target.startswith("trg_l_") and long_id is None:
+            long_id, long_meta = mid, meta
+        elif target.startswith("trg_s_") and short_id is None:
+            short_id, short_meta = mid, meta
+
+    if long_id is None or long_meta is None:
+        raise ValueError(f"No active long model found for asset {resolved!r}")
+    if short_id is None or short_meta is None:
+        raise ValueError(f"No active short model found for asset {resolved!r}")
+
+    return long_id, long_meta, short_id, short_meta
+
+
 def long_short_prediction_columns(model_cfg: dict) -> tuple[str, str]:
     """Return (long_pred_col, short_pred_col) for the active model pair.
 

@@ -6,8 +6,7 @@
     "src",
     "schemas",
     "tools",
-    "skills",
-    "scripts"
+    "skills"
   ],
   "exclude": [
     "**/__pycache__",

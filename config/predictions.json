@@ -1,33 +1,32 @@
 {
-    "schema_version": 1,
+    "schema_version": 2,
     "live_predictions": {
-        "description": "Application-facing live prediction table. It stores only the currently configured runtime model output with stable generic column names.",
-        "runtime_model_source": "config/env.json -> runtime.model_id",
-        "runtime_model_metadata_source": "config/models.json -> models.<runtime.model_id>",
-        "source_feature_table": "config/db.json -> database.tables.features",
-        "destination_table": "config/db.json -> database.tables.predictions",
+        "description": "Application-facing live prediction dataset. The backend resolves the champion long and short models and writes their probabilities to stable column names — consumers never reference model IDs.",
+        "champion_model_source": "config/models.json -> active models filtered by asset_id and target_name prefix (trg_l_ = long, trg_s_ = short)",
+        "source_feature_dataset": "data/<asset_id>/features/*.parquet",
+        "destination_dataset": "data/<asset_id>/predictions/*.parquet",
         "column_names": {
-            "target": "target",
-            "prediction": "prediction",
-            "signal": "signal"
+            "long_pred":  "long_pred",
+            "short_pred": "short_pred"
         },
         "column_docs": {
-            "open_time": "UTC minute timestamp copied from the features table.",
-            "close": "Close price copied from the features table for app display.",
-            "target": "The target value copied from the runtime model's configured target_name column in the features table.",
-            "prediction": "The runtime model probability for its configured target.",
-            "signal": "Trading label derived from prediction and the configured signal threshold."
+            "open_time":       "UTC minute timestamp copied from the features dataset.",
+            "close":           "Close price copied from the features dataset for display and joins.",
+            "trg_l_fw60_q90":  "Long fact target (binary label): 1 if forward max return over 60 bars >= 90th-percentile threshold. Copied from the features dataset.",
+            "trg_s_fw60_q10":  "Short fact target (binary label): 1 if forward min return over 60 bars <= 10th-percentile threshold. Copied from the features dataset.",
+            "long_pred":       "Champion long model probability output. Always reflects the current active long champion regardless of model ID.",
+            "short_pred":      "Champion short model probability output. Always reflects the current active short champion regardless of model ID."
         },
         "signal": {
             "threshold": 0.5,
-            "direction_source": "Inferred from the runtime model target_name prefix: trg_l_ emits LONG above threshold, trg_s_ emits SHORT above threshold.",
+            "direction_source": "Inferred from target column prefix: trg_l_ -> long signal above threshold, trg_s_ -> short signal above threshold.",
             "neutral_rule": "prediction < threshold",
             "note": "Tune this threshold with model evaluation before using it as a live trading cutoff."
         }
     },
     "evaluation_predictions": {
-        "description": "Model comparison predictions should be generated outside the live predictions table.",
-        "recommended_storage": "Model/evaluation artifacts under models/<model_id>/ or a future narrow evaluation table.",
+        "description": "Model comparison predictions are generated outside the live predictions dataset.",
+        "recommended_storage": "Model/evaluation artifacts under models/<model_id>/ or a dedicated evaluation dataset.",
         "recommended_columns": [
             "open_time",
             "model_id",

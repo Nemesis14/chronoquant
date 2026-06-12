@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
-from db.table_ops import sqlite_connect, table_exists
 
 import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_ohlcv import sync_ohlcv
 from data_pipeline.sync_predictions import sync_predictions
+from store.duckdb_query import query_range, row_count
+from store.parquet_store import list_partitions
 from streamlit_app.dashboard_logging import get_dashboard_logger
 
 INITIAL_SYNC_START = "2017-01-01 00:00:00"
@@ -72,54 +73,49 @@ class _LoggerWriter(io.StringIO):
 
 
 def run_database_sync(asset_id: str | None = None) -> SyncResult:
-    logger = get_dashboard_logger()
-    db_cfg = utils.load_asset_config(asset_id)["database"]
-    db_path = db_cfg["db_path"]
-    tables = db_cfg["tables"]
-    table_ohlcv = tables["ohlcv"]
-    table_pred = tables["predictions"]
+    logger   = get_dashboard_logger()
+    db_cfg   = utils.load_asset_config(asset_id)["database"]
+    data_dir = db_cfg["data_dir"]
 
     lock = get_sync_lock(asset_id)
     if not lock.acquire(blocking=False):
         logger.info("Sync already running for asset_id=%s — skipped", asset_id)
-        rows = _row_count(db_path, table_ohlcv)
+        rows = row_count(data_dir, "ohlcv")
         return SyncResult(
-            start_time         = "",
-            end_time           = None,
-            ohlcv_rows_before  = rows,
-            ohlcv_rows_after   = rows,
+            start_time        = "",
+            end_time          = None,
+            ohlcv_rows_before = rows,
+            ohlcv_rows_after  = rows,
         )
 
     try:
-        return _run_database_sync_locked(
-            asset_id, logger, db_path, table_ohlcv, table_pred
-        )
+        return _run_database_sync_locked(asset_id, logger, data_dir)
     finally:
         lock.release()
 
 
 def _run_database_sync_locked(
-    asset_id: str | None,
-    logger: logging.Logger,
-    db_path: str,
-    table_ohlcv: str,
-    table_pred: str,
+    asset_id  : str | None,
+    logger    : logging.Logger,
+    data_dir  : str,
 ) -> SyncResult:
     logger.info("Database sync started")
-    logger.info("Active DB: %s", db_path)
-    _prepare_database(db_path, logger)
+    logger.info("Data dir: %s", data_dir)
 
-    rows_before = _row_count(db_path, table_ohlcv)
-    last_open_time = _latest_open_time(db_path, table_ohlcv)
-    start_time = _next_open_time(last_open_time) if last_open_time else INITIAL_SYNC_START
-    start_ms = _utc_str_to_ms(start_time)
+    rows_before    = row_count(data_dir, "ohlcv")
+    last_open_time = _latest_parquet_open_time(data_dir, "ohlcv")
+    start_time     = _next_open_time(last_open_time) if last_open_time else INITIAL_SYNC_START
+    start_ms       = _utc_str_to_ms(start_time)
 
     logger.info("OHLCV sync from Binance started at %s", start_time)
     _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
 
-    rows_after = _row_count(db_path, table_ohlcv)
-    latest_open_time = _latest_open_time(db_path, table_ohlcv)
-    logger.info("OHLCV rows before=%s after=%s inserted=%s", rows_before, rows_after, rows_after - rows_before)
+    rows_after       = row_count(data_dir, "ohlcv")
+    latest_open_time = _latest_parquet_open_time(data_dir, "ohlcv")
+    logger.info(
+        "OHLCV rows before=%s after=%s inserted=%s",
+        rows_before, rows_after, rows_after - rows_before,
+    )
 
     if not latest_open_time or pd.to_datetime(latest_open_time) < pd.to_datetime(start_time):
         logger.info("No new OHLCV interval found for feature and prediction sync")
@@ -130,18 +126,18 @@ def _run_database_sync_locked(
     _run_with_logged_stdout(
         sync_features,
         start_time,
-        end_time=latest_open_time,
-        asset_id=asset_id,
-        logger=logger,
+        end_time = latest_open_time,
+        asset_id = asset_id,
+        logger   = logger,
     )
 
     logger.info("Prediction sync started: %s -> %s", start_time, latest_open_time)
     _run_with_logged_stdout(
         sync_predictions,
         start_time,
-        end_time=latest_open_time,
-        asset_id=asset_id,
-        logger=logger,
+        end_time = latest_open_time,
+        asset_id = asset_id,
+        logger   = logger,
     )
 
     logger.info("Database sync complete")
@@ -155,22 +151,20 @@ def _run_with_logged_stdout(func, *args, logger: logging.Logger, **kwargs) -> No
     writer.flush()
 
 
-def _latest_open_time(db_path: str, table_name: str) -> str | None:
-    if not table_exists(db_path, table_name):
+def _latest_parquet_open_time(data_dir: str, dataset: str) -> str | None:
+    dates = list_partitions(data_dir, dataset)
+    if not dates:
         return None
-
-    with sqlite_connect(db_path) as conn:
-        row = conn.execute(f"SELECT MAX(open_time) FROM {table_name}").fetchone()
-    return row[0] if row and row[0] else None
-
-
-def _row_count(db_path: str, table_name: str) -> int:
-    if not table_exists(db_path, table_name):
-        return 0
-
-    with sqlite_connect(db_path) as conn:
-        row = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
-    return int(row[0] or 0) if row else 0
+    last_date = dates[-1]
+    df = query_range(
+        data_dir, dataset,
+        start   = last_date + " 00:00:00",
+        end     = last_date + " 23:59:59",
+        columns = ["open_time"],
+    )
+    if df.empty:
+        return None
+    return pd.Timestamp(str(df["open_time"].max())).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _next_open_time(open_time: str) -> str:
@@ -184,15 +178,7 @@ def _utc_str_to_ms(value: str) -> int:
         text = text[:-1] + "+00:00"
 
     dt = datetime.fromisoformat(text)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    else:
-        dt = dt.astimezone(UTC)
+    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
     return int(dt.timestamp() * 1000)
 
 
-def _prepare_database(db_path: str, logger: logging.Logger) -> None:
-    with sqlite_connect(db_path) as conn:
-        mode = conn.execute("PRAGMA journal_mode=WAL").fetchone()
-        conn.execute("PRAGMA synchronous=NORMAL")
-    logger.info("SQLite journal mode: %s", mode[0] if mode else "unknown")

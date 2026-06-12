@@ -497,7 +497,7 @@ prediction timestamp, and strategy/backtest summary.
 
 ## 10. Report
 
-Store completed analysis under `docs/plans/completed/`, `docs/modeling/experiments/`, or `docs/evaluation/reports/`.
+Store implementation specs under `backlog/`, completed modeling analysis under `docs/modeling/experiments/`, and evaluation reports under `docs/evaluation/reports/`.
 
 Minimum report contents:
 

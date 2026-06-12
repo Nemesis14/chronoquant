@@ -40,7 +40,8 @@ uv run python script.py
 "language-server": {
   "command": "mcp-language-server.exe",
   "args": ["--workspace", "d:/repos/chronoquant",
-           "--lsp", "pyright-langserver.exe", "--", "--stdio"]
+           "--lsp", "d:/repos/chronoquant/.venv/Scripts/pyright-langserver.exe",
+           "--", "--stdio"]
 }
 ```
 

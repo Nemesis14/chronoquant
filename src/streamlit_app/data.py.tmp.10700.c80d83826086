@@ -9,12 +9,12 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from db.table_ops import sqlite_connect
 
 import utils
 from store.duckdb_query import query_range
@@ -118,7 +118,7 @@ def table_exists(
     db_path = db_path or _db_path(asset_id)
     if not db_path or not Path(db_path).exists():
         return False
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         row = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
             (table_name,),
@@ -208,9 +208,10 @@ def prediction_history(
     )
     if df.empty:
         return df
-    latest_ts = df["open_time"].max()
-    start_ts  = latest_ts - pd.Timedelta(hours=int(lookback_hours))
-    return df[df["open_time"] >= start_ts].reset_index(drop=True)  # type: ignore[return-value]
+    latest_ts             = df["open_time"].max()
+    start_ts              = latest_ts - pd.Timedelta(hours=int(lookback_hours))
+    filtered: pd.DataFrame = df[df["open_time"] >= start_ts]
+    return filtered.reset_index(drop=True)
 
 
 # =============================================================================
@@ -430,7 +431,7 @@ def table_columns(table_name: str, asset_id: str | None = None) -> list[str]:
     db_path = _db_path(asset_id)
     if not db_path:
         return []
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         return [row[1] for row in conn.execute(f"PRAGMA table_info({_quote_identifier(table_name)})")]
 
 
@@ -505,7 +506,7 @@ def _read_sql(
     db_path = _db_path(asset_id)
     if not db_path:
         return pd.DataFrame()
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         return pd.read_sql_query(query, conn, params=params)
 
 
@@ -523,7 +524,7 @@ def _scalar(
     db_path = _db_path(asset_id)
     if not db_path:
         return None
-    with sqlite3.connect(db_path) as conn:
+    with sqlite_connect(db_path) as conn:
         row = conn.execute(query, params).fetchone()
     return row[0] if row else None
 

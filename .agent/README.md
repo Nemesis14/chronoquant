@@ -8,6 +8,7 @@ Shared rules for AI agents working on ChronoQuant.
 - `board_workflow.md`: board and plan lifecycle rules.
 - `coding_standards.md`: shared code style and implementation standards.
 - `documentation_standards.md`: shared documentation standards.
+- `confluence_standards.md`: Confluence-first documentation rules.
 - `permission_rules.md`: permission authority and expected project capability rules.
 - `mcp_rules.md`: MCP and tool-use rules.
 - `ai_tools_setup.md`: tool setup and operational notes.

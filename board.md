@@ -1,22 +1,9 @@
-
-| # | Task | Scope | Megjegyzes |
-|---|------|-------|-----------|
-| 4 | Tablasema JSON registry | `db/table_ops.py`, uj config fajl | Explicit DDL definicio, generate-if-not-exists pattern |
-| 5 | Concurrent write vedelem | `sync_features.py`, `table_ops.py` | `drop_existing + to_sql` race condition; atallas upsert-re vagy BEGIN EXCLUSIVE tranzakcio |
-| 6 | DuckDB atallas elemzese | egesz `src/` | Elonyok: pandas integracios, analitikus query speed; Hatrany: concurrent write ugyanugy nem megoldott |
-| 7 | Historikus adatok ujraletoltese es Parquet rebuild | `data/`, `scripts/` | SQLite archivalas utan: OHLCV Binance-bol teljesen ujra, features + predictions ujraszamolas; fuggo a DuckDB atallaastol |
-
-
--- claude api - agent ?!
-Manage usage on claude.ai
-What’s contributing to your limits usage?
-Day
-Week
-Approximate, based on local sessions on this machine — does not include other devices or claude.ai
-Last 24h · these are independent characteristics of your usage, not a breakdown
-17% of your usage came from subagent-heavy sessions
-Each subagent runs its own requests. Be deliberate about spawning them — and consider configuring a cheaper model for simpler subagents.
-Skills
-% of usage
-/claude-api
-4%
+| # | Status | Task | Scope | Megjegyzes |
+|---|--------|------|-------|-----------|
+| 1 | Validation | Prediction long/short stabil schema | `backlog/prediction_long_short_schema.md`, `src/data_pipeline/sync_predictions.py`, `src/store/parquet_store.py`, `src/streamlit_app/data.py`, `src/trading/service.py` | Pred dataset tartalmazza mindket fact targetet es stabil `long_pred`/`short_pred` prob oszlopot; backend valaszt champion modelt, model ID ne legyen beegetve schema oszlopnevbe |
+| 2 | Validation | Active model asset feloldas javitas | `src/data_pipeline/sync_predictions.py`, `src/utils.py`, tesztek | `asset_id=None` eseten a default asset modelljei is legyenek aktivnak feloldva; jelenleg a modell-szures kihagyhatja oket |
+| 3 | Open | Prediction dataset validacios checklist | `src/data_pipeline/`, `backlog/`, esetleg `tests/` | Legyen ellenorzes arra, hogy `features` tartalmazza a long es short targetet, `predictions` tartalmazza a long es short probabilityt, es a sorok nem vesznek el rebuild utan |
+| 4 | Open | AI agent usage hint formalizalasa | `.agent/ai_tools_setup.md`, `.agent/general_agent_principles.md` | A bemasolt usage-limit hint alapjan rovid szabaly: subagenteket csak indokolt esetben hasznalunk, koltseges/limit-erzekeny munkanal elobb sajat kontextus es celzott tool-hivas |
+| 6 | Open | Trading journal migracio SQLite → DuckDB | `src/trading/journal.py`, `src/streamlit_app/data.py`, `config/trading.json` | `journal.py` osszes muveletjet (ensure_tables, insert/update/select) DuckDB-re atirni; `data.py` trading tabla olvasasok (active_position, closed_trades, recent_orders, recent_errors, table_health) szinten DuckDB-re; sqlite3 import teljes eltavolitasa a projektbol |
+| 5 | Validation | db_path hianyzik load_asset_config visszateresi ertekebol | `src/utils.py`, `src/streamlit_app/data.py`, `src/trading/service.py` | `load_asset_config()` mar csak `data_dir`-t ad vissza, `db_path` es `tables` nincsenek benne; `data.py` es `service.py` meg mindig SQLite-ot olvas `db_path` alapjan — vagy `load_asset_config()` bovitendo, vagy a fogyasztok atallitandok Parquet/DuckDB olvasasra |
+1

@@ -4,7 +4,11 @@
     "allow": [
       "Bash(*)",
       "Edit(*)",
-      "Write(*)"
+      "Write(*)",
+      "PowerShell(uv run pyright*)",
+      "PowerShell(uv run ruff*)",
+      "PowerShell(uv run python*)",
+      "PowerShell(uv run pytest*)"
     ]
   }
 }

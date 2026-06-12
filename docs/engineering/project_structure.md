@@ -55,9 +55,7 @@ files directly.
 - `docs/evaluation/`: strategy evaluation, backtest engine, decision reports.
 - `docs/engineering/`: code style, commands, tooling, testing, workflow, structure, runbooks.
 - `docs/reference/`: config, artifact, and script reference.
-- `docs/plans/active/`: currently active implementation plans.
-- `docs/plans/completed/`: completed plans.
-- `docs/plans/backlog/`: future work.
+- `backlog/`: implementation specs and future work.
 - `docs/concepts/elliott_waves/`: Elliott Wave research, specs, studies, and examples.
 
 ## Agent Rules

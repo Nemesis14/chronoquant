@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
 import threading
 import time
 import traceback
 import uuid
 from datetime import UTC, datetime, timedelta
+
+import pandas as pd
 
 import utils
 from trading import journal, strategy
@@ -60,9 +61,9 @@ class TradingService:
         self.long_cfg = strategies[config["long_strategy_id"]]
         self.short_cfg = strategies[config["short_strategy_id"]]
 
-        # Prediction column names from model IDs
-        self.long_pred_col = utils.prediction_col_name(self.long_cfg["model_id"])
-        self.short_pred_col = utils.prediction_col_name(self.short_cfg["model_id"])
+        # Stable prediction column names (not model-ID-derived)
+        self.long_pred_col  = "long_pred"
+        self.short_pred_col = "short_pred"
 
         # Exchange client
         self.exchange = BinanceFuturesClient(
@@ -340,44 +341,49 @@ class TradingService:
 
     def _read_latest_bar(self) -> tuple[str, float, float, float] | None:
         """
-        Read the latest safely closed 1-minute bar's predictions.
+        Read the latest safely closed 1-minute bar's predictions from Parquet.
         Returns (bar_open_time, pred_long, pred_short, close_price) or None.
         """
-        db_cfg = utils.load_asset_config(self.asset_id)["database"]
-        db_path = db_cfg["db_path"]
-        table_pred = db_cfg["tables"]["predictions"]
-        table_ohlcv = db_cfg["tables"]["ohlcv"]
+        from store.duckdb_query import query_range
+        from store.parquet_store import list_partitions
 
-        # Latest closed bar = at most 1 minute before now
-        cutoff = datetime.now(UTC)
-        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+        data_dir   = utils.load_asset_config(self.asset_id)["database"]["data_dir"]
+        pred_dates = list_partitions(data_dir, "predictions")
+        if not pred_dates:
+            return None
+
+        cutoff    = datetime.now(UTC).replace(tzinfo=None)
+        start_str = (cutoff - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
+        end_str   = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            with sqlite3.connect(db_path, timeout=10) as conn:
-                row = conn.execute(
-                    f"""
-                    SELECT p.open_time,
-                           p."{self.long_pred_col}" AS pred_long,
-                           p."{self.short_pred_col}" AS pred_short,
-                           o.close
-                    FROM "{table_pred}" p
-                    JOIN "{table_ohlcv}" o ON o.open_time = p.open_time
-                    WHERE p.open_time < ?
-                      AND p."{self.long_pred_col}" IS NOT NULL
-                      AND p."{self.short_pred_col}" IS NOT NULL
-                    ORDER BY p.open_time DESC
-                    LIMIT 1
-                    """,
-                    (cutoff_str,),
-                ).fetchone()
+            df = query_range(
+                data_dir, "predictions",
+                start   = start_str,
+                end     = end_str,
+                columns = ["open_time", "close", self.long_pred_col, self.short_pred_col],
+            )
         except Exception as exc:
-            _logger.error("Failed to read predictions: %s", exc)
+            _logger.error("Failed to read predictions from Parquet: %s", exc)
             return None
 
-        if row is None:
+        if df.empty:
             return None
 
-        return row[0], float(row[1]), float(row[2]), float(row[3])
+        df["open_time"] = pd.to_datetime(df["open_time"])
+        df = df[df["open_time"] < pd.Timestamp(cutoff)].dropna(
+            subset=[self.long_pred_col, self.short_pred_col]
+        )
+        if df.empty:
+            return None
+
+        row = df.sort_values("open_time").iloc[-1]
+        return (
+            row["open_time"].strftime("%Y-%m-%d %H:%M:%S"),
+            float(row[self.long_pred_col]),
+            float(row[self.short_pred_col]),
+            float(row["close"]),
+        )
 
     # ------------------------------------------------------------------
     # Helpers

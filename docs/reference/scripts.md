@@ -1,8 +1,5 @@
 # Script Reference
 
-Use `docs/engineering/commands.md` for common commands. This page groups scripts
-by domain.
-
 ## Data Pipeline
 
 | Script | Purpose |

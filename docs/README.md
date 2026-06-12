@@ -26,8 +26,6 @@ keveredjen egyetlen nagy dokumentumba.
 4. `data/lineage.md`
 5. `modeling/guide.md`
 6. `evaluation/strategy_evaluation.md`
-7. `engineering/commands.md`
-
 ## Documentation Rules
 
 - Stable system design belongs in `architecture/`.

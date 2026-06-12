@@ -9,8 +9,6 @@ read-only monitoring flows.
 
 - `docs/architecture/overview.md`
 - `docs/engineering/code_style.md`
-- `docs/engineering/commands.md`
-
 ## Primary Scope
 
 - `src/streamlit_app/`

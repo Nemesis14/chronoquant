@@ -1,0 +1,21 @@
+{
+    "model_id": "lgbm_solusdt_s_fw60_q10_local_v4",
+    "side": "short",
+    "n_features": 202,
+    "train_prauc": 0.458,
+    "valid_prauc": 0.338,
+    "train_rocauc": 0.853,
+    "valid_rocauc": 0.793,
+    "holdout": {
+        "period": "2025-06-10 \u2013 2026-06-10 (holdout)",
+        "entry": 0.45,
+        "max_hold": 120,
+        "trades": 106,
+        "wins": 59,
+        "losses": 47,
+        "win_rate": 55.7,
+        "total_return": "+52.0%",
+        "final_equity": "15,195.57",
+        "max_dd": "-10.7%"
+    }
+}

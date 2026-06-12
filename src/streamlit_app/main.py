@@ -722,8 +722,9 @@ def render_trade_panel(asset_id: str | None) -> None:
     _render_recent_trades_panel(trades_df, asset_id)
 
     if asset_id == "solusdt_fw60":
-        _render_model_stats_panel("long",  _SOL_MODEL_STATS["long"])
-        _render_model_stats_panel("short", _SOL_MODEL_STATS["short"])
+        for _side in ("long", "short"):
+            if _side in _SOL_MODEL_STATS:
+                _render_model_stats_panel(_side, _SOL_MODEL_STATS[_side])
 
 
 # =============================================================================

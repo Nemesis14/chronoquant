@@ -9,8 +9,6 @@ derived table rebuild workflows.
 
 - `docs/architecture/overview.md`
 - `docs/engineering/code_style.md`
-- `docs/engineering/commands.md`
-
 ## Primary Scope
 
 - `src/data_pipeline/`

@@ -9,7 +9,6 @@ artifacts, and model comparison.
 
 - `docs/architecture/overview.md`
 - `docs/engineering/code_style.md`
-- `docs/engineering/commands.md`
 - `docs/modeling/guide.md`
 - `docs/modeling/sampling.md`
 - `docs/modeling/lightgbm_development.md`

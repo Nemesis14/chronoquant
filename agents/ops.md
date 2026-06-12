@@ -7,7 +7,6 @@ environment setup.
 
 ## Must Read
 
-- `docs/engineering/commands.md`
 - `docs/engineering/testing.md`
 - `docs/engineering/workflow.md`
 

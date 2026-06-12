@@ -1,9 +1,26 @@
 # Claude Entry Point
 
-Read `AGENTS.md` first.
+Runtime settings and coding standards live under `.claude/`.
 
-This file exists as the Claude Code compatibility entry point. Shared project
-rules, startup reading, architecture notes, and agent role definitions are routed
-through `AGENTS.md`.
+## Session Startup
 
-Claude-specific runtime settings live under `.claude/`.
+- `board.md`
+- `.claude/coding_standards.md`
+
+## Agent Definitions
+
+- later spec...
+
+## Board and Backlog Management
+
+When a task is finished:
+1. Remove the task row from `board.md` — do not mark done, delete the row.
+2. Move the backlog plan file from `docs/plans/backlog/` to `docs/plans/completed/` if one exists.
+
+## Task Approach
+
+Before implementing any task:
+1. Outline an execution plan — high-level steps, no exhaustive detail.
+2. Ask if anything critical is unclear before starting.
+3. Check for existing code that already covers the need — do not write redundant logic.
+4. Verify integrity: new code must not duplicate or contradict existing modules or conventions.

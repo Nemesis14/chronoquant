@@ -1,0 +1,26 @@
+{
+  "pythonVersion": "3.12",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "src",
+    "schemas",
+    "tools",
+    "skills",
+    "scripts"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "notebooks",
+    "build",
+    "dist"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "useLibraryCodeForTypes": true
+}

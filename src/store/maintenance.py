@@ -1,17 +1,20 @@
-"""Maintenance workflows for rebuilding derived Parquet datasets.
+"""Maintenance workflows for rebuilding derived DuckDB datasets.
 
 Provides backfill and full-rebuild operations for features and predictions,
 chunked by month to limit peak memory usage. Safe to re-run.
 """
 
 import logging
+import sys
 from datetime import UTC, datetime, timedelta
-from store.duckdb_query import dataset_exists, query_range
-from store.parquet_store import drop_partitions
+from pathlib import Path
+
+import duckdb
 
 import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
+from store.duckdb_query import dataset_exists, ohlcv_dataset_exists, ohlcv_time_stats, query_range
 
 logger = logging.getLogger(__name__)
 
@@ -52,24 +55,87 @@ def backfill_predictions(
 
 
 # =============================================================================
+# raw_manifest_audit(data_dir, dataset) -> None
+# =============================================================================
+def raw_manifest_audit(data_dir: str, dataset: str) -> None:
+    """Run a DuckDB native integrity audit and log statistics.
+
+    Checks row count, open_time range, null timestamps, and duplicate
+    open_time values for the given native DuckDB table.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        dataset  : Table name: 'ohlcv', 'features', or 'predictions'.
+    """
+    db_file = Path(data_dir).with_suffix(".duckdb")
+    if not db_file.exists():
+        logger.warning("%s: raw_manifest_audit - DuckDB file not found: %s", dataset, db_file)
+        return
+
+    conn = duckdb.connect(str(db_file), read_only=True)
+    try:
+        tbl_exists = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+            [dataset],
+        ).fetchone()
+        if not (tbl_exists and tbl_exists[0] > 0):
+            logger.warning("%s: raw_manifest_audit - tabla nem talalhato", dataset)
+            return
+
+        result = conn.execute(f"""
+            SELECT
+                COUNT(*)                                                    AS row_count,
+                MIN(open_time)                                              AS min_ts,
+                MAX(open_time)                                              AS max_ts,
+                SUM(CASE WHEN open_time IS NULL THEN 1 ELSE 0 END)         AS null_ts,
+                COUNT(*) - COUNT(DISTINCT CAST(open_time AS VARCHAR))       AS dup_ts
+            FROM {dataset}
+        """).fetchone()
+        if not result:
+            logger.warning("%s: raw_manifest_audit - nincs adat", dataset)
+            return
+
+        row_count, min_ts, max_ts, null_ts, dup_ts = result
+        logger.info(
+            "%s | rows=%d min=%s max=%s null_ts=%d dup_ts=%d",
+            dataset, row_count, min_ts, max_ts, null_ts, dup_ts,
+        )
+        if null_ts > 0 or dup_ts > 0:
+            logger.warning("%s: GYANÚS - null_ts=%d dup_ts=%d", dataset, null_ts, dup_ts)
+        else:
+            logger.info("%s: raw_manifest_audit OK", dataset)
+    except Exception:
+        logger.exception("raw_manifest_audit DuckDB hiba: dataset=%s", dataset)
+    finally:
+        conn.close()
+
+
+# =============================================================================
 # log_dataset_check(data_dir, dataset) -> None
 # =============================================================================
 def log_dataset_check(data_dir: str, dataset: str) -> None:
-    """Log row count and open_time range for a Parquet dataset.
+    """Log row count, open_time range, and integrity audit for a DuckDB dataset.
 
     Args:
         data_dir : Root data directory for the asset.
         dataset  : Dataset name: 'ohlcv', 'features', or 'predictions'.
     """
-    if not dataset_exists(data_dir, dataset):
-        logger.warning("%s: nincsenek particiok", dataset)
-        return
-
-    df = query_range(data_dir, dataset, columns=["open_time"])
-    n  = len(df)
-    mn = df["open_time"].min() if n else None
-    mx = df["open_time"].max() if n else None
+    if dataset == "ohlcv":
+        if not ohlcv_dataset_exists(data_dir):
+            logger.warning("%s: nincsenek sorok", dataset)
+            return
+        n, mn, mx = ohlcv_time_stats(data_dir)
+    else:
+        if not dataset_exists(data_dir, dataset):
+            logger.warning("%s: nincsenek sorok", dataset)
+            return
+        df = query_range(data_dir, dataset, columns=["open_time"])
+        n  = len(df)
+        mn = df["open_time"].min() if n else None
+        mx = df["open_time"].max() if n else None
     logger.info("%s: sorok=%d, tartomany=%s -> %s", dataset, n, mn, mx)
+
+    raw_manifest_audit(data_dir, dataset)
 
 
 # =============================================================================
@@ -84,12 +150,12 @@ def rebuild_derived_tables(
     asset_id         : str | None = None,
     chunk_months     : int = 6,
 ) -> None:
-    """Rebuild features and predictions from existing OHLCV Parquet data.
+    """Rebuild features and predictions from existing OHLCV data in DuckDB.
 
     Args:
         start            : Start time, YYYY-MM-DD HH:MM:SS.
         end              : Optional end time.
-        drop             : Delete existing derived partitions before rebuild.
+        drop             : Delete existing derived rows before rebuild.
         features_only    : Rebuild only features dataset.
         predictions_only : Rebuild only predictions dataset.
         asset_id         : Asset key from config/assets.json.
@@ -104,12 +170,18 @@ def rebuild_derived_tables(
     )
 
     if drop:
-        if not predictions_only:
-            deleted = drop_partitions(data_dir, "features")
-            logger.info("Torolt feature particiok: %d", deleted)
-        if not features_only:
-            deleted = drop_partitions(data_dir, "predictions")
-            logger.info("Torolt prediction particiok: %d", deleted)
+        db_file = Path(data_dir).with_suffix(".duckdb")
+        if db_file.exists():
+            conn = duckdb.connect(str(db_file))
+            try:
+                if not predictions_only:
+                    conn.execute("DELETE FROM features WHERE 1=1")
+                    logger.info("Torolt feature sorok (DuckDB DELETE)")
+                if not features_only:
+                    conn.execute("DELETE FROM predictions WHERE 1=1")
+                    logger.info("Torolt prediction sorok (DuckDB DELETE)")
+            finally:
+                conn.close()
 
     if not predictions_only:
         chunks = _chunk_date_ranges(start, end, chunk_months)
@@ -144,10 +216,10 @@ def _chunk_date_ranges(
     Returns:
         List of (chunk_start, chunk_end) tuples.
     """
-    end_dt    = datetime.fromisoformat(end) if end else datetime.now(UTC)
-    start_dt  = datetime.fromisoformat(start)
-    chunks    = []
-    chunk_s   = start_dt
+    end_dt   = datetime.fromisoformat(end) if end else datetime.now(UTC).replace(tzinfo=None)
+    start_dt = datetime.fromisoformat(start)
+    chunks   = []
+    chunk_s  = start_dt
 
     while chunk_s < end_dt:
         month   = chunk_s.month - 1 + chunk_months
@@ -161,3 +233,23 @@ def _chunk_date_ranges(
         chunk_s = chunk_e + timedelta(seconds=1)
 
     return chunks
+
+
+# =============================================================================
+# CLI entry point: python -m src.store.maintenance check [asset_id]
+# =============================================================================
+if __name__ == "__main__":
+    import logging as _logging
+    _logging.basicConfig(level=_logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+    cmd      = sys.argv[1] if len(sys.argv) > 1 else "check"
+    asset_id = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if cmd == "check":
+        db_cfg   = utils.load_asset_config(asset_id)
+        data_dir = db_cfg["database"]["data_dir"]
+        for ds in ("ohlcv", "features", "predictions"):
+            log_dataset_check(data_dir, ds)
+    else:
+        print(f"Unknown command: {cmd!r}. Usage: python -m src.store.maintenance check [asset_id]")
+        sys.exit(1)

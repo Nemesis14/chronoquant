@@ -10,12 +10,14 @@ import json
 import logging
 import os
 import pickle
+from datetime import timedelta
 
 import pandas as pd
+import polars as pl
 
 import utils
 from store.duckdb_query import query_range
-from store.parquet_store import upsert_partition
+from store.duckdb_store import ensure_tables, get_connection, insert_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +47,12 @@ def sync_predictions(
     # --- config ---
     resolved_asset = utils.resolve_asset_id(asset_id)
     db_cfg         = utils.load_asset_config(resolved_asset)
+    feat_cfg       = utils.load_features_config(asset_id=resolved_asset)
     model_cfg      = utils.load_models_config()
     data_dir       = db_cfg["database"]["data_dir"]
+
+    _targets     = feat_cfg["database"]["features"].get("targets", [])
+    _fw_minutes  = _targets[0]["rolling_window"] if _targets else 60
 
     # --- champion model resolution ---
     try:
@@ -90,19 +96,31 @@ def sync_predictions(
     long_proba  = _run_inference(df, long_feat_list,  long_model,  long_meta)
     short_proba = _run_inference(df, short_feat_list, short_model, short_meta)
 
-    # --- unified output (index-aligned, single upsert) ---
-    df_out = pd.DataFrame({
-        "open_time"    : df["open_time"],
-        "close"        : df["close"],
-        long_target    : df[long_target],
-        short_target   : df[short_target],
-        _LONG_PRED_COL : pd.to_numeric(pd.Series(long_proba,  dtype=object), errors="coerce"),
-        _SHORT_PRED_COL: pd.to_numeric(pd.Series(short_proba, dtype=object), errors="coerce"),
+    # --- unified output via polars (index-aligned, single upsert) ---
+    _open_time = pd.to_datetime(df["open_time"])
+    pl_out = pl.DataFrame({
+        "open_time"    : _open_time.dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+        "close"        : df["close"].tolist(),
+        "label_end_ts" : (_open_time + timedelta(minutes=_fw_minutes)).dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+        "dataset_split": [None] * len(df),
+        "fold_id"      : [None] * len(df),
+        long_target    : df[long_target].tolist(),
+        short_target   : df[short_target].tolist(),
+        _LONG_PRED_COL : list(map(float, long_proba)),
+        _SHORT_PRED_COL: list(map(float, short_proba)),
     })
+    df_out = pl_out.to_pandas()
+    df_out["open_time"]     = pd.to_datetime(df_out["open_time"])
+    df_out["label_end_ts"]  = pd.to_datetime(df_out["label_end_ts"])
 
-    written = upsert_partition(data_dir, "predictions", df_out)
+    conn = get_connection(data_dir)
+    ensure_tables(conn)
+    try:
+        written = insert_predictions(conn, df_out)
+    finally:
+        conn.close()
     logger.info(
-        "OK: %d predikció irva (long=%s, short=%s), %d sor a particiokban",
+        "OK: %d predikció irva (long=%s, short=%s), %d uj sor DuckDB-ba",
         len(df_out), long_id, short_id, written,
     )
 

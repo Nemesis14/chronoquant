@@ -6,7 +6,6 @@
 #  - Verify shared time-based CV splits are deterministic and non-overlapping
 # =============================================================================
 
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -21,25 +20,27 @@ from modeling.sampling import create_expanding_window_splits, validate_sample_de
 
 
 def test_load_modeling_dataset_from_features_table(tmp_path) -> None:
-    db_path = tmp_path / "dataset.db"
-    table_name = "features"
+    import duckdb
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True)
+    db_path  = data_dir.with_suffix(".duckdb")  # data.duckdb
     df = pd.DataFrame(
         {
-            "open_time": pd.date_range("2024-01-01", periods=5, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "close": [1, 2, 3, 4, 5],
-            "trg_l_fw240_q90": [0, 1, 0, 1, 0],
-            "feat_a": [0.1, 0.2, 0.3, 0.4, 0.5],
-            "feat_b": [1.0, 1.1, 1.2, 1.3, 1.4],
+            "open_time":       pd.date_range("2024-01-01", periods=5, freq="min"),
+            "close":           [1.0, 2.0, 3.0, 4.0, 5.0],
+            "available_ts":    pd.date_range("2024-01-01", periods=5, freq="min"),
+            "trg_l_fw240_q90": [0.0, 1.0, 0.0, 1.0, 0.0],
+            "feat_a":          [0.1, 0.2, 0.3, 0.4, 0.5],
+            "feat_b":          [1.0, 1.1, 1.2, 1.3, 1.4],
         }
     )
-
-    with sqlite3.connect(db_path) as conn:
-        df.to_sql(table_name, conn, index=False, if_exists="replace")
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE TABLE features AS SELECT * FROM df")
+    con.close()
 
     dataset = load_modeling_dataset(
         target_col = "trg_l_fw240_q90",
-        db_path    = str(db_path),
-        table_name = table_name,
+        data_dir   = str(data_dir),
     )
 
     assert dataset.target_col == "trg_l_fw240_q90"

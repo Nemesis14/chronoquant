@@ -26,7 +26,7 @@ sys.path.insert(0, "src")
 import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
-from store.parquet_store import list_partitions
+from store.duckdb_query import ohlcv_time_stats
 
 # %% Constants
 
@@ -48,41 +48,41 @@ def _configure_logging() -> None:
 
 
 def _earliest_ohlcv_date(data_dir: str) -> str:
-    """Return the first OHLCV partition date as a UTC start string.
+    """Return the earliest OHLCV open_time as a UTC start string.
 
     Args:
         data_dir : Root data directory for the asset.
 
     Returns:
-        UTC string 'YYYY-MM-DD 00:00:00' of the earliest OHLCV partition.
+        UTC string 'YYYY-MM-DD HH:MM:SS' of the earliest OHLCV row.
 
     Raises:
-        SystemExit: If no OHLCV partitions exist.
+        SystemExit: If no OHLCV rows exist in DuckDB.
     """
-    dates = list_partitions(data_dir, "ohlcv")
-    if not dates:
-        print("ERROR: Nincs OHLCV particio a megadott data_dir-ben:", data_dir)
+    _, min_ts, _ = ohlcv_time_stats(data_dir)
+    if min_ts is None:
+        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", data_dir)
         sys.exit(1)
-    return f"{dates[0]} 00:00:00"
+    return min_ts
 
 
 def _latest_ohlcv_date(data_dir: str) -> str:
-    """Return the last OHLCV partition date as a UTC end string.
+    """Return the latest OHLCV open_time as a UTC end string.
 
     Args:
         data_dir : Root data directory for the asset.
 
     Returns:
-        UTC string 'YYYY-MM-DD 23:59:59' of the latest OHLCV partition.
+        UTC string 'YYYY-MM-DD HH:MM:SS' of the latest OHLCV row.
 
     Raises:
-        SystemExit: If no OHLCV partitions exist.
+        SystemExit: If no OHLCV rows exist in DuckDB.
     """
-    dates = list_partitions(data_dir, "ohlcv")
-    if not dates:
-        print("ERROR: Nincs OHLCV particio a megadott data_dir-ben:", data_dir)
+    _, _, max_ts = ohlcv_time_stats(data_dir)
+    if max_ts is None:
+        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", data_dir)
         sys.exit(1)
-    return f"{dates[-1]} 23:59:59"
+    return max_ts
 
 
 def _monthly_chunks(start: str, end: str, chunk_months: int) -> list[tuple[str, str]]:

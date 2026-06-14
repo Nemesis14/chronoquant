@@ -1,8 +1,8 @@
-"""Read layer for daily Parquet partitions via DuckDB.
+"""Read layer for DuckDB native tables.
 
-Provides range queries and schema inspection over glob-based Parquet datasets.
-All queries return pandas DataFrames. DuckDB connections are in-memory and
-short-lived — no persistent .duckdb file is created.
+Queries ohlcv, features, and predictions from the persistent .duckdb file.
+The file path is derived from data_dir: data/solusdt_fw60 → data/solusdt_fw60.duckdb.
+All connections are short-lived; callers receive pandas DataFrames.
 """
 
 import logging
@@ -13,66 +13,93 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+# %% Connection helpers
+
+
+def _db_path(data_dir: str) -> Path:
+    """Return the .duckdb file path derived from data_dir."""
+    return Path(data_dir).with_suffix(".duckdb")
+
+
+def _connect(data_dir: str) -> duckdb.DuckDBPyConnection | None:
+    """Open a read-only DuckDB connection to the asset database.
+
+    Returns None when the .duckdb file does not exist yet (before first sync).
+
+    Args:
+        data_dir : Root data directory for the asset.
+
+    Returns:
+        Open DuckDB connection, or None if the database file is absent.
+    """
+    p = _db_path(data_dir)
+    if not p.exists():
+        logger.debug("DuckDB file not found: %s", p)
+        return None
+    return duckdb.connect(str(p), read_only=True)
+
+
+def _tbl_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
+    """Return True if the named table exists in the connected database."""
+    result = conn.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+        [table],
+    ).fetchone()
+    return bool(result and result[0] > 0)
+
+
 # %% Query
 
 
 def query_range(
-    data_dir  : str,
-    dataset   : str,
-    start     : str | None = None,
-    end       : str | None = None,
-    columns   : list[str] | None = None,
+    data_dir : str,
+    dataset  : str,
+    start    : str | None = None,
+    end      : str | None = None,
+    columns  : list[str] | None = None,
 ) -> pd.DataFrame:
-    """Query rows from a dataset within an optional open_time range.
-
-    Reads all daily .parquet partitions via DuckDB glob, filters by
-    open_time, and returns a sorted DataFrame.
+    """Query rows from a native DuckDB table within an optional open_time range.
 
     Args:
         data_dir : Root data directory for the asset.
-        dataset  : Sub-directory: 'ohlcv', 'features', or 'predictions'.
+        dataset  : Table name: 'ohlcv', 'features', or 'predictions'.
         start    : Optional lower bound, inclusive. YYYY-MM-DD HH:MM:SS.
         end      : Optional upper bound, inclusive. YYYY-MM-DD HH:MM:SS.
         columns  : Optional list of columns to SELECT. None = all columns.
 
     Returns:
-        DataFrame sorted by open_time, or empty DataFrame if no files found.
+        DataFrame sorted by open_time, or empty DataFrame if table not found.
     """
-    glob_path = str(Path(data_dir) / dataset / "*.parquet")
-    if not list(Path(data_dir, dataset).glob("*.parquet")):
+    conn = _connect(data_dir)
+    if conn is None:
         return pd.DataFrame()
-
-    col_expr = ", ".join(f'"{c}"' for c in columns) if columns else "*"
-
-    conditions: list[str] = []
-    params: list[str] = []
-    if start:
-        conditions.append("open_time >= ?")
-        params.append(start)
-    if end:
-        conditions.append("open_time <= ?")
-        params.append(end)
-
-    where = " AND ".join(conditions) if conditions else "1=1"
-    sql = f"""
-        SELECT {col_expr}
-        FROM read_parquet('{glob_path}', union_by_name = true)
-        WHERE {where}
-        ORDER BY open_time ASC
-    """
-
-    logger.debug("query_range: dataset=%s start=%s end=%s", dataset, start, end)
-    conn = duckdb.connect()
     try:
+        if not _tbl_exists(conn, dataset):
+            logger.debug("query_range: table not found: %s", dataset)
+            return pd.DataFrame()
+
+        col_expr   = ", ".join(f'"{c}"' for c in columns) if columns else "*"
+        conditions : list[str] = []
+        params     : list[str] = []
+        if start:
+            conditions.append("open_time >= ?")
+            params.append(start)
+        if end:
+            conditions.append("open_time <= ?")
+            params.append(end)
+        where = " AND ".join(conditions) if conditions else "1=1"
+        sql   = f"SELECT {col_expr} FROM {dataset} WHERE {where} ORDER BY open_time ASC"
+
+        logger.debug("query_range: dataset=%s start=%s end=%s", dataset, start, end)
         df = conn.execute(sql, params).df()
+        logger.debug("query_range: rows=%d", len(df))
+        return df
     except Exception:
-        logger.exception("DuckDB query_range sikertelen: dataset=%s", dataset)
+        logger.exception("query_range sikertelen: dataset=%s", dataset)
         raise
     finally:
         conn.close()
-
-    logger.debug("query_range: visszaadott sorok=%d", len(df))
-    return df
 
 
 def query_all(
@@ -80,15 +107,15 @@ def query_all(
     dataset  : str,
     columns  : list[str] | None = None,
 ) -> pd.DataFrame:
-    """Return all rows from a dataset, sorted by open_time.
+    """Return all rows from a dataset table, sorted by open_time.
 
     Args:
         data_dir : Root data directory for the asset.
-        dataset  : Sub-directory: 'ohlcv', 'features', or 'predictions'.
+        dataset  : Table name: 'ohlcv', 'features', or 'predictions'.
         columns  : Optional list of columns to SELECT. None = all columns.
 
     Returns:
-        Full DataFrame sorted by open_time, or empty DataFrame if no files.
+        Full DataFrame sorted by open_time, or empty DataFrame.
     """
     return query_range(data_dir, dataset, columns=columns)
 
@@ -97,69 +124,275 @@ def query_all(
 
 
 def dataset_columns(data_dir: str, dataset: str) -> list[str]:
-    """Return column names from the dataset schema (reads one partition).
+    """Return column names for a native DuckDB table.
 
     Args:
         data_dir : Root data directory for the asset.
-        dataset  : Sub-directory: 'ohlcv', 'features', or 'predictions'.
+        dataset  : Table name.
 
     Returns:
-        List of column name strings, or empty list if no partitions exist.
+        List of column name strings, or empty list if table not found.
     """
-    parts = sorted(Path(data_dir, dataset).glob("*.parquet"))
-    if not parts:
+    conn = _connect(data_dir)
+    if conn is None:
         return []
-
-    conn = duckdb.connect()
     try:
-        row = conn.execute(
-            f"DESCRIBE SELECT * FROM read_parquet('{parts[-1]}')"
+        if not _tbl_exists(conn, dataset):
+            return []
+        rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = ? ORDER BY ordinal_position",
+            [dataset],
         ).fetchall()
+        return [r[0] for r in rows]
     except Exception:
-        logger.exception("DuckDB dataset_columns sikertelen: dataset=%s", dataset)
+        logger.exception("dataset_columns sikertelen: dataset=%s", dataset)
         raise
     finally:
         conn.close()
-
-    return [r[0] for r in row]
 
 
 def dataset_exists(data_dir: str, dataset: str) -> bool:
-    """Return True if at least one partition exists for the dataset.
+    """Return True if the dataset table exists and has at least one row.
 
     Args:
         data_dir : Root data directory for the asset.
-        dataset  : Sub-directory to check.
+        dataset  : Table name.
 
     Returns:
-        True if any .parquet file exists.
+        True if the table exists with at least one row.
     """
-    return any(Path(data_dir, dataset).glob("*.parquet"))
+    conn = _connect(data_dir)
+    if conn is None:
+        return False
+    try:
+        if not _tbl_exists(conn, dataset):
+            return False
+        result = conn.execute(f"SELECT COUNT(*) FROM {dataset}").fetchone()
+        return bool(result and result[0] > 0)
+    except Exception:
+        logger.exception("dataset_exists sikertelen: dataset=%s", dataset)
+        return False
+    finally:
+        conn.close()
 
 
 def row_count(data_dir: str, dataset: str) -> int:
-    """Return total row count across all partitions in a dataset.
+    """Return total row count for a native DuckDB table.
 
     Args:
         data_dir : Root data directory for the asset.
-        dataset  : Sub-directory to count.
+        dataset  : Table name.
 
     Returns:
-        Total row count, or 0 if no files exist.
+        Row count, or 0 if table not found.
     """
-    glob_path = str(Path(data_dir) / dataset / "*.parquet")
-    if not dataset_exists(data_dir, dataset):
+    conn = _connect(data_dir)
+    if conn is None:
         return 0
-
-    conn = duckdb.connect()
     try:
-        result = conn.execute(
-            f"SELECT COUNT(*) FROM read_parquet('{glob_path}', union_by_name = true)"
-        ).fetchone()
+        if not _tbl_exists(conn, dataset):
+            return 0
+        result = conn.execute(f"SELECT COUNT(*) FROM {dataset}").fetchone()
+        return int(result[0]) if result else 0
     except Exception:
-        logger.exception("DuckDB row_count sikertelen: dataset=%s", dataset)
+        logger.exception("row_count sikertelen: dataset=%s", dataset)
         raise
     finally:
         conn.close()
 
-    return int(result[0]) if result else 0
+
+# %% ASOF join
+
+
+def asof_join_predictions_features(
+    data_dir      : str,
+    feature_cols  : list[str] | None = None,
+    start         : str | None = None,
+    end           : str | None = None,
+) -> pd.DataFrame:
+    """Join predictions to features using ASOF JOIN for temporal alignment.
+
+    For each prediction row, finds the most recent feature row where
+    available_ts <= prediction open_time.  Prevents look-ahead bias.
+
+    Args:
+        data_dir     : Root data directory for the asset.
+        feature_cols : Feature columns to SELECT from features. None = all feat_* columns.
+        start        : Optional lower bound on prediction open_time, inclusive.
+        end          : Optional upper bound on prediction open_time, inclusive.
+
+    Returns:
+        DataFrame with prediction_ts, lookback_end_ts, and feature columns.
+        Empty DataFrame if either table has no data.
+    """
+    conn = _connect(data_dir)
+    if conn is None:
+        return pd.DataFrame()
+    try:
+        for tbl in ("features", "predictions"):
+            if not _tbl_exists(conn, tbl):
+                logger.debug("asof_join: table missing: %s", tbl)
+                return pd.DataFrame()
+
+        if feature_cols:
+            feat_select = ", ".join(f'f."{c}"' for c in feature_cols)
+        else:
+            all_cols = conn.execute(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_name = 'features' ORDER BY ordinal_position"
+            ).fetchall()
+            feat_cols_all = [r[0] for r in all_cols if r[0].startswith("feat_")]
+            feat_select = (
+                ", ".join(f'f."{c}"' for c in feat_cols_all)
+                if feat_cols_all else "f.*"
+            )
+
+        conditions : list[str] = []
+        params     : list[str] = []
+        if start:
+            conditions.append("p.open_time >= ?")
+            params.append(start)
+        if end:
+            conditions.append("p.open_time <= ?")
+            params.append(end)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        sql = f"""
+            SELECT
+                p.open_time    AS prediction_ts,
+                f.available_ts AS lookback_end_ts,
+                {feat_select}
+            FROM predictions p
+            ASOF LEFT JOIN features f
+              ON p.open_time >= f.available_ts
+            {where}
+            ORDER BY prediction_ts ASC
+        """
+
+        logger.debug("asof_join_predictions_features: start=%s end=%s", start, end)
+        df = conn.execute(sql, params).df()
+        logger.debug("asof_join_predictions_features: rows=%d", len(df))
+        return df
+    except Exception:
+        logger.exception("asof_join_predictions_features sikertelen")
+        raise
+    finally:
+        conn.close()
+
+
+# %% Generic helpers
+
+
+def latest_open_time(data_dir: str, dataset: str) -> pd.Timestamp | None:
+    """Return the maximum open_time in a DuckDB table as a pandas Timestamp.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        dataset  : Table name: 'ohlcv', 'features', or 'predictions'.
+
+    Returns:
+        Maximum open_time as pd.Timestamp, or None if table is absent/empty.
+    """
+    conn = _connect(data_dir)
+    if conn is None:
+        return None
+    try:
+        if not _tbl_exists(conn, dataset):
+            return None
+        result = conn.execute(f"SELECT MAX(open_time) FROM {dataset}").fetchone()
+        if not result or result[0] is None:
+            return None
+        return pd.Timestamp(result[0])
+    except Exception:
+        logger.exception("latest_open_time sikertelen: dataset=%s", dataset)
+        raise
+    finally:
+        conn.close()
+
+
+# %% OHLCV shortcuts — backwards compat wrappers around query_range / row_count
+
+
+def ohlcv_dataset_exists(data_dir: str) -> bool:
+    """Return True if the ohlcv table exists with at least one row."""
+    return dataset_exists(data_dir, "ohlcv")
+
+
+def ohlcv_query_range(
+    data_dir : str,
+    start    : str | None = None,
+    end      : str | None = None,
+    columns  : list[str] | None = None,
+) -> pd.DataFrame:
+    """Query OHLCV rows from the native ohlcv table."""
+    return query_range(data_dir, "ohlcv", start=start, end=end, columns=columns)
+
+
+def ohlcv_row_count(data_dir: str) -> int:
+    """Return total OHLCV row count from the native ohlcv table."""
+    return row_count(data_dir, "ohlcv")
+
+
+def ohlcv_latest_open_time(data_dir: str) -> str | None:
+    """Return the latest OHLCV open_time as a YYYY-MM-DD HH:MM:SS string.
+
+    Args:
+        data_dir : Root data directory for the asset.
+
+    Returns:
+        Latest open_time string, or None if the table is empty.
+    """
+    conn = _connect(data_dir)
+    if conn is None:
+        return None
+    try:
+        if not _tbl_exists(conn, "ohlcv"):
+            return None
+        result = conn.execute("SELECT MAX(open_time) FROM ohlcv").fetchone()
+        if not result or result[0] is None:
+            return None
+        return str(pd.Timestamp(result[0]).strftime("%Y-%m-%d %H:%M:%S"))
+    except Exception:
+        logger.exception("ohlcv_latest_open_time sikertelen")
+        raise
+    finally:
+        conn.close()
+
+
+def ohlcv_time_stats(data_dir: str) -> tuple[int, str | None, str | None]:
+    """Return (row_count, min_open_time, max_open_time) for the ohlcv table.
+
+    Single aggregation query — no DataFrame materialisation.
+
+    Args:
+        data_dir : Root data directory for the asset.
+
+    Returns:
+        Tuple of (count, min_ts_str, max_ts_str).  count=0 and None timestamps
+        when the ohlcv table is absent or empty.
+    """
+    conn = _connect(data_dir)
+    if conn is None:
+        return 0, None, None
+    try:
+        if not _tbl_exists(conn, "ohlcv"):
+            return 0, None, None
+        result = conn.execute(
+            "SELECT COUNT(*), MIN(open_time), MAX(open_time) FROM ohlcv"
+        ).fetchone()
+        if not result:
+            return 0, None, None
+        n = int(result[0])
+
+        def _fmt(ts: object) -> str | None:
+            if ts is None:
+                return None
+            return str(pd.Timestamp(str(ts)).strftime("%Y-%m-%d %H:%M:%S"))
+
+        return n, _fmt(result[1]), _fmt(result[2])
+    except Exception:
+        logger.exception("ohlcv_time_stats sikertelen")
+        raise
+    finally:
+        conn.close()

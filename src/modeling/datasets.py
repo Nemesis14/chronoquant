@@ -7,7 +7,6 @@
 # =============================================================================
 
 from dataclasses import dataclass
-from typing import cast
 from store.duckdb_query import dataset_columns, query_range
 
 import pandas as pd

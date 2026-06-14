@@ -13,8 +13,7 @@ import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_ohlcv import sync_ohlcv
 from data_pipeline.sync_predictions import sync_predictions
-from store.duckdb_query import query_range, row_count
-from store.parquet_store import list_partitions
+from store.duckdb_query import ohlcv_latest_open_time, ohlcv_row_count
 from streamlit_app.dashboard_logging import get_dashboard_logger
 
 INITIAL_SYNC_START = "2017-01-01 00:00:00"
@@ -80,7 +79,7 @@ def run_database_sync(asset_id: str | None = None) -> SyncResult:
     lock = get_sync_lock(asset_id)
     if not lock.acquire(blocking=False):
         logger.info("Sync already running for asset_id=%s — skipped", asset_id)
-        rows = row_count(data_dir, "ohlcv")
+        rows = ohlcv_row_count(data_dir)
         return SyncResult(
             start_time        = "",
             end_time          = None,
@@ -102,16 +101,16 @@ def _run_database_sync_locked(
     logger.info("Database sync started")
     logger.info("Data dir: %s", data_dir)
 
-    rows_before    = row_count(data_dir, "ohlcv")
-    last_open_time = _latest_parquet_open_time(data_dir, "ohlcv")
+    rows_before    = ohlcv_row_count(data_dir)
+    last_open_time = ohlcv_latest_open_time(data_dir)
     start_time     = _next_open_time(last_open_time) if last_open_time else INITIAL_SYNC_START
     start_ms       = _utc_str_to_ms(start_time)
 
     logger.info("OHLCV sync from Binance started at %s", start_time)
     _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
 
-    rows_after       = row_count(data_dir, "ohlcv")
-    latest_open_time = _latest_parquet_open_time(data_dir, "ohlcv")
+    rows_after       = ohlcv_row_count(data_dir)
+    latest_open_time = ohlcv_latest_open_time(data_dir)
     logger.info(
         "OHLCV rows before=%s after=%s inserted=%s",
         rows_before, rows_after, rows_after - rows_before,
@@ -150,21 +149,6 @@ def _run_with_logged_stdout(func, *args, logger: logging.Logger, **kwargs) -> No
         func(*args, **kwargs)
     writer.flush()
 
-
-def _latest_parquet_open_time(data_dir: str, dataset: str) -> str | None:
-    dates = list_partitions(data_dir, dataset)
-    if not dates:
-        return None
-    last_date = dates[-1]
-    df = query_range(
-        data_dir, dataset,
-        start   = last_date + " 00:00:00",
-        end     = last_date + " 23:59:59",
-        columns = ["open_time"],
-    )
-    if df.empty:
-        return None
-    return pd.Timestamp(str(df["open_time"].max())).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _next_open_time(open_time: str) -> str:

@@ -5,7 +5,6 @@
 #  - Verify the sklearn Lasso trainer writes model artifacts and HTML report
 # =============================================================================
 
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -22,27 +21,28 @@ from modeling.sampling import save_sample_definition
 
 
 def test_train_lasso_logreg_writes_artifacts(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "training.db"
-    table_name = "features"
+    import duckdb
+    data_dir = tmp_path / "data"
+    db_path  = Path(data_dir).with_suffix(".duckdb")
     periods = 120
     index = np.arange(periods)
     target = ((index % 5) == 0).astype(int)
     df = pd.DataFrame(
         {
-            "open_time": pd.date_range("2024-01-01", periods=periods, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "trg_l_fw240_q90": target,
-            "feat_signal": target + (index / 1000),
-            "feat_noise": np.sin(index),
+            "open_time":       pd.date_range("2024-01-01", periods=periods, freq="min"),
+            "trg_l_fw240_q90": target.astype(float),
+            "feat_signal":     target + (index / 1000),
+            "feat_noise":      np.sin(index),
         }
     )
-
-    with sqlite3.connect(db_path) as conn:
-        df.to_sql(table_name, conn, index=False, if_exists="replace")
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE TABLE features AS SELECT * FROM df")
+    con.close()
 
     monkeypatch.setattr(
         datasets.utils,
-        "load_db_config",
-        lambda: {"database": {"db_path": str(db_path), "tables": {"features": table_name}}},
+        "load_asset_config",
+        lambda asset_id=None: {"database": {"data_dir": str(data_dir)}},
     )
 
     sample_dir = tmp_path / "sample"

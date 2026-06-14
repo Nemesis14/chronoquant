@@ -2,7 +2,6 @@
 # Streamlit dashboard data helper tests
 # =============================================================================
 
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -14,52 +13,23 @@ from streamlit_app import data
 
 
 def test_prediction_history_uses_latest_stored_timestamp(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "test.db"
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE predictions (
-                open_time TEXT,
-                close REAL,
-                target INTEGER,
-                test_long_model_p REAL
-            )
-            """
-        )
-        conn.executemany(
-            "INSERT INTO predictions VALUES (?, ?, ?, ?)",
-            [
-                ("2026-01-01 00:00:00", 100.0, 0, 0.10),
-                ("2026-01-01 01:00:00", 101.0, 1, 0.36),
-                ("2026-01-01 02:00:00", 102.0, 0, 0.20),
-            ],
-        )
-
-    monkeypatch.setattr(
-        data.utils,
-        "load_db_config",
-        lambda: {
-            "database": {
-                "active_env": "test",
-                "db_path": str(db_path),
-                "symbol": "SOLUSDT",
-                "interval": "1m",
-                "tables": {"predictions": "predictions"},
-            }
-        },
-    )
-    test_models_cfg = {
-        "models": {
-            "test_long_model": {
-                "asset_id": None,
-                "target_name": "trg_l_fw60_q90",
-                "active": True,
-            }
-        }
-    }
-    monkeypatch.setattr(data.utils, "load_models_config", lambda: test_models_cfg)
-    monkeypatch.setattr(data.utils, "load_env_config",    lambda: {"runtime": {"model_id": "test_long_model"}})
-    monkeypatch.setattr(data.utils, "load_strategies_config", lambda: {"strategies": {}})
+    import pandas as pd
+    now = pd.Timestamp.utcnow().floor("s")
+    pred_df = pd.DataFrame({
+        "open_time": [
+            (now - pd.Timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"),
+            (now - pd.Timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S"),
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+        ],
+        "close": [100.0, 101.0, 102.0],
+        "long_pred": [0.10, 0.36, 0.20],
+        "short_pred": [0.05, 0.10, 0.15],
+    })
+    monkeypatch.setattr(data, "latest_open_time", lambda d, ds: now)
+    monkeypatch.setattr(data, "query_range",
+        lambda d, ds, start, end, columns: pred_df if ds == "predictions" else pd.DataFrame())
+    monkeypatch.setattr(data.utils, "load_asset_config",
+        lambda asset_id=None: {"database": {"data_dir": str(tmp_path / "data")}})
 
     result = data.prediction_history(lookback_hours=1)
 
@@ -68,59 +38,29 @@ def test_prediction_history_uses_latest_stored_timestamp(tmp_path, monkeypatch) 
 
 
 def test_prediction_history_joins_ohlcv_for_candles(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "test.db"
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE predictions (
-                open_time TEXT,
-                close REAL,
-                target INTEGER,
-                prediction REAL,
-                signal TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE ohlcv (
-                open_time TEXT,
-                open REAL,
-                high REAL,
-                low REAL,
-                close REAL,
-                volume REAL
-            )
-            """
-        )
-        conn.executemany(
-            "INSERT INTO predictions VALUES (?, ?, ?, ?, ?)",
-            [
-                ("2026-01-01 00:00:00", 100.0, 0, 0.10, "NEUTRAL"),
-                ("2026-01-01 00:01:00", 101.0, 1, 0.40, "LONG"),
-            ],
-        )
-        conn.executemany(
-            "INSERT INTO ohlcv VALUES (?, ?, ?, ?, ?, ?)",
-            [
-                ("2026-01-01 00:00:00", 99.0, 102.0, 98.0, 100.0, 12.0),
-                ("2026-01-01 00:01:00", 100.0, 103.0, 99.0, 102.0, 13.0),
-            ],
-        )
+    import pandas as pd
+    now = pd.Timestamp.utcnow().floor("s")
+    t0 = (now - pd.Timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+    t1 = now.strftime("%Y-%m-%d %H:%M:%S")
+    pred_df = pd.DataFrame({
+        "open_time": [t0, t1],
+        "close": [100.0, 101.0],
+        "long_pred": [0.10, 0.40],
+        "short_pred": [0.05, 0.15],
+    })
+    ohlcv_df = pd.DataFrame({
+        "open_time": [t0, t1],
+        "open": [99.0, 100.0],
+        "high": [102.0, 103.0],
+        "low": [98.0, 99.0],
+        "close": [100.0, 102.0],
+    })
 
-    monkeypatch.setattr(
-        data.utils,
-        "load_db_config",
-        lambda: {
-            "database": {
-                "active_env": "test",
-                "db_path": str(db_path),
-                "symbol": "SOLUSDT",
-                "interval": "1m",
-                "tables": {"predictions": "predictions", "ohlcv": "ohlcv"},
-            }
-        },
-    )
+    monkeypatch.setattr(data, "latest_open_time", lambda d, ds: now)
+    monkeypatch.setattr(data, "query_range",
+        lambda d, ds, start, end, columns: pred_df if ds == "predictions" else ohlcv_df)
+    monkeypatch.setattr(data.utils, "load_asset_config",
+        lambda asset_id=None: {"database": {"data_dir": str(tmp_path / "data")}})
 
     result = data.prediction_history(lookback_hours=1)
 
@@ -128,53 +68,25 @@ def test_prediction_history_joins_ohlcv_for_candles(tmp_path, monkeypatch) -> No
 
 
 def test_prediction_history_uses_explicit_asset_config(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "sol.db"
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            CREATE TABLE sol_predictions (
-                open_time TEXT,
-                close REAL,
-                target INTEGER,
-                sol_long_model_p REAL
-            )
-            """
-        )
-        conn.executemany(
-            "INSERT INTO sol_predictions VALUES (?, ?, ?, ?)",
-            [
-                ("2026-01-01 00:00:00", 200.0, 0, 0.12),
-                ("2026-01-01 00:30:00", 205.0, 1, 0.55),
-            ],
-        )
+    import pandas as pd
+    now = pd.Timestamp.utcnow().floor("s")
+    t0 = (now - pd.Timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+    t1 = now.strftime("%Y-%m-%d %H:%M:%S")
+    pred_df = pd.DataFrame({
+        "open_time": [t0, t1],
+        "close": [200.0, 205.0],
+        "long_pred": [0.12, 0.55],
+        "short_pred": [0.05, 0.10],
+    })
 
     def load_asset_config(asset_id: str | None = None) -> dict:
         assert asset_id == "solusdt_fw60"
-        return {
-            "database": {
-                "active_env": "test",
-                "asset_id": "solusdt_fw60",
-                "db_path": str(db_path),
-                "symbol": "SOLUSDT",
-                "interval": "1m",
-                "tables": {"predictions": "sol_predictions"},
-                "features_profile": "solusdt_fw60",
-            }
-        }
+        return {"database": {"data_dir": str(tmp_path / "data"), "asset_id": "solusdt_fw60"}}
 
-    test_models_cfg = {
-        "models": {
-            "sol_long_model": {
-                "asset_id": "solusdt_fw60",
-                "target_name": "trg_l_fw60_q90",
-                "active": True,
-            }
-        }
-    }
-    monkeypatch.setattr(data.utils, "load_asset_config",     load_asset_config)
-    monkeypatch.setattr(data.utils, "load_models_config",    lambda: test_models_cfg)
-    monkeypatch.setattr(data.utils, "load_env_config",       lambda: {"runtime": {"models": {"solusdt_fw60": "sol_long_model"}}})
-    monkeypatch.setattr(data.utils, "load_strategies_config", lambda: {"strategies": {}})
+    monkeypatch.setattr(data.utils, "load_asset_config", load_asset_config)
+    monkeypatch.setattr(data, "latest_open_time", lambda d, ds: now)
+    monkeypatch.setattr(data, "query_range",
+        lambda d, ds, start, end, columns: pred_df if ds == "predictions" else pd.DataFrame())
 
     result = data.prediction_history(lookback_hours=1, asset_id="solusdt_fw60")
 
@@ -210,23 +122,9 @@ def test_active_strategy_returns_default_strategy_when_no_asset_id() -> None:
 
 
 def test_prediction_history_missing_table_returns_empty_frame(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "sol_empty.db"
-    sqlite3.connect(db_path).close()
-
-    def load_asset_config(asset_id=None):
-        return {
-            "database": {
-                "active_env":      "test",
-                "asset_id":        "solusdt_fw60",
-                "db_path":         str(db_path),
-                "symbol":          "SOLUSDT",
-                "interval":        "1m",
-                "tables":          {"predictions": "solusdt_1m_predictions"},
-                "features_profile": "solusdt_fw60",
-            }
-        }
-
-    monkeypatch.setattr(data.utils, "load_asset_config", load_asset_config)
+    monkeypatch.setattr(data.utils, "load_asset_config",
+        lambda asset_id=None: {"database": {"data_dir": str(tmp_path / "nonexistent")}})
+    monkeypatch.setattr(data, "latest_open_time", lambda d, ds: None)
 
     result = data.prediction_history(lookback_hours=1, asset_id="solusdt_fw60")
 
@@ -234,21 +132,7 @@ def test_prediction_history_missing_table_returns_empty_frame(tmp_path, monkeypa
 
 
 def test_optional_trading_tables_return_empty_frames(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "test.db"
-    sqlite3.connect(db_path).close()
-    monkeypatch.setattr(
-        data.utils,
-        "load_db_config",
-        lambda: {
-            "database": {
-                "active_env": "test",
-                "db_path": str(db_path),
-                "symbol": "SOLUSDT",
-                "interval": "1m",
-                "tables": {},
-            }
-        },
-    )
+    monkeypatch.setattr(data, "_db_path", lambda asset_id=None: None)
 
     assert data.active_position() is None
     assert data.recent_orders().empty

@@ -1,10 +1,9 @@
 """Pytest tests for data integrity validation assertions.
 
-Tests require actual Parquet data in data/solusdt_fw60/.
-Skipped automatically when the dataset is absent.
+Tests require a populated DuckDB file (data/solusdt_fw60.duckdb).
+Skipped automatically when the database or table is absent.
 """
 
-import os
 import pytest
 
 import utils
@@ -18,20 +17,27 @@ def _data_dir() -> str:
     return cfg["database"]["data_dir"]
 
 
-def _dataset_has_files(data_dir: str, dataset: str) -> bool:
+def _table_exists(data_dir: str, table: str) -> bool:
     from pathlib import Path
-    d = Path(data_dir) / dataset
-    return d.is_dir() and (
-        any(d.glob("*.parquet")) or any(d.rglob("part.parquet"))
-    )
+    db = Path(data_dir).with_suffix(".duckdb")
+    if not db.exists():
+        return False
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        row = con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]
+        ).fetchone()
+        return bool(row and row[0] > 0)
+    finally:
+        con.close()
 
 
 def _features_exist(data_dir: str) -> bool:
-    return _dataset_has_files(data_dir, "features")
+    return _table_exists(data_dir, "features")
 
 
 def _predictions_exist(data_dir: str) -> bool:
-    return _dataset_has_files(data_dir, "predictions")
+    return _table_exists(data_dir, "predictions")
 
 
 # --- assert_zero ---

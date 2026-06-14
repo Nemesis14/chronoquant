@@ -9,16 +9,15 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pandas as pd
 
 import utils
-from store.duckdb_query import query_range
-from store.parquet_store import list_partitions
+from store.duckdb_query import latest_open_time, query_range
 
 
 # =============================================================================
@@ -118,11 +117,14 @@ def table_exists(
     db_path = db_path or _db_path(asset_id)
     if not db_path or not Path(db_path).exists():
         return False
-    with sqlite3.connect(db_path) as conn:
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
         row = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-            (table_name,),
+            "SELECT 1 FROM information_schema.tables WHERE table_name = ?",
+            [table_name],
         ).fetchone()
+    finally:
+        conn.close()
     return row is not None
 
 
@@ -149,7 +151,7 @@ def latest_table_timestamp(table_name: str, asset_id: str | None = None) -> str 
             query = f"""
                 SELECT {_quote_identifier(candidate)}
                 FROM {_quote_identifier(table_name)}
-                ORDER BY rowid DESC
+                ORDER BY {_quote_identifier(candidate)} DESC
                 LIMIT 1
             """
             return _scalar(query, asset_id=asset_id)
@@ -169,12 +171,12 @@ def prediction_history(
     db_cfg   = utils.load_asset_config(asset_id)["database"]
     data_dir = db_cfg["data_dir"]
 
-    pred_dates = list_partitions(data_dir, "predictions")
-    if not pred_dates:
+    latest_pred_ts = latest_open_time(data_dir, "predictions")
+    if latest_pred_ts is None:
         return pd.DataFrame()
 
-    end_dt    = datetime.strptime(pred_dates[-1] + " 23:59:59", "%Y-%m-%d %H:%M:%S")
-    start_dt  = end_dt - timedelta(hours=int(lookback_hours) + 1)
+    end_dt    = latest_pred_ts.to_pydatetime()
+    start_dt  = datetime.utcnow() - timedelta(hours=int(lookback_hours) + 1)
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -223,11 +225,11 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     db_cfg   = utils.load_asset_config(asset_id)["database"]
     data_dir = db_cfg["data_dir"]
 
-    pred_dates = list_partitions(data_dir, "predictions")
-    if not pred_dates:
+    latest_pred_ts = latest_open_time(data_dir, "predictions")
+    if latest_pred_ts is None:
         return None
 
-    last_dt   = datetime.strptime(pred_dates[-1] + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+    last_dt   = latest_pred_ts.to_pydatetime()
     start_dt  = last_dt - timedelta(days=1)
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = last_dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -430,8 +432,15 @@ def table_columns(table_name: str, asset_id: str | None = None) -> list[str]:
     db_path = _db_path(asset_id)
     if not db_path:
         return []
-    with sqlite3.connect(db_path) as conn:
-        return [row[1] for row in conn.execute(f"PRAGMA table_info({_quote_identifier(table_name)})")]
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
+        rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+            [table_name],
+        ).fetchall()
+    finally:
+        conn.close()
+    return [r[0] for r in rows]
 
 
 # =============================================================================
@@ -444,7 +453,7 @@ def table_row_count(table_name: str, asset_id: str | None = None) -> int:
     if not table_exists(table_name, asset_id=asset_id):
         return 0
     value = _scalar(
-        f"SELECT MAX(rowid) FROM {_quote_identifier(table_name)}",
+        f"SELECT COUNT(*) FROM {_quote_identifier(table_name)}",
         asset_id=asset_id,
     )
     return int(value or 0)
@@ -505,8 +514,11 @@ def _read_sql(
     db_path = _db_path(asset_id)
     if not db_path:
         return pd.DataFrame()
-    with sqlite3.connect(db_path) as conn:
-        return pd.read_sql_query(query, conn, params=params)
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
+        return conn.execute(query, list(params)).df()
+    finally:
+        conn.close()
 
 
 # =============================================================================
@@ -523,8 +535,11 @@ def _scalar(
     db_path = _db_path(asset_id)
     if not db_path:
         return None
-    with sqlite3.connect(db_path) as conn:
-        row = conn.execute(query, params).fetchone()
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
+        row = conn.execute(query, list(params)).fetchone()
+    finally:
+        conn.close()
     return row[0] if row else None
 
 
@@ -535,7 +550,14 @@ def _scalar(
 #  - Return configured SQLite path
 # =============================================================================
 def _db_path(asset_id: str | None = None) -> str | None:
-    return utils.load_asset_config(asset_id)["database"].get("db_path")
+    path = utils.load_asset_config(asset_id)["database"].get("db_path")
+    if path:
+        return path
+    try:
+        cfg = utils.load_trading_config()
+        return utils._resolve_path(cfg["db_path"])
+    except Exception:
+        return None
 
 
 # =============================================================================

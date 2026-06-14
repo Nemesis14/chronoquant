@@ -6,7 +6,6 @@
 #  - Verify p-value filtering rounds are exposed as the tuning parameter
 # =============================================================================
 
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -23,29 +22,30 @@ from modeling.statsmodels_logreg import train_statsmodels_pvalue_logreg
 
 
 def test_train_statsmodels_pvalue_logreg_writes_standard_artifacts(tmp_path, monkeypatch) -> None:
-    db_path = tmp_path / "training.db"
-    table_name = "features"
+    import duckdb
+    data_dir = tmp_path / "data"
+    db_path  = Path(data_dir).with_suffix(".duckdb")
     periods = 180
     index = np.arange(periods)
     signal = np.sin(index / 6)
     target = (signal > 0.2).astype(int)
     df = pd.DataFrame(
         {
-            "open_time": pd.date_range("2024-01-01", periods=periods, freq="min").strftime("%Y-%m-%d %H:%M:%S"),
-            "trg_l_fw240_q90": target,
-            "feat_signal": signal,
-            "feat_noise_a": np.cos(index / 11),
-            "feat_noise_b": (index % 13) / 13,
+            "open_time":       pd.date_range("2024-01-01", periods=periods, freq="min"),
+            "trg_l_fw240_q90": target.astype(float),
+            "feat_signal":     signal,
+            "feat_noise_a":    np.cos(index / 11),
+            "feat_noise_b":    (index % 13) / 13,
         }
     )
-
-    with sqlite3.connect(db_path) as conn:
-        df.to_sql(table_name, conn, index=False, if_exists="replace")
+    con = duckdb.connect(str(db_path))
+    con.execute("CREATE TABLE features AS SELECT * FROM df")
+    con.close()
 
     monkeypatch.setattr(
         datasets.utils,
-        "load_db_config",
-        lambda: {"database": {"db_path": str(db_path), "tables": {"features": table_name}}},
+        "load_asset_config",
+        lambda asset_id=None: {"database": {"data_dir": str(data_dir)}},
     )
 
     sample_dir = tmp_path / "sample"

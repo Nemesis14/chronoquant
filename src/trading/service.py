@@ -140,6 +140,8 @@ class TradingService:
         _logger.info("Service ready (run_id=%s)", self.run_id)
 
     def _cycle(self) -> None:
+        assert self.state is not None
+        assert self.run_id is not None
         # 1. Sync data
         self._sync_data()
 
@@ -185,6 +187,7 @@ class TradingService:
     def _apply_cooldown_rearm(self, pred_long: float, pred_short: float,
                                now: datetime) -> None:
         """Handle COOLDOWN → FLAT transition and armed flag."""
+        assert self.state is not None
         if self.state.status != COOLDOWN:
             return
 
@@ -200,6 +203,7 @@ class TradingService:
 
     def _execute(self, decision: str, reason: str, bar_open_time: str,
                  bar_close: float, now: datetime) -> None:
+        assert self.state is not None
         from trading.strategy import ENTER_LONG, ENTER_SHORT, EXIT_LONG, EXIT_SHORT, HOLD
 
         if decision == HOLD:
@@ -223,6 +227,8 @@ class TradingService:
 
     def _open_position(self, side: str, mark_price: float, bar_open_time: str,
                        reason: str) -> None:
+        assert self.state is not None
+        assert self.run_id is not None
         if not self._daily_limits_ok():
             _logger.warning("Daily limits reached — skipping entry")
             return
@@ -270,6 +276,8 @@ class TradingService:
         )
 
     def _close_position(self, mark_price: float, reason: str, now: datetime) -> None:
+        assert self.state is not None
+        assert self.run_id is not None
         if self.state.quantity is None or self.state.quantity <= 0:
             _logger.warning("close_position called but quantity is None/0 — skipping")
             return
@@ -294,6 +302,7 @@ class TradingService:
 
         exit_time = utils.now_utc_str()
         order_id = f"ord_{uuid.uuid4().hex[:12]}"
+        assert self.state.position_id is not None
 
         journal.close_position(
             self.db_path, self.state.position_id, exit_time,
@@ -344,12 +353,10 @@ class TradingService:
         Read the latest safely closed 1-minute bar's predictions from Parquet.
         Returns (bar_open_time, pred_long, pred_short, close_price) or None.
         """
-        from store.duckdb_query import query_range
-        from store.parquet_store import list_partitions
+        from store.duckdb_query import latest_open_time, query_range
 
-        data_dir   = utils.load_asset_config(self.asset_id)["database"]["data_dir"]
-        pred_dates = list_partitions(data_dir, "predictions")
-        if not pred_dates:
+        data_dir = utils.load_asset_config(self.asset_id)["database"]["data_dir"]
+        if latest_open_time(data_dir, "predictions") is None:
             return None
 
         cutoff    = datetime.now(UTC).replace(tzinfo=None)
@@ -371,9 +378,9 @@ class TradingService:
             return None
 
         df["open_time"] = pd.to_datetime(df["open_time"])
-        df = df[df["open_time"] < pd.Timestamp(cutoff)].dropna(
-            subset=[self.long_pred_col, self.short_pred_col]
-        )
+        df = df.loc[df["open_time"] < pd.Timestamp(cutoff)]
+        pred_mask = df[self.long_pred_col].notna() & df[self.short_pred_col].notna()
+        df = df.loc[pred_mask]
         if df.empty:
             return None
 
@@ -390,6 +397,7 @@ class TradingService:
     # ------------------------------------------------------------------
 
     def _daily_limits_ok(self) -> bool:
+        assert self.state is not None
         max_trades = self.risk_cfg.get("max_daily_trades", 20)
         max_loss = self.risk_cfg.get("max_daily_loss_usdt", 30.0)
         if self.state.daily_trade_count >= max_trades:

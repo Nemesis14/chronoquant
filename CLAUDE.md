@@ -7,8 +7,8 @@ runtime reference files, and project standards live under `.agent/`.
 
 You MUST read these files before starting any work in this session:
 
-- `board.md`
 - `.agent/general_agent_principles.md`
+- `.agent/atlassian_workflow.md`
 - `.agent/board_workflow.md`
 - `.agent/coding_standards.md`
 - `.agent/documentation_standards.md`
@@ -19,8 +19,12 @@ You MUST read these files before starting any work in this session:
 ## Claude Role
 
 Claude is the primary implementation agent. Use the shared `.agent/` rules as
-the source of truth for board handling, coding standards, documentation
+the source of truth for Jira task handling, coding standards, documentation
 standards, MCP/tool usage, and validation.
+
+When the user references a task key or asks to start, inspect, update, or
+implement a task, Claude must use Jira first. Jira is the source of truth for
+task state, task descriptions, comments, and workflow transitions.
 
 ## Board and Backlog Management
 

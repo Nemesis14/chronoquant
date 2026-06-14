@@ -355,5 +355,20 @@
                 "session_relative": true
             }
         }
+    },
+    "feature_taxonomy": {
+        "_comment": "t-1 live consistency taxonomy (KAN-25 audit). All OHLCV-based features are globally shifted by 1 bar in sync_features.py so the stored value at row t uses only data from bar t-1.",
+        "deterministic_t2": [
+            "feat_bars_into_session_norm",
+            "feat_hour_sin",
+            "feat_hour_cos",
+            "feat_dayofweek_sin",
+            "feat_dayofweek_cos",
+            "feat_weekend",
+            "feat_session_asia",
+            "feat_session_europe",
+            "feat_session_us"
+        ],
+        "unusable": []
     }
 }

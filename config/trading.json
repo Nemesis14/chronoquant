@@ -7,7 +7,8 @@
     "leverage": 10,
     "quote_order_qty": 10.0,
     "poll_seconds": 60,
-    "db_path": "database/trading.db",
+    "ohlcv_sync_delay_seconds": 3,
+    "db_path": "database/trading.duckdb",
     "risk": {
         "max_daily_trades": 20,
         "max_daily_loss_usdt": 30.0,

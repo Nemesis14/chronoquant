@@ -5,7 +5,8 @@ Shared rules for AI agents working on ChronoQuant.
 ## Files
 
 - `general_agent_principles.md`: behavior that applies to every agent.
-- `board_workflow.md`: board and plan lifecycle rules.
+- `atlassian_workflow.md`: Jira and Confluence source-of-truth workflow.
+- `board_workflow.md`: Jira task lifecycle rules.
 - `coding_standards.md`: shared code style and implementation standards.
 - `documentation_standards.md`: shared documentation standards.
 - `confluence_standards.md`: Confluence-first documentation rules.

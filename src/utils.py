@@ -108,6 +108,17 @@ def load_features_config(asset_id: str | None = None) -> dict:
     return apply_feature_profile(cfg, profile_id)
 
 
+def load_unusable_features() -> list[str]:
+    """Return the list of features marked unusable in the feature taxonomy.
+
+    Unusable features must not appear in model input_features or live prediction
+    inputs.  The list is sourced from config/features.json feature_taxonomy.unusable
+    and may be empty when all features have valid t-1 definitions.
+    """
+    cfg = _load_json("features.json")
+    return list(cfg.get("feature_taxonomy", {}).get("unusable", []))
+
+
 def feature_profile_id(asset_id: str | None = None) -> str | None:
     """Return the features_profile key for the given asset."""
     db_cfg = load_asset_config(asset_id).get("database", {})

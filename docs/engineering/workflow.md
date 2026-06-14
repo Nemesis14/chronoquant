@@ -37,9 +37,8 @@ A `[LOCAL]` jelölésűek a helyi gépen futnak.
 
 Ellenőrizd a features tábla állapotát mielőtt bármit elindítasz:
 
-```bash
-python scripts/feature_audit.py --asset-id solusdt_fw60
-```
+The legacy SQLite feature audit entry point was removed. Use the current
+Parquet/DuckDB validation path before model work.
 
 Kézzel is ellenőrizhető:
 
@@ -130,11 +129,8 @@ mielőtt Colab-on futtatod a keresést. A notebook ellenőrzi, hogy megvannak-e.
 
 #### 4a. Parquet export + Drive másolás
 
-```bash
-python scripts/export_sample_parquet.py \
-    --sample-id base_solusdt_fw60_futures_v1 \
-    --copy-to-drive
-```
+The legacy SQLite sample export entry point was removed. Use the current
+Parquet/DuckDB sample export path once it is redefined.
 
 Ez létrehozza: `samples/base_solusdt_fw60_futures_v1/dataset.parquet`
 és átmásolja: `F:\My Drive\chronoquant\samples\base_solusdt_fw60_futures_v1\dataset.parquet`

@@ -5,11 +5,11 @@
 from __future__ import annotations
 
 import re
-import sqlite3
 import sys
 from html import escape
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 import streamlit as st
 
@@ -185,7 +185,7 @@ def render_asset_chart(asset_id: str | None) -> None:
             position = data.active_position(asset_id=asset_id)
             st.session_state[cache_hist] = df
             st.session_state[cache_pos]  = position
-        except sqlite3.OperationalError as exc:
+        except duckdb.IOException as exc:
             if "locked" not in str(exc).lower():
                 raise
             get_dashboard_logger().warning("Chart DB read skipped — database locked")
@@ -696,7 +696,7 @@ def render_trade_panel(asset_id: str | None) -> None:
         try:
             position  = data.active_position(asset_id=asset_id)
             st.session_state[cache_pos] = position
-        except sqlite3.OperationalError as exc:
+        except duckdb.IOException as exc:
             if "locked" not in str(exc).lower():
                 raise
             get_dashboard_logger().warning("Trade panel DB read skipped — database locked")

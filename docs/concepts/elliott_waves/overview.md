@@ -156,10 +156,7 @@ buffer        = max(0.1 × ATR14, 1–2 tick)
 |---|---|
 | `src/elliott_waves/elliott_1212.py` | Legacy/simple 1-2-1-2 detector entry point |
 | `src/elliott_waves/elliott/` | Modular Elliott engine: pivots, validators, scanners, parser, viz, backtest |
-| `scripts/scan_1212.py` | Full-history scan for 1-2-1-2 setups |
-| `scripts/plot_1212_example.py` | Example 1-2-1-2 chart output |
-| `scripts/plot_elliott.py` | Generic Elliott plot command |
-| `scripts/backtest_elliott.py` | Elliott walk-forward and sweep evaluation |
+| Legacy script entry points | Removed; use maintained `src/` modules or recreate scripts on the current Parquet/DuckDB layer |
 
 ---
 

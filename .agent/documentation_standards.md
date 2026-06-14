@@ -16,8 +16,14 @@ Use Confluence for:
 - user-facing or project-level explanations;
 - stable engineering decisions;
 - migrated content from existing `docs/` or module-local `.md` files.
+- longer task specs and validation plans linked from Jira issues when the Jira
+  description is not enough.
 
 Repository `.md` files are no longer the default documentation output.
+
+When the user asks an agent to create project documentation, create or update
+the relevant Confluence page. Do not create a local `.md` file unless the user
+explicitly asks for a repository-operational Markdown file.
 
 ---
 
@@ -27,10 +33,13 @@ Create or update local `.md` files only when the file is operationally needed by
 the repository or agent workflow:
 
 - `.agent/` bootstrap and shared agent rules;
-- `board.md`;
-- backlog specs while they are actively used by local implementation workflow;
+- `AGENTS.md` or other tool entry points that load shared `.agent/` rules;
 - code-adjacent README files that have not yet been migrated;
 - local migration staging files when explicitly requested.
+
+Do not create new local task boards, backlog specs, implementation plans,
+validation plans, architecture notes, or module docs. Use Jira for task state
+and Confluence for documentation/specification.
 
 If the same topic exists both in Confluence and in the repository, Confluence is
 the source of truth unless the task explicitly says otherwise.
@@ -60,14 +69,26 @@ Prefer short pages with focused scope over large catch-all documents.
 
 ---
 
-## Mermaid And Diagrams
+## Diagrams
 
-When diagrams are needed, use Confluence-supported diagrams or Mermaid blocks if
-the current Confluence editor supports them. Keep diagram syntax conservative:
+When diagrams are needed on Confluence pages, use draw.io diagrams directly.
 
-- node IDs should be ASCII-only;
-- avoid special Unicode arrows and dashes in diagram syntax;
-- keep diagrams small enough to read in the Confluence page.
+- Architecture maps, pipeline maps, data-flow diagrams, and similar visuals
+  must be editable draw.io diagrams embedded with a Confluence draw.io macro.
+- The validated baseline is the `Database` Confluence page's
+  `database-pipeline.drawio` diagram: it renders in the page, opens in draw.io,
+  and is editable by a Confluence user.
+- Do not use PNG, SVG, Mermaid, Graphviz, flowchart source, or other rendered
+  image fallbacks as the reader-facing diagram artifact.
+- Do not leave Mermaid code fences, raw `flowchart ...` blocks, raw SVG/XML, or
+  draw.io XML in the visible Confluence page body.
+- Store the editable `.drawio` source as the Confluence diagram attachment used
+  by the draw.io macro.
+- If the draw.io macro renders as `unknown-macro` or otherwise fails, treat that
+  as a Confluence/app setup problem to fix before publishing. Do not replace it
+  with a PNG fallback.
+- Follow `.agent/confluence_standards.md` for draw.io macro shape, sizing,
+  validated color palette, attachment naming, and validation rules.
 
 ---
 

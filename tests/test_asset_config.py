@@ -24,12 +24,7 @@ def test_sol_asset_config_resolves_dev_database() -> None:
     assert asset_cfg["symbol"] == "SOLUSDT"
     assert asset_cfg["interval"] == "1m"
     assert asset_cfg["features_profile"] == "solusdt_fw60"
-    assert asset_cfg["db_path"].endswith("database/solusdt_data_dev.db")
-    assert asset_cfg["tables"] == {
-        "ohlcv": "solusdt_1m",
-        "features": "solusdt_1m_features",
-        "predictions": "solusdt_1m_predictions",
-    }
+    assert "data_dir" in asset_cfg
 
 
 def test_unknown_asset_id_raises_clear_error() -> None:

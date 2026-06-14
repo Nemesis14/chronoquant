@@ -5,9 +5,6 @@
 | Script | Purpose |
 |---|---|
 | `scripts/sync_ohlcv.py` | Sync raw OHLCV |
-| `scripts/rebuild_derived_tables.py` | Rebuild features/predictions |
-| `scripts/export_sample_parquet.py` | Export sample for remote training |
-| `scripts/feature_audit.py` | Audit feature table |
 
 ## Modeling
 
@@ -26,8 +23,5 @@
 
 ## Elliott
 
-| Script | Purpose |
-|---|---|
-| `scripts/plot_elliott.py` | Plot Elliott setups |
-| `scripts/backtest_elliott.py` | Elliott walk-forward/sweep evaluation |
-
+Legacy SQLite Elliott scripts were removed. Use maintained `src/` entry points
+or create a new script against the current Parquet/DuckDB data layer.

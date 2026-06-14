@@ -8,7 +8,8 @@ Rendszeres felülvizsgálatra szánt összefoglaló. Frissítsd, ha új eszköz 
 
 | Eszköz | Hozzáférés | Mire való |
 |--------|-----------|-----------|
-| **pyright** | MCP (`mcp__language-server__*`) | Szemantikus navigáció, típusellenőrzés |
+| **pyright** | Claude: MCP; Codex: CLI (`uv run pyright`) | Szemantikus navigáció, típusellenőrzés |
+| **Atlassian** | REST Basic Auth (`api_token`) | Jira task tracking, Confluence planning, issue-page links |
 | **ruff** | CLI (Bash) | Linting, auto-fix (`--fix`) |
 | **ast-grep** (`sg`) | CLI (Bash) | Strukturális kódkeresés, mintaillesztés |
 | **uv** | CLI (PowerShell) | `.venv` kezelője — `pip` nincs a venv-ben |
@@ -34,7 +35,7 @@ uv run python script.py
 
 ## Pyright — MCP Language Server
 
-**Konfig:** `.agent/.mcp.json`
+**Konfig:** `.mcp.json` (projekt gyökér, gitignored) — template és token szabályok: `.agent/mcp_rules.md`
 
 ```json
 "language-server": {
@@ -63,10 +64,24 @@ uv run python script.py
 - Refaktor / átnevezés előtt: `references`
 - Ismeretlen szimbólum esetén: `hover` vagy `definition`
 
-**Mandatory priority:** if the active agent runtime exposes the language-server
-MCP tools, every agent must use them first for definitions, references,
-hover/type inspection, and file-level diagnostics. CLI `pyright` is the fallback
-for full-project validation, missing MCP tools, or MCP timeout.
+**Mandatory priority:** agents with a working language-server MCP path, such as
+Claude, should use MCP first for definitions, references, hover/type inspection,
+and file-level diagnostics. CLI `pyright` is the fallback for full-project
+validation, missing MCP tools, or MCP timeout.
+
+**Codex default:** in this repository, Codex should not call integrated
+`mcp__language_server__*` tools for routine navigation, hover/type inspection,
+references, or diagnostics. Use CLI Pyright instead:
+
+```powershell
+uv run pyright <file>
+uv run pyright
+```
+
+Use `rg`, `sg run`, and targeted source reads for navigation context. Note in
+Jira or validation output that Codex skipped the integrated MCP path because it
+is known unreliable here. Claude may continue using the language-server MCP
+when it works.
 
 ---
 
@@ -109,9 +124,9 @@ All agents must follow this order when the relevant tool is available:
 
 | Task | First choice | Fallback |
 |------|--------------|----------|
-| Symbol lookup | Pyright MCP `references` / `definition` | `rg` only if MCP is unavailable or times out |
-| Type/docstring lookup | Pyright MCP `hover` | read the smallest relevant source file |
-| File diagnostics | Pyright MCP `diagnostics` | CLI `uv run pyright <file>` |
+| Symbol lookup | Claude: Pyright MCP; Codex: `rg` / `sg run` / targeted reads | CLI/local inspection |
+| Type/docstring lookup | Claude: Pyright MCP; Codex: targeted source reads | read the smallest relevant source file |
+| File diagnostics | Claude: Pyright MCP; Codex: `uv run pyright <file>` | `uv run pyright <file>` |
 | Structural code pattern | `sg run` | `rg` only for simple text patterns |
 | Simple text search | `rg` | runtime-specific grep/search tool |
 | File listing | `rg --files` or runtime glob tool | shell directory listing |

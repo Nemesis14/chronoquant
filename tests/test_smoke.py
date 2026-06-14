@@ -15,7 +15,7 @@ sys.path.insert(0, str(SRC))
 
 
 def test_core_imports() -> None:
-    from db.maintenance import rebuild_derived_tables
+    from store.maintenance import rebuild_derived_tables
 
     from data_pipeline.sync_features import sync_features
     from data_pipeline.sync_predictions import sync_predictions
@@ -30,7 +30,7 @@ def test_core_imports() -> None:
 def test_config_loads() -> None:
     import utils
 
-    db_cfg = utils.load_db_config()
+    db_cfg = utils.load_asset_config()
     model_cfg = utils.load_models_config()
     predictions_cfg = utils.load_predictions_config()
     strategies_cfg = utils.load_strategies_config()

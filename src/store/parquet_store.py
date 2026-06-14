@@ -1,8 +1,12 @@
-"""Write layer for daily Parquet partitions.
+"""Write layer for Parquet partitions.
 
-Provides atomic single-writer locking and idempotent upsert by open_time.
-Each dataset (ohlcv, features, predictions) is stored as daily .parquet files
-under a per-asset data directory.
+All datasets now use hourly Hive-style partitions (year/month/day/hour/part.parquet):
+  - open_time rows are immutable events; no business upsert is performed.
+  - Only rows past the stored maximum open_time per bucket are appended.
+
+ohlcv: raw immutable; write_ohlcv_hive / write_hive(dataset="ohlcv").
+features: derived, append-only live sync; rebuild on schema/logic change.
+predictions: derived, append-only live sync; rebuild on model change.
 """
 
 import logging
@@ -142,6 +146,299 @@ def upsert_partition(data_dir: str, dataset: str, df: pd.DataFrame) -> int:
             logger.debug("Partition irva: %s, sorok=%d", date_str, len(merged))
 
     return total_written
+
+
+# %% OHLCV Hive write (KAN-35)
+# Layout: <data_dir>/ohlcv/year=YYYY/month=MM/day=DD/hour=HH/part.parquet
+# OHLCV rows are immutable: open_time is a unique event key from Binance.
+# No upsert is performed — only rows strictly past the stored max are appended.
+
+
+def _ohlcv_hive_path(data_dir: str, hour_ts: pd.Timestamp) -> Path:
+    """Return the part.parquet path for a given hour bucket."""
+    return (
+        Path(data_dir) / "ohlcv"
+        / f"year={hour_ts.year}"
+        / f"month={hour_ts.month:02d}"
+        / f"day={hour_ts.day:02d}"
+        / f"hour={hour_ts.hour:02d}"
+        / "part.parquet"
+    )
+
+
+def write_ohlcv_hive(data_dir: str, df: pd.DataFrame) -> int:
+    """Append new OHLCV rows into hourly Hive-style partitions.
+
+    Rows with open_time <= the stored maximum for an hour bucket are silently
+    skipped; the caller should already request only new rows from Binance.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        df       : DataFrame with open_time column (1m OHLCV rows).
+
+    Returns:
+        Total number of new rows appended (not total rows in files).
+    """
+    if df.empty:
+        return 0
+
+    df = df.copy()
+    df["open_time"] = pd.to_datetime(df["open_time"])
+    df = (
+        df.drop_duplicates(subset=["open_time"], keep="last")
+        .sort_values("open_time")
+        .reset_index(drop=True)
+    )
+
+    df["_hour"] = df["open_time"].dt.floor("h")
+    total_appended = 0
+
+    for _hour_key, hour_df in df.groupby("_hour"):
+        hour_ts = pd.Timestamp(str(_hour_key))
+        if hour_ts is pd.NaT:
+            continue
+        hour_df = hour_df.drop(columns=["_hour"]).copy()
+        path = _ohlcv_hive_path(data_dir, hour_ts)  # type: ignore[arg-type]
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with partition_write_lock(path):
+            if path.exists():
+                try:
+                    existing = pd.read_parquet(path)
+                except Exception:
+                    logger.exception("OHLCV Hive particio olvasas sikertelen: %s", path)
+                    raise
+                existing["open_time"] = pd.to_datetime(existing["open_time"])
+                stored_max = existing["open_time"].max()
+                new_rows: pd.DataFrame = hour_df.loc[hour_df["open_time"] > stored_max].copy()
+                if new_rows.empty:
+                    logger.debug(
+                        "OHLCV Hive: nincs uj sor, hora=%s stored_max=%s", hour_ts, stored_max
+                    )
+                    continue
+                merged = pd.concat([existing, new_rows], ignore_index=True)
+                assert isinstance(merged, pd.DataFrame)
+                merged = merged.sort_values("open_time").reset_index(drop=True)
+                appended = len(new_rows)
+            else:
+                merged = hour_df.sort_values("open_time").reset_index(drop=True)
+                appended = len(merged)
+
+            if len(merged) > 60:
+                logger.warning(
+                    "OHLCV Hive: 60-nal tobb sor az oras bucketben: %d, hora=%s",
+                    len(merged), hour_ts,
+                )
+
+            merged["open_time"] = merged["open_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                merged.to_parquet(path, index=False)
+            except Exception:
+                logger.exception("OHLCV Hive particio iras sikertelen: %s", path)
+                raise
+            total_appended += appended
+            logger.debug(
+                "OHLCV Hive irva: hora=%s, uj_sorok=%d, ossz=%d", hour_ts, appended, len(merged)
+            )
+
+    return total_appended
+
+
+# %% Generic Hive write (KAN-54)
+# Layout: <data_dir>/<dataset>/year=YYYY/month=MM/day=DD/hour=HH/part.parquet
+# Applies to features and predictions (same append-only contract as OHLCV).
+
+
+def _hive_path(data_dir: str, dataset: str, hour_ts: pd.Timestamp) -> Path:
+    """Return the part.parquet path for a given dataset and hour bucket."""
+    return (
+        Path(data_dir) / dataset
+        / f"year={hour_ts.year}"
+        / f"month={hour_ts.month:02d}"
+        / f"day={hour_ts.day:02d}"
+        / f"hour={hour_ts.hour:02d}"
+        / "part.parquet"
+    )
+
+
+def write_hive(data_dir: str, dataset: str, df: pd.DataFrame) -> int:
+    """Append new rows into hourly Hive-style partitions for any dataset.
+
+    Only rows with open_time strictly greater than the stored maximum for the
+    hour bucket are written. Older or duplicate open_time rows are skipped
+    and logged; they never overwrite stored data.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        dataset  : Sub-directory: 'features' or 'predictions'.
+        df       : DataFrame with open_time column.
+
+    Returns:
+        Total number of new rows appended.
+    """
+    if df.empty:
+        return 0
+
+    df = df.copy()
+    df["open_time"] = pd.to_datetime(df["open_time"])
+
+    duped = df["open_time"].duplicated(keep=False)
+    if duped.any():
+        dup_times = df.loc[duped, "open_time"].unique().tolist()
+        raise ValueError(
+            f"write_hive: duplicate open_time in input batch dataset={dataset} "
+            f"times={dup_times[:5]}"
+        )
+
+    df = df.sort_values("open_time").reset_index(drop=True)
+
+    df["_hour"] = df["open_time"].dt.floor("h")
+    total_appended = 0
+
+    for _hour_key, hour_df in df.groupby("_hour"):
+        hour_ts = pd.Timestamp(str(_hour_key))
+        if hour_ts is pd.NaT:
+            continue
+        hour_df = hour_df.drop(columns=["_hour"]).copy()
+        path = _hive_path(data_dir, dataset, hour_ts)  # type: ignore[arg-type]
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with partition_write_lock(path):
+            if path.exists():
+                try:
+                    existing = pd.read_parquet(path)
+                except Exception:
+                    logger.exception("Hive particio olvasas sikertelen: %s", path)
+                    raise
+                existing["open_time"] = pd.to_datetime(existing["open_time"])
+                stored_max = existing["open_time"].max()
+                new_rows: pd.DataFrame = hour_df.loc[hour_df["open_time"] > stored_max].copy()
+                skipped = len(hour_df) - len(new_rows)
+                if skipped:
+                    logger.debug(
+                        "Hive append: %d sor kihagyva (open_time <= stored_max) dataset=%s ora=%s",
+                        skipped, dataset, hour_ts,
+                    )
+                if new_rows.empty:
+                    continue
+                merged = pd.concat([existing, new_rows], ignore_index=True)
+                assert isinstance(merged, pd.DataFrame)
+                merged = merged.sort_values("open_time").reset_index(drop=True)
+                appended = len(new_rows)
+            else:
+                merged = hour_df.sort_values("open_time").reset_index(drop=True)
+                appended = len(merged)
+
+            merged["open_time"] = merged["open_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                merged.to_parquet(path, index=False)
+            except Exception:
+                logger.exception("Hive particio iras sikertelen: %s", path)
+                raise
+            total_appended += appended
+            logger.debug(
+                "Hive irva: dataset=%s ora=%s uj_sorok=%d ossz=%d",
+                dataset, hour_ts, appended, len(merged),
+            )
+
+    return total_appended
+
+
+def hive_latest_open_time(data_dir: str, dataset: str) -> pd.Timestamp | None:
+    """Return the latest open_time stored in the Hive layout for a dataset.
+
+    Scans Hive part.parquet files sorted lexicographically to find the most
+    recent hour bucket. Returns None if no Hive files exist yet.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        dataset  : Sub-directory: 'features' or 'predictions'.
+
+    Returns:
+        Latest open_time as Timestamp, or None.
+    """
+    dataset_dir = Path(data_dir) / dataset
+    parts = sorted(dataset_dir.rglob("part.parquet"))
+    if not parts:
+        return None
+
+    last = parts[-1]
+    try:
+        df = pd.read_parquet(last, columns=["open_time"])
+    except Exception:
+        logger.exception("Hive latest open_time olvasas sikertelen: %s", last)
+        return None
+
+    if df.empty:
+        return None
+
+    df["open_time"] = pd.to_datetime(df["open_time"])
+    max_val = df["open_time"].max()  # type: ignore[assignment]
+    if max_val is None or max_val is pd.NaT:
+        return None
+    return pd.Timestamp(str(max_val))  # type: ignore[return-value]
+
+
+def drop_hive_partitions(data_dir: str, dataset: str) -> int:
+    """Delete all Hive part.parquet files (and empty parent dirs) for a dataset.
+
+    Used before a full rebuild to remove the existing Hive tree.
+
+    Args:
+        data_dir : Root data directory for the asset.
+        dataset  : Sub-directory to clear.
+
+    Returns:
+        Number of part.parquet files deleted.
+    """
+    dataset_dir = Path(data_dir) / dataset
+    if not dataset_dir.exists():
+        return 0
+    parts = list(dataset_dir.rglob("part.parquet"))
+    for p in parts:
+        p.unlink()
+        try:
+            p.parent.rmdir()
+            p.parent.parent.rmdir()
+            p.parent.parent.parent.rmdir()
+            p.parent.parent.parent.parent.rmdir()
+        except OSError:
+            pass
+    return len(parts)
+
+
+def ohlcv_hive_latest_open_time(data_dir: str) -> pd.Timestamp | None:
+    """Return the latest open_time stored in the Hive OHLCV layout.
+
+    Scans Hive part.parquet files sorted lexicographically to find the most
+    recent hour bucket. Returns None if no Hive files exist yet.
+
+    Args:
+        data_dir : Root data directory for the asset.
+
+    Returns:
+        Latest open_time as Timestamp, or None.
+    """
+    ohlcv_dir = Path(data_dir) / "ohlcv"
+    parts = sorted(ohlcv_dir.rglob("part.parquet"))
+    if not parts:
+        return None
+
+    last = parts[-1]
+    try:
+        df = pd.read_parquet(last, columns=["open_time"])
+    except Exception:
+        logger.exception("OHLCV Hive latest open_time olvasas sikertelen: %s", last)
+        return None
+
+    if df.empty:
+        return None
+
+    df["open_time"] = pd.to_datetime(df["open_time"])
+    max_val = df["open_time"].max()  # type: ignore[assignment]
+    if max_val is None or max_val is pd.NaT:
+        return None
+    return pd.Timestamp(str(max_val))  # type: ignore[return-value]
 
 
 # %% Read

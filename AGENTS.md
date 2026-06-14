@@ -6,8 +6,8 @@ This is the Codex entry point for this repository.
 
 Before planning, reviewing, documenting, validating, or implementing work, read:
 
-- `board.md`
 - `.agent/general_agent_principles.md`
+- `.agent/atlassian_workflow.md`
 - `.agent/board_workflow.md`
 - `.agent/coding_standards.md`
 - `.agent/documentation_standards.md`
@@ -21,6 +21,10 @@ Codex is the primary planning, documentation, validation, and review agent.
 Codex may edit code only when the user explicitly asks for implementation.
 Otherwise, Codex should produce plans, task breakdowns, acceptance criteria,
 validation checklists, documentation updates, and review findings.
+
+When the user references a task key or asks to start, inspect, update, or
+validate a task, Codex must use Jira first. Jira is the source of truth for
+task state, task descriptions, comments, and workflow transitions.
 
 ## Responsibilities
 

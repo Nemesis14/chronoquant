@@ -80,7 +80,7 @@ Each Colab notebook must:
 ### Data Flow
 
 ```
-Local SQLite  →  export_sample_parquet.py  →  samples/<id>/dataset.parquet
+Parquet/DuckDB data layer -> sample export path -> samples/<id>/dataset.parquet
                                                         ↓
                                             F:\My Drive\chronoquant\samples\
                                                         ↓
@@ -100,14 +100,8 @@ Local SQLite  →  export_sample_parquet.py  →  samples/<id>/dataset.parquet
 
 ### Local Preparation Script
 
-Before running any Colab notebook, export the sample data locally:
-
-```bash
-python scripts/export_sample_parquet.py --sample-id <sample_id> --copy-to-drive
-```
-
-This writes `samples/<sample_id>/dataset.parquet` and copies it to
-`F:\My Drive\chronoquant\samples\<sample_id>\dataset.parquet`.
+The legacy SQLite sample export entry point was removed. Use the current
+Parquet/DuckDB sample export path once it is redefined.
 
 ### Notebooks
 

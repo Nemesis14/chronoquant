@@ -218,22 +218,27 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
 
     Writes features_search.json to search_dir.
     """
-    import sqlite3
+    import duckdb
 
     cfg      = utils.load_asset_config(asset_id)["database"]
-    db_path  = cfg["db_path"]
-    table    = cfg["tables"]["features"]
+    data_dir = cfg["data_dir"]
+    glob_path = str(Path(data_dir) / "features" / "*.parquet")
 
     AUDIT_ROWS = 200_000
-    logger.info(f"[Stage 0] Auditing '{table}' (sample {AUDIT_ROWS:,} rows) …")
+    logger.info(f"[Stage 0] Auditing features dataset (sample {AUDIT_ROWS:,} rows) …")
 
-    with sqlite3.connect(db_path) as conn:
-        total = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-        df    = pd.read_sql_query(
-            f"SELECT * FROM {table} ORDER BY open_time DESC LIMIT {AUDIT_ROWS}",
-            conn,
-        )
-    logger.info(f"[Stage 0] Table: {total:,} rows total, {AUDIT_ROWS:,} sampled for audit")
+    conn = duckdb.connect()
+    try:
+        _count_row = conn.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{glob_path}', union_by_name=true)"
+        ).fetchone()
+        total = int(_count_row[0]) if _count_row else 0
+        df = conn.execute(
+            f"SELECT * FROM read_parquet('{glob_path}', union_by_name=true) ORDER BY open_time DESC LIMIT {AUDIT_ROWS}"
+        ).df()
+    finally:
+        conn.close()
+    logger.info(f"[Stage 0] Dataset: {total:,} rows total, {AUDIT_ROWS:,} sampled for audit")
 
     all_feat = sorted(c for c in df.columns if c.startswith("feat_"))
     logger.info(f"[Stage 0] Total feat_ columns: {len(all_feat)}")
@@ -271,7 +276,19 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
     else:
         logger.info("[Stage 0] No known duplicates found in table")
 
-    excluded     = set(removed_null) | set(removed_const) | set(removed_dupes)
+    # Exclude features marked unusable in feature_taxonomy (KAN-32/KAN-34)
+    unusable       = set(utils.load_unusable_features())
+    removed_unusable = sorted(c for c in all_feat if c in unusable
+                              and c not in removed_null and c not in removed_const
+                              and c not in removed_dupes)
+    if removed_unusable:
+        logger.info(
+            "[Stage 0] Removed %d unusable features (feature_taxonomy):", len(removed_unusable)
+        )
+        for c in removed_unusable:
+            logger.info(f"  REMOVED (unusable)  {c}")
+
+    excluded     = set(removed_null) | set(removed_const) | set(removed_dupes) | unusable
     feature_cols = sorted(c for c in all_feat if c not in excluded)
 
     logger.info(

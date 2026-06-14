@@ -10,12 +10,12 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 
 import pandas as pd
 
 import utils
+from store import duckdb_query
 
 
 # =============================================================================
@@ -94,37 +94,26 @@ def build_backtest_frame(
     if model_meta is None:
         raise ValueError(f"Model not found in config/models.json: {model_id!r}")
 
-    db_path    = db_cfg["db_path"]
-    table_pred = db_cfg["tables"]["predictions"]
+    data_dir   = db_cfg["data_dir"]
     pred_col   = utils.prediction_col_name(model_id)
     target_col = model_meta["target_name"]
 
-    with sqlite3.connect(db_path) as conn:
-        existing_cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table_pred}")')}
-        missing = [c for c in [pred_col, target_col] if c not in existing_cols]
-        if missing:
-            raise ValueError(
-                f"Column(s) {missing!r} not found in '{table_pred}'. "
-                f"Run sync_predictions.py to backfill '{model_id}' for this date range."
-            )
-
-        predictions = pd.read_sql_query(
-            f"""
-            SELECT open_time,
-                   {_quote_identifier(target_col)} AS target,
-                   {_quote_identifier(pred_col)}   AS prediction
-            FROM   {_quote_identifier(table_pred)}
-            WHERE  open_time >= ?
-               AND open_time <= ?
-            ORDER  BY open_time ASC
-            """,
-            conn,
-            params=(start, end),
+    existing_cols = duckdb_query.dataset_columns(data_dir, "predictions")
+    missing = [c for c in [pred_col, target_col] if c not in existing_cols]
+    if missing:
+        raise ValueError(
+            f"Column(s) {missing!r} not found in predictions dataset. "
+            f"Run sync_predictions.py to backfill '{model_id}' for this date range."
         )
+
+    predictions = duckdb_query.query_range(
+        data_dir, "predictions", start, end,
+        columns=["open_time", target_col, pred_col],
+    ).rename(columns={target_col: "target", pred_col: "prediction"})
 
     if predictions.empty:
         raise ValueError(
-            f"No prediction rows for '{model_id}' in '{table_pred}' "
+            f"No prediction rows for '{model_id}' in predictions dataset "
             f"between {start} and {end}. "
             f"Run sync_predictions.py to backfill this date range."
         )
@@ -146,21 +135,12 @@ def build_backtest_frame(
 # =============================================================================
 def load_ohlcv_frame(start: str, end: str, asset_id: str | None = None) -> pd.DataFrame:
     db_cfg = utils.load_asset_config(asset_id)["database"]
-    db_path = db_cfg["db_path"]
-    table_ohlcv = db_cfg["tables"]["ohlcv"]
+    data_dir = db_cfg["data_dir"]
 
-    with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(
-            f"""
-            SELECT open_time, open, high, low, close
-            FROM {_quote_identifier(table_ohlcv)}
-            WHERE open_time >= ?
-                AND open_time <= ?
-            ORDER BY open_time ASC
-            """,
-            conn,
-            params=(start, end),
-        )
+    df = duckdb_query.query_range(
+        data_dir, "ohlcv", start, end,
+        columns=["open_time", "open", "high", "low", "close"],
+    )
 
     for col in ["open", "high", "low", "close"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -628,16 +608,6 @@ def write_backtest_report(
 </html>
 """
     (output_dir / "report.html").write_text(html, encoding="utf-8")
-
-
-# =============================================================================
-# _quote_identifier(value: str) -> str
-# =============================================================================
-# Purpose:
-#  - Quote SQLite identifiers safely
-# =============================================================================
-def _quote_identifier(value: str) -> str:
-    return '"' + value.replace('"', '""') + '"'
 
 
 # =============================================================================

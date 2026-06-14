@@ -3,7 +3,7 @@
 # =============================================================================
 # Purpose:
 #  - Manage per-asset background sync threads and session state
-#  - Provide asset-scoped state keys and locks for independent sync per asset
+#  - Trigger sync once per closed minute, after a configurable delay
 # =============================================================================
 
 from __future__ import annotations
@@ -14,11 +14,21 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+import utils
 from streamlit_app.dashboard_logging import get_dashboard_logger
 from streamlit_app.sync import SyncResult, get_sync_lock, run_database_sync
 
-_STATE_KEY_PREFIX        = "database_sync_state"
-AUTO_SYNC_INTERVAL_SECONDS = 30
+_STATE_KEY_PREFIX = "database_sync_state"
+_DEFAULT_SYNC_DELAY_SECONDS = 3
+
+
+def _load_sync_delay() -> int:
+    """Return ohlcv_sync_delay_seconds from trading.json, default 3."""
+    try:
+        cfg = utils.load_trading_config()
+        return int(cfg.get("ohlcv_sync_delay_seconds", _DEFAULT_SYNC_DELAY_SECONDS))
+    except Exception:
+        return _DEFAULT_SYNC_DELAY_SECONDS
 
 
 # =============================================================================
@@ -30,9 +40,6 @@ def _state_key(asset_id: str | None) -> str:
 
 # =============================================================================
 # ensure_sync_state(session_state, asset_id) -> dict
-# =============================================================================
-# Purpose:
-#  - Initialise and return the per-asset sync state dict from session_state
 # =============================================================================
 def ensure_sync_state(session_state, asset_id: str | None = None) -> dict[str, Any]:
     key = _state_key(asset_id)
@@ -47,20 +54,20 @@ def ensure_sync_state(session_state, asset_id: str | None = None) -> dict[str, A
             "error":                     None,
             "result":                    None,
             "auto_sync_enabled":         False,
-            "auto_sync_interval_seconds": AUTO_SYNC_INTERVAL_SECONDS,
+            "last_synced_minute":        None,
         }
 
     state = session_state[key]
     state.setdefault("started_at_epoch", None)
     state.setdefault("finished_at_epoch", None)
     state.setdefault("auto_sync_enabled", False)
-    state.setdefault("auto_sync_interval_seconds", AUTO_SYNC_INTERVAL_SECONDS)
+    state.setdefault("last_synced_minute", None)
 
     thread = state.get("thread")
     if thread is not None and not thread.is_alive() and state.get("running"):
-        state["running"]       = False
-        state["finished_at"]   = state.get("finished_at") or _now_label()
-        state["finished_at_epoch"] = state.get("finished_at_epoch") or _now_epoch()
+        state["running"]             = False
+        state["finished_at"]         = state.get("finished_at") or _now_label()
+        state["finished_at_epoch"]   = state.get("finished_at_epoch") or _now_epoch()
     return state
 
 
@@ -74,9 +81,6 @@ def is_sync_running(state: dict[str, Any], asset_id: str | None = None) -> bool:
 
 # =============================================================================
 # start_sync(state, asset_id) -> bool
-# =============================================================================
-# Purpose:
-#  - Launch a background sync thread for the given asset
 # =============================================================================
 def start_sync(state: dict[str, Any], asset_id: str | None = None) -> bool:
     if is_sync_running(state, asset_id):
@@ -94,6 +98,9 @@ def start_sync(state: dict[str, Any], asset_id: str | None = None) -> bool:
             "result":            None,
         }
     )
+    # Record which closed minute this sync covers to prevent double-firing.
+    state["last_synced_minute"] = _current_closed_minute(now_epoch)
+
     name   = f"chronoquant-db-sync-{asset_id or 'default'}"
     thread = threading.Thread(
         target=_sync_worker,
@@ -110,8 +117,7 @@ def start_sync(state: dict[str, Any], asset_id: str | None = None) -> bool:
 # enable_auto_sync / disable_auto_sync
 # =============================================================================
 def enable_auto_sync(state: dict[str, Any]) -> None:
-    state["auto_sync_enabled"]          = True
-    state["auto_sync_interval_seconds"] = AUTO_SYNC_INTERVAL_SECONDS
+    state["auto_sync_enabled"] = True
 
 
 def disable_auto_sync(state: dict[str, Any]) -> None:
@@ -121,17 +127,31 @@ def disable_auto_sync(state: dict[str, Any]) -> None:
 # =============================================================================
 # auto_sync_due_seconds(state, asset_id) -> int | None
 # =============================================================================
+# Returns seconds until the next sync is due, or None if auto-sync is off/running.
+#
+# Sync timing rule:
+#   target = closed_minute_boundary + ohlcv_sync_delay_seconds
+#   Fire once per closed minute (guarded by last_synced_minute).
+# =============================================================================
 def auto_sync_due_seconds(state: dict[str, Any], asset_id: str | None = None) -> int | None:
     if not state.get("auto_sync_enabled") or is_sync_running(state, asset_id):
         return None
 
-    interval = int(state.get("auto_sync_interval_seconds") or AUTO_SYNC_INTERVAL_SECONDS)
-    base     = state.get("finished_at_epoch") or state.get("started_at_epoch")
-    if base is None:
-        return 0
+    delay        = _load_sync_delay()
+    now          = _now_epoch()
+    closed_min   = _current_closed_minute(now)
+    last_synced  = state.get("last_synced_minute")
 
-    elapsed = _now_epoch() - float(base)
-    return max(0, int(math.ceil(interval - elapsed)))
+    if last_synced is not None and last_synced >= closed_min:
+        # Already synced this minute — wait for the next one.
+        next_target = closed_min + 60 + delay
+        seconds_left = int(math.ceil(next_target - now))
+        return max(0, seconds_left)
+
+    # Closed minute has passed and we haven't synced it yet.
+    # Wait until closed_minute + delay.
+    target = closed_min + delay
+    return max(0, int(math.ceil(target - now)))
 
 
 # =============================================================================
@@ -159,6 +179,11 @@ def _result_payload(result: SyncResult) -> dict[str, Any]:
         "ohlcv_rows_after":    result.ohlcv_rows_after,
         "inserted_ohlcv_rows": result.inserted_ohlcv_rows,
     }
+
+
+def _current_closed_minute(epoch: float) -> int:
+    """Return the Unix epoch seconds of the last completed minute boundary."""
+    return int(epoch // 60) * 60
 
 
 def _now_label() -> str:

@@ -7,9 +7,9 @@
 # =============================================================================
 
 import json
-import sqlite3
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 
 import utils
@@ -99,8 +99,6 @@ def create_expanding_window_splits(
 # =============================================================================
 def create_sample_definition_from_db(
     sample_id: str,
-    db_path: str | None = None,
-    table_name: str | None = None,
     asset_id: str | None = None,
     target_horizon_minutes: int = 240,
     min_train_days: int = 730,
@@ -109,9 +107,8 @@ def create_sample_definition_from_db(
     test_days: int = 365,
 ) -> dict:
     db_cfg = utils.load_asset_config(asset_id)["database"]
-    db_path = db_path or db_cfg["db_path"]
-    table_name = table_name or db_cfg["tables"]["features"]
-    data_start, data_end = features_time_range(db_path, table_name)
+    data_dir = db_cfg["data_dir"]
+    data_start, data_end = features_time_range(data_dir)
 
     sample = create_expanding_window_splits(
         sample_id=sample_id,
@@ -125,28 +122,36 @@ def create_sample_definition_from_db(
     )
     sample["source"] = {
         "asset_id": db_cfg.get("asset_id"),
-        "db_path": db_path,
-        "table_name": table_name,
+        "data_dir": data_dir,
+        "dataset": "features",
     }
     return sample
 
 
 # =============================================================================
-# features_time_range(db_path: str, table_name: str) -> tuple[str, str]
+# features_time_range(data_dir: str) -> tuple[str, str]
 # =============================================================================
 # Purpose:
-#  - Return min/max open_time for the feature table
+#  - Return min/max open_time for the features Parquet dataset
 # =============================================================================
-def features_time_range(db_path: str, table_name: str) -> tuple[str, str]:
-    with sqlite3.connect(db_path) as conn:
+def features_time_range(data_dir: str) -> tuple[str, str]:
+    glob_path = str(Path(data_dir) / "features" / "*.parquet")
+    parts = list(Path(data_dir, "features").glob("*.parquet"))
+    if not parts:
+        raise ValueError(f"No features partitions found: {data_dir}")
+
+    conn = duckdb.connect()
+    try:
         row = conn.execute(
-            f"SELECT MIN(open_time), MAX(open_time) FROM {table_name}",
+            f"SELECT MIN(open_time), MAX(open_time) FROM read_parquet('{glob_path}', union_by_name=true)"
         ).fetchone()
+    finally:
+        conn.close()
 
     if row is None or row[0] is None or row[1] is None:
-        raise ValueError(f"Table has no open_time range: {table_name}")
+        raise ValueError(f"Features dataset has no open_time range: {data_dir}")
 
-    return row[0], row[1]
+    return str(row[0]), str(row[1])
 
 
 # =============================================================================

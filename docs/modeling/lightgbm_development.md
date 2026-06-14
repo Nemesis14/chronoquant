@@ -106,14 +106,8 @@ Complete these local steps **before** opening the notebook:
 
 **Step 1 — Export parquet + copy to Drive:**
 
-```bash
-python scripts/export_sample_parquet.py \
-    --sample-id base_solusdt_fw60_futures_v1 \
-    --copy-to-drive
-```
-
-This writes `samples/<sample_id>/dataset.parquet` and copies it to
-`F:\My Drive\chronoquant\samples\<sample_id>\dataset.parquet`.
+The legacy SQLite sample export entry point was removed. Use the current
+Parquet/DuckDB sample export path once it is redefined.
 
 **Step 2 — Commit + push** (notebook clones the repo from GitHub):
 
@@ -154,9 +148,8 @@ for mid in ['lgbm_solusdt_l_fw60_q90_local_v4', 'lgbm_solusdt_s_fw60_q10_local_v
 
 Check that planned features and targets exist in the feature table:
 
-```bash
-python scripts/feature_audit.py --asset-id solusdt_fw60
-```
+The legacy SQLite feature audit entry point was removed. Use the current
+Parquet/DuckDB validation path.
 
 Manual inspection example:
 

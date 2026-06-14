@@ -1,7 +1,7 @@
 {
     "models": {
         "lgbm_solusdt_l_fw60_q90_local_v4": {
-            "asset_id": "solusdt_fw60",
+            "asset_id": "solusdt",
             "target_name": "trg_l_fw60_q90",
             "family": "lightgbm",
             "variant": "local_v4",
@@ -20,7 +20,7 @@
             "active": true
         },
         "lgbm_solusdt_s_fw60_q10_local_v4": {
-            "asset_id": "solusdt_fw60",
+            "asset_id": "solusdt",
             "target_name": "trg_s_fw60_q10",
             "family": "lightgbm",
             "variant": "local_v4",

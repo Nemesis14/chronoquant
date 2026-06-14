@@ -35,9 +35,9 @@ T_MINUS_1_SKIP: frozenset[str] = frozenset({
 })
 
 
-# ---------------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------------
+
+# %% Utilities
+
 
 def _safe_div(a: pl.Expr, b: pl.Expr) -> pl.Expr:
     """Divide a by b, setting result to null where b == 0."""
@@ -51,9 +51,9 @@ def _drop_tmp(lf: pl.LazyFrame) -> pl.LazyFrame:
     return lf.drop(tmp_cols) if tmp_cols else lf
 
 
-# ---------------------------------------------------------------------------
-# Numpy vectorized rolling helpers — no Python callbacks per window
-# ---------------------------------------------------------------------------
+
+# %% Numpy rolling helpers
+
 
 def _rolling_rank_arr(arr: np.ndarray, w: int) -> np.ndarray:
     """Rolling percentile rank (0..1): fraction of window values <= current."""
@@ -171,9 +171,9 @@ def _rolling_rank_inject(
     return lf.with_columns([pl.lit(pl.Series(col_name, result, dtype=pl.Float64))])
 
 
-# ---------------------------------------------------------------------------
-# Momentum indicators
-# ---------------------------------------------------------------------------
+
+# %% Momentum indicators
+
 
 def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str, tp_np: np.ndarray) -> pl.LazyFrame:
     momentum_cfg = indicators.get("momentum", {})
@@ -201,17 +201,17 @@ def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str, tp_np: np.ndarr
     for cfg in momentum_cfg.get("stochastic", []):
         w  = cfg["window"]
         sw = cfg.get("smooth_window", 3)
-        hh = high.rolling_max(window_size=w)
-        ll = low.rolling_min(window_size=w)
+        hh = high.rolling_max(window_size=w, min_samples=w)
+        ll = low.rolling_min(window_size=w, min_samples=w)
         stoch_k = _safe_div(close - ll, hh - ll) * 100.0
         new_cols.append(stoch_k.alias(f"{p}stoch_k_{w}"))
-        new_cols.append(stoch_k.rolling_mean(window_size=sw).alias(f"{p}stoch_d_{w}"))
+        new_cols.append(stoch_k.rolling_mean(window_size=sw, min_samples=sw).alias(f"{p}stoch_d_{w}"))
 
     # Williams R
     for cfg in momentum_cfg.get("williams_r", []):
         w  = cfg["window"]
-        hh = high.rolling_max(window_size=w)
-        ll = low.rolling_min(window_size=w)
+        hh = high.rolling_max(window_size=w, min_samples=w)
+        ll = low.rolling_min(window_size=w, min_samples=w)
         new_cols.append((_safe_div(hh - close, hh - ll) * -100.0).alias(f"{p}williams_r_{w}"))
 
     if new_cols:
@@ -276,9 +276,9 @@ def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str, tp_np: np.ndarr
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Trend indicators
-# ---------------------------------------------------------------------------
+
+# %% Trend indicators
+
 
 def _kama_numpy(close_arr: np.ndarray, window: int, fast: int, slow: int) -> np.ndarray:
     """Kaufman's Adaptive Moving Average via numpy loop (matches ta library output)."""
@@ -377,9 +377,9 @@ def _add_trend_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarr
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Volatility indicators
-# ---------------------------------------------------------------------------
+
+# %% Volatility indicators
+
 
 def _add_volatility_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     volatility_cfg = indicators.get("volatility", {})
@@ -422,9 +422,9 @@ def _add_volatility_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFra
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Volume indicators
-# ---------------------------------------------------------------------------
+
+# %% Volume indicators
+
 
 def _add_volume_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     volume_cfg = indicators.get("volume", {})
@@ -498,9 +498,9 @@ def _add_volume_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Price action features
-# ---------------------------------------------------------------------------
+
+# %% Price action features
+
 
 def _add_price_action_pl(lf: pl.LazyFrame, indicators: dict, p: str, log_ret_np: np.ndarray) -> pl.LazyFrame:
     price_cfg = indicators.get("price_action", {})
@@ -560,9 +560,9 @@ def _add_price_action_pl(lf: pl.LazyFrame, indicators: dict, p: str, log_ret_np:
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Market structure features
-# ---------------------------------------------------------------------------
+
+# %% Market structure features
+
 
 def _add_market_structure_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     market_cfg = indicators.get("market_structure", {})
@@ -595,9 +595,9 @@ def _add_market_structure_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.L
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Activity features (activity columns may or may not exist)
-# ---------------------------------------------------------------------------
+
+# %% Activity features
+
 
 def _add_activity_pl(
     lf: pl.LazyFrame,
@@ -663,9 +663,9 @@ def _add_activity_pl(
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Return & distance features
-# ---------------------------------------------------------------------------
+
+# %% Return & distance features
+
 
 def _add_return_distance_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     rd_cfg = indicators.get("return_distance", {})
@@ -708,9 +708,9 @@ def _add_return_distance_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.La
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Regime rank features
-# ---------------------------------------------------------------------------
+
+# %% Regime rank features
+
 
 def _add_regime_rank_pl(
     lf        : pl.LazyFrame,
@@ -768,7 +768,7 @@ def _add_regime_rank_pl(
         medium = cfg["medium"]
         rng    = high - low
         new_cols.append(
-            _safe_div(rng.rolling_mean(window_size=short), rng.rolling_mean(window_size=medium))
+            _safe_div(rng.rolling_mean(window_size=short, min_samples=short), rng.rolling_mean(window_size=medium, min_samples=medium))
             .alias(f"{p}range_expansion_{short}_{medium}")
         )
 
@@ -797,7 +797,7 @@ def _add_regime_rank_pl(
         short  = cfg["short"]
         medium = cfg["medium"]
         new_cols.append(
-            _safe_div(volume.rolling_mean(window_size=short), volume.rolling_mean(window_size=medium))
+            _safe_div(volume.rolling_mean(window_size=short, min_samples=short), volume.rolling_mean(window_size=medium, min_samples=medium))
             .alias(f"{p}volume_accel_{short}_{medium}")
         )
 
@@ -807,7 +807,7 @@ def _add_regime_rank_pl(
             medium = cfg["medium"]
             tr = pl.col("trades")
             new_cols.append(
-                _safe_div(tr.rolling_mean(window_size=short), tr.rolling_mean(window_size=medium))
+                _safe_div(tr.rolling_mean(window_size=short, min_samples=short), tr.rolling_mean(window_size=medium, min_samples=medium))
                 .alias(f"{p}trade_count_accel_{short}_{medium}")
             )
 
@@ -816,9 +816,9 @@ def _add_regime_rank_pl(
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Candle shape features
-# ---------------------------------------------------------------------------
+
+# %% Candle shape features
+
 
 def _add_candle_shape_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     cs_cfg = indicators.get("candle_shape", {})
@@ -852,24 +852,24 @@ def _add_candle_shape_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyF
 
     for cfg in cs_cfg.get("body_ratio_sma", []):
         w = cfg["window"]
-        new_cols.append(body_ratio.rolling_mean(window_size=w).alias(f"{p}body_ratio_sma_{w}"))
+        new_cols.append(body_ratio.rolling_mean(window_size=w, min_samples=w).alias(f"{p}body_ratio_sma_{w}"))
 
     for cfg in cs_cfg.get("signed_body_sma", []):
         w = cfg["window"]
-        new_cols.append(signed_body_ratio.rolling_mean(window_size=w).alias(f"{p}signed_body_sma_{w}"))
+        new_cols.append(signed_body_ratio.rolling_mean(window_size=w, min_samples=w).alias(f"{p}signed_body_sma_{w}"))
 
     for cfg in cs_cfg.get("wick_imbalance_sma", []):
         w = cfg["window"]
-        new_cols.append(_safe_div(wick_imbalance, high_low).rolling_mean(window_size=w).alias(f"{p}wick_imbalance_sma_{w}"))
+        new_cols.append(_safe_div(wick_imbalance, high_low).rolling_mean(window_size=w, min_samples=w).alias(f"{p}wick_imbalance_sma_{w}"))
 
     if new_cols:
         lf = lf.with_columns(new_cols)
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Trend slope features
-# ---------------------------------------------------------------------------
+
+# %% Trend slope features
+
 
 def _add_trend_slope_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     ts_cfg = indicators.get("trend_slope", {})
@@ -900,9 +900,9 @@ def _add_trend_slope_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFr
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Interaction features
-# ---------------------------------------------------------------------------
+
+# %% Interaction features
+
 
 def _add_interaction_pl(
     lf: pl.LazyFrame,
@@ -977,9 +977,9 @@ def _add_interaction_pl(
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Time / session features (P2 — NOT shifted by t-1 lag)
-# ---------------------------------------------------------------------------
+
+# %% Time / session features (P2 — NOT shifted by t-1 lag)
+
 
 def _add_time_session_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("time_session"):
@@ -1002,9 +1002,9 @@ def _add_time_session_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyF
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Garman-Klass volatility
-# ---------------------------------------------------------------------------
+
+# %% Garman-Klass volatility
+
 
 def _add_gk_volatility_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("gk_volatility"):
@@ -1023,16 +1023,16 @@ def _add_gk_volatility_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.Lazy
 
     new_cols: list[pl.Expr] = []
     for w in (10, 30, 60):
-        new_cols.append(pk_sq.rolling_mean(window_size=w).clip(lower_bound=0.0).sqrt().alias(f"{p}parkinson_vol_{w}"))
-        new_cols.append(gk_sq.rolling_mean(window_size=w).clip(lower_bound=0.0).sqrt().alias(f"{p}gk_vol_{w}"))
+        new_cols.append(pk_sq.rolling_mean(window_size=w, min_samples=w).clip(lower_bound=0.0).sqrt().alias(f"{p}parkinson_vol_{w}"))
+        new_cols.append(gk_sq.rolling_mean(window_size=w, min_samples=w).clip(lower_bound=0.0).sqrt().alias(f"{p}gk_vol_{w}"))
 
     lf = lf.with_columns(new_cols)
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Autocorrelation features — pure polars arithmetic, no rolling_map
-# ---------------------------------------------------------------------------
+
+# %% Autocorrelation features
+
 
 def _add_autocorr_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("autocorr"):
@@ -1069,9 +1069,9 @@ def _add_autocorr_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Drawdown timing — numpy sliding_window_view replaces rolling_map Python callbacks
-# ---------------------------------------------------------------------------
+
+# %% Drawdown timing
+
 
 def _add_drawdown_timing_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray) -> pl.LazyFrame:
     if not indicators.get("drawdown_timing"):
@@ -1102,9 +1102,9 @@ def _add_drawdown_timing_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Pattern flags
-# ---------------------------------------------------------------------------
+
+# %% Pattern flags
+
 
 def _add_pattern_flags_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("pattern_flags"):
@@ -1142,14 +1142,14 @@ def _add_pattern_flags_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.Lazy
 
     new_cols2: list[pl.Expr] = []
     for w in (10, 30, 60):
-        new_cols2.append(bull_bar.rolling_mean(window_size=w).alias(f"{p}bull_bars_ratio_{w}"))
+        new_cols2.append(bull_bar.rolling_mean(window_size=w, min_samples=w).alias(f"{p}bull_bars_ratio_{w}"))
     lf = lf.with_columns(new_cols2)
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Gap features
-# ---------------------------------------------------------------------------
+
+# %% Gap features
+
 
 def _add_gap_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("gap"):
@@ -1161,14 +1161,14 @@ def _add_gap_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
 
     new_cols = [gap_open.alias(f"{p}gap_open")]
     for w in (10, 30):
-        new_cols.append(gap_open.abs().rolling_mean(window_size=w).alias(f"{p}gap_open_abs_sma_{w}"))
+        new_cols.append(gap_open.abs().rolling_mean(window_size=w, min_samples=w).alias(f"{p}gap_open_abs_sma_{w}"))
     lf = lf.with_columns(new_cols)
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Efficiency ratio
-# ---------------------------------------------------------------------------
+
+# %% Efficiency ratio
+
 
 def _add_efficiency_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("efficiency"):
@@ -1187,9 +1187,9 @@ def _add_efficiency_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFra
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Support / resistance level features
-# ---------------------------------------------------------------------------
+
+# %% Support / resistance levels
+
 
 def _add_sr_levels_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("sr_levels"):
@@ -1237,9 +1237,9 @@ def _add_sr_levels_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFram
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Tail risk features
-# ---------------------------------------------------------------------------
+
+# %% Tail risk features
+
 
 def _add_tail_risk_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("tail_risk"):
@@ -1264,9 +1264,9 @@ def _add_tail_risk_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFram
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Extended acceleration features
-# ---------------------------------------------------------------------------
+
+# %% Extended acceleration features
+
 
 def _add_extended_accel_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("accel_extended"):
@@ -1296,9 +1296,9 @@ def _add_extended_accel_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.Laz
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Ichimoku features
-# ---------------------------------------------------------------------------
+
+# %% Ichimoku features
+
 
 def _add_ichimoku_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("ichimoku"):
@@ -1309,7 +1309,7 @@ def _add_ichimoku_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
     c  = pl.col("close")
 
     def _midpoint(w: int) -> pl.Expr:
-        return (h.rolling_max(window_size=w) + lo.rolling_min(window_size=w)) / 2.0
+        return (h.rolling_max(window_size=w, min_samples=w) + lo.rolling_min(window_size=w, min_samples=w)) / 2.0
 
     tenkan   = _midpoint(9)
     kijun    = _midpoint(26)
@@ -1335,9 +1335,9 @@ def _add_ichimoku_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Donchian channel features
-# ---------------------------------------------------------------------------
+
+# %% Donchian channel features
+
 
 def _add_donchian_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("donchian"):
@@ -1349,8 +1349,8 @@ def _add_donchian_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
     new_cols: list[pl.Expr] = []
 
     for w in (10, 30, 60):
-        rh  = h.rolling_max(window_size=w)
-        rl  = lo.rolling_min(window_size=w)
+        rh  = h.rolling_max(window_size=w, min_samples=w)
+        rl  = lo.rolling_min(window_size=w, min_samples=w)
         rng = pl.when(rh - rl != 0).then(rh - rl).otherwise(None)
         new_cols += [
             _safe_div(rh - rl, c).alias(f"{p}donchian_width_{w}"),
@@ -1362,9 +1362,9 @@ def _add_donchian_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Linear regression features — numpy convolution (same as pandas version)
-# ---------------------------------------------------------------------------
+
+# %% Linear regression features
+
 
 def _add_lr_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray) -> pl.LazyFrame:
     if not indicators.get("lr"):
@@ -1408,9 +1408,9 @@ def _add_lr_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray)
     return lf
 
 
-# ---------------------------------------------------------------------------
-# Session-relative features — polars group-by replacing groupby.expanding
-# ---------------------------------------------------------------------------
+
+# %% Session-relative features
+
 
 def _add_session_relative_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
     if not indicators.get("session_relative"):
@@ -1468,9 +1468,9 @@ def _add_session_relative_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.L
     return lf
 
 
-# ---------------------------------------------------------------------------
-# t-1 lag — polars shift(1) on all OHLCV-based feature columns
-# ---------------------------------------------------------------------------
+
+# %% t-1 lag
+
 
 def _apply_t1_lag_pl(lf: pl.LazyFrame, p: str) -> pl.LazyFrame:
     schema  = lf.collect_schema().names()
@@ -1483,9 +1483,9 @@ def _apply_t1_lag_pl(lf: pl.LazyFrame, p: str) -> pl.LazyFrame:
     return lf.with_columns([pl.col(c).shift(1) for c in lag_cols])
 
 
-# ---------------------------------------------------------------------------
-# Clean inf → null
-# ---------------------------------------------------------------------------
+
+# %% Clean inf → null
+
 
 def _clean_features_pl(lf: pl.LazyFrame, p: str) -> pl.LazyFrame:
     schema   = lf.collect_schema()
@@ -1499,9 +1499,9 @@ def _clean_features_pl(lf: pl.LazyFrame, p: str) -> pl.LazyFrame:
     ])
 
 
-# ---------------------------------------------------------------------------
-# Main entry point
-# ---------------------------------------------------------------------------
+
+# %% Main entry point
+
 
 def compute_features_polars(
     df_ohlcv          : pl.DataFrame,

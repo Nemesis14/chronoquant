@@ -46,6 +46,11 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts    = "--import-mode=importlib"
 markers = [
-    "duckdb_stats: informational DuckDB statistics and timing smoke reports",
+    "smoke: callable with dummy/tmp data, correct return type — no real DB required",
+    "sanity: business invariants on real or synthetic data (gaps, nulls, counts, distributions)",
+    "perf: wall-clock timing benchmarks against the production database",
+    "integration: cross-layer flow tests (ohlcv → features → target → predictions)",
 ]

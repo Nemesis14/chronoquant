@@ -1,7 +1,7 @@
-"""Informational DuckDB statistics smoke report tests.
+"""DuckDB statistics smoke tests.
 
-Verifies that the validation report handles missing databases and collects
-basic count, range, and timing metrics for populated native DuckDB tables.
+Verifies that the stats report is callable, handles missing databases gracefully,
+and collects basic metrics on populated data.
 """
 
 from pathlib import Path
@@ -12,7 +12,7 @@ import pytest
 from store.duckdb_stats import collect_duckdb_stats_report, format_duckdb_stats_report
 from store.duckdb_store import ensure_tables, get_connection, insert_ohlcv
 
-pytestmark = pytest.mark.duckdb_stats
+pytestmark = pytest.mark.smoke
 
 
 def test_stats_report_skips_missing_database(tmp_path: Path) -> None:
@@ -49,9 +49,9 @@ def test_stats_report_collects_counts_ranges_and_timings(tmp_path: Path) -> None
     finally:
         conn.close()
 
-    report = collect_duckdb_stats_report(data_dir)
+    report   = collect_duckdb_stats_report(data_dir)
     rendered = format_duckdb_stats_report(report)
-    ohlcv = next(table for table in report.tables if table.table == "ohlcv")
+    ohlcv    = next(table for table in report.tables if table.table == "ohlcv")
 
     assert ohlcv.status == "OK"
     assert ohlcv.row_count == 48

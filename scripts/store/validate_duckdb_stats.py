@@ -1,4 +1,4 @@
-"""Print non-blocking DuckDB statistics smoke metrics for validation.
+﻿"""Print non-blocking DuckDB statistics smoke metrics for validation.
 
 Usage:
     uv run python scripts/validate_duckdb_stats.py
@@ -7,8 +7,9 @@ Usage:
 
 import argparse
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import utils
 from store.duckdb_stats import collect_duckdb_stats_report, format_duckdb_stats_report

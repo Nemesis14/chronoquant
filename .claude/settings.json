@@ -14,32 +14,25 @@
       "PowerShell(Get-*)",
       "PowerShell(Select-*)",
       "PowerShell(Get-Content*)",
-      "mcp__atlassian__atlassianUserInfo",
-      "mcp__atlassian__getJiraIssue",
-      "mcp__atlassian__searchJiraIssuesUsingJql",
-      "mcp__atlassian__getVisibleJiraProjects",
-      "mcp__atlassian__getTransitionsForJiraIssue",
-      "mcp__atlassian__transitionJiraIssue",
-      "mcp__atlassian__addCommentToJiraIssue",
-      "mcp__atlassian__createJiraIssue",
-      "mcp__atlassian__editJiraIssue",
-      "mcp__atlassian__createIssueLink",
-      "mcp__atlassian__getIssueLinkTypes",
-      "mcp__atlassian__getJiraIssueRemoteIssueLinks",
-      "mcp__atlassian__getJiraIssueTypeMetaWithFields",
-      "mcp__atlassian__getJiraProjectIssueTypesMetadata",
-      "mcp__atlassian__lookupJiraAccountId",
-      "mcp__atlassian__getAccessibleAtlassianResources",
-      "mcp__atlassian__addTeamworkGraphContext",
-      "mcp__atlassian__addWorklogToJiraIssue",
-      "mcp__atlassian__getTeamworkGraphContext",
-      "mcp__atlassian__getTeamworkGraphObject",
       "mcp__language-server__diagnostics",
       "mcp__language-server__hover",
       "mcp__language-server__definition",
       "mcp__language-server__references",
       "mcp__language-server__rename_symbol",
       "mcp__language-server__edit_file"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '*** SESSION VEGE: Ellenorizd a project_overview.md frissitesi igenyet! (uj tabla, modell, strategy, modul, agent, asset) ***'"
+          }
+        ]
+      }
     ]
   }
 }

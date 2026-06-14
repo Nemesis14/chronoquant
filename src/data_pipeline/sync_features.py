@@ -127,12 +127,10 @@ def sync_features(
     df_final = df_final.with_columns([
         pl.col("open_time").alias("available_ts"),
         pl.col("open_time").alias("lookback_end_ts"),
-        pl.lit(None).cast(pl.Utf8).alias("dataset_split"),
-        pl.lit(None).cast(pl.Utf8).alias("fold_id"),
     ])
 
     cols_to_keep = (
-        ["open_time", "close", "available_ts", "lookback_end_ts", "dataset_split", "fold_id"]
+        ["open_time", "close", "available_ts", "lookback_end_ts"]
         + all_feat_cols
     )
     df_final = df_final.select([c for c in cols_to_keep if c in df_final.columns])

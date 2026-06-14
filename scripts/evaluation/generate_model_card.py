@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from statistics import mean
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import utils
 from evaluation.backtest import build_backtest_frame, simulate_long_probability_strategy

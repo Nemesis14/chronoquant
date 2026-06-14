@@ -44,7 +44,8 @@ _tests/             Tests mirroring src/
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
 models/             Generated model artifacts
-scripts/            Operational scripts (sync_ohlcv.py, benchmark_duckdb.py)
+scripts/            Operational scripts, organised by domain (mirrors src/ structure):
+                      store/, data_pipeline/, modeling/, evaluation/, trading/, research/
 database/           DuckDB files (database/solusdt/solusdt.duckdb)
 ```
 
@@ -119,7 +120,7 @@ Probability-threshold state machine (`src/trading/strategy.py`):
 |-------------|------|
 | `uv run pyright src/<module>/` | After any type-annotated change |
 | `ruff check src/<module>/ --fix` | Before committing any Python file |
-| `uv run pytest _tests/store/ _tests/data_pipeline/ -v` | Store or pipeline changes |
+| `uv run pytest _tests/store/ _tests/data_pipeline/ -v` | Store or pipeline changes (smoke/sanity/perf) |
 | `uv run pytest _tests/ -k "feature or model or backtest" -v` | Modeling changes |
 | `uv run streamlit run src/streamlit_app/main.py` | UI changes (manual smoke test) |
 

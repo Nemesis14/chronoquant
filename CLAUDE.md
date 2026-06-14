@@ -157,6 +157,26 @@ Ez a szabály minden agentre vonatkozik, nem csak az orchestrátorra.
 
 ---
 
+## Session végi kötelező lépés: epic archiválás
+
+Minden session végén — közvetlenül a project_overview ellenőrzése után — nézd át a `_jira/` aktív epicjeit:
+
+```
+_jira/
+  epic_{id}_{slug}/
+    done_t1_...md   ← mind done_?
+    done_t2_...md
+```
+
+Ha egy epic mappában **minden fájl** `done_` prefixű (nincs `todo_` és nincs `pr_`):
+
+1. Mozgasd át: `_jira/epic_{id}_{slug}/` → `_jira/archive/epic_{id}_{slug}/`
+2. Nem kell manuálisan ellenőrizni a frontmatter `status` mezőt — a fájlnév a döntő.
+
+Ha vannak még `todo_` vagy `pr_` fájlok az epicben: **ne archivald**, az epic aktív marad.
+
+---
+
 ## Delegation Table
 
 | Domain | Agent |

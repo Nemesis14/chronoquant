@@ -8,22 +8,23 @@ Processes features and predictions in monthly chunks by default to avoid memory
 issues on long histories.  Targets are always rebuilt from the full OHLCV range.
 
 Usage examples:
-    uv run python src/data_pipeline/rebuild_derived.py
-    uv run python src/data_pipeline/rebuild_derived.py --start "2024-01-01 00:00:00"
-    uv run python src/data_pipeline/rebuild_derived.py --features-only
-    uv run python src/data_pipeline/rebuild_derived.py --targets-only
-    uv run python src/data_pipeline/rebuild_derived.py --predictions-only --start "2025-01-01 00:00:00"
-    uv run python src/data_pipeline/rebuild_derived.py --asset-id solusdt --chunk-months 3
+    uv run python scripts/data_pipeline/rebuild_derived.py
+    uv run python scripts/data_pipeline/rebuild_derived.py --start "2024-01-01 00:00:00"
+    uv run python scripts/data_pipeline/rebuild_derived.py --features-only
+    uv run python scripts/data_pipeline/rebuild_derived.py --targets-only
+    uv run python scripts/data_pipeline/rebuild_derived.py --predictions-only --start "2025-01-01 00:00:00"
+    uv run python scripts/data_pipeline/rebuild_derived.py --asset-id solusdt --chunk-months 3
 """
 
 import argparse
 import logging
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
 
-sys.path.insert(0, "src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import utils
 from data_pipeline.sync_features import sync_features

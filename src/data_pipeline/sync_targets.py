@@ -55,15 +55,26 @@ forward_extrema AS (
         MIN(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
-        ) AS future_min_close
+        ) AS future_min_close,
+        COUNT(*) OVER (
+            ORDER BY open_time
+            ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
+        ) AS future_bar_count
     FROM ohlcv_ordered
 ),
 returns AS (
     SELECT
         open_time,
         close,
-        future_max_close / NULLIF(close, 0) - 1 AS future_max_return,
-        future_min_close / NULLIF(close, 0) - 1 AS future_min_return
+        -- NULL where the forward window is incomplete (< horizon bars available)
+        CASE WHEN future_bar_count >= {horizon}
+             THEN future_max_close / NULLIF(close, 0) - 1
+             ELSE NULL
+        END AS future_max_return,
+        CASE WHEN future_bar_count >= {horizon}
+             THEN future_min_close / NULLIF(close, 0) - 1
+             ELSE NULL
+        END AS future_min_return
     FROM forward_extrema
 )
 SELECT

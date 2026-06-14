@@ -123,10 +123,8 @@ def sync_predictions(
         "label_end_ts" : pl.Series(
             (_open_time + timedelta(minutes=_fw_minutes)).values, dtype=pl.Datetime("us")
         ),
-        "dataset_split": pl.Series([None] * len(df), dtype=pl.Utf8),
-        "fold_id"      : pl.Series([None] * len(df), dtype=pl.Utf8),
-        long_target    : df[long_target].tolist(),
-        short_target   : df[short_target].tolist(),
+        long_target    : [None if pd.isna(v) else bool(v) for v in df[long_target]],
+        short_target   : [None if pd.isna(v) else bool(v) for v in df[short_target]],
         _LONG_PRED_COL : long_proba.tolist(),
         _SHORT_PRED_COL: short_proba.tolist(),
     })

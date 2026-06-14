@@ -39,8 +39,8 @@ def partition_write_lock(parquet_path: Path) -> Generator[None, None, None]:
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.close(fd)
-    except FileExistsError:
-        raise RuntimeError(f"Partition locked, another writer is active: {parquet_path.name}")
+    except FileExistsError as err:
+        raise RuntimeError(f"Partition locked, another writer is active: {parquet_path.name}") from err
     logger.debug("Lock acquired: %s", parquet_path.name)
     try:
         yield

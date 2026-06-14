@@ -31,6 +31,54 @@ Read these before starting work:
 
 ---
 
+## Test Structure
+
+All tests live under `_tests/<module>/<category>/`. The categories and what belongs in each:
+
+| Category | Folder | What it tests | Real DB? |
+|----------|--------|---------------|----------|
+| `smoke` | `smoke/` | Callable with dummy/tmp data? Returns correct type? | No |
+| `sanity` | `sanity/` | Business invariants: gaps, nulls, row counts, distributions | No (synthetic) or Yes (real DB, skippable) |
+| `perf` | `perf/` | Wall-clock query timing against production DB | Yes (skippable) |
+| `integration` | `integration/` | Cross-layer flow: ohlcv → features → target → predictions | No |
+
+Tests that require the real production DB **must** skip gracefully when the file is absent:
+```python
+if not Path(db_path).exists():
+    pytest.skip(f"Database not found: {db_path}")
+```
+
+Every test file starts with `pytestmark = pytest.mark.<category>`.
+
+Shared fixtures for real-DB tests go in the nearest `conftest.py` (e.g., `_tests/store/conftest.py`).
+
+---
+
+## Test Writing Rules by Implementation Type
+
+### Store / sync (load) implementations
+Write all three:
+1. **smoke** — `ensure_tables` callable, `insert_*` returns row count, `query_*` returns DataFrame
+2. **sanity** — row count > 0, no time gaps (1-minute cadence), no null `open_time`, correct column set
+3. **perf** — `COUNT(*)` < 2 s, range query 7d/30d < 3–5 s, `GROUP BY year/month` < 3 s
+
+### Query / helper implementations
+Write:
+1. **smoke** — callable with minimal seed data, returns expected type
+2. **sanity** — result matches known invariants (e.g., ASOF join only uses past features)
+
+### Validation functions
+Write:
+1. **smoke** — happy path does not raise
+2. **exception** (in smoke/) — invalid input raises the expected exception type and message
+
+### Feature computation
+Write:
+1. **smoke** — expected columns present, `open_time` is unique, no all-null feature columns
+2. **sanity** — appending future bars does not change past feature values (leak prevention)
+
+---
+
 ## Validation Workflow
 
 For every `pr_` ticket:
@@ -51,9 +99,10 @@ Fix all ruff and pyright issues directly — do not leave them for the developer
 
 ### 3. Write tests
 
-Write test cases in `_tests/<module>/` covering:
-- Happy path for the new/changed behavior
-- Edge cases visible from the code or acceptance criteria
+Determine the implementation type (see **Test Writing Rules** above).
+Write tests in the correct `_tests/<module>/<category>/` subfolder.
+Use `pytestmark = pytest.mark.<category>` at module level.
+Inherit shared DB fixtures from `conftest.py` — do not redefine them.
 
 Developer agents do not write tests — this is the Validator Agent's responsibility.
 
@@ -92,6 +141,7 @@ changing behavior beyond a small correction. When in doubt: fix small, return la
 - Changing ML model logic or DB schema
 - Updating `.agent/` rule files
 - Running backtests or training models
+- ML methodology analysis → that is `analyst_agent`
 
 ---
 

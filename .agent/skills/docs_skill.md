@@ -5,6 +5,13 @@ updating module documentation.
 
 ---
 
+## When to Document
+
+**Only when there is an explicit task or direct user request for it.** Never
+create or update docs speculatively. If no task and no request: skip entirely.
+
+---
+
 ## Structure
 
 `_docs/` mirrors `src/`. Every `src/` module directory has a corresponding
@@ -25,18 +32,6 @@ _docs/
 
 ---
 
-## When to Create a Doc
-
-- When a module has non-obvious architecture, invariants, or data flow
-- When acceptance criteria for a task include documentation
-- When onboarding a new agent to a module
-- When a design decision is made that is not obvious from the code
-
-Do NOT duplicate what is already readable from the source code. Document
-the **why** and **how**, not the **what**.
-
----
-
 ## Doc File Naming
 
 - One file per logical topic within the module directory
@@ -45,46 +40,145 @@ the **why** and **how**, not the **what**.
 
 ---
 
-## Doc File Template
+## Diagram Format
 
-```markdown
-# {Topic Title}
+Always use **Mermaid** for diagrams inside `.md` files.
 
-One-line summary of what this document covers.
+Supported types:
+- `erDiagram` — database schemas
+- `sequenceDiagram` — call flows between functions / modules
+- `flowchart LR` / `flowchart TD` — module overview, data flow
+- `classDiagram` — class structure and relationships
 
----
+### Rendering Rules (mandatory — breaks silently if violated)
 
-## Purpose
-Why this module or subsystem exists. What problem it solves.
+A Mermaid block renders in VS Code preview **only if all of these are true:**
 
-## Structure
-Key files and their roles within this module.
+1. **The opening fence starts at column 0** — never indented, never inside a list or blockquote
+2. **Lowercase `mermaid`, no trailing spaces** on the opening line
+3. **The closing ` ``` ` is also at column 0**
+4. **Not nested inside another code fence** — a ` ```mermaid ` block inside a ` ```markdown ` block renders as raw code, not a diagram
 
-## Key Patterns
-Important conventions, data flows, or invariants that are not obvious from code.
+**Correct — renders as diagram:**
 
-## Dependencies
-What this module depends on; what depends on it.
-
-## Notes
-Open questions, known limitations, future considerations.
+```mermaid
+flowchart TD
+  A[entry_point] --> B[helper_fn]
+  B --> C[output]
 ```
 
+```mermaid
+sequenceDiagram
+  caller ->> function_name: call
+  function_name ->> dependency: query
+  dependency -->> function_name: result
+  function_name -->> caller: return
+```
+
+> VS Code requires the **"Markdown Preview Mermaid Support"** extension for rendering.
+> Without it, all Mermaid blocks show as raw code regardless of syntax.
+
+### Diagram Design Rules
+
+- Prefer **multiple simple diagrams** over one complex one
+- Every diagram must be readable without rendering (label all nodes)
+- Max ~15 nodes per diagram; split if larger
+
 ---
 
-## Agent Responsibilities
+## Documentation Types
 
-Each specialist agent is responsible for the `_docs/` subdirectories within
-their scope:
+### 1. Database Doc
 
-| Agent | _docs/ scope |
-|-------|-------------|
-| DataEngineer | `_docs/store/`, `_docs/data_pipeline/` |
-| MLEngineer | `_docs/modeling/`, `_docs/evaluation/` |
-| Prism | `_docs/streamlit_app/`, `_docs/trading/` |
-| Steward | `_docs/` root README only |
+Required when documenting a DuckDB schema, table, or store module.
 
-Conductor links relevant `_docs/` pages from task files when useful.
+**Must include:**
+- Top-level **ER diagram** (`erDiagram`) of all tables and their relationships
+- One subsection per table with:
+  - Purpose: one sentence on why the table exists
+  - Columns: listed with `name | type | description` in a markdown table
+  - Notable constraints or partitioning logic
+
+**Structure:**
+
+````markdown
+# Schema — {Module Name}
+
+One-line summary.
+
+---
+
+## Overview
+
+[erDiagram — all tables and FK relationships]
+
+## Tables
+
+### table_name
+
+Purpose: …
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id     | BIGINT | … |
+| …      | …      | … |
+````
+
+---
+
+### 2. Flow / Module Doc
+
+Required when documenting a `.py` file, a package, or a data pipeline.
+
+**Must include:**
+- **Module overview** at the top: one paragraph + one `flowchart` or `sequenceDiagram`
+- One subsection per function (or logical group of functions) with:
+  - What the function does (1–2 sentences)
+  - Parameters: name, type, purpose
+  - Return value: type and meaning
+  - At least one diagram (sequence or flowchart node) showing what the function
+    influences or calls
+
+**Structure:**
+
+````markdown
+# {Module Name}
+
+One-line summary.
+
+---
+
+## Overview
+
+[flowchart TD — module-level entry points and data flow]
+
+## Functions
+
+### function_name(param1, param2)
+
+What it does.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| param1    | str  | … |
+
+Returns: `type` — what it means.
+
+[sequenceDiagram — caller → function → dependencies → return]
+````
+
+---
+
+## Layout Rule: Always Top-Down
+
+Every doc starts with the **simplest possible overview** (one diagram, one paragraph),
+then drills down into subsections. Never start with details.
+
+```
+1. Module overview + overview diagram
+2. Subsection per table / function / component
+3. Each subsection has its own focused diagram
+```
 
 ---
 

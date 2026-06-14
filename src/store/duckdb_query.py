@@ -148,23 +148,6 @@ def query_range_pl(
         conn.close()
 
 
-def query_all(
-    db_path  : str,
-    dataset  : str,
-    columns  : list[str] | None = None,
-) -> pd.DataFrame:
-    """Return all rows from a dataset table, sorted by open_time.
-
-    Args:
-        db_path  : Absolute path to the asset .duckdb file.
-        dataset  : Table name.
-        columns  : Optional list of columns to SELECT. None = all columns.
-
-    Returns:
-        Full DataFrame sorted by open_time, or empty DataFrame.
-    """
-    return query_range(db_path, dataset, columns=columns)
-
 
 # %% Schema
 
@@ -367,15 +350,6 @@ def ohlcv_dataset_exists(db_path: str) -> bool:
     """Return True if the ohlcv table exists with at least one row."""
     return dataset_exists(db_path, "ohlcv")
 
-
-def ohlcv_query_range(
-    db_path  : str,
-    start    : str | None = None,
-    end      : str | None = None,
-    columns  : list[str] | None = None,
-) -> pd.DataFrame:
-    """Query OHLCV rows from the native ohlcv table."""
-    return query_range(db_path, "ohlcv", start=start, end=end, columns=columns)
 
 
 def ohlcv_row_count(db_path: str) -> int:

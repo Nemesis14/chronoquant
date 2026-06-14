@@ -1,4 +1,4 @@
-"""DuckDB storage layer benchmarks.
+﻿"""DuckDB storage layer benchmarks.
 
 Measures insert throughput, range query speed, aggregation, and ASOF join
 on the native ohlcv / features / predictions tables.
@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, "src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import duckdb
 import numpy as np
@@ -85,7 +85,8 @@ def bench_insert(data_dir: str, n_rows: int) -> None:
             "taker_buy_quote":    rng.uniform(4e4, 2.5e5, n_rows),
         })
 
-        conn = get_connection(tmp)
+        bench_db = str(Path(tmp) / "bench.duckdb")
+        conn = get_connection(bench_db)
         ensure_tables(conn)
 
         def _do_insert():
@@ -93,8 +94,8 @@ def bench_insert(data_dir: str, n_rows: int) -> None:
             insert_ohlcv(conn, df_syn)
 
         _bench(_do_insert, f"insert {n_rows:,} rows (cold)", reps=3)
-        _result("row count after insert", f"{ohlcv_row_count(tmp):,}")
         conn.close()
+        _result("row count after insert", f"{ohlcv_row_count(bench_db):,}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -107,7 +108,7 @@ def bench_query(data_dir: str) -> None:
         return
 
     _result("total rows", f"{count:,}")
-    _result("date range", f"{min_ts} → {max_ts}")
+    _result("date range", f"{min_ts} -> {max_ts}")
 
     # Recent 7 days
     end_dt   = pd.Timestamp(max_ts or "1970-01-01")
@@ -133,7 +134,7 @@ def bench_aggregation(data_dir: str) -> None:
         print("  SKIP — ohlcv table is empty")
         return
 
-    db = Path(data_dir).with_suffix(".duckdb")
+    db = Path(data_dir)
     conn = duckdb.connect(str(db), read_only=True)
     try:
         def _daily_agg():
@@ -168,20 +169,20 @@ def bench_aggregation(data_dir: str) -> None:
 
 def bench_asof_join(data_dir: str) -> None:
     _section("ASOF JOIN — predictions ⋈ features")
-    db = Path(data_dir).with_suffix(".duckdb")
+    db = Path(data_dir)
     if not db.exists():
         print("  SKIP — database not found")
         return
     conn = duckdb.connect(str(db), read_only=True)
     try:
-        for tbl in ("predictions", "features"):
+        for tbl in ("predictions", "feat_ohlcv_quant"):
             row = conn.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name='{tbl}'").fetchone()
             if not row or row[0] == 0:
                 print(f"  SKIP — {tbl} table missing")
                 conn.close()
                 return
         pred_row = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()
-        feat_row = conn.execute("SELECT COUNT(*) FROM features").fetchone()
+        feat_row = conn.execute("SELECT COUNT(*) FROM feat_ohlcv_quant").fetchone()
         pred_count = pred_row[0] if pred_row else 0
         feat_count = feat_row[0] if feat_row else 0
         _result("predictions rows", f"{pred_count:,}")
@@ -208,18 +209,17 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args   = _parse_args()
-    cfg    = utils.load_asset_config(args.asset_id)
-    data_dir = cfg["database"]["data_dir"]
+    cfg      = utils.load_asset_config(args.asset_id)
+    db_path = cfg["database"]["db_path"]
     asset_id = cfg["database"]["asset_id"]
 
     print(f"\nDuckDB Benchmark — asset_id={asset_id}")
-    print(f"  data_dir : {data_dir}")
-    print(f"  db_path  : {Path(data_dir).with_suffix('.duckdb')}")
+    print(f"  db_path  : {db_path}")
 
-    bench_insert(data_dir, args.rows)
-    bench_query(data_dir)
-    bench_aggregation(data_dir)
-    bench_asof_join(data_dir)
+    bench_insert(db_path, args.rows)
+    bench_query(db_path)
+    bench_aggregation(db_path)
+    bench_asof_join(db_path)
 
     print(f"\n{'=' * 60}")
     print("  Done.")

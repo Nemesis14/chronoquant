@@ -72,14 +72,31 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
             open_time       TIMESTAMP PRIMARY KEY,
             close           DOUBLE,
             label_end_ts    TIMESTAMP,
-            dataset_split   VARCHAR,
-            fold_id         VARCHAR,
             trg_l_fw60_q90  BOOLEAN,
             trg_s_fw60_q10  BOOLEAN,
             long_pred       DOUBLE,
             short_pred      DOUBLE
         )
     """)
+    # Migration: drop legacy split columns if present
+    for table, col in [
+        ("feat_ohlcv_quant", "dataset_split"),
+        ("feat_ohlcv_quant", "fold_id"),
+        ("predictions",      "dataset_split"),
+        ("predictions",      "fold_id"),
+    ]:
+        try:
+            exists = conn.execute(
+                "SELECT COUNT(*) FROM information_schema.columns"
+                " WHERE table_name = ? AND column_name = ?",
+                [table, col],
+            ).fetchone()
+            if exists and exists[0] > 0:
+                conn.execute(f'ALTER TABLE "{table}" DROP COLUMN "{col}"')
+                logger.info("Migration: dropped %s.%s", table, col)
+        except Exception:
+            logger.debug("Migration skip: %s.%s (table may not exist yet)", table, col)
+
     logger.debug("ensure_tables: ohlcv + target + predictions OK")
 
 

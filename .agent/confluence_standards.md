@@ -64,7 +64,7 @@ PowerShell 5.1 `Invoke-RestMethod` and `Invoke-WebRequest` may send string
 `-Body` arguments with the system default encoding instead of UTF-8. This can
 corrupt Hungarian accented characters into mojibake stored in Confluence/Jira.
 
-### Required pattern -- always pass bytes, never a string
+### Required write pattern -- always pass bytes, never a string
 
 **Correct (works):**
 
@@ -91,6 +91,26 @@ Invoke-RestMethod -Uri $url -Method POST -Headers $headers -Body $body
 
 This rule applies to Jira issue create/update, Jira comments, and Confluence
 page create/update calls alike.
+
+### Required Confluence read pattern -- decode response bytes as UTF-8
+
+PowerShell 5.1 can also corrupt Confluence page bodies on read, not only on
+write. Do not use `Invoke-RestMethod` or the decoded `.Content` string as the
+source for a page body that will be round-tripped back to Confluence. Read the
+raw response stream and decode it explicitly as UTF-8:
+
+```powershell
+$response = Invoke-WebRequest -Uri $url -Headers $headers -UseBasicParsing
+$stream   = New-Object System.IO.MemoryStream
+$response.RawContentStream.CopyTo($stream)
+$jsonText = [System.Text.Encoding]::UTF8.GetString($stream.ToArray())
+$page     = $jsonText | ConvertFrom-Json
+```
+
+When updating a Confluence page, use this UTF-8 decoded object as the source for
+`body.storage.value`. Never read a page body through a lossy decoded string and
+then PUT that body back, because valid Hungarian characters such as `ő` and `ű`
+can become stored mojibake like `Å`, `&Aring;`, `Ă`, or `Ĺ`.
 
 ### Confluence storage entities for Hungarian text
 
@@ -141,10 +161,17 @@ documents must be editable in Confluence, not merely valid as source Markdown.
 - Do not publish raw draw.io XML in the visible page body.
 - Store the editable `.drawio` source as the Confluence attachment referenced by
   the draw.io macro.
+- Write `.drawio` attachments as valid UTF-8 XML bytes. In PowerShell single
+  quoted here-strings, do not escape XML quotes as `\"`; that produces invalid
+  draw.io XML. Validate generated draw.io source with `[xml]$null = $drawio`
+  before upload.
 - Use the storage format of a working UI-created or already validated draw.io
   diagram on the same Confluence instance as the template. Update only the page
   id, diagram name, size, and other clearly understood parameters.
 - Prefer several focused diagrams over one large full-system diagram.
+- For light-mode diagrams, force the diagram itself to be light: set
+  `mxGraphModel background="#FFFFFF"` and add a full-page white background cell
+  behind the diagram if the draw.io/Confluence viewer otherwise appears dark.
 - Keep draw.io diagrams compact:
   - default max width: `760 px`;
   - use narrower widths, such as `720 px` or `740 px`, when the diagram does
@@ -161,9 +188,13 @@ documents must be editable in Confluence, not merely valid as source Markdown.
     `#2e7d32`;
   - query/engine nodes: light violet fill `#f3f0ff`, violet border `#6554c0`;
   - runtime/state nodes: neutral fill `#f4f5f7`, neutral border `#6b778c`.
-- Use simple rectangular nodes with small corner radius, consistent spacing,
-  and visible borders. Avoid decorative gradients, heavy shadows, oversized
-  shapes, and dark canvases.
+- Use a small visual vocabulary: external systems may use one distinctive
+  shape, process/function nodes use rounded rectangles, persisted data uses
+  cylinders, and query/model layers use a separate but subdued color. Avoid more
+  than 5-7 primary nodes in one diagram.
+- Use simple nodes with small corner radius, consistent spacing, and visible
+  borders. Avoid decorative gradients, heavy shadows, oversized shapes, nested
+  lanes, dense connector crossings, and dark canvases.
 - Keep labels short and scannable. If text becomes cramped at `760 px`, split
   the content into multiple smaller diagrams.
 - When replacing a diagram, update the existing `.drawio` attachment version

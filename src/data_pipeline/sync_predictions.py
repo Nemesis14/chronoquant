@@ -1,9 +1,13 @@
 """Load champion models and generate unified long/short predictions from feature data.
 
-Resolves the asset-specific champion long and short model, loads feature rows
-once with both target columns, runs inference for each model, and writes a
-single unified row per open_time with stable long_pred/short_pred columns.
-Idempotent by open_time — safe to re-run.
+Resolves the asset-specific champion long and short model, loads feature rows from
+feat_ohlcv_quant, joins target labels from the target table, runs inference for each
+model, and writes a single unified row per open_time with stable long_pred/short_pred
+columns.  Idempotent by open_time — safe to re-run.
+
+Data flow
+---------
+feat_ohlcv_quant + target  →  JOIN on open_time  →  inference  →  predictions
 """
 
 import json
@@ -11,7 +15,9 @@ import logging
 import os
 import pickle
 from datetime import timedelta
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -49,7 +55,7 @@ def sync_predictions(
     db_cfg         = utils.load_asset_config(resolved_asset)
     feat_cfg       = utils.load_features_config(asset_id=resolved_asset)
     model_cfg      = utils.load_models_config()
-    data_dir       = db_cfg["database"]["data_dir"]
+    db_path        = db_cfg["database"]["db_path"]
 
     _targets     = feat_cfg["database"]["features"].get("targets", [])
     _fw_minutes  = _targets[0]["rolling_window"] if _targets else 60
@@ -77,43 +83,55 @@ def sync_predictions(
         return
     short_model, short_feat_list = short_artifacts
 
-    # --- feature query (single pass, both targets) ---
+    # --- feature query from feat_ohlcv_quant ---
     all_features = list(dict.fromkeys(long_feat_list + short_feat_list))
-    select_cols  = list(dict.fromkeys(
-        ["open_time", "close", long_target, short_target] + all_features
-    ))
+    feat_select  = list(dict.fromkeys(["open_time", "close"] + all_features))
 
-    df = query_range(data_dir, "features", start=start_time, end=end_time, columns=select_cols)
-    if df.empty:
+    feat_df = query_range(db_path, "feat_ohlcv_quant", start=start_time, end=end_time, columns=feat_select)
+    if feat_df.empty:
         logger.warning(
             "Nincs feature sor: asset_id=%s start_time=%s", resolved_asset, start_time
         )
         return
 
-    df = df.drop_duplicates(subset=["open_time"], keep="last").reset_index(drop=True)
+    # --- target query from target table ---
+    target_select = list(dict.fromkeys(["open_time", long_target, short_target]))
+    target_df = query_range(db_path, "target", start=start_time, end=end_time, columns=target_select)
+
+    # --- join features and targets on open_time ---
+    if not target_df.empty:
+        feat_df = feat_df.merge(target_df, on="open_time", how="left")
+    else:
+        logger.warning(
+            "Nincs target adat: asset_id=%s — predictions target oszlopok NULL lesznek",
+            resolved_asset,
+        )
+        feat_df[long_target]  = None
+        feat_df[short_target] = None
+
+    df = feat_df.drop_duplicates(subset=["open_time"], keep="last").reset_index(drop=True)
 
     # --- inference ---
     long_proba  = _run_inference(df, long_feat_list,  long_model,  long_meta)
     short_proba = _run_inference(df, short_feat_list, short_model, short_meta)
 
-    # --- unified output via polars (index-aligned, single upsert) ---
+    # --- unified output (index-aligned, single upsert via Polars) ---
     _open_time = pd.to_datetime(df["open_time"])
-    pl_out = pl.DataFrame({
-        "open_time"    : _open_time.dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+    df_out = pl.DataFrame({
+        "open_time"    : pl.Series(_open_time.values, dtype=pl.Datetime("us")),
         "close"        : df["close"].tolist(),
-        "label_end_ts" : (_open_time + timedelta(minutes=_fw_minutes)).dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
-        "dataset_split": [None] * len(df),
-        "fold_id"      : [None] * len(df),
+        "label_end_ts" : pl.Series(
+            (_open_time + timedelta(minutes=_fw_minutes)).values, dtype=pl.Datetime("us")
+        ),
+        "dataset_split": pl.Series([None] * len(df), dtype=pl.Utf8),
+        "fold_id"      : pl.Series([None] * len(df), dtype=pl.Utf8),
         long_target    : df[long_target].tolist(),
         short_target   : df[short_target].tolist(),
-        _LONG_PRED_COL : list(map(float, long_proba)),
-        _SHORT_PRED_COL: list(map(float, short_proba)),
+        _LONG_PRED_COL : long_proba.tolist(),
+        _SHORT_PRED_COL: short_proba.tolist(),
     })
-    df_out = pl_out.to_pandas()
-    df_out["open_time"]     = pd.to_datetime(df_out["open_time"])
-    df_out["label_end_ts"]  = pd.to_datetime(df_out["label_end_ts"])
 
-    conn = get_connection(data_dir)
+    conn = get_connection(db_path)
     ensure_tables(conn)
     try:
         written = insert_predictions(conn, df_out)
@@ -168,7 +186,7 @@ def _run_inference(
     feature_list : list[str],
     model        : object,
     model_meta   : dict,
-) -> object:
+) -> np.ndarray:
     """Run model inference and return a probability array.
 
     Args:
@@ -188,13 +206,13 @@ def _run_inference(
         X.insert(0, "const", 1.0)
 
     if predict_method == "predict_proba":
-        proba = model.predict_proba(X)  # type: ignore[union-attr]
+        proba: Any = model.predict_proba(X)  # type: ignore[union-attr]
         if hasattr(proba, "shape") and len(proba.shape) == 2:
             proba = proba[:, 1]
     else:
         proba = model.predict(X)  # type: ignore[union-attr]
 
-    return proba
+    return np.asarray(proba, dtype=float)
 
 
 def _feature_list_for_prediction(

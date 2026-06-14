@@ -1,14 +1,12 @@
 """Persistent DuckDB store layer for ChronoQuant market data.
 
-Single .duckdb file per asset (data/solusdt_fw60.duckdb) with three native
-tables: ohlcv, features, predictions.  All inserts are append-only, keyed by
-open_time.  The .duckdb path is derived from data_dir:
-  data/solusdt_fw60 → data/solusdt_fw60.duckdb
+Single .duckdb file per asset (database/solusdt/solusdt.duckdb) with native
+tables: ohlcv, target, feat_ohlcv_quant, predictions.  All inserts are
+append-only, keyed by open_time.  The .duckdb path is passed directly as db_path.
 """
 
 import logging
 from pathlib import Path
-from typing import Union
 
 import duckdb
 import pandas as pd
@@ -16,23 +14,22 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
-_AnyDF = Union[pd.DataFrame, pl.DataFrame]
+_AnyDF = pd.DataFrame | pl.DataFrame
 
 
 # %% Connection
 
 
-def get_connection(data_dir: str) -> duckdb.DuckDBPyConnection:
+def get_connection(db_path: str) -> duckdb.DuckDBPyConnection:
     """Return a persistent read-write DuckDB connection for the asset database.
 
     Args:
-        data_dir : Resolved data directory path for the asset.
+        db_path : Absolute path to the .duckdb file for the asset.
 
     Returns:
         Open DuckDB connection.  Caller must close it.
     """
-    db_path = Path(data_dir).with_suffix(".duckdb")
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     return duckdb.connect(str(db_path))
 
 
@@ -40,10 +37,10 @@ def get_connection(data_dir: str) -> duckdb.DuckDBPyConnection:
 
 
 def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
-    """Create ohlcv and predictions tables if they do not exist.
+    """Create ohlcv, target, feat_ohlcv_quant, and predictions tables if absent.
 
-    The features table is created lazily on the first insert_features() call
-    because its column set is determined at runtime by the features.json config.
+    feat_ohlcv_quant starts with stable metadata columns and evolves on the
+    first insert_feat_ohlcv_quant() call because feature columns are config-driven.
 
     Args:
         conn : Open DuckDB connection.
@@ -63,6 +60,14 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS target (
+            open_time      TIMESTAMP PRIMARY KEY,
+            close          DOUBLE,
+            trg_l_fw60_q90 BOOLEAN,
+            trg_s_fw60_q10 BOOLEAN
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
             open_time       TIMESTAMP PRIMARY KEY,
             close           DOUBLE,
@@ -75,7 +80,7 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
             short_pred      DOUBLE
         )
     """)
-    logger.debug("ensure_tables: ohlcv + predictions OK")
+    logger.debug("ensure_tables: ohlcv + target + predictions OK")
 
 
 def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
@@ -87,44 +92,73 @@ def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
     return bool(result and result[0] > 0)
 
 
-def _ensure_features_table(conn: duckdb.DuckDBPyConnection, df: pd.DataFrame) -> None:
-    """Create or evolve the features table to match df's schema.
+def _sql_type_from_polars(dtype: pl.DataType) -> str:
+    """Map a Polars dtype to a DuckDB SQL type string."""
+    if dtype == pl.Boolean:
+        return "BOOLEAN"
+    if dtype.is_integer():
+        return "BIGINT"
+    if dtype.is_float():
+        return "DOUBLE"
+    if isinstance(dtype, (pl.Datetime, pl.Date)):
+        return "TIMESTAMP"
+    return "VARCHAR"
+
+
+def _sql_type_from_pandas_dtype(dtype_str: str) -> str:
+    """Map a pandas dtype string to a DuckDB SQL type string."""
+    if "bool" in dtype_str:
+        return "BOOLEAN"
+    if "int" in dtype_str:
+        return "BIGINT"
+    if "float" in dtype_str or "double" in dtype_str:
+        return "DOUBLE"
+    return "VARCHAR"
+
+
+def _ensure_feat_ohlcv_quant_table(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> None:
+    """Create or evolve the feat_ohlcv_quant table to match df's schema.
 
     First call  : creates the table from df's column types (no hardcoded schema).
     Later calls : adds any new columns that appear in df but not in the table.
 
+    Accepts both pandas and Polars DataFrames.  DuckDB can register either type
+    directly, so no intermediate conversion is needed.
+
     Args:
         conn : Open DuckDB connection.
-        df   : Pandas DataFrame whose columns define the target schema.
+        df   : DataFrame whose columns define the target schema.
     """
-    if not _table_exists(conn, "features"):
+    if not _table_exists(conn, "feat_ohlcv_quant"):
         conn.register("_feat_schema_tmp", df)
-        conn.execute("CREATE TABLE features AS SELECT * FROM _feat_schema_tmp LIMIT 0")
+        conn.execute("CREATE TABLE feat_ohlcv_quant AS SELECT * FROM _feat_schema_tmp LIMIT 0")
         conn.unregister("_feat_schema_tmp")
-        logger.debug("_ensure_features_table: created, cols=%d", len(df.columns))
+        logger.debug("_ensure_feat_ohlcv_quant_table: created, cols=%d", len(df.columns))
         return
 
     existing = {
         row[0]
         for row in conn.execute(
             "SELECT column_name FROM information_schema.columns"
-            " WHERE table_name = 'features'"
+            " WHERE table_name = 'feat_ohlcv_quant'"
         ).fetchall()
     }
-    for col in df.columns:
-        if col in existing:
-            continue
-        dtype_str = str(df[col].dtype)
-        if "bool" in dtype_str:
-            sql_type = "BOOLEAN"
-        elif "int" in dtype_str:
-            sql_type = "BIGINT"
-        elif "float" in dtype_str or "double" in dtype_str:
-            sql_type = "DOUBLE"
-        else:
-            sql_type = "VARCHAR"
-        conn.execute(f'ALTER TABLE features ADD COLUMN IF NOT EXISTS "{col}" {sql_type}')
-        logger.debug("_ensure_features_table: added column %s %s", col, sql_type)
+
+    if isinstance(df, pl.DataFrame):
+        schema = df.schema
+        for col in df.columns:
+            if col in existing:
+                continue
+            sql_type = _sql_type_from_polars(schema[col])
+            conn.execute(f'ALTER TABLE feat_ohlcv_quant ADD COLUMN IF NOT EXISTS "{col}" {sql_type}')
+            logger.debug("_ensure_feat_ohlcv_quant_table: added column %s %s", col, sql_type)
+    else:
+        for col in df.columns:
+            if col in existing:
+                continue
+            sql_type = _sql_type_from_pandas_dtype(str(df[col].dtype))
+            conn.execute(f'ALTER TABLE feat_ohlcv_quant ADD COLUMN IF NOT EXISTS "{col}" {sql_type}')
+            logger.debug("_ensure_feat_ohlcv_quant_table: added column %s %s", col, sql_type)
 
 
 # %% Insert helpers
@@ -140,38 +174,59 @@ def _to_pandas(df: _AnyDF) -> pd.DataFrame:
 def _insert_append_only(
     conn  : duckdb.DuckDBPyConnection,
     table : str,
-    df    : pd.DataFrame,
+    df    : _AnyDF,
 ) -> int:
     """Insert df rows where open_time > stored MAX(open_time).
 
     Rows are inserted in ascending open_time order so that DuckDB zonemap
     statistics remain tight on subsequent range queries.  Columns are matched
     by name so that df column ordering does not need to match the table schema.
+    Both Polars and pandas DataFrames are accepted; DuckDB registers them natively.
 
     Args:
         conn  : Open DuckDB connection.
-        table : Target table name (ohlcv, features, or predictions).
-        df    : Pandas DataFrame with open_time column.
+        table : Target table name.
+        df    : Polars or pandas DataFrame with open_time column.
 
     Returns:
         Number of rows inserted.
     """
-    if df.empty:
-        return 0
+    if isinstance(df, pl.DataFrame):
+        if df.is_empty():
+            return 0
+        if "open_time" in df.columns and df.schema["open_time"] == pl.Utf8:
+            df = df.with_columns(
+                pl.col("open_time").str.strptime(pl.Datetime("us"), "%Y-%m-%d %H:%M:%S")
+            )
+    else:
+        if df.empty:
+            return 0
+        if "open_time" in df.columns:
+            df = df.copy()
+            df["open_time"] = pd.to_datetime(df["open_time"])
 
     col_list = ", ".join(f'"{c}"' for c in df.columns)
     conn.register("_ins_batch", df)
     try:
-        result = conn.execute(f"""
+        max_row = conn.execute(
+            f"SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01') FROM {table}"
+        ).fetchone()
+        max_open_time = max_row[0] if max_row else pd.Timestamp("1970-01-01")
+        count_row = conn.execute(
+            "SELECT COUNT(*) FROM _ins_batch WHERE open_time > ?",
+            [max_open_time],
+        ).fetchone()
+        n = int(count_row[0]) if count_row else 0
+        if n == 0:
+            return 0
+
+        conn.execute(f"""
             INSERT INTO {table} ({col_list})
             SELECT {col_list}
             FROM _ins_batch
-            WHERE open_time > (
-                SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01') FROM {table}
-            )
+            WHERE open_time > ?
             ORDER BY open_time
-        """)
-        n = result.rowcount if result.rowcount is not None else 0
+        """, [max_open_time])
     finally:
         conn.unregister("_ins_batch")
 
@@ -200,29 +255,87 @@ def insert_ohlcv(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> int:
         "open_time", "open", "high", "low", "close", "volume",
         "quote_volume", "trades", "taker_buy_base", "taker_buy_quote",
     ]
-    pdf = pdf[[c for c in ohlcv_cols if c in pdf.columns]].copy()
-    n = _insert_append_only(conn, "ohlcv", pdf)
+    pdf_ohlcv = pd.DataFrame(pdf[[c for c in ohlcv_cols if c in pdf.columns]])
+    n = _insert_append_only(conn, "ohlcv", pdf_ohlcv)
     logger.info("insert_ohlcv: inserted=%d", n)
     return n
 
 
-def insert_features(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> int:
-    """Append new feature rows to the features table.
+def insert_feat_ohlcv_quant(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> int:
+    """Append new feature rows to the feat_ohlcv_quant table.
 
-    Creates the features table from df's schema on the first call.
+    Creates the table from df's schema on the first call.
     Only rows with open_time strictly greater than the current maximum are inserted.
+
+    Polars DataFrames are passed directly to DuckDB without conversion.
+    Pandas DataFrames are handled via the legacy path.
 
     Args:
         conn : Open DuckDB connection.
-        df   : Polars or pandas DataFrame with open_time and feature columns.
+        df   : Polars or pandas DataFrame with open_time and feat_* columns.
 
     Returns:
         Number of rows inserted.
     """
-    pdf = _to_pandas(df)
-    _ensure_features_table(conn, pdf)
-    n = _insert_append_only(conn, "features", pdf)
-    logger.info("insert_features: inserted=%d", n)
+    if isinstance(df, pl.DataFrame):
+        _ensure_feat_ohlcv_quant_table(conn, df)
+        n = _insert_append_only(conn, "feat_ohlcv_quant", df)
+    else:
+        pdf = _to_pandas(df)
+        _ensure_feat_ohlcv_quant_table(conn, pdf)
+        n = _insert_append_only(conn, "feat_ohlcv_quant", pdf)
+    logger.info("insert_feat_ohlcv_quant: inserted=%d", n)
+    return n
+
+
+def insert_target(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> int:
+    """Upsert target rows into the target table (DELETE + INSERT for full rebuild).
+
+    The target table is rebuilt in full on each sync_targets run.  This function
+    deletes rows within the open_time range of df, then inserts all rows from df.
+
+    Args:
+        conn : Open DuckDB connection.
+        df   : Polars or pandas DataFrame with open_time and trg_* columns.
+
+    Returns:
+        Number of rows inserted.
+    """
+    if isinstance(df, pl.DataFrame):
+        if df.is_empty():
+            return 0
+        if "open_time" in df.columns and df.schema["open_time"] == pl.Utf8:
+            df = df.with_columns(
+                pl.col("open_time").str.strptime(pl.Datetime("us"), "%Y-%m-%d %H:%M:%S")
+            )
+    else:
+        if df.empty:
+            return 0
+        if "open_time" in df.columns:
+            df = df.copy()
+            df["open_time"] = pd.to_datetime(df["open_time"])
+
+    conn.register("_target_batch", df)
+    try:
+        # Delete existing rows in the same time range to allow full or partial rebuild
+        conn.execute("""
+            DELETE FROM target
+            WHERE open_time IN (SELECT open_time FROM _target_batch)
+        """)
+
+        col_list = ", ".join(f'"{c}"' for c in df.columns)
+        conn.execute(f"""
+            INSERT INTO target ({col_list})
+            SELECT {col_list} FROM _target_batch
+            ORDER BY open_time
+        """)
+
+        count_row = conn.execute("SELECT COUNT(*) FROM _target_batch").fetchone()
+        n = int(count_row[0]) if count_row else 0
+    finally:
+        conn.unregister("_target_batch")
+
+    logger.info("insert_target: inserted=%d", n)
     return n
 
 
@@ -248,7 +361,7 @@ def insert_predictions(conn: duckdb.DuckDBPyConnection, df: _AnyDF) -> int:
         ).fetchall()
     ]
     available = [c for c in pred_cols if c in pdf.columns]
-    pdf = pdf[available].copy()
-    n = _insert_append_only(conn, "predictions", pdf)
+    pdf_pred = pd.DataFrame(pdf[available])
+    n = _insert_append_only(conn, "predictions", pdf_pred)
     logger.info("insert_predictions: inserted=%d", n)
     return n

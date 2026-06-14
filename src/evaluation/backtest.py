@@ -94,7 +94,7 @@ def build_backtest_frame(
     if model_meta is None:
         raise ValueError(f"Model not found in config/models.json: {model_id!r}")
 
-    data_dir   = db_cfg["data_dir"]
+    data_dir   = db_cfg["db_path"]
     pred_col   = utils.prediction_col_name(model_id)
     target_col = model_meta["target_name"]
 

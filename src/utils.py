@@ -18,7 +18,7 @@ def _repo_root() -> str:
 
 def _runtime_root() -> str:
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return str(sys._MEIPASS)
+        return str(sys._MEIPASS)  # type: ignore[attr-defined]
     return _repo_root()
 
 
@@ -57,7 +57,7 @@ def load_assets_config() -> dict:
 def default_asset_id(assets_cfg: dict | None = None) -> str:
     """Return the default asset ID from assets config."""
     assets_cfg = assets_cfg or load_assets_config()
-    return assets_cfg.get("default_asset_id", "solusdt_fw60")
+    return assets_cfg.get("default_asset_id", "solusdt")
 
 
 def resolve_asset_id(asset_id: str | None = None) -> str:
@@ -72,33 +72,76 @@ def load_asset_config(asset_id: str | None = None) -> dict:
         asset_id: Asset key from config/assets.json. Uses default_asset_id if None.
 
     Returns:
-        Dict with a single "database" key containing asset metadata and data_dir.
+        Dict with a single "database" key containing asset metadata and db_path.
 
     Raises:
-        ValueError: If asset_id is not found or has no data_dir configured.
+        ValueError: If asset_id is not found or has no db_path configured.
     """
     assets_cfg = load_assets_config()
-    resolved   = asset_id or assets_cfg.get("default_asset_id", "solusdt_fw60")
+    resolved   = asset_id or assets_cfg.get("default_asset_id", "solusdt")
     assets     = assets_cfg.get("assets", {})
 
     if resolved not in assets:
         raise ValueError(f"Asset not found in config/assets.json: {resolved}")
 
-    asset_cfg = assets[resolved]
-    data_dir  = asset_cfg.get("data_dir")
-    if not data_dir:
-        raise ValueError(f"No data_dir configured for asset {resolved}")
+    asset_cfg     = assets[resolved]
+    db_path_raw   = asset_cfg.get("db_path")
+    if not db_path_raw:
+        raise ValueError(f"No db_path configured for asset {resolved}")
+
+    metadata_path_raw = asset_cfg.get("metadata_path")
 
     return {
         "database": {
             "asset_id":         resolved,
-            "data_dir":         _resolve_path(data_dir),
+            "db_path":          _resolve_path(db_path_raw),
+            "metadata_path":    _resolve_path(metadata_path_raw) if metadata_path_raw else None,
             "symbol":           asset_cfg.get("symbol"),
             "interval":         asset_cfg.get("interval", "1m"),
             "market":           asset_cfg.get("market", "spot"),
             "features_profile": asset_cfg.get("features_profile", resolved),
         }
     }
+
+
+def load_database_metadata(asset_id: str | None = None) -> dict:
+    """Load the per-database metadata JSON for an asset.
+
+    This file (e.g. database/solusdt/solusdt.json) stores computed target
+    thresholds, table names, and champion model references for the asset.
+
+    Args:
+        asset_id: Asset key from config/assets.json. Uses default_asset_id if None.
+
+    Returns:
+        Parsed metadata dict, or empty dict if the file does not exist yet.
+    """
+    db_cfg        = load_asset_config(asset_id)["database"]
+    metadata_path = db_cfg.get("metadata_path")
+    if not metadata_path or not os.path.exists(metadata_path):
+        return {}
+    with open(metadata_path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_database_metadata(metadata: dict, asset_id: str | None = None) -> None:
+    """Persist updated per-database metadata JSON for an asset.
+
+    Args:
+        metadata  : Full metadata dict to write (replaces existing file content).
+        asset_id  : Asset key from config/assets.json. Uses default_asset_id if None.
+
+    Raises:
+        ValueError: If no metadata_path is configured for the asset.
+    """
+    db_cfg        = load_asset_config(asset_id)["database"]
+    metadata_path = db_cfg.get("metadata_path")
+    if not metadata_path:
+        raise ValueError(f"No metadata_path configured for asset: {asset_id}")
+    Path(metadata_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
 
 def load_features_config(asset_id: str | None = None) -> dict:

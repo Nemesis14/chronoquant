@@ -7,7 +7,7 @@ upsert is performed. Only rows past the stored maximum open_time are written.
 
 import json
 import logging
-import os
+import time
 
 import polars as pl
 from binance.client import Client
@@ -41,7 +41,7 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     # --- load config ---
     db_cfg   = utils.load_asset_config(asset_id)
     env_cfg  = utils.load_env_config()
-    data_dir = db_cfg["database"]["data_dir"]
+    db_path  = db_cfg["database"]["db_path"]
     symbol   = db_cfg["database"]["symbol"]
     market   = db_cfg["database"].get("market", "spot")
 
@@ -54,8 +54,7 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     api_secret = keys.get("api_secret") or keys.get("secret")
 
     # --- open DuckDB connection ---
-    os.makedirs(data_dir, exist_ok=True)
-    conn = get_connection(data_dir)
+    conn = get_connection(db_path)
     ensure_tables(conn)
 
     # --- fetch klines (paginated) ---
@@ -65,6 +64,7 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
     start_ms       = int(open_time_ms_from)
     inserted_total = 0
     batch_count    = 0
+    t_start        = time.monotonic()
 
     try:
         while True:
@@ -92,7 +92,7 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
 
             # --- build Polars DataFrame (fast type parsing) ---
             pl_df = pl.DataFrame(
-                {col: [row[i] for row in rows] for i, col in enumerate(_KLINE_COLUMNS)},
+                {col: [str(row[i]) for row in rows] for i, col in enumerate(_KLINE_COLUMNS)},
                 schema={col: pl.String for col in _KLINE_COLUMNS},
             ).with_columns([
                 pl.col("open_time").cast(pl.Int64).alias("open_time_ms"),
@@ -140,9 +140,10 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
 
             last_open_ms = int(rows[-1][0])
             if batch_count == 1 or batch_count % 10 == 0 or len(rows) < limit:
+                elapsed = time.monotonic() - t_start
                 logger.info(
-                    "OHLCV batches=%d appended=%d latest=%s",
-                    batch_count, inserted_total, utils.ms_to_utc_str(last_open_ms),
+                    "OHLCV batches=%d appended=%d latest=%s elapsed=%.1fs",
+                    batch_count, inserted_total, utils.ms_to_utc_str(last_open_ms), elapsed,
                 )
 
             next_start = last_open_ms + 60000
@@ -160,4 +161,4 @@ def sync_ohlcv(open_time_ms_from: int, asset_id: str | None = None) -> None:
         logger.info("Nincs uj kline adat")
         return
 
-    logger.info("OK: %d kline szinkronizalva, dataset=ohlcv, data_dir=%s", inserted_total, data_dir)
+    logger.info("OK: %d kline szinkronizalva, dataset=ohlcv, db_path=%s", inserted_total, db_path)

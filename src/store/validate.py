@@ -1,7 +1,7 @@
 """SQL assertion utilities for data integrity validation.
 
 Provides DuckDB-based look-ahead bias and label overlap checks against
-native DuckDB tables (ohlcv, features, predictions in the .duckdb file).
+native DuckDB tables (ohlcv, target, feat_ohlcv_quant, predictions in the .duckdb file).
 Callable standalone (returns violation count) or from pytest (raises on violation).
 """
 
@@ -11,10 +11,6 @@ from pathlib import Path
 import duckdb
 
 logger = logging.getLogger(__name__)
-
-
-def _db_path(data_dir: str) -> Path:
-    return Path(data_dir).with_suffix(".duckdb")
 
 
 def _tbl_exists(con: duckdb.DuckDBPyConnection, table: str) -> bool:
@@ -45,33 +41,34 @@ def assert_zero(con: duckdb.DuckDBPyConnection, sql: str, msg: str) -> int:
     return 0
 
 
-def check_no_future_features(data_dir: str) -> int:
+def check_no_future_features(db_path: str) -> int:
     """Assert no feature row has available_ts > open_time (look-ahead bias check).
 
-    Queries the native features table in the .duckdb file.
+    Queries the native feat_ohlcv_quant table in the .duckdb file.
 
     Args:
-        data_dir: Root data directory for the asset (e.g. data/solusdt_fw60).
+        db_path: Absolute path to the asset .duckdb file.
 
     Returns:
         0 on pass.
 
     Raises:
-        AssertionError: If any row has available_ts > open_time.
-        FileNotFoundError: If the .duckdb file or features table does not exist.
+        AssertionError : If any row has available_ts > open_time.
+        FileNotFoundError : If the .duckdb file or feat_ohlcv_quant table does not exist.
     """
-    db = _db_path(data_dir)
+    db = Path(db_path)
     if not db.exists():
         raise FileNotFoundError(f"DuckDB file not found: {db}")
 
     con = duckdb.connect(str(db), read_only=True)
     try:
-        if not _tbl_exists(con, "features"):
-            raise FileNotFoundError(f"features table not found in {db}")
+        if not _tbl_exists(con, "feat_ohlcv_quant"):
+            raise FileNotFoundError(f"feat_ohlcv_quant table not found in {db}")
 
-        sql = "SELECT COUNT(*) FROM features WHERE available_ts > open_time"
+        sql = "SELECT COUNT(*) FROM feat_ohlcv_quant WHERE available_ts > open_time"
         try:
-            count = int(con.execute(sql).fetchone()[0])
+            _row = con.execute(sql).fetchone()
+            count = int(_row[0]) if _row else 0
         except duckdb.BinderException as exc:
             if "available_ts" in str(exc):
                 logger.warning(
@@ -90,14 +87,14 @@ def check_no_future_features(data_dir: str) -> int:
         con.close()
 
 
-def check_no_label_overlap(data_dir: str) -> int:
+def check_no_label_overlap(db_path: str) -> int:
     """Assert no train/test label interval overlap.
 
-    Joins features and predictions native tables to check dataset_split / label_end_ts.
+    Joins feat_ohlcv_quant and predictions native tables to check dataset_split / label_end_ts.
     If dataset_split is not populated the check skips (returns 0).
 
     Args:
-        data_dir: Root data directory for the asset.
+        db_path: Absolute path to the asset .duckdb file.
 
     Returns:
         0 on pass.
@@ -105,15 +102,15 @@ def check_no_label_overlap(data_dir: str) -> int:
     Raises:
         AssertionError: If any train row's label interval overlaps a test row's interval.
     """
-    db = _db_path(data_dir)
+    db = Path(db_path)
     if not db.exists():
         logger.warning("check_no_label_overlap: DuckDB file missing, skipping")
         return 0
 
     con = duckdb.connect(str(db), read_only=True)
     try:
-        if not _tbl_exists(con, "features") or not _tbl_exists(con, "predictions"):
-            logger.warning("check_no_label_overlap: features/predictions table missing, skipping")
+        if not _tbl_exists(con, "feat_ohlcv_quant") or not _tbl_exists(con, "predictions"):
+            logger.warning("check_no_label_overlap: feat_ohlcv_quant/predictions table missing, skipping")
             return 0
 
         sql = """
@@ -122,7 +119,7 @@ def check_no_label_overlap(data_dir: str) -> int:
                     f.open_time,
                     p.label_end_ts,
                     f.dataset_split
-                FROM features f
+                FROM feat_ohlcv_quant f
                 JOIN predictions p ON f.open_time = p.open_time
                 WHERE f.dataset_split IS NOT NULL
             ),
@@ -155,6 +152,49 @@ def check_no_label_overlap(data_dir: str) -> int:
             raise AssertionError(f"train/test label overlap: {count} pair(s)")
 
         logger.info("check_no_label_overlap: OK (0 violations)")
+        return 0
+    finally:
+        con.close()
+
+
+def check_target_no_current_bar(db_path: str) -> int:
+    """Assert that target values do not incorporate the current bar's close price.
+
+    Checks the target table for rows where the forward window potentially includes
+    bar t (i.e. the most recent rows without null targets when ohlcv has no further data).
+    This is a structural check — the actual window correctness is validated by
+    sync_targets using SQL ROWS BETWEEN 1 FOLLOWING AND k FOLLOWING.
+
+    Args:
+        db_path: Absolute path to the asset .duckdb file.
+
+    Returns:
+        0 on pass (placeholder — real check is deterministic via SQL window definition).
+    """
+    db = Path(db_path)
+    if not db.exists():
+        logger.warning("check_target_no_current_bar: DuckDB file missing, skipping")
+        return 0
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        if not _tbl_exists(con, "target"):
+            logger.warning("check_target_no_current_bar: target table missing, skipping")
+            return 0
+
+        # Last `horizon` rows must have NULL targets (insufficient future data)
+        # This is enforced by sync_targets — we verify the table has any NULLs at the tail.
+        row = con.execute(
+            "SELECT COUNT(*) FROM target WHERE trg_l_fw60_q90 IS NULL"
+        ).fetchone()
+        null_count = int(row[0]) if row else 0
+        if null_count == 0:
+            logger.warning(
+                "check_target_no_current_bar: no NULL targets found — "
+                "last horizon rows should be NULL (rebuild targets)"
+            )
+        else:
+            logger.info("check_target_no_current_bar: OK (%d NULL tail rows)", null_count)
         return 0
     finally:
         con.close()

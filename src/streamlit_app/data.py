@@ -162,16 +162,16 @@ def latest_table_timestamp(table_name: str, asset_id: str | None = None) -> str 
 # prediction_history(...) -> pd.DataFrame
 # =============================================================================
 # Purpose:
-#  - Load the latest prediction window joined with OHLCV from Parquet
+#  - Load the latest prediction window joined with OHLCV from DuckDB
 # =============================================================================
 def prediction_history(
     lookback_hours: int = 24,
     asset_id: str | None = None,
 ) -> pd.DataFrame:
-    db_cfg   = utils.load_asset_config(asset_id)["database"]
-    data_dir = db_cfg["data_dir"]
+    db_cfg  = utils.load_asset_config(asset_id)["database"]
+    db_path = db_cfg["db_path"]
 
-    latest_pred_ts = latest_open_time(data_dir, "predictions")
+    latest_pred_ts = latest_open_time(db_path, "predictions")
     if latest_pred_ts is None:
         return pd.DataFrame()
 
@@ -181,7 +181,7 @@ def prediction_history(
     end_str   = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     pred_df = query_range(
-        data_dir, "predictions",
+        db_path, "predictions",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "close", "long_pred", "short_pred"],
@@ -190,7 +190,7 @@ def prediction_history(
         return pd.DataFrame()
 
     ohlcv_df = query_range(
-        data_dir, "ohlcv",
+        db_path, "ohlcv",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "open", "high", "low", "close"],
@@ -219,13 +219,13 @@ def prediction_history(
 # latest_prediction(asset_id: str | None = None) -> dict | None
 # =============================================================================
 # Purpose:
-#  - Return the newest prediction row from Parquet as a dict
+#  - Return the newest prediction row from DuckDB as a dict
 # =============================================================================
 def latest_prediction(asset_id: str | None = None) -> dict | None:
-    db_cfg   = utils.load_asset_config(asset_id)["database"]
-    data_dir = db_cfg["data_dir"]
+    db_cfg  = utils.load_asset_config(asset_id)["database"]
+    db_path = db_cfg["db_path"]
 
-    latest_pred_ts = latest_open_time(data_dir, "predictions")
+    latest_pred_ts = latest_open_time(db_path, "predictions")
     if latest_pred_ts is None:
         return None
 
@@ -235,7 +235,7 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     end_str   = last_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     pred_df = query_range(
-        data_dir, "predictions",
+        db_path, "predictions",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "close", "long_pred", "short_pred"],

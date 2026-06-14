@@ -16,8 +16,8 @@ import logging
 import math
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 import polars as pl
+from numpy.lib.stride_tricks import sliding_window_view
 
 logger = logging.getLogger(__name__)
 
@@ -130,23 +130,52 @@ def _rolling_mad_arr(arr: np.ndarray, w: int) -> np.ndarray:
     return result
 
 
+def _rolling_std_arr(arr: np.ndarray, w: int) -> np.ndarray:
+    """Rolling sample standard deviation (ddof=1)."""
+    n = len(arr)
+    result = np.full(n, np.nan)
+    if w > n:
+        return result
+    wins = sliding_window_view(arr.astype(float), w)
+    result[w - 1:] = wins.std(axis=1, ddof=1)
+    return result
+
+
+def _natr_arr(high_np: np.ndarray, low_np: np.ndarray, close_np: np.ndarray, w: int = 14) -> np.ndarray:
+    """Normalized ATR via Wilder's EMA of True Range."""
+    n = len(close_np)
+    prev_close = np.empty(n)
+    prev_close[0] = close_np[0]
+    prev_close[1:] = close_np[:-1]
+    tr = np.maximum(high_np - low_np, np.maximum(
+        np.abs(high_np - prev_close), np.abs(low_np - prev_close)
+    ))
+    tr[0] = high_np[0] - low_np[0]
+    alpha = 1.0 / w
+    atr = np.full(n, np.nan)
+    if n >= w:
+        atr[w - 1] = tr[:w].mean()
+        for i in range(w, n):
+            atr[i] = (1.0 - alpha) * atr[i - 1] + alpha * tr[i]
+    return np.where(close_np != 0, atr / close_np, np.nan)
+
+
 def _rolling_rank_inject(
-    lf: pl.LazyFrame, src: pl.Expr, w: int, col_name: str
+    lf      : pl.LazyFrame,
+    src_arr : np.ndarray,
+    w       : int,
+    col_name: str,
 ) -> pl.LazyFrame:
-    """Materialise src, compute rolling percentile rank via numpy, inject result."""
-    lf  = lf.with_columns([src.alias("_tmp_rr_src")])
-    arr = lf.select("_tmp_rr_src").collect().get_column("_tmp_rr_src").to_numpy()
-    result = _rolling_rank_arr(arr, w)
-    return lf.drop("_tmp_rr_src").with_columns([
-        pl.lit(pl.Series(col_name, result, dtype=pl.Float64))
-    ])
+    """Compute rolling percentile rank of src_arr and inject the result into lf."""
+    result = _rolling_rank_arr(src_arr, w)
+    return lf.with_columns([pl.lit(pl.Series(col_name, result, dtype=pl.Float64))])
 
 
 # ---------------------------------------------------------------------------
 # Momentum indicators
 # ---------------------------------------------------------------------------
 
-def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str, tp_np: np.ndarray) -> pl.LazyFrame:
     momentum_cfg = indicators.get("momentum", {})
     close = pl.col("close")
     high  = pl.col("high")
@@ -194,8 +223,7 @@ def _add_momentum_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
         lf = lf.with_columns([
             ((pl.col("high") + pl.col("low") + pl.col("close")) / 3.0).alias("_tmp_tp"),
         ])
-        tp_arr  = lf.select("_tmp_tp").collect().get_column("_tmp_tp").to_numpy()
-        mad_arr = _rolling_mad_arr(tp_arr, w)
+        mad_arr = _rolling_mad_arr(tp_np, w)
         tp_sma  = pl.col("_tmp_tp").rolling_mean(window_size=w, min_samples=w)
         lf = lf.with_columns([
             pl.lit(pl.Series("_tmp_mad", mad_arr, dtype=pl.Float64)),
@@ -278,7 +306,7 @@ def _kama_numpy(close_arr: np.ndarray, window: int, fast: int, slow: int) -> np.
     return kama
 
 
-def _add_trend_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_trend_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray) -> pl.LazyFrame:
     trend_cfg = indicators.get("trend", {})
     close = pl.col("close")
     new_cols: list[pl.Expr] = []
@@ -337,9 +365,7 @@ def _add_trend_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
         fast = cfg.get("fast",    2)
         slow = cfg.get("slow",   30)
         col_name = f"{p}kama_ratio_{w}_{fast}_{slow}"
-        # Collect only close column for KAMA iterative computation
-        close_series = lf.select("close").collect().get_column("close").to_numpy()
-        kama_arr = _kama_numpy(close_series, w, fast, slow)
+        kama_arr = _kama_numpy(close_np, w, fast, slow)
         kama_pl = pl.Series(col_name + "_raw", kama_arr)
         lf = lf.with_columns([
             pl.lit(kama_pl).alias("_tmp_kama"),
@@ -476,7 +502,7 @@ def _add_volume_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
 # Price action features
 # ---------------------------------------------------------------------------
 
-def _add_price_action_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_price_action_pl(lf: pl.LazyFrame, indicators: dict, p: str, log_ret_np: np.ndarray) -> pl.LazyFrame:
     price_cfg = indicators.get("price_action", {})
     close = pl.col("close")
     new_cols: list[pl.Expr] = []
@@ -506,17 +532,16 @@ def _add_price_action_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyF
     _skew_cfgs = price_cfg.get("returns_skew", [])
     _kurt_cfgs = price_cfg.get("returns_kurt", [])
     if _skew_cfgs or _kurt_cfgs:
-        _log_ret_arr = lf.select(pl.col(log_ret_col)).collect().get_column(log_ret_col).to_numpy()
         for cfg in _skew_cfgs:
             w = cfg["window"]
             new_cols.append(
-                pl.lit(pl.Series(f"{p}returns_skew_{w}", _rolling_skew_arr(_log_ret_arr, w), dtype=pl.Float64))
+                pl.lit(pl.Series(f"{p}returns_skew_{w}", _rolling_skew_arr(log_ret_np, w), dtype=pl.Float64))
                 .alias(f"{p}returns_skew_{w}")
             )
         for cfg in _kurt_cfgs:
             w = cfg["window"]
             new_cols.append(
-                pl.lit(pl.Series(f"{p}returns_kurt_{w}", _rolling_kurt_arr(_log_ret_arr, w), dtype=pl.Float64))
+                pl.lit(pl.Series(f"{p}returns_kurt_{w}", _rolling_kurt_arr(log_ret_np, w), dtype=pl.Float64))
                 .alias(f"{p}returns_kurt_{w}")
             )
 
@@ -687,51 +712,56 @@ def _add_return_distance_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.La
 # Regime rank features
 # ---------------------------------------------------------------------------
 
-def _add_regime_rank_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_regime_rank_pl(
+    lf        : pl.LazyFrame,
+    indicators: dict,
+    p         : str,
+    close_np  : np.ndarray,
+    high_np   : np.ndarray,
+    low_np    : np.ndarray,
+    log_ret_np: np.ndarray,
+    vol_np    : np.ndarray,
+    qvol_np   : np.ndarray | None,
+    trades_np : np.ndarray | None,
+) -> pl.LazyFrame:
     rr_cfg = indicators.get("regime_rank", {})
     if not rr_cfg:
         return lf
 
-    close  = pl.col("close")
-    high   = pl.col("high")
-    low    = pl.col("low")
-    volume = pl.col("volume")
-
+    high       = pl.col("high")
+    low        = pl.col("low")
+    volume     = pl.col("volume")
+    has_trades = trades_np is not None
     new_cols: list[pl.Expr] = []
-    natr_col     = f"{p}natr_14"
-    hist_vol_col = f"{p}hist_vol_20"
-    bb_width_col = f"{p}bb_width_14"
-    schema = lf.collect_schema().names()
 
-    for cfg in rr_cfg.get("natr_rank", []):
-        w   = cfg["window"]
-        src = pl.col(natr_col) if natr_col in schema else _safe_div(
-            pl.max_horizontal([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()])
-            .ewm_mean(com=13, min_samples=14, adjust=False), close
-        )
-        if new_cols:
-            lf = lf.with_columns(new_cols)
-            new_cols = []
-        lf = _rolling_rank_inject(lf, src, w, f"{p}natr_rank_{w}")
+    # Derived ranks — computed fully in numpy, no LazyFrame collect needed
+    if rr_cfg.get("natr_rank"):
+        natr_np = _natr_arr(high_np, low_np, close_np, w=14)
+        for cfg in rr_cfg.get("natr_rank", []):
+            w = cfg["window"]
+            if new_cols:
+                lf = lf.with_columns(new_cols)
+                new_cols = []
+            lf = _rolling_rank_inject(lf, natr_np, w, f"{p}natr_rank_{w}")
 
-    for cfg in rr_cfg.get("hist_vol_rank", []):
-        w   = cfg["window"]
-        lr  = (close / close.shift(1)).log()
-        src = pl.col(hist_vol_col) if hist_vol_col in schema else lr.rolling_std(window_size=20, min_samples=20)
-        if new_cols:
-            lf = lf.with_columns(new_cols)
-            new_cols = []
-        lf = _rolling_rank_inject(lf, src, w, f"{p}hist_vol_rank_{w}")
+    if rr_cfg.get("hist_vol_rank"):
+        hist_vol_np = _rolling_std_arr(log_ret_np, 20)
+        for cfg in rr_cfg.get("hist_vol_rank", []):
+            w = cfg["window"]
+            if new_cols:
+                lf = lf.with_columns(new_cols)
+                new_cols = []
+            lf = _rolling_rank_inject(lf, hist_vol_np, w, f"{p}hist_vol_rank_{w}")
 
-    for cfg in rr_cfg.get("bb_width_rank", []):
-        w   = cfg["window"]
-        sma = close.rolling_mean(window_size=14, min_samples=14)
-        std = close.rolling_std(window_size=14, min_samples=14)
-        src = pl.col(bb_width_col) if bb_width_col in schema else _safe_div((sma + 2 * std) - (sma - 2 * std), close)
-        if new_cols:
-            lf = lf.with_columns(new_cols)
-            new_cols = []
-        lf = _rolling_rank_inject(lf, src, w, f"{p}bb_width_rank_{w}")
+    if rr_cfg.get("bb_width_rank"):
+        std14       = _rolling_std_arr(close_np, 14)
+        bb_width_np = np.where(close_np != 0, 4.0 * std14 / close_np, np.nan)
+        for cfg in rr_cfg.get("bb_width_rank", []):
+            w = cfg["window"]
+            if new_cols:
+                lf = lf.with_columns(new_cols)
+                new_cols = []
+            lf = _rolling_rank_inject(lf, bb_width_np, w, f"{p}bb_width_rank_{w}")
 
     for cfg in rr_cfg.get("range_expansion", []):
         short  = cfg["short"]
@@ -747,32 +777,21 @@ def _add_regime_rank_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFr
         if new_cols:
             lf = lf.with_columns(new_cols)
             new_cols = []
-        lf = _rolling_rank_inject(lf, volume, w, f"{p}volume_rank_{w}")
+        lf = _rolling_rank_inject(lf, vol_np, w, f"{p}volume_rank_{w}")
 
     if new_cols:
         lf = lf.with_columns(new_cols)
         new_cols = []
 
-    schema = lf.collect_schema().names()
-
-    has_qv     = "quote_volume" in schema
-    has_trades = "trades" in schema
-
-    if has_qv:
+    if qvol_np is not None:
         for cfg in rr_cfg.get("quote_volume_rank", []):
             w = cfg["window"]
-            if new_cols:
-                lf = lf.with_columns(new_cols)
-                new_cols = []
-            lf = _rolling_rank_inject(lf, pl.col("quote_volume"), w, f"{p}quote_volume_rank_{w}")
+            lf = _rolling_rank_inject(lf, qvol_np, w, f"{p}quote_volume_rank_{w}")
 
-    if has_trades:
+    if trades_np is not None:
         for cfg in rr_cfg.get("trade_count_rank", []):
             w = cfg["window"]
-            if new_cols:
-                lf = lf.with_columns(new_cols)
-                new_cols = []
-            lf = _rolling_rank_inject(lf, pl.col("trades"), w, f"{p}trade_count_rank_{w}")
+            lf = _rolling_rank_inject(lf, trades_np, w, f"{p}trade_count_rank_{w}")
 
     for cfg in rr_cfg.get("volume_accel", []):
         short  = cfg["short"]
@@ -890,6 +909,7 @@ def _add_interaction_pl(
     indicators: dict,
     p: str,
     available_activity: list[str],
+    vol_np: np.ndarray,
 ) -> pl.LazyFrame:
     int_cfg = indicators.get("interaction", {})
     if not int_cfg:
@@ -930,8 +950,7 @@ def _add_interaction_pl(
         if new_cols:
             lf = lf.with_columns(new_cols)
             new_cols = []
-        vol_arr  = lf.select(pl.col("volume")).collect().get_column("volume").to_numpy()
-        rank_arr = _rolling_rank_arr(vol_arr, w)
+        rank_arr = _rolling_rank_arr(vol_np, w)
         lf = lf.with_columns([
             pl.lit(pl.Series("_tmp_vol_rank", rank_arr, dtype=pl.Float64)),
         ]).with_columns([
@@ -1054,7 +1073,7 @@ def _add_autocorr_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
 # Drawdown timing — numpy sliding_window_view replaces rolling_map Python callbacks
 # ---------------------------------------------------------------------------
 
-def _add_drawdown_timing_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_drawdown_timing_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray) -> pl.LazyFrame:
     if not indicators.get("drawdown_timing"):
         return lf
 
@@ -1073,12 +1092,11 @@ def _add_drawdown_timing_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.La
     lf = lf.with_columns(ratio_cols)
 
     # time_since_high / time_since_low via numpy sliding_window_view (no Python callbacks)
-    close_arr  = lf.select(pl.col("close")).collect().get_column("close").to_numpy()
     ts_cols: list[pl.Expr] = []
     for w in (10, 30, 60):
         ts_cols += [
-            pl.lit(pl.Series(f"{p}time_since_high_{w}", _time_since_high_arr(close_arr, w), dtype=pl.Float64)),
-            pl.lit(pl.Series(f"{p}time_since_low_{w}",  _time_since_low_arr(close_arr, w),  dtype=pl.Float64)),
+            pl.lit(pl.Series(f"{p}time_since_high_{w}", _time_since_high_arr(close_np, w), dtype=pl.Float64)),
+            pl.lit(pl.Series(f"{p}time_since_low_{w}",  _time_since_low_arr(close_np, w),  dtype=pl.Float64)),
         ]
     lf = lf.with_columns(ts_cols)
     return lf
@@ -1348,13 +1366,11 @@ def _add_donchian_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame
 # Linear regression features — numpy convolution (same as pandas version)
 # ---------------------------------------------------------------------------
 
-def _add_lr_pl(lf: pl.LazyFrame, indicators: dict, p: str) -> pl.LazyFrame:
+def _add_lr_pl(lf: pl.LazyFrame, indicators: dict, p: str, close_np: np.ndarray) -> pl.LazyFrame:
     if not indicators.get("lr"):
         return lf
 
-    # Collect only close column — avoids materialising all feature columns
-    close_np = lf.select("close").collect().get_column("close").to_numpy().astype(float)
-    n        = len(close_np)
+    n = len(close_np)
     new_data: dict[str, np.ndarray] = {}
 
     for w in (10, 30, 60):
@@ -1484,107 +1500,73 @@ def _clean_features_pl(lf: pl.LazyFrame, p: str) -> pl.LazyFrame:
 
 
 # ---------------------------------------------------------------------------
-# Target variables
-# ---------------------------------------------------------------------------
-
-def _add_targets_pl(lf: pl.LazyFrame, targets_cfg: list[dict]) -> pl.LazyFrame:
-    """Compute rolling-max/min threshold targets in polars."""
-    close = pl.col("close")
-
-    for target_cfg in targets_cfg:
-        direction   = target_cfg["direction"]
-        rolling_win = target_cfg["rolling_window"]
-        percentile  = target_cfg["percentile"]
-        target_col  = target_cfg.get("name") or f"trg_{direction[0]}_fw{rolling_win}_q{int(percentile*100)}"
-
-        if direction == "long":
-            rolling_max = close.reverse().rolling_max(window_size=rolling_win, min_samples=1).reverse()
-            ratio       = _safe_div(rolling_max, close)
-        elif direction == "short":
-            rolling_min = close.reverse().rolling_min(window_size=rolling_win, min_samples=1).reverse()
-            ratio       = _safe_div(rolling_min, close)
-        else:
-            raise ValueError(f"Unknown target direction: {direction}")
-
-        # Compute threshold via quantile — needs collect for global quantile
-        collected  = lf.select([ratio.alias("_ratio")]).collect()
-        threshold  = collected.get_column("_ratio").quantile(percentile, interpolation="linear")
-        n          = len(collected)  # reuse — avoids a second full collect
-
-        if direction == "long":
-            label = (ratio >= threshold).cast(pl.Float64)
-        else:
-            label = (ratio <= threshold).cast(pl.Float64)
-
-        lf = lf.with_columns([label.alias(target_col)])
-
-        # Edge-null: last rolling_win rows are set to null (can't observe full forward window)
-        if n >= rolling_win:
-            edge_mask = pl.int_range(pl.len()) >= (pl.len() - rolling_win)
-            lf = lf.with_columns([
-                pl.when(edge_mask).then(None).otherwise(pl.col(target_col)).alias(target_col)
-            ])
-
-    return lf
-
-
-# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
 def compute_features_polars(
-    df_ohlcv          : "pd.DataFrame",  # noqa: F821
+    df_ohlcv          : pl.DataFrame,
     indicators        : dict,
     feat_prefix       : str,
     available_activity: list[str],
     targets_cfg       : list[dict],
-) -> "pd.DataFrame":  # noqa: F821
-    """Compute all features from OHLCV data using polars LazyFrame.
+) -> pl.DataFrame:
+    """Compute all features from OHLCV data using a Polars LazyFrame pipeline.
 
     Args:
-        df_ohlcv           : OHLCV pandas DataFrame with DatetimeIndex (open_time).
+        df_ohlcv           : OHLCV Polars DataFrame with open_time as a column.
         indicators         : Indicator config dict from features.json.
         feat_prefix        : Column name prefix (e.g. "feat_").
         available_activity : List of activity column names present in df_ohlcv.
-        targets_cfg        : Target variable config list.
+        targets_cfg        : Unused — targets are computed upstream before this call.
 
     Returns:
-        pandas DataFrame with all feature and target columns.
+        Polars DataFrame with all feature columns and t-1 lag applied.
     """
-    import pandas as pd  # local to avoid circular at module level
+    # open_time is already a column in Polars (no DatetimeIndex / reset_index needed).
+    # Extract base OHLCV numpy arrays upfront — passed to indicator functions that
+    # need numpy computation, avoiding mid-pipeline LazyFrame collect() calls.
+    _close_np = df_ohlcv["close"].to_numpy().astype(float)
+    _high_np  = df_ohlcv["high"].to_numpy().astype(float)
+    _low_np   = df_ohlcv["low"].to_numpy().astype(float)
+    _vol_np   = df_ohlcv["volume"].to_numpy().astype(float)
+    _tp_np    = (_high_np + _low_np + _close_np) / 3.0
+    _log_ret_np = np.empty(len(_close_np), dtype=float)
+    _log_ret_np[0] = np.nan
+    with np.errstate(divide="ignore", invalid="ignore"):
+        _log_ret_np[1:] = np.log(_close_np[1:] / _close_np[:-1])
+    _qvol_np   = df_ohlcv["quote_volume"].to_numpy().astype(float) if "quote_volume" in df_ohlcv.columns else None
+    _trades_np = df_ohlcv["trades"].to_numpy().astype(float)       if "trades"       in df_ohlcv.columns else None
 
-    df_reset = df_ohlcv.reset_index()
-    lf       = pl.from_pandas(df_reset).lazy()
+    lf = df_ohlcv.lazy()
 
-    # Ensure open_time is Datetime
-    if lf.collect_schema()["open_time"] != pl.Datetime:
-        lf = lf.with_columns([pl.col("open_time").cast(pl.Datetime("us"))])
+    # Ensure open_time is Datetime(us) — idempotent if already correct type.
+    lf = lf.with_columns([pl.col("open_time").cast(pl.Datetime("us"))])
 
     # Ensure all OHLCV numeric columns are Float64
     ohlcv_cols = ["open", "high", "low", "close", "volume"] + available_activity
     for col in ohlcv_cols:
         lf = lf.with_columns([pl.col(col).cast(pl.Float64)])
 
-    # Targets
-    lf = _add_targets_pl(lf, targets_cfg)
+    # Targets are already in df_ohlcv (computed by sync_features before this call);
+    # we skip recomputing them here to avoid 2 unnecessary LazyFrame collects.
 
     # Feature groups
-    lf = _add_momentum_pl(lf, indicators, feat_prefix)
-    lf = _add_trend_pl(lf, indicators, feat_prefix)
+    lf = _add_momentum_pl(lf, indicators, feat_prefix, _tp_np)
+    lf = _add_trend_pl(lf, indicators, feat_prefix, _close_np)
     lf = _add_volatility_pl(lf, indicators, feat_prefix)
     lf = _add_volume_pl(lf, indicators, feat_prefix)
-    lf = _add_price_action_pl(lf, indicators, feat_prefix)
+    lf = _add_price_action_pl(lf, indicators, feat_prefix, _log_ret_np)
     lf = _add_market_structure_pl(lf, indicators, feat_prefix)
     lf = _add_activity_pl(lf, indicators, feat_prefix, available_activity)
     lf = _add_return_distance_pl(lf, indicators, feat_prefix)
-    lf = _add_regime_rank_pl(lf, indicators, feat_prefix)
+    lf = _add_regime_rank_pl(lf, indicators, feat_prefix, _close_np, _high_np, _low_np, _log_ret_np, _vol_np, _qvol_np, _trades_np)
     lf = _add_candle_shape_pl(lf, indicators, feat_prefix)
     lf = _add_trend_slope_pl(lf, indicators, feat_prefix)
-    lf = _add_interaction_pl(lf, indicators, feat_prefix, available_activity)
+    lf = _add_interaction_pl(lf, indicators, feat_prefix, available_activity, _vol_np)
     lf = _add_time_session_pl(lf, indicators, feat_prefix)
     lf = _add_gk_volatility_pl(lf, indicators, feat_prefix)
     lf = _add_autocorr_pl(lf, indicators, feat_prefix)
-    lf = _add_drawdown_timing_pl(lf, indicators, feat_prefix)
+    lf = _add_drawdown_timing_pl(lf, indicators, feat_prefix, _close_np)
     lf = _add_pattern_flags_pl(lf, indicators, feat_prefix)
     lf = _add_gap_pl(lf, indicators, feat_prefix)
     lf = _add_efficiency_pl(lf, indicators, feat_prefix)
@@ -1593,7 +1575,7 @@ def compute_features_polars(
     lf = _add_extended_accel_pl(lf, indicators, feat_prefix)
     lf = _add_ichimoku_pl(lf, indicators, feat_prefix)
     lf = _add_donchian_pl(lf, indicators, feat_prefix)
-    lf = _add_lr_pl(lf, indicators, feat_prefix)
+    lf = _add_lr_pl(lf, indicators, feat_prefix, _close_np)
     lf = _add_session_relative_pl(lf, indicators, feat_prefix)
 
     # t-1 lag
@@ -1602,7 +1584,4 @@ def compute_features_polars(
     # Clean inf
     lf = _clean_features_pl(lf, feat_prefix)
 
-    # Collect to pandas
-    result = lf.collect().to_pandas()
-    result["open_time"] = pd.to_datetime(result["open_time"])
-    return result
+    return lf.collect()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import time
@@ -218,7 +219,7 @@ class TradingService:
             elif decision == ENTER_SHORT:
                 self._open_position("SHORT", mark_price, bar_open_time, reason)
 
-            elif decision == EXIT_LONG or decision == EXIT_SHORT:
+            elif decision in (EXIT_LONG, EXIT_SHORT):
                 self._close_position(mark_price, reason, now)
 
         except Exception as exc:
@@ -295,10 +296,7 @@ class TradingService:
         # PnL calculation (notional, before leverage cost — leverage already amplifies gain)
         entry = self.state.entry_price or mark_price
         qty = self.state.quantity
-        if side == "LONG":
-            pnl_usdt = (avg_price - entry) * qty
-        else:
-            pnl_usdt = (entry - avg_price) * qty
+        pnl_usdt = (avg_price - entry) * qty if side == "LONG" else (entry - avg_price) * qty
 
         exit_time = utils.now_utc_str()
         order_id = f"ord_{uuid.uuid4().hex[:12]}"
@@ -349,14 +347,15 @@ class TradingService:
             raise
 
     def _read_latest_bar(self) -> tuple[str, float, float, float] | None:
-        """
-        Read the latest safely closed 1-minute bar's predictions from Parquet.
-        Returns (bar_open_time, pred_long, pred_short, close_price) or None.
+        """Read the latest safely closed 1-minute bar's predictions from DuckDB.
+
+        Returns:
+            Tuple of (bar_open_time, pred_long, pred_short, close_price) or None.
         """
         from store.duckdb_query import latest_open_time, query_range
 
-        data_dir = utils.load_asset_config(self.asset_id)["database"]["data_dir"]
-        if latest_open_time(data_dir, "predictions") is None:
+        db_path = utils.load_asset_config(self.asset_id)["database"]["db_path"]
+        if latest_open_time(db_path, "predictions") is None:
             return None
 
         cutoff    = datetime.now(UTC).replace(tzinfo=None)
@@ -365,13 +364,13 @@ class TradingService:
 
         try:
             df = query_range(
-                data_dir, "predictions",
+                db_path, "predictions",
                 start   = start_str,
                 end     = end_str,
                 columns = ["open_time", "close", self.long_pred_col, self.short_pred_col],
             )
         except Exception as exc:
-            _logger.error("Failed to read predictions from Parquet: %s", exc)
+            _logger.error("Failed to read predictions from DuckDB: %s", exc)
             return None
 
         if df.empty:
@@ -416,12 +415,10 @@ class TradingService:
         msg = str(exc)
         tb = traceback.format_exc()
         _logger.error("[%s] %s: %s", component, type(exc).__name__, msg)
-        try:
+        with contextlib.suppress(Exception):
             journal.insert_error(
                 self.db_path, self.run_id, component, type(exc).__name__, msg, tb
             )
-        except Exception:
-            pass
 
     def _sleep_until_next_bar(self) -> None:
         """Sleep until 5 seconds after the next 1-minute boundary."""
@@ -434,10 +431,8 @@ class TradingService:
     def _shutdown(self) -> None:
         _logger.info("Trading service shutting down (run_id=%s)", self.run_id)
         if self.run_id:
-            try:
+            with contextlib.suppress(Exception):
                 journal.mark_run_stopped(self.db_path, self.run_id)
-            except Exception:
-                pass
 
         if self.journal_cfg.get("export_on_stop") and self.run_id:
             try:

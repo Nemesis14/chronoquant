@@ -1,12 +1,13 @@
 {
-    "schema_version": 2,
-    "default_asset_id": "solusdt_fw60",
+    "schema_version": 3,
+    "default_asset_id": "solusdt",
     "assets": {
-        "solusdt_fw60": {
+        "solusdt": {
             "symbol": "SOLUSDT",
             "interval": "1m",
             "market": "futures",
-            "data_dir": "data/solusdt_fw60",
+            "db_path": "database/solusdt/solusdt.duckdb",
+            "metadata_path": "database/solusdt/solusdt.json",
             "features_profile": "solusdt_fw60"
         }
     }

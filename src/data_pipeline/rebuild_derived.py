@@ -1,17 +1,19 @@
-"""Rebuild features and predictions datasets from stored OHLCV data.
+"""Rebuild targets, features, and predictions from stored OHLCV data.
 
-Run this after training a new model or when the features config changes.
-Reads OHLCV from Parquet, computes features, then runs champion model
-inference and writes unified long/short predictions.
+Run this after training a new model or when the features/target config changes.
+Reads OHLCV from DuckDB, computes targets, then features, then runs champion
+model inference and writes unified long/short predictions.
 
-Processes in monthly chunks by default to avoid memory issues on long histories.
+Processes features and predictions in monthly chunks by default to avoid memory
+issues on long histories.  Targets are always rebuilt from the full OHLCV range.
 
 Usage examples:
     uv run python src/data_pipeline/rebuild_derived.py
     uv run python src/data_pipeline/rebuild_derived.py --start "2024-01-01 00:00:00"
     uv run python src/data_pipeline/rebuild_derived.py --features-only
+    uv run python src/data_pipeline/rebuild_derived.py --targets-only
     uv run python src/data_pipeline/rebuild_derived.py --predictions-only --start "2025-01-01 00:00:00"
-    uv run python src/data_pipeline/rebuild_derived.py --asset-id solusdt_fw60 --chunk-months 3
+    uv run python src/data_pipeline/rebuild_derived.py --asset-id solusdt --chunk-months 3
 """
 
 import argparse
@@ -26,6 +28,7 @@ sys.path.insert(0, "src")
 import utils
 from data_pipeline.sync_features import sync_features
 from data_pipeline.sync_predictions import sync_predictions
+from data_pipeline.sync_targets import sync_targets
 from store.duckdb_query import ohlcv_time_stats
 
 # %% Constants
@@ -47,11 +50,11 @@ def _configure_logging() -> None:
 # %% Helpers
 
 
-def _earliest_ohlcv_date(data_dir: str) -> str:
+def _earliest_ohlcv_date(db_path: str) -> str:
     """Return the earliest OHLCV open_time as a UTC start string.
 
     Args:
-        data_dir : Root data directory for the asset.
+        db_path : Absolute path to the asset .duckdb file.
 
     Returns:
         UTC string 'YYYY-MM-DD HH:MM:SS' of the earliest OHLCV row.
@@ -59,18 +62,18 @@ def _earliest_ohlcv_date(data_dir: str) -> str:
     Raises:
         SystemExit: If no OHLCV rows exist in DuckDB.
     """
-    _, min_ts, _ = ohlcv_time_stats(data_dir)
+    _, min_ts, _ = ohlcv_time_stats(db_path)
     if min_ts is None:
-        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", data_dir)
+        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", db_path)
         sys.exit(1)
     return min_ts
 
 
-def _latest_ohlcv_date(data_dir: str) -> str:
+def _latest_ohlcv_date(db_path: str) -> str:
     """Return the latest OHLCV open_time as a UTC end string.
 
     Args:
-        data_dir : Root data directory for the asset.
+        db_path : Absolute path to the asset .duckdb file.
 
     Returns:
         UTC string 'YYYY-MM-DD HH:MM:SS' of the latest OHLCV row.
@@ -78,9 +81,9 @@ def _latest_ohlcv_date(data_dir: str) -> str:
     Raises:
         SystemExit: If no OHLCV rows exist in DuckDB.
     """
-    _, _, max_ts = ohlcv_time_stats(data_dir)
+    _, _, max_ts = ohlcv_time_stats(db_path)
     if max_ts is None:
-        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", data_dir)
+        print("ERROR: Nincs OHLCV adat a DuckDB-ben:", db_path)
         sys.exit(1)
     return max_ts
 
@@ -115,7 +118,7 @@ def _monthly_chunks(start: str, end: str, chunk_months: int) -> list[tuple[str, 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description     = "Rebuild features and/or predictions datasets from OHLCV.",
+        description     = "Rebuild targets, features, and/or predictions datasets from OHLCV.",
         formatter_class = argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -137,14 +140,19 @@ def _parse_args() -> argparse.Namespace:
         help    = "Asset key from config/assets.json. Uses default_asset_id if omitted.",
     )
     parser.add_argument(
+        "--targets-only",
+        action = "store_true",
+        help   = "Run only sync_targets (full rebuild, ignores --start/--end).",
+    )
+    parser.add_argument(
         "--features-only",
         action = "store_true",
-        help   = "Run only sync_features, skip predictions.",
+        help   = "Run only sync_features, skip targets and predictions.",
     )
     parser.add_argument(
         "--predictions-only",
         action = "store_true",
-        help   = "Run only sync_predictions, skip features.",
+        help   = "Run only sync_predictions, skip targets and features.",
     )
     parser.add_argument(
         "--chunk-months",
@@ -160,32 +168,39 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Resolve config and run chunked rebuild of features and/or predictions."""
+    """Resolve config and run chunked rebuild of targets, features, and/or predictions."""
     _configure_logging()
     args = _parse_args()
 
-    if args.features_only and args.predictions_only:
-        print("ERROR: --features-only es --predictions-only nem kombinalhato.")
+    exclusive = [args.targets_only, args.features_only, args.predictions_only]
+    if sum(exclusive) > 1:
+        print("ERROR: --targets-only, --features-only, --predictions-only nem kombinalhatok.")
         sys.exit(1)
 
     # --- resolve asset config ---
     asset_id = args.asset_id
     db_cfg   = utils.load_asset_config(asset_id)
-    data_dir = db_cfg["database"]["data_dir"]
+    db_path  = db_cfg["database"]["db_path"]
     resolved = db_cfg["database"]["asset_id"]
 
-    start_time = args.start or _earliest_ohlcv_date(data_dir)
-    end_time   = args.end   or _latest_ohlcv_date(data_dir)
+    start_time = args.start or _earliest_ohlcv_date(db_path)
+    end_time   = args.end   or _latest_ohlcv_date(db_path)
 
     chunks = _monthly_chunks(start_time, end_time, args.chunk_months)
 
     print(f"INFO: asset_id={resolved}")
-    print(f"INFO: data_dir={data_dir}")
+    print(f"INFO: db_path={db_path}")
     print(f"INFO: start={start_time}  end={end_time}")
     print(f"INFO: chunk_months={args.chunk_months}  chunks={len(chunks)}")
 
+    # --- targets (always full rebuild — quantile threshold must cover full history) ---
+    if not args.features_only and not args.predictions_only:
+        print("INFO: sync_targets indul (full rebuild)...")
+        sync_targets(asset_id=asset_id)
+        print("OK: sync_targets kesz.")
+
     # --- features ---
-    if not args.predictions_only:
+    if not args.targets_only and not args.predictions_only:
         print("INFO: sync_features indul...")
         for i, (chunk_start, chunk_end) in enumerate(chunks, 1):
             print(f"INFO: features chunk {i}/{len(chunks)}: {chunk_start} -> {chunk_end}")
@@ -198,7 +213,7 @@ def main() -> None:
         print("OK: sync_features kesz.")
 
     # --- predictions ---
-    if not args.features_only:
+    if not args.targets_only and not args.features_only:
         print("INFO: sync_predictions indul...")
         for i, (chunk_start, chunk_end) in enumerate(chunks, 1):
             print(f"INFO: predictions chunk {i}/{len(chunks)}: {chunk_start} -> {chunk_end}")

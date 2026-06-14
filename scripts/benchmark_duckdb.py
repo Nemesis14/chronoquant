@@ -28,7 +28,6 @@ from store.duckdb_query import (
 )
 from store.duckdb_store import ensure_tables, get_connection, insert_ohlcv
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -66,8 +65,8 @@ def _bench(fn, label: str, reps: int = 1) -> float:
 
 def bench_insert(data_dir: str, n_rows: int) -> None:
     _section(f"INSERT — {n_rows:,} synthetic OHLCV rows")
-    import tempfile
     import shutil
+    import tempfile
     tmp = tempfile.mkdtemp()
     try:
         rng = np.random.default_rng(42)
@@ -111,7 +110,7 @@ def bench_query(data_dir: str) -> None:
     _result("date range", f"{min_ts} → {max_ts}")
 
     # Recent 7 days
-    end_dt   = pd.Timestamp(max_ts)
+    end_dt   = pd.Timestamp(max_ts or "1970-01-01")
     start_7d = (end_dt - pd.Timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     end_str  = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -181,8 +180,10 @@ def bench_asof_join(data_dir: str) -> None:
                 print(f"  SKIP — {tbl} table missing")
                 conn.close()
                 return
-        pred_count = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
-        feat_count = conn.execute("SELECT COUNT(*) FROM features").fetchone()[0]
+        pred_row = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()
+        feat_row = conn.execute("SELECT COUNT(*) FROM features").fetchone()
+        pred_count = pred_row[0] if pred_row else 0
+        feat_count = feat_row[0] if feat_row else 0
         _result("predictions rows", f"{pred_count:,}")
         _result("features rows",    f"{feat_count:,}")
     finally:

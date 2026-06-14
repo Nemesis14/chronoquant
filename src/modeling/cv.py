@@ -8,8 +8,8 @@ training end and test start to eliminate short-term autocorrelation leakage.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from dataclasses import dataclass, field
-from typing import Generator
 
 import numpy as np
 import pandas as pd

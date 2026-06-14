@@ -73,13 +73,13 @@ class _LoggerWriter(io.StringIO):
 
 def run_database_sync(asset_id: str | None = None) -> SyncResult:
     logger   = get_dashboard_logger()
-    db_cfg   = utils.load_asset_config(asset_id)["database"]
-    data_dir = db_cfg["data_dir"]
+    db_cfg  = utils.load_asset_config(asset_id)["database"]
+    db_path = db_cfg["db_path"]
 
     lock = get_sync_lock(asset_id)
     if not lock.acquire(blocking=False):
         logger.info("Sync already running for asset_id=%s — skipped", asset_id)
-        rows = ohlcv_row_count(data_dir)
+        rows = ohlcv_row_count(db_path)
         return SyncResult(
             start_time        = "",
             end_time          = None,
@@ -88,29 +88,29 @@ def run_database_sync(asset_id: str | None = None) -> SyncResult:
         )
 
     try:
-        return _run_database_sync_locked(asset_id, logger, data_dir)
+        return _run_database_sync_locked(asset_id, logger, db_path)
     finally:
         lock.release()
 
 
 def _run_database_sync_locked(
-    asset_id  : str | None,
-    logger    : logging.Logger,
-    data_dir  : str,
+    asset_id : str | None,
+    logger   : logging.Logger,
+    db_path  : str,
 ) -> SyncResult:
     logger.info("Database sync started")
-    logger.info("Data dir: %s", data_dir)
+    logger.info("DB path: %s", db_path)
 
-    rows_before    = ohlcv_row_count(data_dir)
-    last_open_time = ohlcv_latest_open_time(data_dir)
+    rows_before    = ohlcv_row_count(db_path)
+    last_open_time = ohlcv_latest_open_time(db_path)
     start_time     = _next_open_time(last_open_time) if last_open_time else INITIAL_SYNC_START
     start_ms       = _utc_str_to_ms(start_time)
 
     logger.info("OHLCV sync from Binance started at %s", start_time)
     _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
 
-    rows_after       = ohlcv_row_count(data_dir)
-    latest_open_time = ohlcv_latest_open_time(data_dir)
+    rows_after       = ohlcv_row_count(db_path)
+    latest_open_time = ohlcv_latest_open_time(db_path)
     logger.info(
         "OHLCV rows before=%s after=%s inserted=%s",
         rows_before, rows_after, rows_after - rows_before,

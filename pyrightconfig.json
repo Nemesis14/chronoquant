@@ -4,9 +4,8 @@
   "venv": ".venv",
   "include": [
     "src",
-    "schemas",
-    "tools",
-    "skills"
+    "_tests",
+    "scripts"
   ],
   "exclude": [
     "**/__pycache__",

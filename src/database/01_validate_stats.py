@@ -24,10 +24,10 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     """Print the informational DuckDB statistics report."""
-    args     = _parse_args()
+    args      = _parse_args()
     asset_cfg = utils.load_asset_config(args.asset_id)
-    data_dir  = asset_cfg["database"]["data_dir"]
-    report    = collect_duckdb_stats_report(data_dir)
+    db_path = asset_cfg["database"]["db_path"]
+    report  = collect_duckdb_stats_report(db_path)
     print(format_duckdb_stats_report(report))
 
 

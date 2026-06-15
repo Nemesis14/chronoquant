@@ -5,12 +5,22 @@ DuckDB tables.  Intended for validation output after data reloads; only explicit
 SQL/data integrity errors should fail callers.
 """
 
+import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import duckdb
-import pandas as pd
+
+from database.store.duckdb_query import (
+    dataset_exists,
+    ohlcv_dataset_exists,
+    ohlcv_time_stats,
+    query_range_pl,
+)
+
+logger = logging.getLogger(__name__)
 
 # %% Schemas
 
@@ -64,7 +74,9 @@ def _fmt_ts(value: object) -> str | None:
     """Format a DuckDB timestamp value for report output."""
     if value is None:
         return None
-    return pd.Timestamp(str(value)).strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)[:19]
 
 
 def _time_query(
@@ -175,11 +187,11 @@ def collect_duckdb_stats_report(
         timings: list[TimedMetric] = []
         ohlcv_stats = next((s for s in table_stats if s.table == "ohlcv"), None)
         if ohlcv_stats is not None and ohlcv_stats.status == "OK" and ohlcv_stats.max_open_time:
-            end_dt = pd.Timestamp(ohlcv_stats.max_open_time)
+            end_dt = datetime.strptime(ohlcv_stats.max_open_time, "%Y-%m-%d %H:%M:%S")
             windows = {
-                "1d"  : end_dt - pd.Timedelta(days=1),
-                "1w"  : end_dt - pd.Timedelta(days=7),
-                "1mo" : end_dt - pd.Timedelta(days=30),
+                "1d"  : end_dt - timedelta(days=1),
+                "1w"  : end_dt - timedelta(days=7),
+                "1mo" : end_dt - timedelta(days=30),
                 "full": None,
             }
             for label, start_dt in windows.items():
@@ -220,6 +232,84 @@ def collect_duckdb_stats_report(
         return DuckDBStatsReport(db_path=str(db_path), tables=table_stats, timings=timings)
     finally:
         conn.close()
+
+
+def raw_manifest_audit(db_path: str, dataset: str) -> None:
+    """Run a DuckDB native integrity audit and log statistics.
+
+    Checks row count, open_time range, null timestamps, and duplicate
+    open_time values for the given native DuckDB table.
+
+    Args:
+        db_path  : Absolute path to the asset .duckdb file.
+        dataset  : Table name: 'ohlcv', 'target', 'feat_ohlcv_quant', or 'predictions'.
+    """
+    db_file = Path(db_path)
+    if not db_file.exists():
+        logger.warning("%s: raw_manifest_audit - DuckDB file not found: %s", dataset, db_file)
+        return
+
+    conn = duckdb.connect(str(db_file), read_only=True)
+    try:
+        tbl_exists = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+            [dataset],
+        ).fetchone()
+        if not (tbl_exists and tbl_exists[0] > 0):
+            logger.warning("%s: raw_manifest_audit - tabla nem talalhato", dataset)
+            return
+
+        result = conn.execute(f"""
+            SELECT
+                COUNT(*)                                                    AS row_count,
+                MIN(open_time)                                              AS min_ts,
+                MAX(open_time)                                              AS max_ts,
+                SUM(CASE WHEN open_time IS NULL THEN 1 ELSE 0 END)         AS null_ts,
+                COUNT(*) - COUNT(DISTINCT CAST(open_time AS VARCHAR))       AS dup_ts
+            FROM {dataset}
+        """).fetchone()
+        if not result:
+            logger.warning("%s: raw_manifest_audit - nincs adat", dataset)
+            return
+
+        row_count, min_ts, max_ts, null_ts, dup_ts = result
+        logger.info(
+            "%s | rows=%d min=%s max=%s null_ts=%d dup_ts=%d",
+            dataset, row_count, min_ts, max_ts, null_ts, dup_ts,
+        )
+        if null_ts > 0 or dup_ts > 0:
+            logger.warning("%s: GYANÚS - null_ts=%d dup_ts=%d", dataset, null_ts, dup_ts)
+        else:
+            logger.info("%s: raw_manifest_audit OK", dataset)
+    except Exception:
+        logger.exception("raw_manifest_audit DuckDB hiba: dataset=%s", dataset)
+    finally:
+        conn.close()
+
+
+def log_dataset_check(db_path: str, dataset: str) -> None:
+    """Log row count, open_time range, and integrity audit for a DuckDB dataset.
+
+    Args:
+        db_path  : Absolute path to the asset .duckdb file.
+        dataset  : Dataset name: 'ohlcv', 'target', 'feat_ohlcv_quant', or 'predictions'.
+    """
+    if dataset == "ohlcv":
+        if not ohlcv_dataset_exists(db_path):
+            logger.warning("%s: nincsenek sorok", dataset)
+            return
+        n, mn, mx = ohlcv_time_stats(db_path)
+    else:
+        if not dataset_exists(db_path, dataset):
+            logger.warning("%s: nincsenek sorok", dataset)
+            return
+        df = query_range_pl(db_path, dataset, columns=["open_time"])
+        n  = len(df)
+        mn = df["open_time"].min() if n else None
+        mx = df["open_time"].max() if n else None
+    logger.info("%s: sorok=%d, tartomany=%s -> %s", dataset, n, mn, mx)
+
+    raw_manifest_audit(db_path, dataset)
 
 
 def format_duckdb_stats_report(report: DuckDBStatsReport) -> str:

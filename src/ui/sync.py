@@ -10,9 +10,9 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 
 import utils
-from database.data_pipeline.sync_features import sync_features
-from database.data_pipeline.sync_ohlcv import sync_ohlcv
-from database.data_pipeline.sync_predictions import sync_predictions
+from database.sync_tables.sync_features import sync_features
+from database.sync_tables.sync_ohlcv import sync_ohlcv
+from database.sync_tables.sync_predictions import sync_predictions
 from database.store.duckdb_query import ohlcv_latest_open_time, ohlcv_row_count
 from ui.dashboard_logging import get_dashboard_logger
 

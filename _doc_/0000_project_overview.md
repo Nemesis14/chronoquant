@@ -29,12 +29,11 @@ it does not feed the live trading pipeline.
 ```
 src/
   database/         DuckDB domain
-    store/            DuckDB store, queries, validation, maintenance, stats
-    data_pipeline/    OHLCV sync, feature sync, prediction sync, target sync
+    store/            DuckDB store, queries, validation, stats
+    sync_tables/      OHLCV sync, feature sync, prediction sync, target sync
+    tests/            Tests (store/, sync_tables/ — smoke, sanity, perf, integration)
     01_validate_stats.py
-    02_sync_ohlcv.py
-    03_rebuild_derived.py
-    04_benchmark_duckdb.py
+    02_sync_pipeline.py
 
   modeling/         ML modeling domain (family structure)
     quantitative/     Active family: LightGBM, features, CV, evaluation
@@ -58,7 +57,6 @@ src/
 
 _doc_/              Module documentation mirroring src/ (agent-specific, not preloaded)
 _jira_/              Local task tracking (epics → tasks → stories)
-src/tests/          Tests, co-located with src/
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
 models/             Generated model artifacts
@@ -136,8 +134,8 @@ Probability-threshold state machine (`src/trading/strategy.py`):
 |-------------|------|
 | `uv run pyright src/<module>/` | After any type-annotated change |
 | `ruff check src/<module>/ --fix` | Before committing any Python file |
-| `uv run pytest src/tests/store/ src/tests/data_pipeline/ -v` | Store or pipeline changes (smoke/sanity/perf) |
-| `uv run pytest src/tests/ -k "feature or model or backtest" -v` | Modeling changes |
+| `uv run pytest src/database/tests/ -v` | Store or pipeline changes (smoke/sanity/perf) |
+| `uv run pytest src/modeling/ -k "feature or model or backtest" -v` | Modeling changes |
 | `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
 
 Always run pyright and ruff for the affected module. Pytest scope depends on which

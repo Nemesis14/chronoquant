@@ -4,7 +4,7 @@
 
 ## Session Startup (minden session elején kötelező)
 
-1. Olvasd be: `_doc_/project_overview.md`
+1. Olvasd be: `_doc_/0000_project_overview.md`
 2. Olvasd be: `.agent/general_principles.md`
 3. Listázd a `_jira_/` tartalmát (csak fájlnevek, nem tartalom) — aktív taskokat azonosítani
 4. Várd meg a user kérését
@@ -24,7 +24,7 @@ Az orchestrátor **nem ír alkalmazáskódot**. Feladata:
 
 ---
 
-## Flow A — Egyszerű kérés (1 agent, nincs jira)
+## Flow A — Egyszerű kérés (1 agent, ticket elvégzés után)
 
 Ha a kérés egyértelműen **egy** agenthez tartozik:
 
@@ -32,10 +32,10 @@ Ha a kérés egyértelműen **egy** agenthez tartozik:
 Orchestrátor: "Ez [Agent] feladata. Menjünk?"
 User: "igen"
 → Betöltődik: CLAUDE.md + agent manifest + agent saját _doc_/ oldalai
-→ Agent végrehajtja — nincs jira ticket, nincs state tracking
+→ Agent végrehajtja, majd egyből pr_ ticketet hoz létre
 ```
 
-Nincs jira, nincs epic, nincs ticket mozgatás. Az agent elvégzi és kész.
+Nincs előzetes `todo_` ticket, nincs terv jóváhagyás. Az agent elvégzi, létrehozza a `pr_` ticketet, majd a validator_agent validál.
 
 ---
 
@@ -56,7 +56,9 @@ Feladat: <rövid leírás>
 
 Taskok:
   t{n}: <cím> → database_agent
-  t{n}: <cím> → modeling_agent
+  t{n}: <cím> → database_agent
+  t{n}: <cím> → validator_agent
+  t{n}: <cím> → doc_agent
   ...
 
 Sorrend: t{n} → t{n} (függőségek)
@@ -71,15 +73,36 @@ OK?
 - Minden taskhoz: `todo_t{n}_{slug}.md` az `assignee` mezővel (sablon lent)
 - `blocks` / `blocked_by` mezők a sorrendhez
 
-### 4. Végrehajtás ticket alapján
+### 4. Végrehajtás — session = egy agent típus
 
-Ha a user azt mondja: "futtasd t{n}-t" vagy "hajtsd végre epic_X-et":
+**Egy session = egy agent típus összes taskja az epicen belül.**
 
-- Olvasd be a task fájlt: agent, scope, acceptance criteria
-- Töltsd be **csak** azt az agent manifestet: `.agent/agents/<agent>.md`
-- Az agent betölti saját `_doc_/` oldalait és végrehajtja
-- Elvégzés után az agent rename-eli: `todo_` → `pr_`
-- Az orchestrátor csak akkor avatkozik be, ha a következő task feloldásához kell
+Az agent manifestek nem halmozódnak — session határon a context ürül, a `_jira_/`
+ticketek viszik át a state-et a következő sessionbe.
+
+**Session indítása:**
+User megnevezi: epic ID + agent típus (pl. "futtasd az epic_3 database taskjait")
+
+Orchestrátor:
+1. Betölti **csak** a megnevezett agent manifestjét
+2. Beolvassa az epic összes `todo_` és `pr_` ticketjét — kontextus
+3. Az agent végrehajtja az összes hozzá rendelt `todo_` taskot sorban
+4. Minden elvégzett task: `todo_` → `pr_` rename
+5. Ha a következő feloldott task más agenthez tartozik: **session zár**
+
+**Session zárása után** a user új sessiont indít a következő agent típussal.
+
+### 4a. Validátor session — minden dev session után kötelező
+
+User: "futtasd az epic_3 validátorát"
+
+1. Betöltődik: `.agent/agents/validator_agent.md`
+2. Beolvassa az epic összes `pr_` ticketjét
+3. Minden `pr_` taskra lefuttat: `ruff check` + `pyright` + pytest
+4. Ha minden átmegy: `pr_t{n}` → `done_t{n}`
+5. Ha blocker: `pr_t{n}` → visszakerül `todo_t{n}` (Notes szekcióba ok beírva)
+
+**Csak `done_` státuszú task után futhat a következő blokkolt task.**
 
 ---
 
@@ -97,7 +120,7 @@ Minden elvégzett munka kap jira ticketet. A különbség csak az időzítés:
   2. A `## Notes` szekciót frissíti munka közben
   3. Elvégzés után rename: `todo_` → `pr_`
 
-Mindkét esetben a ticket validálása (→ `done_`) egy **következő session** feladata.
+Mindkét esetben a ticket validálása (→ `done_`) a **validator_agent** feladata, ugyanazon session-ben (lásd 4a. lépés).
 
 ---
 
@@ -143,7 +166,7 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 
 | Domain | Agent |
 |--------|-------|
-| `src/database/` (store, data_pipeline), DuckDB, Parquet | `database_agent` |
+| `src/database/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
 | `src/modeling/` (quantitative, elliott), features, predictions | `modeling_agent` |
 | `src/ui/`, `src/trading/` | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies | `doc_agent` |

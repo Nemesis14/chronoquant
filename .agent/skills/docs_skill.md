@@ -1,6 +1,6 @@
 # Docs Skill — Local Documentation
 
-ChronoQuant documentation lives in `_docs/`. Read this before creating or
+ChronoQuant documentation lives in `_doc_/`. Read this before creating or
 updating module documentation.
 
 ---
@@ -14,11 +14,11 @@ create or update docs speculatively. If no task and no request: skip entirely.
 
 ## Structure
 
-`_docs/` mirrors `src/`. Every `src/` module directory has a corresponding
-`_docs/` subdirectory:
+`_doc_/` mirrors `src/`. Every `src/` module directory has a corresponding
+`_doc_/` subdirectory:
 
 ```
-_docs/
+_doc_/
   store/             ← mirrors src/store/
   data_pipeline/     ← mirrors src/data_pipeline/
   modeling/          ← mirrors src/modeling/
@@ -184,10 +184,10 @@ then drills down into subsections. Never start with details.
 
 ## Relationship to _jira
 
-Task files in `_jira/` may reference `_docs/` pages for context:
+Task files in `_jira_/` may reference `_doc_/` pages for context:
 ```markdown
 ## Scope
-See `_docs/store/schema.md` for current DuckDB schema.
+See `_doc_/store/schema.md` for current DuckDB schema.
 ```
 
 This keeps task files concise while pointing to stable reference docs.

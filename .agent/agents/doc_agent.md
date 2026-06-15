@@ -48,7 +48,7 @@ Do NOT load:
 
 - Application code under `src/` — specialist agents
 - Model artifacts under `models/`
-- `_jira/` task content (Orchestrator creates tasks; Doc Agent only maintains the skill file)
+- `_jira_/` task content (Orchestrator creates tasks; Doc Agent only maintains the skill file)
 
 ---
 

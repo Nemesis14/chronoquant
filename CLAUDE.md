@@ -4,12 +4,12 @@
 
 ## Session Startup (minden session elején kötelező)
 
-1. Olvasd be: `_docs/project_overview.md`
+1. Olvasd be: `_doc_/project_overview.md`
 2. Olvasd be: `.agent/general_principles.md`
-3. Listázd a `_jira/` tartalmát (csak fájlnevek, nem tartalom) — aktív taskokat azonosítani
+3. Listázd a `_jira_/` tartalmát (csak fájlnevek, nem tartalom) — aktív taskokat azonosítani
 4. Várd meg a user kérését
 
-**Ne töltsd be az agent manifesteket és a `_docs/<module>/` oldalakat** session
+**Ne töltsd be az agent manifesteket és a `_doc_/<module>/` oldalakat** session
 kezdetén — ezeket csak a delegált agent tölti be, amikor ténylegesen dolgozik.
 
 ---
@@ -20,7 +20,7 @@ Az orchestrátor **nem ír alkalmazáskódot**. Feladata:
 
 - Eldönti: **egyszerű vagy komplex** a kérés
 - Egyszerű esetben: azonosítja az agentet és átadja a kontrollt
-- Komplex esetben: feladatokra bontja, agenteket rendel, `_jira/` boardot hoz létre
+- Komplex esetben: feladatokra bontja, agenteket rendel, `_jira_/` boardot hoz létre
 
 ---
 
@@ -31,7 +31,7 @@ Ha a kérés egyértelműen **egy** agenthez tartozik:
 ```
 Orchestrátor: "Ez [Agent] feladata. Menjünk?"
 User: "igen"
-→ Betöltődik: CLAUDE.md + agent manifest + agent saját _docs/ oldalai
+→ Betöltődik: CLAUDE.md + agent manifest + agent saját _doc_/ oldalai
 → Agent végrehajtja — nincs jira ticket, nincs state tracking
 ```
 
@@ -45,7 +45,7 @@ Ha a kérés **több domaint érint**, vagy a user **nyomon követést akar**:
 
 ### 1. Elemzés
 
-- Ellenőrizd: van-e már kapcsolódó nyitott task a `_jira/`-ban?
+- Ellenőrizd: van-e már kapcsolódó nyitott task a `_jira_/`-ban?
 - Határozd meg: hány domain és melyik agent felelős?
 - Értékeld: új epic kell, vagy meglévőhöz adódik hozzá?
 
@@ -65,9 +65,9 @@ Kapcsolódik: [meglévő epic/task ID, ha van]
 OK?
 ```
 
-### 3. Jóváhagyás után: `_jira/` létrehozás
+### 3. Jóváhagyás után: `_jira_/` létrehozás
 
-- Hozd létre az epic mappát: `_jira/epic_{id}_{slug}/`
+- Hozd létre az epic mappát: `_jira_/epic_{id}_{slug}/`
 - Minden taskhoz: `todo_t{n}_{slug}.md` az `assignee` mezővel (sablon lent)
 - `blocks` / `blocked_by` mezők a sorrendhez
 
@@ -77,7 +77,7 @@ Ha a user azt mondja: "futtasd t{n}-t" vagy "hajtsd végre epic_X-et":
 
 - Olvasd be a task fájlt: agent, scope, acceptance criteria
 - Töltsd be **csak** azt az agent manifestet: `.agent/agents/<agent>.md`
-- Az agent betölti saját `_docs/` oldalait és végrehajtja
+- Az agent betölti saját `_doc_/` oldalait és végrehajtja
 - Elvégzés után az agent rename-eli: `todo_` → `pr_`
 - Az orchestrátor csak akkor avatkozik be, ha a következő task feloldásához kell
 
@@ -89,7 +89,7 @@ Minden elvégzett munka kap jira ticketet. A különbség csak az időzítés:
 
 **Flow A — ticket elvégzés után, egyből `pr_`:**
   1. Agent elvégzi a munkát
-  2. Létrehozza: `_jira/epic_{id}_{slug}/pr_t{n}_{slug}.md` (nincs `todo_` lépés)
+  2. Létrehozza: `_jira_/epic_{id}_{slug}/pr_t{n}_{slug}.md` (nincs `todo_` lépés)
   3. Az epic mappát is létrehozza ha még nem létezik
 
 **Flow B — ticket előre `todo_`, agent mozgatja `pr_`-re:**
@@ -132,48 +132,10 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 
 ## Context-takarékos elvek
 
-- Az orchestrátor **csak** `project_overview.md` + `_jira/` tartalmat tölt be
+- Az orchestrátor **csak** `project_overview.md` + `_jira_/` tartalmat tölt be
 - Agent manifesteket **csak végrehajtáskor** tölt be, delegáláshoz
-- `_docs/<module>/` oldalakat az **agent** tölti be, nem az orchestrátor
+- `_doc_/<module>/` oldalakat az **agent** tölti be, nem az orchestrátor
 - Hosszú jira task tartalmakat csak akkor olvasd be, ha az adott taskra kérdeznek rá
-
----
-
-## Session végi kötelező lépés: project_overview frissítése
-
-Minden session végén — mielőtt a user lezárja a munkát — ellenőrizd:
-
-> Történt-e olyasmi, ami a `_docs/project_overview.md`-t érinti?
-
-Frissíteni kell ha:
-- Új DB tábla, oszlop, vagy sémaváltozás történt
-- Új vagy inaktívvá tett ML modell
-- Trading strategy logika változott
-- Új modul, agent, vagy fő konvenció jött létre
-- Asset config változott (új asset, interval, stb.)
-
-Ha igen: frissítsd az érintett szekciót. Ha nem: nem kell semmit csinálni.
-Ez a szabály minden agentre vonatkozik, nem csak az orchestrátorra.
-
----
-
-## Session végi kötelező lépés: epic archiválás
-
-Minden session végén — közvetlenül a project_overview ellenőrzése után — nézd át a `_jira/` aktív epicjeit:
-
-```
-_jira/
-  epic_{id}_{slug}/
-    done_t1_...md   ← mind done_?
-    done_t2_...md
-```
-
-Ha egy epic mappában **minden fájl** `done_` prefixű (nincs `todo_` és nincs `pr_`):
-
-1. Mozgasd át: `_jira/epic_{id}_{slug}/` → `_jira/archive/epic_{id}_{slug}/`
-2. Nem kell manuálisan ellenőrizni a frontmatter `status` mezőt — a fájlnév a döntő.
-
-Ha vannak még `todo_` vagy `pr_` fájlok az epicben: **ne archivald**, az epic aktív marad.
 
 ---
 
@@ -181,9 +143,9 @@ Ha vannak még `todo_` vagy `pr_` fájlok az epicben: **ne archivald**, az epic 
 
 | Domain | Agent |
 |--------|-------|
-| `src/store/`, `src/data_pipeline/`, DuckDB, Parquet | `database_agent` |
-| `src/modeling/`, `src/evaluation/`, features, predictions | `modeling_agent` |
-| `src/streamlit_app/`, `src/trading/service.py`, UI | `ui_agent` |
+| `src/database/` (store, data_pipeline), DuckDB, Parquet | `database_agent` |
+| `src/modeling/` (quantitative, elliott), features, predictions | `modeling_agent` |
+| `src/ui/`, `src/trading/` | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies | `doc_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 

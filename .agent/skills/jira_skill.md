@@ -1,6 +1,6 @@
 # Jira Skill — Local Task Management
 
-ChronoQuant uses a local `_jira/` directory for task tracking. No external
+ChronoQuant uses a local `_jira_/` directory for task tracking. No external
 issue tracker. Read this before creating, updating, or referencing tasks.
 
 ---
@@ -8,7 +8,7 @@ issue tracker. Read this before creating, updating, or referencing tasks.
 ## Directory Structure
 
 ```
-_jira/
+_jira_/
   epic_{id}_{slug}/
     todo_{tid}_{slug}.md     ← task, active work
     pr_{tid}_{slug}.md       ← task, ready for review
@@ -20,11 +20,11 @@ _jira/
 
 ## ID Rules
 
-- IDs are **globally unique** across the entire `_jira/` directory
+- IDs are **globally unique** across the entire `_jira_/` directory
 - `epic_{n}` — epic number, e.g. `epic_27`
 - `t{n}` — task, e.g. `t11`, `t12`
 - `s{n}` — story, e.g. `s2`, `s3`
-- When creating a new item: scan all `_jira/` for the highest existing ID and increment
+- When creating a new item: scan all `_jira_/` for the highest existing ID and increment
 
 ---
 

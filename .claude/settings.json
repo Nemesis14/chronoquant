@@ -29,7 +29,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '*** SESSION VEGE: Ellenorizd a project_overview.md frissitesi igenyet! (uj tabla, modell, strategy, modul, agent, asset) ***'"
+            "command": "powershell.exe -NonInteractive -NoProfile -File \"d:/repos/chronoquant/.claude/hooks/archive_epics.ps1\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NonInteractive -NoProfile -File \"d:/repos/chronoquant/.claude/hooks/session_end.ps1\""
           }
         ]
       }

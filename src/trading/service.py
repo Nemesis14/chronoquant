@@ -21,7 +21,7 @@ _logger = logging.getLogger("chronoquant.trading")
 def _dash_log(msg: str, level: str = "info") -> None:
     """Log to dashboard logger if available (no-op when running headless)."""
     try:
-        from streamlit_app.dashboard_logging import get_dashboard_logger
+        from ui.dashboard_logging import get_dashboard_logger
         getattr(get_dashboard_logger(), level)(msg)
     except Exception:
         pass
@@ -340,7 +340,7 @@ class TradingService:
 
     def _sync_data(self) -> None:
         try:
-            from streamlit_app.sync import run_database_sync
+            from ui.sync import run_database_sync
             run_database_sync(asset_id=self.asset_id)
         except Exception as exc:
             _logger.warning("Data sync failed: %s", exc)
@@ -352,7 +352,7 @@ class TradingService:
         Returns:
             Tuple of (bar_open_time, pred_long, pred_short, close_price) or None.
         """
-        from store.duckdb_query import latest_open_time, query_range
+        from database.store.duckdb_query import latest_open_time, query_range
 
         db_path = utils.load_asset_config(self.asset_id)["database"]["db_path"]
         if latest_open_time(db_path, "predictions") is None:

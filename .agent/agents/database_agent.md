@@ -25,8 +25,8 @@ Read these before starting work:
 
 Load relevant module docs (only for affected modules):
 
-- `_docs/store/` — if touching `src/store/`
-- `_docs/data_pipeline/` — if touching `src/data_pipeline/`
+- `_doc_/store/` — if touching `src/store/`
+- `_doc_/data_pipeline/` — if touching `src/data_pipeline/`
 
 ---
 
@@ -40,7 +40,7 @@ Load relevant module docs (only for affected modules):
 | `config/assets.json` | Asset configuration |
 | `src/utils.py` | Config-loading helpers (shared — coordinate with others) |
 | `_tests/store/`, `_tests/data_pipeline/` | Tests for this layer |
-| `_docs/store/`, `_docs/data_pipeline/` | Module documentation |
+| `_doc_/store/`, `_doc_/data_pipeline/` | Module documentation |
 
 ---
 

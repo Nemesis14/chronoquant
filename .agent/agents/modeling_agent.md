@@ -26,8 +26,8 @@ Read these before starting work:
 
 Load relevant module docs (only for affected modules):
 
-- `_docs/modeling/` — if touching `src/modeling/`
-- `_docs/evaluation/` — if touching `src/evaluation/`
+- `_doc_/modeling/` — if touching `src/modeling/`
+- `_doc_/evaluation/` — if touching `src/evaluation/`
 
 ---
 
@@ -42,7 +42,7 @@ Load relevant module docs (only for affected modules):
 | `src/data_pipeline/sync_predictions.py` | Prediction sync into store |
 | `models/` | Generated model artifacts (`models/<model_id>/`) |
 | `_tests/data_pipeline/` | Feature-related tests |
-| `_docs/modeling/`, `_docs/evaluation/` | Module documentation |
+| `_doc_/modeling/`, `_doc_/evaluation/` | Module documentation |
 
 ---
 

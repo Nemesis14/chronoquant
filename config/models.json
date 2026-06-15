@@ -14,7 +14,7 @@
             "predict": { "method": "predict_proba", "proba": true },
             "training": {
                 "sample_id": "base_solusdt_fw60_futures_v1",
-                "sample_dir": "samples/base_solusdt_fw60_futures_v1",
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_futures_v1",
                 "row_stride": 60
             },
             "active": true
@@ -33,7 +33,7 @@
             "predict": { "method": "predict_proba", "proba": true },
             "training": {
                 "sample_id": "base_solusdt_fw60_futures_v1",
-                "sample_dir": "samples/base_solusdt_fw60_futures_v1",
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_futures_v1",
                 "row_stride": 60
             },
             "active": true
@@ -52,7 +52,7 @@
             "predict": { "method": "predict_proba", "proba": true },
             "training": {
                 "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_dev",
                 "row_stride": 60
             },
             "active": false
@@ -71,7 +71,7 @@
             "predict": { "method": "predict_proba", "proba": true },
             "training": {
                 "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev",
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_dev",
                 "row_stride": 60
             },
             "active": false

@@ -36,7 +36,7 @@ Write the **Summary** section last (after the analysis), but place it first in t
 
 ```python
 import sys
-sys.path.insert(0, "../../src")   # adjust depth from _docs/<topic>/
+sys.path.insert(0, "../../src")   # adjust depth from _doc_/<topic>/
 import utils
 cfg     = utils.load_asset_config()
 db_path = cfg["database"]["db_path"]
@@ -61,12 +61,12 @@ or
 
 ## Output Location
 
-Notebooks go in `_docs/<topic>/analysis_<slug>.ipynb`.
+Notebooks go in `_doc_/<topic>/analysis_<slug>.ipynb`.
 
 If the topic directory does not exist, create it. Topic naming mirrors `src/` module names:
-- `_docs/store/` — DB integrity, stats
-- `_docs/modeling/` — CV structure, sample independence, feature null patterns
-- `_docs/data_pipeline/` — leakage, sync correctness
+- `_doc_/store/` — DB integrity, stats
+- `_doc_/modeling/` — CV structure, sample independence, feature null patterns
+- `_doc_/data_pipeline/` — leakage, sync correctness
 
 ---
 
@@ -78,6 +78,6 @@ If the analysis finds a critical issue (leakage, broken CV, wrong null count):
    ```
    [analyst] Critical finding — <date>
    Issue: <one-line description>
-   Notebook: _docs/<topic>/analysis_<slug>.ipynb
+   Notebook: _doc_/<topic>/analysis_<slug>.ipynb
    ```
 3. Create a `todo_` ticket for the responsible agent if a fix is required

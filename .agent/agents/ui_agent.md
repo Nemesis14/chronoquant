@@ -26,8 +26,8 @@ Do NOT load:
 
 Load relevant module docs (only for affected modules):
 
-- `_docs/streamlit_app/` — if touching `src/streamlit_app/`
-- `_docs/trading/` — if touching `src/trading/`
+- `_doc_/streamlit_app/` — if touching `src/streamlit_app/`
+- `_doc_/trading/` — if touching `src/trading/`
 
 ---
 
@@ -37,7 +37,7 @@ Load relevant module docs (only for affected modules):
 |------|---------------|
 | `src/streamlit_app/` | Pages, components, data loading, sync wrappers |
 | `src/trading/service.py` | Trading service called from UI |
-| `_docs/streamlit_app/`, `_docs/trading/` | Module documentation |
+| `_doc_/streamlit_app/`, `_doc_/trading/` | Module documentation |
 
 ---
 

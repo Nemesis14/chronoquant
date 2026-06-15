@@ -30,7 +30,7 @@
             },
             "training": {
                 "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev"
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_dev"
             },
             "status": {
                 "active": true,
@@ -58,7 +58,7 @@
             },
             "training": {
                 "sample_id": "base_solusdt_fw60_dev",
-                "sample_dir": "samples/base_solusdt_fw60_dev"
+                "sample_dir": "database/solusdt/samples/base_solusdt_fw60_dev"
             },
             "status": {
                 "active": true,

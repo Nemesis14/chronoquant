@@ -19,8 +19,8 @@ Shared rules, skills, and tool docs for AI agents working on ChronoQuant.
 
   skills/                       ← knowledge and workflows
     coding_skill.md             ← Python coding standards for this project
-    jira_skill.md               ← _jira/ local task management workflow
-    docs_skill.md               ← _docs/ local documentation workflow
+    jira_skill.md               ← _jira_/ local task management workflow
+    docs_skill.md               ← _doc_/ local documentation workflow
 
   tools/                        ← tool setup, usage, and config anchors
     lsp_tool.md                 ← Pyright MCP language server + .mcp.json + pyrightconfig.json

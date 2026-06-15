@@ -27,7 +27,7 @@ Read these before starting work:
 
 ## Scope
 
-- `_docs/<topic>/analysis_<slug>.ipynb` — all output goes here
+- `_doc_/<topic>/analysis_<slug>.ipynb` — all output goes here
 - Reads from: `src/modeling/`, `src/store/`, `src/data_pipeline/`, `models/`, `database/`
 - Does NOT write tests, agent rules, or application code
 
@@ -35,7 +35,7 @@ Read these before starting work:
 
 ## Output Format
 
-Every analysis is a **Jupyter notebook** (`.ipynb`) placed in `_docs/<topic>/`.
+Every analysis is a **Jupyter notebook** (`.ipynb`) placed in `_doc_/<topic>/`.
 
 Naming convention: `analysis_<slug>.ipynb`
 - `analysis_sample_independence.ipynb`
@@ -95,8 +95,8 @@ User spec can add checks or override thresholds — it does not remove defaults.
 ## Workflow
 
 1. Read the request or `pr_` ticket that triggered the analysis
-2. Identify the topic → choose or create the `_docs/<topic>/` directory
-3. Create `_docs/<topic>/analysis_<slug>.ipynb`
+2. Identify the topic → choose or create the `_doc_/<topic>/` directory
+3. Create `_doc_/<topic>/analysis_<slug>.ipynb`
 4. Apply the methodology checklist — skip items only if they don't apply (document why)
 5. Add a **Summary** section at the top of the notebook with key findings
 6. If a critical issue is found (e.g., leakage, broken CV), flag it in the jira ticket Notes

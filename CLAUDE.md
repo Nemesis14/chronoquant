@@ -170,6 +170,7 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 | `src/modeling/` (quantitative, elliott), features, predictions | `modeling_agent` |
 | `src/ui/`, `src/trading/` | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies | `doc_agent` |
+| `_doc_/analysis/`, ML EDA, feature/model analysis notebooks | `analyst_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 
 Ha egy task több domaint érint: bontsd szét több taskra, minden taskhoz egy agent.

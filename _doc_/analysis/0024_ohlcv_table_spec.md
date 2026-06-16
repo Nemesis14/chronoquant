@@ -144,6 +144,58 @@ Summarize by:
 
 Purpose: identify distribution shift and regime changes.
 
+### 7. Temporal price structure and volatility
+
+Goal: detect whether the price series exhibits structural regime changes over time, and quantify how volatile each period is — informing the decision of which historical window to use for model development.
+
+#### 7a. Price level over time
+
+Plot `close` as a time-series line chart (daily or weekly resampled) with a rolling standard-deviation band (e.g. ±1 std over a 30-day window).
+
+Visual purpose: reveal long-term trend phases, regime shifts, and whether the series is stationary or trending.
+
+#### 7b. Period volatility — box plots
+
+Compute realized volatility for each calendar period:
+
+- per **year**
+- per **half-year** (H1 / H2)
+
+Realized volatility proxy: annualized standard deviation of 1-minute log returns within each period.
+
+```python
+df["log_ret"] = np.log(df["close"] / df["close"].shift(1))
+# group by year or half-year, then compute std * sqrt(525600) for annualized 1-min vol
+```
+
+Display as box plots (one box per period). Each box shows: median, IQR, whiskers, and outliers.
+
+Visual purpose: compare spread and skew of volatility across periods — identify whether certain years/halves are structurally more volatile.
+
+#### 7c. Rolling volatility line chart
+
+Plot annualized realized volatility as a continuous line (e.g. 30-day rolling window of 1-minute log-return std), with a shaded ±1 std envelope around the rolling mean.
+
+Add vertical reference lines at year boundaries.
+
+Visual purpose: show volatility regime changes continuously rather than aggregated — reveal gradual regime drift vs. sudden structural breaks.
+
+#### 7d. Structural break indicators
+
+Report per period (year / half-year):
+
+- mean `close`
+- std of `close`
+- mean log return
+- std of log return (realized vol)
+- 5th and 95th percentile of log return
+- max drawdown within period
+- Sharpe-like ratio: mean return / std return
+
+Present as a table sorted by period. Flag periods where any metric differs by more than 2× from the dataset-wide value.
+
+Decision context: this analysis directly informs whether model training should use the full history or a more recent structurally stable window.
+
 ## Required Notebook Outputs
 
 1. Summary table with row count, min/max time, gap count, duplicate count.
@@ -154,6 +206,10 @@ Purpose: identify distribution shift and regime changes.
 6. Volume/activity distribution.
 7. Regime summaries by year/month.
 8. Cross-table coverage comparison.
+9. Line chart: `close` over time with rolling std band.
+10. Box plots: realized volatility by year and by half-year.
+11. Rolling volatility line chart with shaded envelope and year boundary markers.
+12. Structural break summary table per period (mean/std of price and returns, max drawdown, Sharpe proxy).
 
 ## Critical Findings
 

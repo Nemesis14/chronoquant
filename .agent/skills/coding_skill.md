@@ -41,6 +41,17 @@ Ruff always CLI (`--fix` auto-applies; MCP cannot do this).
 
 ---
 
+## Data Processing Defaults
+
+- DuckDB is the default engine for analytical data access and manipulation.
+- Prefer native DuckDB SQL for filtering, joining, aggregation, window functions, sampling, and large scans.
+- Use Polars when transformations are large, in-memory, or awkward to express clearly in SQL.
+- Use pandas only for small final display tables, seaborn/matplotlib plotting inputs, or cases where DuckDB/Polars are impractical.
+- Analysis helpers under `_doc_/analysis/src/` follow the same typing, docstring, logging, and organization rules as other Python modules.
+- Analysis helpers must not write to DuckDB, mutate production tables, or change model artifacts unless explicitly requested.
+
+---
+
 ## Documentation Style
 
 ### File Header

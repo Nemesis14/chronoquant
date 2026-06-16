@@ -1,7 +1,7 @@
 # Analyst Agent
 
 Owns methodological analysis of ML models, feature sets, and dataset quality.
-Produces presentation-quality Quarto-renderable Jupyter notebooks with code and narrative.
+Produces one executable `.ipynb` per analysis spec, rendered with Quarto.
 
 ---
 
@@ -12,8 +12,9 @@ Validator Agent (tests) nor the Doc Agent (documentation) cover. It answers
 questions like: "Are the training samples independent?", "Is there an embargo
 gap?", "Are the null patterns in windowed features correct?"
 
-It does **not** write pytest tests. It writes one executable `.ipynb` analysis
-notebook per analysis spec and renders that notebook with Quarto.
+It does **not** write pytest tests.
+It does **not** modify production code under `src/`, modeling artifacts, or
+application configuration unless explicitly asked.
 
 ---
 
@@ -24,82 +25,65 @@ Read these before starting work:
 - `.agent/general_principles.md`
 - `.agent/skills/analyst_skill.md`
 - `.agent/skills/analysis_presentation_skill.md`
+- `.agent/skills/coding_skill.md`
+- `.agent/tools/quarto_analysis_defaults.md`
 
 ---
 
-## Scope
+## Folder Structure
 
-- `_doc_/<topic>/analysis_<spec_slug>.ipynb` — primary source output
-- `_doc_/<topic>/analysis_<spec_slug>.html` — rendered Quarto output, produced after notebook execution
-- Reads from: `src/modeling/`, `src/store/`, `src/data_pipeline/`, `models/`, `database/`, `_analysis_specs/` or the triggering spec location
-- Does NOT write tests, agent rules, or application code unless explicitly asked
+```
+_doc_/
+  analysis/            ← analyst working area
+    *.spec.md          ← input analysis specs
+    _quarto.yml        ← Quarto config
+    *.css              ← CSS
+    src/               ← reusable analysis helper modules
+    *.ipynb            ← notebooks (named after spec, _spec suffix stripped, no prefix)
+  *.html               ← rendered Quarto output (one level up from analysis/)
+```
+
+Helpers under `_doc_/analysis/src/` must follow `coding_skill.md` (typed public
+functions, Google-style docstrings, no writes to DB or production state).
 
 ---
 
 ## One Spec = One Notebook Rule
 
-Every analysis spec file produces exactly one notebook.
+Each `.spec.md` produces exactly one notebook. Strip the `_spec` suffix from
+the spec filename (if present) — **no prefix is added**. The spec filename
+is the notebook name.
 
-- If the request references `4.spec.md`, create one notebook for that spec only.
-- Do not merge multiple specs into one large notebook.
-- Notebook name must mirror the spec slug:
-  - `4_full_ml_dataset_audit.spec.md` -> `analysis_full_ml_dataset_audit.ipynb`
-  - `sample_independence.spec.md` -> `analysis_sample_independence.ipynb`
-- If four specs are assigned, produce four separate notebooks and render each one.
+| Spec file | Notebook |
+|-----------|----------|
+| `0024_ohlcv_table_spec.md` | `0024_ohlcv_table.ipynb` |
+| `0025_target_table_spec.md` | `0025_target_table.ipynb` |
+| `sample_independence_spec.md` | `sample_independence.ipynb` |
 
----
-
-## Output Format
-
-Every analysis is a **Jupyter notebook** (`.ipynb`) placed in `_doc_/<topic>/`.
-
-Naming convention: `analysis_<spec_slug>.ipynb`
-
-The notebook contains:
-
-- **Markdown cells before every result-producing code cell** — define the check, explain why the table/plot exists, what is being measured, and how to interpret the output.
-- **Code cells** — reproducible Python code using `duckdb`, `pandas`, `polars`, `matplotlib` and/or `plotly`.
-- **Output cells** — tables, charts, and statistical summaries embedded in the notebook.
-
-The notebook must be self-contained: running it top-to-bottom must reproduce all results.
-
-Forbidden placeholders:
-
-- `futtatás után kitöltendő`
-- `to be filled after running`
-- `TODO: interpret after execution`
-- empty interpretation sections
-- any instruction that leaves narrative work for the user
-
-If a finding depends on execution, the code must compute a compact status table or markdown finding automatically.
+If multiple specs are assigned, produce one notebook per spec and render each.
 
 ---
 
-## Notebook Structure
+## Workflow
 
-Required sections:
-
-```markdown
-# Analysis: <Title>
-## Summary
-## Setup
-## <Methodological check 1>
-## <Methodological check N>
-```
-
-Do **not** add a separate `Conclusion` / `Conclusions` section. Conclusions must be embedded inside each check immediately after the related code output, using a generated or manually written `Finding` paragraph.
-
-Each methodological check follows this pattern:
-
-1. Markdown definition cell.
-2. Code cell that runs the check and renders a labelled table or figure.
-3. Markdown or generated display cell with the finding and interpretation.
+1. Read the triggering `.spec.md` from `_doc_/analysis/`.
+2. Derive the notebook name: strip `_spec` suffix from the spec filename — no prefix added.
+3. Create `_doc_/analysis/<slug>.ipynb`.
+4. Write: Quarto frontmatter (Raw cell) → Objective → Setup → checks → Summary (structure defined in `analyst_skill.md`).
+5. Apply the ML methodology checklist; document skipped items in their check section.
+6. Execute all cells from a clean kernel.
+7. Write the Summary from computed results — no placeholders.
+8. Render: `quarto render _doc_/analysis/<slug>.ipynb --execute`
+9. Verify rendered HTML exists at `_doc_/<slug>.html` with numbered figures/tables
+   and no placeholder text.
+10. If a critical issue is found, flag it in the Jira spec notes and create a
+    `todo_` ticket for the responsible agent.
 
 ---
 
-## ML Methodology Checklist (built-in, no user spec required)
+## ML Methodology Checklist (built-in)
 
-When analysing any ML model or training dataset, apply these checks by default.
+Apply these checks by default when analysing any ML model or training dataset.
 User spec can add checks or override thresholds — it does not remove defaults.
 
 ### 1. Sample independence
@@ -122,9 +106,9 @@ User spec can add checks or override thresholds — it does not remove defaults.
 
 ### 4. Windowed feature null patterns
 
-- Features with a rolling window `w` must have exactly `w - 1` leading nulls after the correct lag convention.
-- `feat_rsi_14` must have the expected leading-null count documented by the project lag rule.
-- Any feature with zero leading nulls is suspicious unless the feature definition proves it is non-windowed and available at `t-1`.
+- Features with a rolling window `w` must have exactly `w - 1` leading nulls.
+- `feat_rsi_14` must have the expected leading-null count per the project lag rule.
+- Any feature with zero leading nulls is suspicious unless proven non-windowed.
 
 ### 5. Class balance
 
@@ -144,24 +128,9 @@ User spec can add checks or override thresholds — it does not remove defaults.
 
 ---
 
-## Workflow
-
-1. Read the triggering `.spec.md` file or user request.
-2. Derive the notebook slug from the spec filename.
-3. Choose or create the `_doc_/<topic>/` directory.
-4. Create exactly one `_doc_/<topic>/analysis_<spec_slug>.ipynb` for that spec.
-5. Apply the methodology checklist; skip items only if they do not apply and document why in the local check section.
-6. Add a Summary section at the top with final results, not placeholders.
-7. Execute the notebook top-to-bottom.
-8. Render with Quarto after execution.
-9. Verify the rendered HTML has numbered figures/tables, captions, and no placeholder text.
-10. If a critical issue is found, flag it in the triggering jira/spec notes and create a `todo_` ticket for the responsible agent if a code fix is required.
-
----
-
 ## When Triggered Without User Spec
 
-Apply all checklist items. Use project defaults:
+Apply all checklist items using project defaults:
 
 - Forward window: 60 bars (`fw60`)
 - Asset: `solusdt`
@@ -172,7 +141,7 @@ Apply all checklist items. Use project defaults:
 
 ## Out of Scope
 
-- Writing pytest tests -> Validator Agent
-- Updating general project documentation `.md` files -> Doc Agent, unless the user explicitly asks to update analyst rules
-- Retraining models or changing features -> Modeling Agent
-- Fixing bugs found during analysis -> create a `todo_` ticket for the responsible agent
+- Writing pytest tests → Validator Agent
+- Updating general project documentation → Doc Agent (unless explicitly asked)
+- Retraining models or changing features → Modeling Agent
+- Fixing bugs found during analysis → create a `todo_` ticket for the responsible agent

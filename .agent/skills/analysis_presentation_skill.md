@@ -1,104 +1,143 @@
 # Analysis Presentation Skill
 
-Shared visual, table, caption, and Quarto rendering rules for all ChronoQuant analysis notebooks.
+Visual, table, caption, and rendering rules for ChronoQuant analysis notebooks.
+Applies Urban Institute-style data communication principles to Quarto-rendered notebooks.
 
-This skill maps Urban Institute-style data communication principles to Python notebooks rendered by Quarto.
+Quarto config and label syntax → see `quarto_analysis_defaults.md`.
+Notebook structure and cell patterns → see `analyst_skill.md`.
 
 ---
 
 ## Design Goals
 
-Analysis notebooks must be readable as standalone reports after Quarto rendering. A reader should understand every table and figure without opening the code.
+Analysis notebooks must be readable as standalone reports after Quarto rendering.
+A reader must understand every table and figure without opening the code.
 
 Each result-producing code cell must have:
 
-1. A preceding markdown explanation.
+1. A preceding markdown explanation (purpose, method, interpretation, action rule).
 2. A Quarto label and caption.
 3. Consistent numeric formatting.
 4. A nearby finding that interprets the result.
 
 ---
 
-## Quarto Project Defaults
+## Palette
 
-Add or update `_quarto.yaml` near the analysis docs root. The goal is to let Quarto handle numbering instead of manually writing numbers in headings or captions.
+Urban Institute-inspired project palette:
 
-Recommended project config:
+```python
+CQ_COLORS = {
+    "blue": "#1696d2",
+    "black": "#000000",
+    "gray_dark": "#353535",
+    "gray": "#696969",
+    "gray_light": "#d2d2d2",
+    "cyan": "#55b748",
+    "yellow": "#fdbf11",
+    "orange": "#f15a24",
+    "red": "#ec008b",
+}
 
-```yaml
-project:
-  type: website
-
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    number-sections: true
-    code-fold: true
-    code-tools: true
-    theme: cosmo
-    fig-width: 9
-    fig-height: 5.5
-    df-print: paged
-
-execute:
-  echo: true
-  warning: false
-  message: false
-  freeze: false
-
-crossref:
-  fig-title: "Figure"
-  tbl-title: "Table"
-  title-delim: ":"
+CQ_SEQUENCE = [
+    CQ_COLORS["blue"],
+    CQ_COLORS["yellow"],
+    CQ_COLORS["orange"],
+    CQ_COLORS["gray"],
+    CQ_COLORS["red"],
+]
 ```
 
-Rules:
+Color meaning (apply consistently):
 
-- Do not manually number section headings, figures, or tables.
-- Use `number-sections: true` for section numbering.
-- Use `label`, `fig-cap`, and `tbl-cap` for figure/table numbering.
-- Use `fig-subcap` for multi-plot panels.
-- Use markdown `tbl-` div panels for subtable groups when needed.
+- main measured series: blue
+- expected/acceptable reference: gray or gray_light
+- warning threshold: yellow or orange
+- failure/violation: red
+- neutral context: gray
 
 ---
 
-## Required Cell Narrative Pattern
+## Seaborn Setup
 
-Before every table or plot code cell, add a markdown cell with this structure:
+Put this complete block in the notebook Setup cell:
 
-```markdown
-### <Human-readable check title>
+```python
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 
-**Purpose.** This table/figure checks <what is being checked>.
+CQ_COLORS = {
+    "blue": "#1696d2",
+    "black": "#000000",
+    "gray_dark": "#353535",
+    "gray": "#696969",
+    "gray_light": "#d2d2d2",
+    "yellow": "#fdbf11",
+    "orange": "#f15a24",
+    "red": "#ec008b",
+}
+CQ_SEQUENCE = [CQ_COLORS["blue"], CQ_COLORS["yellow"], CQ_COLORS["orange"], CQ_COLORS["gray"], CQ_COLORS["red"]]
 
-**Method.** It uses <source tables/files/columns> and computes <metric> at <grain>.
-
-**Interpretation.** Healthy output means <condition>. Suspicious or failing output means <condition>.
-
-**Action rule.** If the check fails, <next action>.
+sns.set_theme(
+    style="whitegrid",
+    rc={
+        "figure.figsize": (9, 5.5),
+        "figure.dpi": 120,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.edgecolor": CQ_COLORS["gray"],
+        "axes.labelcolor": CQ_COLORS["gray_dark"],
+        "xtick.color": CQ_COLORS["gray_dark"],
+        "ytick.color": CQ_COLORS["gray_dark"],
+        "grid.color": CQ_COLORS["gray_light"],
+        "grid.linewidth": 0.8,
+        "axes.axisbelow": True,
+        "legend.frameon": False,
+    },
+)
+sns.set_palette(CQ_SEQUENCE)
 ```
-
-Do not write placeholders. If the finding is data-dependent, compute it in the next code cell and display it as Markdown.
 
 ---
 
-## Quarto Caption Examples
+## Chart Rules
+
+- seaborn is the primary charting library; matplotlib is the fallback and customization layer (axis formatters, reference lines, multi-panel layout).
+- Plotly is forbidden by default — use only if the spec explicitly requests interactive HTML output.
+- Every plot must have a corresponding source dataframe or summary table computed in the same or adjacent code cell. Findings must derive from that data, not from visual inspection of the chart.
+- Do not use `ax.set_title()` — let Quarto captions title and number figures.
+- Use clear axis labels with units.
+- Remove top and right spines (handled by `sns.set_theme` rc above).
+- Use light gridlines on the value axis.
+- Start bar charts at zero unless documented otherwise.
+- Prefer horizontal bars for long category names.
+- Sort bars by measured value unless chronological or logical order matters.
+- Use direct labels or compact legends.
+- Show thresholds as reference lines and explain them in the preceding markdown.
+- Use red/orange only for actual warnings or failures.
+- **Temporal subplot layout:** when a multi-panel cell contains two or more time-ordered
+  subplots (period box plots by year/half-year, rolling time-series), always use
+  `layout-ncol: 1` (vertical stacking). Side-by-side (`layout-ncol: 2`) compresses
+  the time axis and makes period comparisons unreadable.
+
+---
+
+## Caption Examples
 
 ### Single figure
 
 ```python
 #| label: fig-positive-rate-by-year
 #| fig-cap: "Positive target rate by year"
-#| fig-alt: "Line chart showing yearly positive target rate, with the expected range shown as reference bands."
+#| fig-alt: "Line chart showing yearly positive target rate with reference bands."
 
 fig, ax = plt.subplots(figsize=(9, 5.5))
-ax.plot(yearly["year"], yearly["positive_rate"])
-ax.axhline(0.08, linestyle="--", linewidth=1)
-ax.axhline(0.12, linestyle="--", linewidth=1)
+sns.lineplot(data=yearly, x="year", y="positive_rate", ax=ax, color=CQ_COLORS["blue"])
+ax.axhline(0.08, linestyle="--", linewidth=1, color=CQ_COLORS["gray"])
+ax.axhline(0.12, linestyle="--", linewidth=1, color=CQ_COLORS["gray"])
 ax.set_xlabel("Year")
 ax.set_ylabel("Positive rate")
-ax.set_title("")
 ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
 ax.xaxis.set_major_locator(mtick.MaxNLocator(integer=True))
 plt.show()
@@ -129,127 +168,66 @@ display_df
 #| layout-ncol: 2
 
 fig, ax = plt.subplots(figsize=(7, 4))
-ax.barh(nulls_by_feature["feature"], nulls_by_feature["leading_nulls"])
+sns.barplot(data=nulls_by_feature, y="feature", x="leading_nulls", ax=ax, color=CQ_COLORS["blue"], orient="h")
 ax.set_xlabel("Leading nulls")
 ax.set_ylabel("")
-ax.set_title("")
 plt.show()
 
 fig, ax = plt.subplots(figsize=(7, 4))
-ax.hist(nulls_by_family["null_rate"], bins=20)
+sns.histplot(data=nulls_by_family, x="null_rate", bins=20, ax=ax, color=CQ_COLORS["blue"])
 ax.set_xlabel("Null rate")
 ax.set_ylabel("Feature families")
-ax.set_title("")
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
 plt.show()
 ```
 
----
+### Subtable group (markdown)
 
-## Python Visual Style
+```markdown
+::: {#tbl-feature-quality-panel layout-ncol=2}
 
-Use a clean, restrained style inspired by Urban Institute's chart conventions: strong readability, minimal clutter, direct labels, clear axes, and consistent palette.
+| feature | leading_nulls |
+|---|---:|
+| feat_rsi_14 | 14 |
 
-### Palette
+: Leading null counts {#tbl-leading-nulls}
 
-Use this project palette unless the user requests otherwise:
+| feature_family | null_rate_pct |
+|---|---:|
+| momentum | 2.31% |
 
-```python
-CQ_COLORS = {
-    "blue": "#1696d2",
-    "black": "#000000",
-    "gray_dark": "#353535",
-    "gray": "#696969",
-    "gray_light": "#d2d2d2",
-    "cyan": "#55b748",
-    "yellow": "#fdbf11",
-    "orange": "#f15a24",
-    "red": "#ec008b",
-}
+: Null rates by family {#tbl-null-rates}
 
-CQ_SEQUENCE = [
-    CQ_COLORS["blue"],
-    CQ_COLORS["yellow"],
-    CQ_COLORS["orange"],
-    CQ_COLORS["gray"],
-    CQ_COLORS["red"],
-]
+Feature quality diagnostics
+:::
 ```
-
-Use color meaning consistently:
-
-- main measured series: blue
-- expected/acceptable reference: gray or gray light
-- warning threshold: yellow or orange
-- failure/violation: red
-- neutral context: gray
-
-### Matplotlib setup
-
-Put this in the notebook setup cell:
-
-```python
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-
-CQ_COLORS = {
-    "blue": "#1696d2",
-    "black": "#000000",
-    "gray_dark": "#353535",
-    "gray": "#696969",
-    "gray_light": "#d2d2d2",
-    "yellow": "#fdbf11",
-    "orange": "#f15a24",
-    "red": "#ec008b",
-}
-CQ_SEQUENCE = [CQ_COLORS["blue"], CQ_COLORS["yellow"], CQ_COLORS["orange"], CQ_COLORS["gray"], CQ_COLORS["red"]]
-
-plt.rcParams.update({
-    "figure.figsize": (9, 5.5),
-    "figure.dpi": 120,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "axes.edgecolor": CQ_COLORS["gray"],
-    "axes.labelcolor": CQ_COLORS["gray_dark"],
-    "xtick.color": CQ_COLORS["gray_dark"],
-    "ytick.color": CQ_COLORS["gray_dark"],
-    "grid.color": CQ_COLORS["gray_light"],
-    "grid.linewidth": 0.8,
-    "axes.grid": True,
-    "axes.axisbelow": True,
-    "legend.frameon": False,
-})
-```
-
-### Chart rules
-
-- Do not use `ax.set_title()` for the main title. Let Quarto captions title and number the figure.
-- Use clear axis labels with units.
-- Remove top and right spines.
-- Use light gridlines, mainly on the value axis.
-- Start bar charts at zero unless there is a documented reason not to.
-- Prefer horizontal bars for long category names.
-- Sort bars by the measured value unless chronological or logical order matters.
-- Use direct labels or compact legends; avoid large legends when labels can be put near data.
-- Show thresholds as reference lines or bands and explain them in the preceding markdown.
-- Use red/orange only for actual warnings/failures.
 
 ---
 
-## Table Style Rules
+## Numeric Formatting
 
-Tables must be compact and typed for reading.
+Apply consistently in all displayed tables and plot axes.
 
-Required formatting:
+| Column type | Display format |
+|---|---|
+| `year` | Full integer, e.g. `2024` — never `2,024` or `2024.0` |
+| `count`, `n`, `row_count`, `count(*)` | Integer, zero decimals |
+| rates, proportions, shares, positive rates | Percent string, exactly 2 decimals, e.g. `23.24%` |
 
-- `year`: full integer year, no thousands separator.
-- `count(*)`, `count`, `n`, `row_count`: integer, zero decimals.
-- rates/proportions/shares: percent string with exactly two decimals.
-- Boolean pass/fail columns: use `PASS` / `FAIL` or compact icons plus text.
-- Sort tables so the most important failures appear first.
-- Show at most 20 rows in the main report; link or save full detail separately if needed.
+Python helpers:
 
-Python formatter:
+```python
+def fmt_year(s):
+    return s.astype("Int64").astype(str)
+
+def fmt_count(s):
+    return s.round(0).astype("Int64")
+
+def fmt_pct(s):
+    return (s * 100).map(lambda x: f"{x:.2f}%")
+```
+
+Auto-formatter for display DataFrames:
 
 ```python
 def format_analysis_table(df):
@@ -260,12 +238,23 @@ def format_analysis_table(df):
             out[col] = out[col].astype("Int64").astype(str)
         elif lower in {"count", "count(*)", "n", "row_count", "rows", "violations"} or lower.endswith("_count"):
             out[col] = out[col].round(0).astype("Int64")
-        elif any(token in lower for token in ["rate", "ratio", "share", "pct", "percent"]):
+        elif any(t in lower for t in ["rate", "ratio", "share", "pct", "percent"]):
             values = out[col]
             if values.max(skipna=True) <= 1.0:
                 values = values * 100
             out[col] = values.map(lambda x: f"{x:.2f}%")
     return out
+```
+
+Axis formatters (matplotlib ticker on seaborn axes):
+
+```python
+# Percent axis
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
+
+# Year axis
+ax.xaxis.set_major_locator(mtick.MaxNLocator(integer=True))
+ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%d"))
 ```
 
 ---
@@ -274,13 +263,13 @@ def format_analysis_table(df):
 
 Before handing off an analysis notebook, verify:
 
-- One spec produced one notebook.
-- Notebook executed from a clean kernel.
-- Quarto render succeeded.
-- No `futtatás után kitöltendő` or equivalent placeholder remains.
-- Every table cell has `#| label: tbl-...` and `#| tbl-cap: ...`.
-- Every plot cell has `#| label: fig-...` and `#| fig-cap: ...`.
-- Multi-plot cells use `fig-subcap` or are split into separate labelled cells.
-- Markdown before each output explains purpose, method, interpretation, and action rule.
-- Numeric formatting follows project conventions.
-- Headings/captions are not manually numbered.
+- [ ] One spec produced one notebook.
+- [ ] Notebook executed from a clean kernel.
+- [ ] Quarto render succeeded and HTML is at `_doc_/<slug>.html`.
+- [ ] No forbidden placeholder text remains (`futtatás után kitöltendő`, etc.).
+- [ ] Every table cell has `#| label: tbl-...` and `#| tbl-cap: ...`.
+- [ ] Every plot cell has `#| label: fig-...` and `#| fig-cap: ...`.
+- [ ] Multi-plot cells use `fig-subcap` or are split into separate labelled cells.
+- [ ] Markdown before each output explains purpose, method, interpretation, and action rule.
+- [ ] Numeric formatting follows project conventions.
+- [ ] Headings and captions are not manually numbered.

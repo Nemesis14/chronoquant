@@ -1,8 +1,8 @@
 """Persistent DuckDB store layer for ChronoQuant market data.
 
 Single .duckdb file per asset (database/solusdt/solusdt.duckdb) with native
-tables: ohlcv, target, feat_ohlcv_quant, predictions.  All inserts are
-append-only, keyed by open_time.  The .duckdb path is passed directly as db_path.
+tables: ohlcv, target, feat_ohlcv_quant, predictions, quant_train.  All inserts
+are append-only, keyed by open_time.  The .duckdb path is passed directly as db_path.
 """
 
 import logging
@@ -195,6 +195,152 @@ def _ensure_feat_ohlcv_quant_table(conn: duckdb.DuckDBPyConnection, df: pl.DataF
         sql_type = _sql_type_from_polars(schema[col])
         conn.execute(f'ALTER TABLE feat_ohlcv_quant ADD COLUMN IF NOT EXISTS "{col}" {sql_type}')
         logger.debug("_ensure_feat_ohlcv_quant_table: added column %s %s", col, sql_type)
+
+
+# %% quant_train
+
+
+def rebuild_quant_train(
+    conn       : duckdb.DuckDBPyConnection,
+    start_time : str | None = None,
+    end_time   : str | None = None,
+) -> int:
+    """Rebuild quant_train as an INNER JOIN of feat_ohlcv_quant and target.
+
+    Full rebuild (both bounds None): DROP + CREATE OR REPLACE TABLE.
+    Range rebuild (at least one bound given): DELETE range + INSERT.
+
+    Rows where long_mfe_fw60 or short_mfe_fw60 is NULL are excluded.
+    The feat_* column list is discovered dynamically from feat_ohlcv_quant.
+
+    Args:
+        conn       : Open DuckDB read-write connection.
+        start_time : Optional range lower bound, inclusive (YYYY-MM-DD HH:MM:SS).
+        end_time   : Optional range upper bound, inclusive (YYYY-MM-DD HH:MM:SS).
+
+    Returns:
+        Total row count in quant_train after rebuild.
+    """
+    if not _table_exists(conn, "feat_ohlcv_quant"):
+        logger.warning("rebuild_quant_train: feat_ohlcv_quant tábla hiányzik — skip")
+        return 0
+    if not _table_exists(conn, "target"):
+        logger.warning("rebuild_quant_train: target tábla hiányzik — skip")
+        return 0
+
+    feat_cols = [
+        row[0]
+        for row in conn.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'feat_ohlcv_quant' ORDER BY ordinal_position"
+        ).fetchall()
+        if row[0].startswith("feat_")
+    ]
+
+    if feat_cols:
+        feat_select  = ", ".join(f'f."{c}"' for c in feat_cols)
+        select_cols  = f"f.open_time, {feat_select}, t.long_mfe_fw60, t.short_mfe_fw60"
+    else:
+        select_cols  = "f.open_time, t.long_mfe_fw60, t.short_mfe_fw60"
+
+    null_filter = "t.long_mfe_fw60 IS NOT NULL AND t.short_mfe_fw60 IS NOT NULL"
+
+    is_full = start_time is None and end_time is None
+
+    if is_full:
+        conn.execute(f"""
+            CREATE OR REPLACE TABLE quant_train AS
+            SELECT {select_cols}
+            FROM feat_ohlcv_quant f
+            INNER JOIN target t ON f.open_time = t.open_time
+            WHERE {null_filter}
+        """)
+    else:
+        # Range rebuild: ensure table exists, then delete + insert
+        if not _table_exists(conn, "quant_train"):
+            conn.execute(f"""
+                CREATE TABLE quant_train AS
+                SELECT {select_cols}
+                FROM feat_ohlcv_quant f
+                INNER JOIN target t ON f.open_time = t.open_time
+                WHERE 1 = 0
+            """)
+
+        del_conds: list[str] = []
+        del_params: list[str] = []
+        if start_time:
+            del_conds.append("open_time >= ?")
+            del_params.append(start_time)
+        if end_time:
+            del_conds.append("open_time <= ?")
+            del_params.append(end_time)
+        if del_conds:
+            conn.execute(
+                f"DELETE FROM quant_train WHERE {' AND '.join(del_conds)}",
+                del_params,
+            )
+
+        ins_conds  = [null_filter]
+        ins_params: list[str] = []
+        if start_time:
+            ins_conds.append("f.open_time >= ?")
+            ins_params.append(start_time)
+        if end_time:
+            ins_conds.append("f.open_time <= ?")
+            ins_params.append(end_time)
+
+        conn.execute(f"""
+            INSERT INTO quant_train
+            SELECT {select_cols}
+            FROM feat_ohlcv_quant f
+            INNER JOIN target t ON f.open_time = t.open_time
+            WHERE {' AND '.join(ins_conds)}
+            ORDER BY f.open_time
+        """, ins_params)
+
+    result = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()
+    n = int(result[0]) if result else 0
+    logger.info("rebuild_quant_train: rows=%d start=%s end=%s", n, start_time, end_time)
+    return n
+
+
+# %% Sample tables
+
+
+def materialize_sample_table(
+    conn       : duckdb.DuckDBPyConnection,
+    sample_id  : str,
+    segment_df : pl.DataFrame,
+) -> int:
+    """Materialize a segment DataFrame as a DuckDB sample table.
+
+    Table name: ``sample_<sample_id>``.  Uses CREATE OR REPLACE — safe to rerun.
+    Column order: open_time, fold_id, segment, feat_* (sorted), target columns.
+
+    Args:
+        conn       : Open DuckDB read-write connection.
+        sample_id  : Sample identifier (appended to 'sample_' for the table name).
+        segment_df : Polars DataFrame from assign_segments — contains open_time,
+                     fold_id, segment, feat_*, and target columns.
+
+    Returns:
+        Row count in the newly created table.
+    """
+    table_name  = f"sample_{sample_id}"
+    feat_cols   = sorted(c for c in segment_df.columns if c.startswith("feat_"))
+    target_cols = [c for c in ("long_mfe_fw60", "short_mfe_fw60") if c in segment_df.columns]
+    df_out = segment_df.select(["open_time", "fold_id", "segment"] + feat_cols + target_cols)
+
+    conn.register("_sample_tmp", df_out)
+    try:
+        conn.execute(f'CREATE OR REPLACE TABLE "{table_name}" AS SELECT * FROM _sample_tmp')
+    finally:
+        conn.unregister("_sample_tmp")
+
+    result = conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()
+    n = int(result[0]) if result else 0
+    logger.info("materialize_sample_table: table=%s rows=%d", table_name, n)
+    return n
 
 
 # %% Insert helpers

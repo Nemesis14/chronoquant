@@ -6,6 +6,7 @@ and prints a summary to stdout.
 Usage:
     uv run python src/modeling/quantitative/00_create_sample.py --year 2021 --asset-id solusdt
     uv run python src/modeling/quantitative/00_create_sample.py --year 2022 --asset-id solusdt --seed 100
+    uv run python src/modeling/quantitative/00_create_sample.py --year 2024 --asset-id solusdt --test-months 2
 """
 
 import argparse
@@ -25,9 +26,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate a ChronoQuant yearly random-hour sample.",
     )
-    parser.add_argument("--year",     required=True, type=int, help="Calendar year to sample (e.g. 2021)")
-    parser.add_argument("--asset-id", required=True,           help="Asset key from config/assets.json")
-    parser.add_argument("--seed",     default=None,  type=int, help="Random seed (default: 42 + year)")
+    parser.add_argument("--year",        required=True, type=int, help="Calendar year to sample (e.g. 2021)")
+    parser.add_argument("--asset-id",    required=True,           help="Asset key from config/assets.json")
+    parser.add_argument("--seed",        default=None,  type=int, help="Random seed (default: 42 + year)")
+    parser.add_argument("--test-months", default=1,     type=int, help="Trailing months held out as test (default: 1)")
     return parser.parse_args()
 
 
@@ -38,10 +40,11 @@ def main() -> None:
     sample_id = f"{args.asset_id}_fw60_yearly_{args.year}"
 
     config = YearlySamplingConfig(
-        sample_id=sample_id,
-        asset_id=args.asset_id,
-        year=args.year,
-        seed=seed,
+        sample_id   = sample_id,
+        asset_id    = args.asset_id,
+        year        = args.year,
+        seed        = seed,
+        test_months = args.test_months,
     )
 
     create_yearly_sample(config)
@@ -50,14 +53,22 @@ def main() -> None:
     sample     = load_yearly_sample(sample_dir)
     counts     = sample.get("row_counts", {})
     n_weeks    = len(sample.get("selected_valid_weeks", []))
+    feat_cols  = sample.get("feature_cols", [])
+
+    table_name = sample.get("sample_table_name", f"sample_{sample_id}")
 
     print(f"OK: Sample created at {sample_dir}")
     print(f"    year           = {sample['year']}")
     print(f"    seed           = {sample['seed']}")
+    print(f"    test_months    = {sample['test_months']}")
     print(f"    valid_weeks    = {n_weeks}")
+    print(f"    feature_cols   = {len(feat_cols)}")
+    print(f"    sample_table   = {table_name}")
     print(f"    total_rows     = {sum(counts.values())}")
-    for seg in ("train", "valid", "purge"):
-        print(f"      {seg:<6}       = {counts.get(seg, 0)}")
+    for seg in ("train", "valid", "purge", "test"):
+        count = counts.get(seg, 0)
+        if count:
+            print(f"      {seg:<6}       = {count}")
 
 
 if __name__ == "__main__":

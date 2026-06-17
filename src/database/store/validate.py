@@ -87,6 +87,136 @@ def check_no_future_features(db_path: str) -> int:
         con.close()
 
 
+def check_quant_train_no_duplicates(db_path: str) -> int:
+    """Assert no duplicate open_time rows exist in quant_train.
+
+    Args:
+        db_path: Absolute path to the asset .duckdb file.
+
+    Returns:
+        0 on pass.
+
+    Raises:
+        AssertionError: If duplicate open_time rows exist.
+    """
+    db = Path(db_path)
+    if not db.exists():
+        logger.warning("check_quant_train_no_duplicates: DuckDB file missing, skipping")
+        return 0
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        if not _tbl_exists(con, "quant_train"):
+            logger.warning("check_quant_train_no_duplicates: quant_train table missing, skipping")
+            return 0
+
+        return assert_zero(
+            con,
+            "SELECT COUNT(*) - COUNT(DISTINCT CAST(open_time AS VARCHAR)) FROM quant_train",
+            "quant_train duplicate open_time",
+        )
+    finally:
+        con.close()
+
+
+def check_sample_table(
+    db_path           : str,
+    sample_id         : str,
+    expected_feat_cols: list[str] | None = None,
+) -> int:
+    """Run all integrity checks on a materialized sample table.
+
+    Checks:
+      1. No duplicate (open_time, fold_id, segment) rows.
+      2. test rows start strictly after all non-test rows (chronological order).
+      3. At least one purge row exists (embargo buffer must be present).
+      4. If expected_feat_cols given: each expected column is present in the table.
+      5. Required target columns are non-null in train and valid segments.
+
+    Args:
+        db_path           : Absolute path to the asset .duckdb file.
+        sample_id         : Sample identifier (table name = sample_<sample_id>).
+        expected_feat_cols: Optional list of feat_* columns from feature_set.json.
+
+    Returns:
+        0 on pass.
+
+    Raises:
+        AssertionError   : If any check fails.
+        FileNotFoundError: If the .duckdb file or sample table does not exist.
+    """
+    db = Path(db_path)
+    if not db.exists():
+        raise FileNotFoundError(f"DuckDB file not found: {db}")
+
+    table = f"sample_{sample_id}"
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        if not _tbl_exists(con, table):
+            raise FileNotFoundError(f"Sample table '{table}' not found in {db}")
+
+        assert_zero(
+            con,
+            f"""
+            SELECT COUNT(*) - COUNT(DISTINCT
+                open_time::VARCHAR || '|' ||
+                COALESCE(fold_id::VARCHAR, 'NULL') || '|' ||
+                segment
+            )
+            FROM "{table}"
+            """,
+            f"{table}: duplicate (open_time, fold_id, segment) rows",
+        )
+
+        assert_zero(
+            con,
+            f"""
+            SELECT COUNT(*)
+            FROM "{table}" AS a
+            JOIN "{table}" AS b ON b.segment = 'test'
+            WHERE a.segment != 'test'
+              AND a.open_time >= b.open_time
+            """,
+            f"{table}: non-test rows not strictly before test rows",
+        )
+
+        assert_zero(
+            con,
+            f"SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM \"{table}\" WHERE segment = 'purge'",
+            f"{table}: no purge rows found (embargo buffer missing)",
+        )
+
+        assert_zero(
+            con,
+            f"""
+            SELECT COUNT(*)
+            FROM "{table}"
+            WHERE segment IN ('train', 'valid')
+              AND (long_mfe_fw60 IS NULL OR short_mfe_fw60 IS NULL)
+            """,
+            f"{table}: NULL target columns in train/valid rows",
+        )
+
+        if expected_feat_cols:
+            existing_cols = {
+                row[0]
+                for row in con.execute(
+                    "SELECT column_name FROM information_schema.columns"
+                    f" WHERE table_name = '{table}'"
+                ).fetchall()
+            }
+            missing = [c for c in expected_feat_cols if c not in existing_cols]
+            if missing:
+                raise AssertionError(
+                    f"{table}: expected feature columns missing: {missing}"
+                )
+
+        logger.info("check_sample_table: %s OK", table)
+        return 0
+    finally:
+        con.close()
+
+
 def check_target_no_current_bar(db_path: str) -> int:
     """Assert that target values do not incorporate the current bar's close price.
 

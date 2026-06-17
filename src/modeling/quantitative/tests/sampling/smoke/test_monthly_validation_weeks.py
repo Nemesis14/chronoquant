@@ -71,3 +71,23 @@ def test_all_starts_within_year() -> None:
     weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
     for ws, _ in weeks:
         assert ws.year == YEAR, f"Week start {ws} is not in year {YEAR}"
+
+
+def test_test_months_reduces_week_count() -> None:
+    hourly_df = _make_hourly_df(YEAR)
+    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42, test_months=1)
+    assert len(weeks) == 11, f"Expected 11 weeks with test_months=1, got {len(weeks)}"
+
+
+def test_test_months_excludes_last_months() -> None:
+    hourly_df = _make_hourly_df(YEAR)
+    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42, test_months=2)
+    # Last valid CV month is October (month 10)
+    for ws, _ in weeks:
+        assert ws.month <= 10, f"Week start {ws} is in a test month"
+
+
+def test_test_months_zero_returns_all_12() -> None:
+    hourly_df = _make_hourly_df(YEAR)
+    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42, test_months=0)
+    assert len(weeks) == 12, f"Expected 12 weeks with test_months=0, got {len(weeks)}"

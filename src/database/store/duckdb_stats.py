@@ -36,6 +36,7 @@ class TableStats:
     max_open_time: str | None
     column_count : int
     null_ratios  : dict[str, float]
+    dup_count    : int = 0
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,7 @@ def collect_duckdb_stats_report(
     Returns:
         DuckDBStatsReport with SKIP/EMPTY statuses when data is unavailable.
     """
-    names   = tables or ["ohlcv", "target", "feat_ohlcv_quant", "predictions"]
+    names   = tables or ["ohlcv", "target", "feat_ohlcv_quant", "predictions", "quant_train"]
     p = Path(db_path)
     if not p.exists():
         return DuckDBStatsReport(
@@ -163,7 +164,18 @@ def collect_duckdb_stats_report(
                 table_stats.append(_empty_table_stats(table, "EMPTY"))
                 continue
 
-            sampled_cols = [c for c in cols if c != "open_time"][:5]
+            dup_row = conn.execute(
+                f"SELECT COUNT(*) - COUNT(DISTINCT CAST(open_time AS VARCHAR)) FROM {table}"
+            ).fetchone()
+            dup_count = int(dup_row[0]) if dup_row else 0
+
+            if table == "quant_train":
+                target_cols = [c for c in cols if c in {"long_mfe_fw60", "short_mfe_fw60"}]
+                feat_sample = [c for c in cols if c.startswith("feat_")][:3]
+                sampled_cols = target_cols + [c for c in feat_sample if c not in target_cols]
+            else:
+                sampled_cols = [c for c in cols if c != "open_time"][:5]
+
             null_ratios: dict[str, float] = {}
             for col in sampled_cols:
                 null_row = conn.execute(
@@ -181,6 +193,7 @@ def collect_duckdb_stats_report(
                     max_open_time = _fmt_ts(row[2]),
                     column_count  = len(cols),
                     null_ratios   = null_ratios,
+                    dup_count     = dup_count,
                 )
             )
 
@@ -324,7 +337,7 @@ def format_duckdb_stats_report(report: DuckDBStatsReport) -> str:
     for stat in report.tables:
         lines.append(
             f"- {stat.table}: status={stat.status} rows={stat.row_count} "
-            f"min={stat.min_open_time} max={stat.max_open_time} cols={stat.column_count}"
+            f"min={stat.min_open_time} max={stat.max_open_time} cols={stat.column_count} dups={stat.dup_count}"
         )
         if stat.null_ratios:
             nulls = ", ".join(f"{col}={ratio:.3f}" for col, ratio in stat.null_ratios.items())

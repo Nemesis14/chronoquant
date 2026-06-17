@@ -37,25 +37,33 @@ def select_hourly_observations(df: pl.DataFrame, year: int, seed: int) -> pl.Dat
 
 
 def select_monthly_validation_weeks(
-    hourly_df: pl.DataFrame,
-    year: int,
-    seed: int,
+    hourly_df  : pl.DataFrame,
+    year       : int,
+    seed       : int,
+    test_months: int = 0,
 ) -> list[tuple[date, date]]:
     """Select one full Monday–Sunday week per calendar month.
 
+    Months reserved for test holdout (the last ``test_months`` months of the
+    year) are excluded from validation-week selection.
+
     Args:
-        hourly_df : Hourly observations (available for future data-availability checks).
-        year      : Calendar year.
-        seed      : Reproducibility seed (Python random.Random).
+        hourly_df   : Hourly observations (available for future data-availability checks).
+        year        : Calendar year.
+        seed        : Reproducibility seed (Python random.Random).
+        test_months : Number of trailing months to exclude (default 0 = all 12 months).
 
     Returns:
-        List of up to 12 (week_start, week_end) tuples — one per month.
-        The selected week may extend beyond the month boundary; that is acceptable.
+        List of up to ``12 - test_months`` (week_start, week_end) tuples —
+        one per non-test month.  The selected week may extend beyond the month
+        boundary; that is acceptable.
     """
     rng = random.Random(seed)
     weeks: list[tuple[date, date]] = []
 
-    for month in range(1, 13):
+    last_cv_month = 12 - test_months
+
+    for month in range(1, last_cv_month + 1):
         mondays: list[date] = []
         d = date(year, month, 1)
         while d.month == month:
@@ -71,49 +79,74 @@ def select_monthly_validation_weeks(
 
 
 def assign_segments(
-    hourly_df: pl.DataFrame,
-    valid_weeks: list[tuple[date, date]],
+    hourly_df    : pl.DataFrame,
+    valid_weeks  : list[tuple[date, date]],
     purge_minutes: int = 240,
+    test_start   : date | None = None,
 ) -> pl.DataFrame:
-    """Assign 'train', 'valid', or 'purge' label to every row.
+    """Assign segment label and fold_id to every row.
 
-    Rules (evaluated in this priority order):
-        valid  : rows within any validation week (Mon 00:00 → Sun 23:59)
-        purge  : rows within ±purge_minutes of any validation week boundary
-                 (never overlaps with the valid set)
-        train  : everything else
+    Segment priority (highest wins):
+        test  : rows with open_time >= test_start (when test_start is set)
+        valid : rows within any validation week (Mon 00:00 → Sun 23:59)
+        purge : rows within ±purge_minutes of any validation week boundary
+        train : everything else
+
+    fold_id semantics (Int16, nullable):
+        valid/purge rows: index of the corresponding validation week (0-based)
+        train/test rows: null
 
     Args:
         hourly_df     : Hourly observations from select_hourly_observations.
         valid_weeks   : Output of select_monthly_validation_weeks.
         purge_minutes : Buffer in minutes around each validation week boundary.
+        test_start    : First day of the test holdout period.  Rows on or after
+                        this date receive segment='test'.  None disables test rows.
 
     Returns:
-        hourly_df with an added 'segment' Utf8 column.
+        hourly_df with added 'segment' (Utf8) and 'fold_id' (Int16, nullable) columns.
     """
     delta = timedelta(minutes=purge_minutes)
 
-    valid_expr: pl.Expr = pl.lit(value=False)
-    purge_expr: pl.Expr = pl.lit(value=False)
+    # Build segment and fold_id expressions iteratively.
+    # Later assignments override earlier ones; valid overrides purge.
+    segment_expr: pl.Expr = pl.lit("train")
+    fold_id_expr: pl.Expr = pl.lit(None).cast(pl.Int16)
 
-    for week_start, week_end in valid_weeks:
+    for fold_idx, (week_start, week_end) in enumerate(valid_weeks):
         vs = datetime(week_start.year, week_start.month, week_start.day, 0, 0, 0)
         ve = datetime(week_end.year, week_end.month, week_end.day, 23, 59, 0)
 
-        valid_expr = valid_expr | (
-            (pl.col("open_time") >= vs) & (pl.col("open_time") <= ve)
+        pre_purge  = (pl.col("open_time") >= vs - delta) & (pl.col("open_time") < vs)
+        post_purge = (pl.col("open_time") > ve) & (pl.col("open_time") <= ve + delta)
+        purge_week = pre_purge | post_purge
+        valid_week = (pl.col("open_time") >= vs) & (pl.col("open_time") <= ve)
+
+        segment_expr = (
+            pl.when(purge_week).then(pl.lit("purge"))
+            .otherwise(segment_expr)
         )
-        purge_expr = purge_expr | (
-            (pl.col("open_time") >= vs - delta) & (pl.col("open_time") < vs)
-        ) | (
-            (pl.col("open_time") > ve) & (pl.col("open_time") <= ve + delta)
+        segment_expr = (
+            pl.when(valid_week).then(pl.lit("valid"))
+            .otherwise(segment_expr)
         )
 
+        # fold_id: assign for purge and valid rows of this fold.
+        # valid overrides purge when they overlap (handled by segment_expr above;
+        # fold_id is the same for both so the assignment is identical).
+        fold_id_expr = (
+            pl.when(purge_week | valid_week).then(pl.lit(fold_idx).cast(pl.Int16))
+            .otherwise(fold_id_expr)
+        )
+
+    # Test segment overrides everything — applied last.
+    if test_start is not None:
+        test_start_dt = datetime(test_start.year, test_start.month, test_start.day, 0, 0, 0)
+        is_test = pl.col("open_time") >= test_start_dt
+        segment_expr = pl.when(is_test).then(pl.lit("test")).otherwise(segment_expr)
+        fold_id_expr = pl.when(is_test).then(pl.lit(None).cast(pl.Int16)).otherwise(fold_id_expr)
+
     return hourly_df.with_columns(
-        pl.when(valid_expr)
-        .then(pl.lit("valid"))
-        .when(purge_expr)
-        .then(pl.lit("purge"))
-        .otherwise(pl.lit("train"))
-        .alias("segment")
+        segment_expr.alias("segment"),
+        fold_id_expr.alias("fold_id"),
     )

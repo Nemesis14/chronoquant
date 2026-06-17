@@ -46,18 +46,52 @@ WHERE available_ts > open_time
 
 **Célja:** Ellenőrzi, hogy a `target` tábla utolsó `horizon` (=60) sorában a target oszlopok `NULL`-ok.
 
-**Invariáns:** Az utolsó 60 bar jövőbeli záróára még nem ismert — a labelek `NULL`-ok kell legyenek. Ha valamelyik `NOT NULL`, a forward window SQL sérült.
-
-**SQL belül:**
-```sql
-SELECT COUNT(*) FROM (
-    SELECT open_time, trg_l_fw60_q90 FROM target
-    ORDER BY open_time DESC LIMIT 60
-) sub
-WHERE trg_l_fw60_q90 IS NOT NULL OR trg_s_fw60_q10 IS NOT NULL
-```
+**Invariáns:** Az utolsó 60 bar jövőbeli záróára még nem ismert — a labelek `NULL`-ok kell legyenek.
 
 **Hiba esetén:** `AssertionError` — az utolsó sorok NULL kell legyenek.
+
+---
+
+## `check_sample_table(db_path, sample_id, expected_feat_cols=None)`
+
+**Célja:** Integritás ellenőrzések a materializált `sample_<sample_id>` DuckDB táblán, mielőtt a modellező pipeline felhasználja.
+
+**Paraméterek:**
+
+| Paraméter | Típus | Leírás |
+|-----------|-------|--------|
+| `db_path` | `str` | Abszolút path a .duckdb fájlhoz |
+| `sample_id` | `str` | Sample azonosító (`sample_<sample_id>` a tábla neve) |
+| `expected_feat_cols` | `list[str] \| None` | Opcionális: elvárt feat_* oszlopok listája (pl. `feature_set.json`-ból) |
+
+**Ellenőrzések:**
+
+| # | Invariáns | Hiba |
+|---|-----------|------|
+| 1 | Nincs duplikált `(open_time, fold_id, segment)` sor | `AssertionError: duplicate (open_time, fold_id, segment) rows` |
+| 2 | A `test` sorok minden `non-test` sort időben megelőznek | `AssertionError: non-test rows not strictly before test rows` |
+| 3 | Legalább egy `purge` sor létezik (embargo buffer jelen van) | `AssertionError: no purge rows found` |
+| 4 | A `train` és `valid` soroknál `long_mfe_fw60` és `short_mfe_fw60` nem NULL | `AssertionError: NULL target columns in train/valid rows` |
+| 5 | Ha `expected_feat_cols` megadva: minden oszlop jelen van a táblában | `AssertionError: expected feature columns missing: [...]` |
+
+**Raises:**
+- `FileNotFoundError` — ha a .duckdb fájl nem létezik, vagy a tábla hiányzik
+- `AssertionError` — ha bármely invariáns sérül
+
+**Felhasználás:**
+```python
+from database.store.validate import check_sample_table
+
+# Alap ellenőrzés
+check_sample_table("database/solusdt/solusdt.duckdb", "solusdt_fw60_yearly_2024")
+
+# Feature set konzisztencia-ellenőrzéssel
+check_sample_table(
+    "database/solusdt/solusdt.duckdb",
+    "solusdt_fw60_yearly_2024",
+    expected_feat_cols=["feat_rsi_14", "feat_roc_14", ...],
+)
+```
 
 ---
 
@@ -68,7 +102,13 @@ WHERE trg_l_fw60_q90 IS NOT NULL OR trg_s_fw60_q10 IS NOT NULL
 uv run python src/database/01_validate_stats.py
 
 # Direkt hívás Python-ból
-from database.store.validate import check_no_future_features, check_target_no_current_bar
+from database.store.validate import (
+    check_no_future_features,
+    check_quant_train_no_duplicates,
+    check_sample_table,
+    check_target_no_current_bar,
+)
 check_no_future_features("database/solusdt/solusdt.duckdb")
-check_target_no_current_bar("database/solusdt/solusdt.duckdb")
+check_quant_train_no_duplicates("database/solusdt/solusdt.duckdb")
+check_sample_table("database/solusdt/solusdt.duckdb", "solusdt_fw60_yearly_2024")
 ```

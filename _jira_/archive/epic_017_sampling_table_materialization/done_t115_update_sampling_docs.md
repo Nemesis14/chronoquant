@@ -26,3 +26,8 @@ Document the new modeling data flow and sample table contract.
 
 ## Notes
 Keep docs aligned with the new `quant_train` table name.
+
+Változtatások:
+- `_doc_/3101_sampling_yearly.md`: flowchart frissítve (`quant_train` input + DuckDB tábla output); `test` szegmens hozzáadva; validációs checklist frissítve (`sample_table_name`, `check_sample_table`).
+- `_doc_/1140_validate.md`: `check_sample_table` dokumentálva (5 invariáns, paraméterek, hiba típusok).
+- `_doc_/1260_quant_train.md`: sample tábla materialization szekció hozzáadva (oszlopok, rebuild szemantika, artifact szerepek); flowchart frissítve.

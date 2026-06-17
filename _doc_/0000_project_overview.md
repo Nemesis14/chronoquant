@@ -45,6 +45,7 @@ src/
       03_backtest_strategy.py
       04_sweep_strategy.py
       05_generate_model_card.py
+    feature_engineering/  Feature quality, target-relation, redundancy, stability analysis
     elliott/          Research family: Elliott wave parser, validators, scanners
     text/             Future family placeholder
     blockchain/       Future family placeholder
@@ -65,6 +66,7 @@ models/             Generated model artifacts
 database/           DuckDB files and sample definitions
                       database/solusdt/solusdt.duckdb
                       database/solusdt/samples/<sample_id>/  (metadata.json, audit.json, sample.parquet)
+                      database/solusdt/feature_engineering/<run_id>/  (feature_set.json, analyst_report.md)
 ```
 
 ---
@@ -83,6 +85,12 @@ Currently only one active asset: **solusdt** (SOLUSDT, 1m, futures).
 | `target` | `open_time` TIMESTAMP | fw60 forward outcomes: `long_mfe_fw60`, `short_mfe_fw60` + 8 further fw60 columns |
 | `feat_ohlcv_quant` | `open_time` TIMESTAMP | Quantitative features (`feat_` prefix) |
 | `predictions` | `open_time` TIMESTAMP | Model probability scores + signals |
+| `quant_train` | `open_time` TIMESTAMP | Model-ready join: all `feat_*` + `long_mfe_fw60` + `short_mfe_fw60`; NULL targets excluded |
+| `sample_<sample_id>` | `open_time` TIMESTAMP | Materialized yearly sample: `open_time`, `fold_id`, `segment`, selected `feat_*`, targets |
+
+`quant_train` is built ad-hoc before training runs via `src/database/03_build_quant_train.py` —
+it is **not** part of the live sync pipeline.  Full rebuild = `CREATE OR REPLACE TABLE`;
+range rebuild = DELETE + INSERT for the specified `open_time` window.
 
 All timestamps are **UTC, format `YYYY-MM-DD HH:MM:SS`** (naive strings treated
 as UTC). Epoch milliseconds used internally as `open_time_ms`.
@@ -120,12 +128,18 @@ ohlcv → feat_ohlcv_quant → 00_create_sample.py → database/<asset>/samples/
 ```
 
 `00_create_sample.py` generates a yearly random-hour sample: selects one random minute
-per hour for the given calendar year, assigns monthly validation weeks, applies a
-±240-minute purge buffer, and writes `metadata.json`, `audit.json`, `sample.parquet`
-into `database/<asset_id>/samples/<sample_id>/`.
+per hour for the given calendar year, assigns monthly validation weeks (excluding the
+test-holdout months), applies a ±240-minute purge buffer, writes `metadata.json`,
+`audit.json`, `sample.parquet` into `database/<asset_id>/samples/<sample_id>/`, and
+materializes a DuckDB table `sample_<sample_id>` in the asset database.
+
+Source table: `quant_train` (feat_* + target columns; NULL targets excluded).
 
 Sample ID format: `{asset_id}_fw60_yearly_{year}` (e.g. `solusdt_fw60_yearly_2024`).
-`sample.parquet` columns: `open_time`, `segment` (train/valid/purge), `long_mfe_fw60`, `short_mfe_fw60`.
+`sample.parquet` columns: `open_time`, `fold_id` (Int16, nullable), `segment` (train/valid/purge/test),
+selected `feat_*` columns, `long_mfe_fw60`, `short_mfe_fw60`.
+`fold_id`: 0-based index of the corresponding validation week for valid/purge rows; null for train/test rows.
+`test_months` (default 1): last N months of the year are segment='test' holdout, excluded from CV folds.
 CLI: `uv run python src/modeling/quantitative/00_create_sample.py --year 2024 --asset-id solusdt`
 
 ---

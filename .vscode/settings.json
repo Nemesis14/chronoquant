@@ -4,5 +4,15 @@
         "*.csv": "duckdb.dataFileViewer",
         "*.tsv": "duckdb.dataFileViewer",
         "*.xlsx": "duckdb.dataFileViewer"
-    }
+    },
+    "duckdb.databases": [
+        {
+            "alias": "solusdt",
+            "type": "file",
+            "path": "d:\\repos\\chronoquant\\database\\solusdt\\solusdt.duckdb",
+            "readOnly": true,
+            "attached": false
+        }
+    ],
+    "duckdb.defaultDatabase": "solusdt"
 }

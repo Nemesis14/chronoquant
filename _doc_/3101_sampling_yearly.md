@@ -10,17 +10,20 @@ jelöl ki, és purge-ablakkal választja el a train és valid szegmenseket.
 
 ```mermaid
 flowchart TD
-  DB[(DuckDB\nohlcv ⋈ target)] --> CS[create_yearly_sample\ncreate_sample.py]
+  QT[(DuckDB\nquant_train)] --> CS[create_yearly_sample\ncreate_sample.py]
   CS --> A[select_hourly_observations\nyearly_sampler.py]
   A --> B[select_monthly_validation_weeks\nyearly_sampler.py]
   B --> C[assign_segments\nyearly_sampler.py]
   C --> D[write_yearly_artifacts\nartifacts.py]
   D --> E[database/asset/samples/id/\nmetadata.json\naudit.json\nsample.parquet]
+  C --> M[materialize_sample_table\nduckdb_store.py]
+  M --> T[(DuckDB\nsample_sample_id)]
 ```
 
-A pipeline input-ja az `ohlcv ⋈ target` join (csak non-null target sorok); kimenete
-egy ZSTD-tömörített Parquet fájl `open_time`, `segment`, `long_mfe_fw60`,
-`short_mfe_fw60` oszlopokkal.
+A pipeline input-ja a `quant_train` tábla (feat_* + target oszlopok, NULL target sorok
+kizárva); kimenetei:
+- `database/<asset>/samples/<sample_id>/metadata.json`, `audit.json`, `sample.parquet`
+- DuckDB tábla: `sample_<sample_id>` — elsődleges modellezési handoff
 
 ---
 
@@ -136,11 +139,12 @@ marad, nem "néz bele" a válida ablak előtti percekbe.
 
 | Érték | Leírás |
 |-------|--------|
-| `train` | Minden sor, amely nincs valid és nincs purge ablakban |
-| `valid` | Pontosan a 12 validációs hét (Mon 00:00 → Sun 23:59) |
+| `train` | Minden sor, amely nincs valid, purge és test ablakban |
+| `valid` | Pontosan a 12 validációs hét (Mon 00:00 → Sun 23:59), test hónapok kizárva |
 | `purge` | ±240 perces zóna minden validációs hét határán (nem fed át validdal) |
+| `test` | Az év utolsó `test_months` hónapja (holdout) — nem kerül train/valid/purge-ba |
 
-Prioritási sorrend az assign_segments logikájában: valid > purge > train.
+Prioritási sorrend az assign_segments logikájában: test > valid > purge > train.
 
 ---
 
@@ -169,16 +173,17 @@ Prioritási sorrend az assign_segments logikájában: valid > purge > train.
 
 ### Validációs checklist
 
-- [ ] `sample.parquet` létezik a `database/<asset>/samples/<sample_id>/` könyvtárban
-- [ ] `metadata.json` tartalmaz: `year`, `seed`, `selected_valid_weeks` (12 elem), `row_counts` szegmensenként
-- [ ] `audit.json` tartalmaz: `missing_hours`, `total_ohlcv_rows_in_year`, `actual_hourly_rows`
-- [ ] Standard évben: `total ≈ 8760`, `valid = 2016`, `purge = 96`, `train = 6648`
-- [ ] Szökőévben (2024): `total ≈ 8784`, `valid = 2016`, `purge ≤ 96`
+- [ ] `sample.parquet` és `sample_<sample_id>` DuckDB tábla létezik
+- [ ] `metadata.json` tartalmaz: `year`, `seed`, `selected_valid_weeks` (12 elem), `row_counts` szegmensenként, `sample_table_name`
+- [ ] `audit.json` tartalmaz: `missing_hours`, `total_quant_train_rows_in_year`, `actual_hourly_rows`
+- [ ] Standard évben (1 test hónap): `valid = 2016`, `purge = 96` (kb.), `test` = utolsó hónap sorai
+- [ ] Szökőévben (2024): `valid = 2016`, `purge ≤ 96`
 - [ ] Nincs `open_time` átfedés train és valid szegmens között
 - [ ] Purge sorok sem trainben, sem validban nem szerepelnek
-- [ ] `segment` oszlop értékkészlete: `{"train", "valid", "purge"}` — semmi más
+- [ ] `segment` oszlop értékkészlete: `{"train", "valid", "purge", "test"}` — semmi más
 - [ ] Azonos seed + év → azonos `sample.parquet` (reprodukálhatósági teszt)
 - [ ] `missing_hours < 500` (ha felette van: vizsgáld meg az adatbázis hiányait)
+- [ ] `check_sample_table(db_path, sample_id)` lefut hiba nélkül
 
 ---
 

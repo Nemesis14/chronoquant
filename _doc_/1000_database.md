@@ -24,8 +24,9 @@ erDiagram
     target {
         TIMESTAMP open_time PK
         DOUBLE close
-        BOOLEAN trg_l_fw60_q90
-        BOOLEAN trg_s_fw60_q10
+        DOUBLE long_mfe_fw60 "log(max_fw60/close)"
+        DOUBLE short_mfe_fw60 "log(min_fw60/close)"
+        DOUBLE fw60_cols "8 további fw60 outcome oszlop"
     }
 
     feat_ohlcv_quant {
@@ -40,15 +41,22 @@ erDiagram
         TIMESTAMP open_time PK
         DOUBLE close
         TIMESTAMP label_end_ts
-        BOOLEAN trg_l_fw60_q90
-        BOOLEAN trg_s_fw60_q10
         DOUBLE long_pred
         DOUBLE short_pred
+    }
+
+    quant_train {
+        TIMESTAMP open_time PK
+        DOUBLE feat_cols "összes feat_* oszlop (feat_ohlcv_quant-ból)"
+        DOUBLE long_mfe_fw60 "fw60 long outcome"
+        DOUBLE short_mfe_fw60 "fw60 short outcome"
     }
 
     ohlcv ||--o{ target : "open_time"
     ohlcv ||--o{ feat_ohlcv_quant : "open_time"
     feat_ohlcv_quant ||--o{ predictions : "available_ts ASOF join"
+    feat_ohlcv_quant ||--o{ quant_train : "INNER JOIN open_time"
+    target ||--o{ quant_train : "INNER JOIN open_time"
 ```
 
 Minden tábla `open_time` TIMESTAMP primary key-en alapul. Az összes timestamp **UTC**, `YYYY-MM-DD HH:MM:SS` formátumban tárolva.
@@ -178,6 +186,32 @@ CREATE TABLE IF NOT EXISTS predictions (
 ```
 
 **Legacy oszlopok:** `dataset_split` és `fold_id` — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
+
+---
+
+### quant_train
+
+**Cél:** Model-ready join tábla — az összes `feat_*` feature és a két aktív fw60 target oszlop (`long_mfe_fw60`, `short_mfe_fw60`) egyetlen lekérdezhető táblaként. A feature engineering, sampling és LightGBM tanítás kiindulópontja.
+
+**Forrás:** `feat_ohlcv_quant` INNER JOIN `target` ON `open_time`. NULL target sorok kizárva.
+
+**Beírási mód:** Ad-hoc rebuild, NEM a live sync pipeline része. Tanítás előtt futtatandó:
+- Full rebuild: `CREATE OR REPLACE TABLE` (determinisztikus)
+- Range rebuild: `DELETE + INSERT` a megadott `open_time` ablakra
+
+**CLI:** `uv run python src/database/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
+
+**Kód referencia:** [`_doc_/1260_quant_train.md`](_doc_/1260_quant_train.md)
+
+| Oszlop | Típus | Leírás |
+|--------|-------|--------|
+| `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC. Egyedi — INNER JOIN garantálja. |
+| `feat_*` | `DOUBLE` | Az összes `feat_ohlcv_quant`-ban szereplő feature oszlop (t-1 lag már alkalmazva) |
+| `long_mfe_fw60` | `DOUBLE` | Fw60 long outcome: `log(max_fw60 / close[t])`. NULL sorok kizárva. |
+| `short_mfe_fw60` | `DOUBLE` | Fw60 short outcome: `log(min_fw60 / close[t])`. NULL sorok kizárva. |
+
+> **Megjegyzés:** A `quant_train` nem tartalmaz `close`, `available_ts`, `label_end_ts` vagy predikció oszlopokat.
+> A legacy `trg_*` boolean target elnevezés NEM kerül felhasználásra ebben a rétegben.
 
 ---
 

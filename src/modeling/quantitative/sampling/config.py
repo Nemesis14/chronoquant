@@ -15,7 +15,11 @@ class YearlySamplingConfig:
                         validation week selection. Suggested default: 42 + year.
         purge_minutes : Gap in minutes to exclude around each validation week
                         boundary. Default 240 covers the max feature lookback.
-        target_cols   : Target columns to include in sample.parquet.
+        target_cols   : Target columns to include in sample output.
+        feature_cols  : Feature columns to include. Empty tuple = all feat_*
+                        columns discovered from quant_train at runtime.
+        test_months   : Number of trailing months of the year to reserve as
+                        the test holdout (segment='test'). 0 disables test rows.
     """
 
     sample_id    : str
@@ -24,3 +28,5 @@ class YearlySamplingConfig:
     seed         : int
     purge_minutes: int = 240
     target_cols  : tuple[str, ...] = ("long_mfe_fw60", "short_mfe_fw60")
+    feature_cols : tuple[str, ...] = ()
+    test_months  : int = 1

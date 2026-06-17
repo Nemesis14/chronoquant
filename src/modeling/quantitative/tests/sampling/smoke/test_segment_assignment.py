@@ -98,3 +98,61 @@ def test_segment_column_added() -> None:
     assert "segment" not in df.columns
     result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES)
     assert "segment" in result.columns
+
+
+def test_fold_id_column_added() -> None:
+    df = _make_hourly_df(2021)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES)
+    assert "fold_id" in result.columns
+
+
+def test_fold_id_matches_valid_week_index() -> None:
+    df = _make_hourly_df(2021)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES)
+    for fold_idx, (week_start, week_end) in enumerate(VALID_WEEKS):
+        vs = datetime(week_start.year, week_start.month, week_start.day, 0, 0, 0)
+        ve = datetime(week_end.year, week_end.month, week_end.day, 23, 59, 0)
+        valid_rows = result.filter(
+            (pl.col("open_time") >= vs) & (pl.col("open_time") <= ve)
+        )
+        assert (valid_rows["fold_id"] == fold_idx).all(), (
+            f"Fold {fold_idx} valid rows have wrong fold_id"
+        )
+
+
+def test_train_rows_have_null_fold_id() -> None:
+    df = _make_hourly_df(2021)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES)
+    train_rows = result.filter(pl.col("segment") == "train")
+    assert train_rows["fold_id"].null_count() == len(train_rows), (
+        "Train rows should have null fold_id"
+    )
+
+
+def test_test_segment_with_test_start() -> None:
+    df = _make_hourly_df(2021)
+    test_start = date(2021, 12, 1)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES, test_start=test_start)
+    values = set(result["segment"].unique().to_list())
+    assert "test" in values, "test segment not found when test_start is set"
+    test_dt = datetime(2021, 12, 1, 0, 0, 0)
+    test_rows = result.filter(pl.col("open_time") >= test_dt)
+    assert (test_rows["segment"] == "test").all(), "Rows >= test_start should be 'test'"
+
+
+def test_test_rows_have_null_fold_id() -> None:
+    df = _make_hourly_df(2021)
+    test_start = date(2021, 12, 1)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES, test_start=test_start)
+    test_rows = result.filter(pl.col("segment") == "test")
+    assert test_rows["fold_id"].null_count() == len(test_rows), (
+        "Test rows should have null fold_id"
+    )
+
+
+def test_no_test_segment_without_test_start() -> None:
+    df = _make_hourly_df(2021)
+    result = assign_segments(df, VALID_WEEKS, PURGE_MINUTES)
+    assert "test" not in result["segment"].unique().to_list(), (
+        "test segment should not appear when test_start is None"
+    )

@@ -75,4 +75,8 @@ for errors — that belongs to the Validator Agent.
 
 ## Notes
 
-<!-- Database Agent-specific notes here as the role evolves. -->
+### DuckDB: ORDER BY veszélyes CREATE TABLE AS SELECT-ben
+
+`CREATE TABLE AS SELECT ... ORDER BY` kényszeríti DuckDB-t az **egész eredményhalmaz memóriában való materializálására** rendezés előtt. Nagy JOIN-oknál (pl. feat_ohlcv_quant × target) ez OOM-ot okoz még 16GB RAM-on is, mert a decompressed columnar adat 5-10× nagyobb lehet a fájlméretnél.
+
+**Szabály:** full rebuild esetén hagyja el az `ORDER BY`-t — DuckDB streameli a JOIN-t egyenesen a táblába, és a sorok fizikai sorrendje úgyis a forrástábla insert-sorrendjét követi (ami open_time szerint kronologikus).

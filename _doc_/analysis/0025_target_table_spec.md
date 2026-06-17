@@ -6,26 +6,85 @@
 
 Primary key: `open_time`
 
-Expected columns:
+## Expected columns
+
+Required base columns:
 
 - `open_time`
 - `close`
+
+Required fw60 continuous outcome columns:
+
+- `fw60_close`
+- `fw60_max`
+- `fw60_min`
+- `fw60_close_ret`
+- `fw60_close_logret`
+- `fw60_max_ratio`
+- `fw60_min_ratio`
+- `long_mfe_fw60`
+- `short_mfe_fw60`
+
+Legacy binary target columns may still exist for backward compatibility, but they are not the primary source-of-truth for target analysis:
+
 - `trg_l_fw60_q90`
 - `trg_s_fw60_q10`
 
-Project semantics:
+## Project semantics
 
-- `fw60` means a 60-bar forward window.
-- Long target `trg_l_fw60_q90` means future maximum return over t+1..t+60 is in the top decile.
-- Short target `trg_s_fw60_q10` means future minimum return over t+1..t+60 is in the bottom decile.
-- Bar `t` must not be included in the forward label window.
-- The last 60 rows should have null targets because the future window is incomplete.
+`fw60` means a 60-bar forward window.
+
+The target table stores continuous forward outcomes for the 60-bar horizon. These outcomes are supervised-learning labels or analysis outcomes, not live features.
+
+Forward window rule:
+
+```text
+forward window = t+1 .. t+60
+```
+
+The current bar `t` must be excluded from all forward-window calculations.
+
+SQL invariant:
+
+```sql
+ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING
+```
+
+For each row:
+
+```text
+close[t]                    = current bar close
+close[t+60]                 = fw60_close
+max(close[t+1:t+60])        = fw60_max
+min(close[t+1:t+60])        = fw60_min
+```
+
+Derived continuous outcome definitions:
+
+```text
+fw60_close_ret     = fw60_close / close - 1
+fw60_close_logret  = log(fw60_close / close)
+fw60_max_ratio     = fw60_max / close
+fw60_min_ratio     = fw60_min / close
+long_mfe_fw60      = log(fw60_max / close)
+short_mfe_fw60     = log(fw60_min / close)
+```
+
+Important sign convention:
+
+- `long_mfe_fw60` is usually non-negative when the forward max is above current close.
+- `short_mfe_fw60` is a signed downside log return and is usually non-positive when the forward min is below current close.
+- If a downstream model needs a positive short opportunity target, use `-short_mfe_fw60` as a derived modeling target. The stored source outcome remains `short_mfe_fw60 = log(fw60_min / close)`.
+
+The last 60 rows should have null fw60 outcome values because the future window is incomplete.
 
 ## Purpose
 
-The `target` table defines the supervised learning labels.
+The `target` table defines model-ready continuous forward outcomes for supervised learning and target analysis.
 
-The analyst must verify that target labels are temporally correct, class-balanced as expected, and not leaking future information into training.
+The analyst must verify that target outcomes are temporally correct, numerically consistent with OHLCV, null-handled correctly, and free from target-definition leakage caused by full-history percentile thresholds.
+
+The primary audit goal is no longer class balance of q90/q10 labels. Instead, the primary audit goal is correctness and stability of continuous fw60 forward outcomes.
 
 ## Required Checks
 
@@ -37,7 +96,7 @@ Report:
 - first `open_time`
 - last `open_time`
 - duplicate `open_time` count
-- null counts per target column
+- null counts per target outcome column
 - target rows missing matching `ohlcv`
 - `ohlcv` rows missing target
 
@@ -45,17 +104,39 @@ Expected:
 
 - `target.open_time` aligns to `ohlcv.open_time`
 - `target.close` equals `ohlcv.close`
-- last `fw60` rows have null target values
+- last 60 rows have null fw60 outcome values
+- non-tail rows should have non-null fw60 outcome values, unless source OHLCV values are invalid
+
+Target outcome columns to audit:
+
+```text
+fw60_close
+fw60_max
+fw60_min
+fw60_close_ret
+fw60_close_logret
+fw60_max_ratio
+fw60_min_ratio
+long_mfe_fw60
+short_mfe_fw60
+```
 
 ### 2. Forward-window correctness
 
-Recompute forward extrema directly from `ohlcv`:
+Recompute forward outcomes directly from `ohlcv` and compare against the stored `target` table.
 
-- `future_max_close = MAX(close)` over rows t+1 through t+60
-- `future_min_close = MIN(close)` over rows t+1 through t+60
+Recompute:
+
+- `fw60_close = close[t+60]`
+- `fw60_max = MAX(close)` over rows t+1 through t+60
+- `fw60_min = MIN(close)` over rows t+1 through t+60
 - `future_bar_count`
-- `future_max_return = future_max_close / close - 1`
-- `future_min_return = future_min_close / close - 1`
+- `fw60_close_ret = fw60_close / close - 1`
+- `fw60_close_logret = log(fw60_close / close)`
+- `fw60_max_ratio = fw60_max / close`
+- `fw60_min_ratio = fw60_min / close`
+- `long_mfe_fw60 = log(fw60_max / close)`
+- `short_mfe_fw60 = log(fw60_min / close)`
 
 Suggested SQL:
 
@@ -67,69 +148,198 @@ WITH ohlcv_ordered AS (
     FROM ohlcv
     ORDER BY open_time
 ),
-forward_extrema AS (
+forward_window AS (
     SELECT
         open_time,
         close,
+        NTH_VALUE(close, 60) OVER (
+            ORDER BY open_time
+            ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING
+        ) AS fw60_close,
         MAX(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING
-        ) AS future_max_close,
+        ) AS fw60_max,
         MIN(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING
-        ) AS future_min_close,
+        ) AS fw60_min,
         COUNT(*) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING
         ) AS future_bar_count
     FROM ohlcv_ordered
+),
+recomputed AS (
+    SELECT
+        open_time,
+        close,
+        CASE WHEN future_bar_count >= 60 THEN fw60_close ELSE NULL END AS fw60_close,
+        CASE WHEN future_bar_count >= 60 THEN fw60_max ELSE NULL END AS fw60_max,
+        CASE WHEN future_bar_count >= 60 THEN fw60_min ELSE NULL END AS fw60_min,
+        CASE WHEN future_bar_count >= 60 THEN fw60_close / NULLIF(close, 0) - 1 ELSE NULL END AS fw60_close_ret,
+        CASE WHEN future_bar_count >= 60 THEN LOG(fw60_close / NULLIF(close, 0)) ELSE NULL END AS fw60_close_logret,
+        CASE WHEN future_bar_count >= 60 THEN fw60_max / NULLIF(close, 0) ELSE NULL END AS fw60_max_ratio,
+        CASE WHEN future_bar_count >= 60 THEN fw60_min / NULLIF(close, 0) ELSE NULL END AS fw60_min_ratio,
+        CASE WHEN future_bar_count >= 60 THEN LOG(fw60_max / NULLIF(close, 0)) ELSE NULL END AS long_mfe_fw60,
+        CASE WHEN future_bar_count >= 60 THEN LOG(fw60_min / NULLIF(close, 0)) ELSE NULL END AS short_mfe_fw60
+    FROM forward_window
 )
 SELECT *
-FROM forward_extrema
+FROM recomputed
 ORDER BY open_time;
 ```
 
-### 3. Quantile threshold audit
+Analyst note:
 
-Compute empirical thresholds:
+- If DuckDB `NTH_VALUE(close, 60)` does not produce the expected `close[t+60]` under the selected frame semantics, use an explicit row-number self-join to compute `fw60_close`.
+- The correctness requirement is semantic, not tied to this exact SQL implementation.
 
-- long threshold from non-null `future_max_return` at q90
-- short threshold from non-null `future_min_return` at q10
+### 3. Numeric consistency checks
 
-Report:
+For all non-null fw60 rows, verify:
 
-- computed long threshold
-- computed short threshold
-- thresholds saved in metadata, if available
-- positive rate for long target
-- positive rate for short target
+```text
+fw60_close_ret    ~= fw60_close / close - 1
+fw60_close_logret ~= log(fw60_close / close)
+fw60_max_ratio    ~= fw60_max / close
+fw60_min_ratio    ~= fw60_min / close
+long_mfe_fw60     ~= log(fw60_max / close)
+short_mfe_fw60    ~= log(fw60_min / close)
+```
+
+Report maximum absolute mismatch per derived column.
 
 Expected:
 
-- q90/q10 positive rate should be approximately 10%
-- project tolerance: 8-12%, unless ties or sample-size explain otherwise
+- mismatches should be zero or within floating point tolerance
+- suggested tolerance: `1e-10` for direct recomputation, unless engine precision explains a larger difference
 
-Important note:
+### 4. Forward-window ordering and boundary checks
 
-If the target threshold is computed from full history, document this explicitly. For strict live-simulation analysis, compare against train-only or rolling threshold calibration.
+For all non-null rows, check:
 
-### 4. Class balance by time
+```text
+fw60_max >= fw60_min
+fw60_max >= LEAST(fw60_close, fw60_min) is not sufficient; recompute from full window
+fw60_min <= GREATEST(fw60_close, fw60_max) is not sufficient; recompute from full window
+fw60_max_ratio >= fw60_min_ratio
+long_mfe_fw60 >= short_mfe_fw60
+```
 
-Report distribution by:
+Expected:
+
+- `fw60_max` equals the maximum close in t+1..t+60
+- `fw60_min` equals the minimum close in t+1..t+60
+- `fw60_close` equals close at exactly t+60
+- the current row close must not be included in max/min/close outcome calculations
+
+### 5. Distribution and stability analysis
+
+Report distributions for:
+
+```text
+fw60_close_ret
+fw60_close_logret
+fw60_max_ratio
+fw60_min_ratio
+long_mfe_fw60
+short_mfe_fw60
+```
+
+Report by:
 
 - year
 - month
-- volatility regime
+- quarter
+- volatility regime, if available
 - train/validation/test fold, if sample definition is available
 
-Check:
+For each period/fold, report:
 
-- whether long and short positives occur on the same row
-- whether class rate is stable over time
-- whether folds have enough positive examples
+- count
+- null count
+- mean
+- median
+- standard deviation
+- min
+- max
+- p01
+- p05
+- p10
+- p25
+- p75
+- p90
+- p95
+- p99
 
-### 5. Label horizon and embargo audit
+Purpose:
+
+- detect regime drift
+- detect abnormal target distribution shifts
+- detect corrupted forward outcome calculations
+- provide inputs for optional derived binary thresholds later
+
+### 6. Legacy q90/q10 binary label audit, if columns exist
+
+If `trg_l_fw60_q90` and `trg_s_fw60_q10` still exist, treat them as legacy derived labels.
+
+Compute empirical thresholds from continuous source outcomes:
+
+```text
+legacy long threshold  = q90(long_mfe_fw60 over non-null full available history)
+legacy short threshold = q10(short_mfe_fw60 over non-null full available history)
+```
+
+Then verify:
+
+```text
+trg_l_fw60_q90 ~= long_mfe_fw60 >= legacy long threshold
+trg_s_fw60_q10 ~= short_mfe_fw60 <= legacy short threshold
+```
+
+Report:
+
+- computed legacy long threshold
+- computed legacy short threshold
+- thresholds saved in metadata, if available
+- positive rate for legacy long target
+- positive rate for legacy short target
+- mismatch count between stored binary columns and recomputed legacy labels
+
+Important:
+
+- Full-history q90/q10 binary labels are legacy compatibility outputs.
+- They must not be treated as the primary target source for strict time-series model validation.
+- If binary labels are needed for modeling, prefer fold-train, train-only, rolling, or explicitly fixed trading thresholds derived from continuous outcomes.
+
+### 7. Fold-level target analysis
+
+For every sample/fold definition, report continuous target distributions separately for train and validation:
+
+```text
+long target candidate  = long_mfe_fw60
+short target candidate = -short_mfe_fw60, if positive short opportunity is needed downstream
+```
+
+For each fold:
+
+- train count
+- validation count
+- train target mean/median/std
+- validation target mean/median/std
+- train target quantiles
+- validation target quantiles
+- top-decile threshold in train only
+- validation rate above train-only top-decile threshold
+
+Purpose:
+
+- quantify target drift across folds
+- support future fold-as-of binary label derivation
+- avoid using future validation/test periods to define thresholds
+
+### 8. Label horizon and embargo audit
 
 For every sample/fold definition:
 
@@ -142,35 +352,55 @@ Required rule:
 
 - minimum embargo must be at least `fw60`, i.e. 60 bars/minutes.
 
-### 6. Leakage proxy checks
+This rule still applies for continuous outcomes because the label uses forward information from t+1..t+60.
+
+### 9. Leakage proxy checks
 
 Search feature/prediction tables for suspicious columns:
 
 - `trg_*`
 - `future_*`
+- `fw60_*`
+- `*_mfe_*`
+- `*_mae_*`
 - `label_*`
 - `return_forward_*`
 
-Critical if future returns, target columns, or label proxies appear in feature inputs.
+Critical if continuous target outcomes, future returns, target columns, or label proxies appear in model feature inputs.
+
+Allowed:
+
+- `fw60_*`, `*_mfe_*`, and legacy `trg_*` columns may exist in `target`, reports, model evaluation artifacts, or prediction evaluation joins.
+
+Forbidden:
+
+- these columns must not be part of live model input features.
 
 ## Required Notebook Outputs
 
 1. Target coverage summary.
 2. Forward-window recomputation check.
-3. Threshold audit table.
-4. Target positive-rate table by year/month.
-5. Fold-level class balance table.
-6. Embargo validation table.
-7. Long/short overlap analysis.
-8. Leakage proxy column scan.
+3. Numeric consistency mismatch table.
+4. Null-tail validation table.
+5. Continuous target distribution tables by year/month/quarter.
+6. Fold-level continuous target distribution table.
+7. Optional legacy q90/q10 threshold audit table, if legacy binary columns exist.
+8. Embargo validation table.
+9. Long/short outcome relationship analysis.
+10. Leakage proxy column scan.
 
 ## Critical Findings
 
 Mark as critical if any of these occur:
 
-- target labels do not match recomputed logic
+- stored fw60 outcomes do not match recomputed OHLCV logic
 - bar t is included in the forward window
-- last horizon rows are not null
-- class balance is far outside expected range
+- `fw60_close` is not close[t+60]
+- `fw60_max` is not max(close[t+1:t+60])
+- `fw60_min` is not min(close[t+1:t+60])
+- last 60 rows are not null for fw60 outcomes
+- non-tail rows are unexpectedly null without source data explanation
+- derived return/logreturn columns are numerically inconsistent
 - train/validation/test gaps are shorter than horizon
-- features include future return or target-like proxy columns
+- feature tables include fw60 outcome or target-like proxy columns as model inputs
+- binary q90/q10 labels are used as primary source targets without documenting the threshold policy

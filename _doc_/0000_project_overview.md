@@ -64,7 +64,7 @@ config/             JSON config files (assets, features, models, strategies, tra
 models/             Generated model artifacts
 database/           DuckDB files and sample definitions
                       database/solusdt/solusdt.duckdb
-                      database/solusdt/samples/<sample_id>/  (metadata.json, folds.json, audit.json, sample.parquet)
+                      database/solusdt/samples/<sample_id>/  (metadata.json, audit.json, sample.parquet)
 ```
 
 ---
@@ -119,9 +119,14 @@ ohlcv → feat_ohlcv_quant → 00_create_sample.py → database/<asset>/samples/
                               predictions ← sync_predictions ← predict_proba
 ```
 
-`00_create_sample.py` runs `audit_feature_table()` to find safe boundaries, then
-`build_expanding_window_splits()`, and writes `metadata.json`, `folds.json`, `audit.json`
+`00_create_sample.py` generates a yearly random-hour sample: selects one random minute
+per hour for the given calendar year, assigns monthly validation weeks, applies a
+±240-minute purge buffer, and writes `metadata.json`, `audit.json`, `sample.parquet`
 into `database/<asset_id>/samples/<sample_id>/`.
+
+Sample ID format: `{asset_id}_fw60_yearly_{year}` (e.g. `solusdt_fw60_yearly_2024`).
+`sample.parquet` columns: `open_time`, `segment` (train/valid/purge), `long_mfe_fw60`, `short_mfe_fw60`.
+CLI: `uv run python src/modeling/quantitative/00_create_sample.py --year 2024 --asset-id solusdt`
 
 ---
 

@@ -1,14 +1,70 @@
 """Sample artifact IO — write, load, and validate sample definition files.
 
-Writes three JSON files per sample: metadata.json, folds.json, audit.json.
-No pandas import — stdlib only (json, pathlib, datetime).
+Yearly format: metadata.json, audit.json, sample.parquet (Polars).
+Legacy format (load/validate only): metadata.json + folds.json — kept for
+backward compatibility with lightgbm_model.py and lgbm_search.py.
 """
 
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-# %% Write
+import polars as pl
+
+# %% Yearly format — write
+
+
+def write_yearly_artifacts(
+    sample_dir : Path,
+    metadata   : dict,
+    segment_df : pl.DataFrame,
+    audit      : dict,
+) -> None:
+    """Write metadata.json, audit.json, and sample.parquet to sample_dir.
+
+    Injects generated_at (UTC ISO string) into the metadata before writing.
+    Creates sample_dir if it does not exist.
+
+    Args:
+        sample_dir : Target directory (created if absent).
+        metadata   : Sample metadata dict (sample_id, year, seed, …).
+        segment_df : Polars DataFrame with open_time, segment, and target columns.
+        audit      : Source data quality metrics dict.
+    """
+    sample_dir = Path(sample_dir)
+    sample_dir.mkdir(parents=True, exist_ok=True)
+
+    meta_out = {**metadata, "generated_at": datetime.now(UTC).isoformat()}
+    _write_json(sample_dir / "metadata.json", meta_out)
+    _write_json(sample_dir / "audit.json", audit)
+
+    segment_df.write_parquet(sample_dir / "sample.parquet", compression="zstd")
+
+
+# %% Yearly format — load
+
+
+def load_yearly_sample(sample_dir: str | Path) -> dict:
+    """Load yearly sample metadata and return path to sample.parquet.
+
+    Args:
+        sample_dir : Path to the directory produced by write_yearly_artifacts.
+
+    Returns:
+        Metadata dict augmented with 'sample_parquet_path' key.
+
+    Raises:
+        FileNotFoundError: If metadata.json or sample.parquet are missing.
+    """
+    sample_dir = Path(sample_dir)
+    metadata = json.loads((sample_dir / "metadata.json").read_text(encoding="utf-8"))
+    parquet_path = sample_dir / "sample.parquet"
+    if not parquet_path.exists():
+        raise FileNotFoundError(f"sample.parquet not found in {sample_dir}")
+    return {**metadata, "sample_parquet_path": str(parquet_path)}
+
+
+# %% Legacy format — write (kept for existing tests)
 
 
 def write_sample_artifacts(
@@ -17,44 +73,34 @@ def write_sample_artifacts(
     folds      : dict,
     audit      : dict,
 ) -> None:
-    """Write metadata.json, folds.json, and audit.json to sample_dir.
-
-    Injects generated_at (UTC ISO string) into the metadata before writing.
-    Creates sample_dir if it does not exist.
+    """Write metadata.json, folds.json, and audit.json (expanding-window format).
 
     Args:
         sample_dir : Target directory (created if absent).
-        metadata   : Sample metadata dict (sample_id, asset_id, parameters, source, …).
+        metadata   : Sample metadata dict.
         folds      : Output of build_expanding_window_splits — {'folds': […], 'test': {…}}.
         audit      : Output of audit_feature_table.
     """
     sample_dir = Path(sample_dir)
     sample_dir.mkdir(parents=True, exist_ok=True)
 
-    meta_out = {
-        **metadata,
-        "generated_at": datetime.now(UTC).isoformat(),
-    }
+    meta_out = {**metadata, "generated_at": datetime.now(UTC).isoformat()}
     _write_json(sample_dir / "metadata.json", meta_out)
     _write_json(sample_dir / "folds.json",    folds)
     _write_json(sample_dir / "audit.json",    audit)
 
 
-# %% Load
+# %% Legacy format — load / validate (referenced by lightgbm_model.py, lgbm_search.py)
 
 
 def load_sample_definition(sample_dir: str | Path) -> dict:
-    """Load a sample definition from its artifact directory.
-
-    Merges metadata.json and folds.json into one dict.  The result exposes
-    sample["folds"], sample["test"], and sample["data"]["start"/"end"] which
-    are the keys expected by lightgbm_model and lgbm_search.
+    """Load an expanding-window sample definition from its artifact directory.
 
     Args:
         sample_dir : Path to the directory produced by write_sample_artifacts.
 
     Returns:
-        Merged dict suitable for validate_sample_definition and model training.
+        Merged dict with sample["folds"], sample["test"], sample["data"]["start"/"end"].
 
     Raises:
         FileNotFoundError: If metadata.json or folds.json are missing.
@@ -67,9 +113,6 @@ def load_sample_definition(sample_dir: str | Path) -> dict:
         "folds": folds["folds"],
         "test" : folds["test"],
     }
-
-
-# %% Validate
 
 
 def validate_sample_definition(sample: dict) -> None:

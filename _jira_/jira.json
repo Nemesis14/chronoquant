@@ -1,4 +1,4 @@
 {
-  "epic_counter": 14,
+  "epic_counter": 15,
   "_comment": "Next epic ID to assign. Always read this before creating a new epic. Increment after creation. Format: 3-digit zero-padded, e.g. epic_011_slug."
 }

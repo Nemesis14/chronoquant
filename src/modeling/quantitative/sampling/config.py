@@ -1,36 +1,26 @@
-"""SamplingConfig dataclass — all parameters needed to generate a sample definition."""
+"""YearlySamplingConfig dataclass — parameters for yearly random-hour sampling."""
 
 from dataclasses import dataclass
 
-# %% Config
-
 
 @dataclass(frozen=True)
-class SamplingConfig:
-    """Immutable configuration for generating a time-based CV sample.
+class YearlySamplingConfig:
+    """Immutable configuration for generating a yearly random-hour sample.
 
     Args:
-        sample_id               : Unique identifier written to the sample directory name.
-        asset_id                : Asset key from config/assets.json (e.g. 'solusdt').
-        target_col              : Target column name (e.g. 'long_mfe_fw60').
-        target_horizon_minutes  : Forward-return horizon in minutes; used as default embargo.
-        min_train_days          : Minimum number of calendar days in the first training fold.
-        valid_days              : Validation window length in calendar days.
-        step_days               : Step between consecutive fold starts in calendar days.
-        test_days               : Final holdout window length in calendar days.
-        embargo_minutes         : Gap between train end and valid start (default: target_horizon_minutes).
-        round_to_months         : If True (default), round data_start up and data_end down to whole
-                                  calendar months before generating splits. Ensures clean month boundaries
-                                  for easier analysis and cross-version comparability.
+        sample_id     : Unique identifier; becomes the sample directory name.
+        asset_id      : Asset key from config/assets.json (e.g. 'solusdt').
+        year          : Calendar year to sample (e.g. 2021).
+        seed          : Fixed random seed. Controls both hourly selection and
+                        validation week selection. Suggested default: 42 + year.
+        purge_minutes : Gap in minutes to exclude around each validation week
+                        boundary. Default 240 covers the max feature lookback.
+        target_cols   : Target columns to include in sample.parquet.
     """
 
-    sample_id              : str
-    asset_id               : str
-    target_col             : str
-    target_horizon_minutes : int
-    min_train_days         : int        = 730
-    valid_days             : int        = 180
-    step_days              : int        = 180
-    test_days              : int        = 365
-    embargo_minutes        : int | None = None
-    round_to_months        : bool       = True
+    sample_id    : str
+    asset_id     : str
+    year         : int
+    seed         : int
+    purge_minutes: int = 240
+    target_cols  : tuple[str, ...] = ("long_mfe_fw60", "short_mfe_fw60")

@@ -1,162 +1,111 @@
-"""Sampling orchestrator — runs audit → splits → write in one call.
+"""Yearly sampling orchestrator — runs DB load → hourly select → segment → write.
 
-Only this module imports utils; audit, splits, and artifacts are project-agnostic.
+Only this module imports utils and duckdb; yearly_sampler and artifacts are project-agnostic.
 """
 
-from datetime import datetime, timedelta
+import calendar
 from pathlib import Path
 
 import duckdb
+import polars as pl
 
 import utils
-from modeling.quantitative.sampling.artifacts import write_sample_artifacts
-from modeling.quantitative.sampling.audit import audit_feature_table
-from modeling.quantitative.sampling.config import SamplingConfig
-from modeling.quantitative.sampling.splits import build_expanding_window_splits
+from modeling.quantitative.sampling.artifacts import write_yearly_artifacts
+from modeling.quantitative.sampling.config import YearlySamplingConfig
+from modeling.quantitative.sampling.yearly_sampler import (
+    assign_segments,
+    select_hourly_observations,
+    select_monthly_validation_weeks,
+)
 
 
-def _month_start(ts: str) -> str:
-    """Round ts UP to the first minute of the next calendar month."""
-    dt = datetime.fromisoformat(ts)
-    first = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    if dt == first:
-        return ts
-    if dt.month == 12:
-        return datetime(dt.year + 1, 1, 1).strftime("%Y-%m-%d %H:%M:%S")
-    return datetime(dt.year, dt.month + 1, 1).strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _month_end(ts: str) -> str:
-    """Round ts DOWN to the last minute of the previous calendar month."""
-    dt = datetime.fromisoformat(ts)
-    last = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(minutes=1)
-    return last.strftime("%Y-%m-%d %H:%M:%S")
-
-# %% Public API
-
-
-def create_sample(config: SamplingConfig) -> None:
-    """Generate and persist a time-based CV sample definition for a given config.
+def create_yearly_sample(config: YearlySamplingConfig) -> None:
+    """Generate and persist a yearly random-hour sample for the given config.
 
     Steps:
-        1. Resolve db_path and sample_dir from config.
-        2. Audit feat_ohlcv_quant to determine safe data boundaries.
-        3. Build expanding-window splits from the safe boundaries.
-        4. Assemble metadata and write all three artifact files.
+        1. Load ohlcv ⋈ target rows for config.year from DuckDB (only rows with
+           non-null target values are included).
+        2. Select one random minute per hour (select_hourly_observations).
+        3. Select one validation week per calendar month (select_monthly_validation_weeks).
+        4. Assign train / valid / purge segments (assign_segments).
+        5. Write metadata.json, audit.json, sample.parquet.
 
     Args:
-        config : Frozen SamplingConfig with all required parameters.
+        config : Frozen YearlySamplingConfig with all required parameters.
 
     Raises:
-        ValueError: If the database is missing, the feature table is empty,
-                    or no folds can be generated with the given parameters.
+        ValueError: If no rows with valid targets exist for config.year.
     """
-    # --- resolve paths ---
-    db_path        = utils.load_asset_config(config.asset_id)["database"]["db_path"]
-    assets_raw     = utils.load_assets_config()
-    db_path_raw    = assets_raw["assets"][config.asset_id]["db_path"]
-    sample_dir     = Path(f"database/{config.asset_id}/samples/{config.sample_id}")
-    embargo_minutes = config.embargo_minutes or config.target_horizon_minutes
+    db_path    = utils.load_asset_config(config.asset_id)["database"]["db_path"]
+    sample_dir = Path(f"database/{config.asset_id}/samples/{config.sample_id}")
 
-    # --- audit ---
-    audit = audit_feature_table(db_path, config.target_col)
+    target_select = ", ".join(f"t.{col}" for col in config.target_cols)
+    null_checks   = " AND ".join(f"t.{col} IS NOT NULL" for col in config.target_cols)
 
-    if audit["data_start_safe"] is None or audit["data_end_safe"] is None:
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
+        df: pl.DataFrame = conn.execute(
+            f"""
+            SELECT o.open_time, {target_select}
+            FROM ohlcv o
+            JOIN target t USING (open_time)
+            WHERE YEAR(o.open_time) = {config.year}
+              AND {null_checks}
+            ORDER BY o.open_time
+            """
+        ).pl()
+
+        total_ohlcv_row = conn.execute(
+            f"SELECT COUNT(*) FROM ohlcv WHERE YEAR(open_time) = {config.year}"
+        ).fetchone()
+        total_ohlcv = int(total_ohlcv_row[0]) if total_ohlcv_row else 0
+    finally:
+        conn.close()
+
+    if len(df) == 0:
         raise ValueError(
-            f"Cannot determine safe data boundaries for {config.asset_id}. "
-            "Check that feat_ohlcv_quant and target tables are populated."
+            f"No data with valid targets found for year {config.year} "
+            f"in asset '{config.asset_id}'."
         )
 
-    # --- optionally round to complete calendar months ---
-    if config.round_to_months:
-        data_start = _month_start(audit["data_start_safe"])
-        data_end   = _month_end(audit["data_end_safe"])
-    else:
-        data_start = audit["data_start_safe"]
-        data_end   = audit["data_end_safe"]
+    hourly_df  = select_hourly_observations(df, config.year, config.seed)
+    valid_weeks = select_monthly_validation_weeks(hourly_df, config.year, config.seed)
+    segment_df  = assign_segments(hourly_df, valid_weeks, config.purge_minutes)
 
-    # --- splits ---
-    splits = build_expanding_window_splits(
-        data_start      = data_start,
-        data_end        = data_end,
-        min_train_days  = config.min_train_days,
-        valid_days      = config.valid_days,
-        step_days       = config.step_days,
-        test_days       = config.test_days,
-        embargo_minutes = embargo_minutes,
-    )
+    row_counts = _segment_counts(segment_df)
 
-    # --- metadata ---
-    metadata = {
-        "sample_id"             : config.sample_id,
-        "asset_id"              : config.asset_id,
-        "target_col"            : config.target_col,
-        "target_horizon_minutes": config.target_horizon_minutes,
-        "split_type"            : "expanding_window",
-        "embargo_minutes"       : embargo_minutes,
-        "data"                  : {
-            "start": data_start,
-            "end"  : data_end,
-        },
-        "parameters": {
-            "min_train_days": config.min_train_days,
-            "valid_days"    : config.valid_days,
-            "step_days"     : config.step_days,
-            "test_days"     : config.test_days,
-        },
-        "n_folds": len(splits["folds"]),
-        "source" : {
-            "db_relative_path": db_path_raw,
-            "feature_table"   : "feat_ohlcv_quant",
-            "target_table"    : "target",
-        },
+    expected_hours = 8784 if calendar.isleap(config.year) else 8760
+    audit = {
+        "source_rows_with_valid_targets": len(df),
+        "total_ohlcv_rows_in_year"       : total_ohlcv,
+        "expected_hours"                 : expected_hours,
+        "actual_hourly_rows"             : len(hourly_df),
+        "missing_hours"                  : expected_hours - len(hourly_df),
     }
 
-    # --- write ---
-    write_sample_artifacts(sample_dir, metadata, splits, audit)
-    _write_sample_parquet(db_path, sample_dir, splits)
+    metadata = {
+        "sample_id"          : config.sample_id,
+        "asset_id"           : config.asset_id,
+        "year"               : config.year,
+        "seed"               : config.seed,
+        "purge_minutes"      : config.purge_minutes,
+        "target_cols"        : list(config.target_cols),
+        "selected_valid_weeks": [
+            {"start": str(ws), "end": str(we)} for ws, we in valid_weeks
+        ],
+        "row_counts"         : row_counts,
+    }
+
+    write_yearly_artifacts(sample_dir, metadata, segment_df, audit)
 
 
 # %% Internal
 
 
-def _write_sample_parquet(db_path: str, sample_dir: Path, splits: dict) -> None:
-    """Stream all sample segments to sample.parquet via DuckDB COPY TO.
-
-    Builds a UNION ALL query over every (fold_N_train, fold_N_valid, test)
-    segment and writes directly to parquet without materialising the full
-    dataset in Python memory.
-
-    Column layout: all feat_ohlcv_quant columns, then target columns (excluding
-    the shared open_time), then a 'segment' string column.
-    """
-    parts: list[str] = []
-
-    for fold in splits["folds"]:
-        n = fold["fold"]
-        for label, start, end in [
-            (f"fold_{n}_train", fold["train_start"], fold["train_end"]),
-            (f"fold_{n}_valid", fold["valid_start"], fold["valid_end"]),
-        ]:
-            parts.append(
-                f"SELECT f.*, t.* EXCLUDE (open_time), '{label}' AS segment"
-                f" FROM feat_ohlcv_quant f JOIN target t USING (open_time)"
-                f" WHERE f.open_time BETWEEN '{start}' AND '{end}'"
-            )
-
-    test = splits["test"]
-    parts.append(
-        f"SELECT f.*, t.* EXCLUDE (open_time), 'test' AS segment"
-        f" FROM feat_ohlcv_quant f JOIN target t USING (open_time)"
-        f" WHERE f.open_time BETWEEN '{test['start']}' AND '{test['end']}'"
+def _segment_counts(segment_df: pl.DataFrame) -> dict[str, int]:
+    rows = (
+        segment_df.group_by("segment")
+        .agg(pl.len().alias("count"))
+        .to_dict(as_series=False)
     )
-
-    union_sql  = "\nUNION ALL\n".join(parts)
-    out_path   = str(sample_dir.resolve() / "sample.parquet")
-    con        = duckdb.connect(db_path, read_only=True)
-    try:
-        con.execute(
-            f"COPY ({union_sql}) TO '{out_path}' (FORMAT PARQUET, CODEC 'ZSTD')"
-        )
-    finally:
-        con.close()
+    return dict(zip(rows["segment"], rows["count"], strict=False))

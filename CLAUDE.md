@@ -58,7 +58,7 @@ Taskok:
   t{n}: <cím> → database_agent
   t{n}: <cím> → database_agent
   t{n}: <cím> → validator_agent
-  t{n}: <cím> → doc_agent
+  t{n}: <cím> → code_doc_agent
   ...
 
 Sorrend: t{n} → t{n} (függőségek)
@@ -131,7 +131,7 @@ Mindkét esetben a ticket validálása (→ `done_`) a **validator_agent** felad
 epic: epic_{id}
 id: t{n}
 title: Rövid imperatív cím
-assignee: database_agent | modeling_agent | ui_agent | doc_agent
+assignee: database_agent | modeling_agent | ui_agent | code_doc_agent
 status: todo | pr | done
 blocks: [t{n}, t{n}]      # opcionális: ezeket blokkol
 blocked_by: [t{n}]        # opcionális: ezektől függ
@@ -169,8 +169,9 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 | `src/database/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
 | `src/modeling/` (quantitative, elliott), features, predictions | `modeling_agent` |
 | `src/ui/`, `src/trading/` | `ui_agent` |
-| `.agent/`, tooling, infra, dependencies | `doc_agent` |
+| `.agent/`, tooling, infra, dependencies | `code_doc_agent` |
 | `_doc_/analysis/`, ML EDA, feature/model analysis notebooks | `analyst_agent` |
+| `_doc_/` X000, X100 szintek — módszertani háttér és üzleti rationale | `methodology_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 
 Ha egy task több domaint érint: bontsd szét több taskra, minden taskhoz egy agent.

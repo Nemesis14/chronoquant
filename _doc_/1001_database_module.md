@@ -16,10 +16,10 @@ src/database/
 ```
 
 Részletes dokumentáció:
-- Store réteg → [0021_store.md](0021_store.md)
-- Sync tables → [0022_sync_tables.md](0022_sync_tables.md)
-- Tesztek → [0023_tests.md](0023_tests.md)
-- DuckDB schema → [0001_database.md](0001_database.md)
+- Store réteg → [1100_store.md](1100_store.md)
+- Sync tables → [1200_sync_tables.md](1200_sync_tables.md)
+- Tesztek → [1300_tests.md](1300_tests.md)
+- DuckDB schema → [1000_database.md](1000_database.md)
 
 ---
 

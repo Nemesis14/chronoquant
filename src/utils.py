@@ -328,9 +328,9 @@ def live_model_meta(
 
 def target_direction_from_name(target_name: str) -> str:
     """Return 'long' or 'short' inferred from a target column name prefix."""
-    if target_name.startswith("trg_l_"):
+    if target_name.startswith("trg_l_") or target_name.startswith("long_"):
         return "long"
-    if target_name.startswith("trg_s_"):
+    if target_name.startswith("trg_s_") or target_name.startswith("short_"):
         return "short"
     raise ValueError(f"Cannot infer target direction from target name: {target_name}")
 
@@ -349,7 +349,7 @@ def champion_models_for_asset(
     """Return (long_model_id, long_meta, short_model_id, short_meta) for an asset.
 
     Resolves the default asset when asset_id is None. Long model is identified
-    by target_name starting with 'trg_l_'; short by 'trg_s_'.
+    by target_name starting with 'long_' or 'trg_l_'; short by 'short_' or 'trg_s_'.
 
     Args:
         model_cfg : Loaded models config dict.
@@ -375,9 +375,9 @@ def champion_models_for_asset(
         if meta.get("asset_id") != resolved:
             continue
         target = meta.get("target_name", "")
-        if target.startswith("trg_l_") and long_id is None:
+        if (target.startswith("trg_l_") or target.startswith("long_")) and long_id is None:
             long_id, long_meta = mid, meta
-        elif target.startswith("trg_s_") and short_id is None:
+        elif (target.startswith("trg_s_") or target.startswith("short_")) and short_id is None:
             short_id, short_meta = mid, meta
 
     if long_id is None or long_meta is None:
@@ -407,9 +407,9 @@ def long_short_prediction_columns(model_cfg: dict) -> tuple[str, str]:
         model_meta  = model_cfg["models"][model_id]
         target_name = model_meta.get("target_name", "")
 
-        if target_name.startswith("trg_l_") or "_l_" in model_id:
+        if target_name.startswith("trg_l_") or target_name.startswith("long_") or "_l_" in model_id:
             long_col = prediction_col_name(model_id)
-        elif target_name.startswith("trg_s_") or "_s_" in model_id:
+        elif target_name.startswith("trg_s_") or target_name.startswith("short_") or "_s_" in model_id:
             short_col = prediction_col_name(model_id)
 
     if long_col is None or short_col is None:
@@ -442,7 +442,7 @@ def _format_target_direction(kind: str) -> str:
 
 
 def target_col_name(kind: str, rolling_window: int, percentile: float) -> str:
-    """Build a target column name, e.g. 'trg_l_fw60_q90'."""
+    """Build a legacy binary target column name (pre-epic-011 format)."""
     direction = _format_target_direction(kind)
     quantile  = _format_quantile(percentile)
     return f"trg_{direction}_fw{rolling_window}_{quantile}"

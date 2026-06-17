@@ -149,12 +149,7 @@ plt.show()
 #| label: tbl-positive-rate-by-year
 #| tbl-cap: "Positive target rate by year"
 
-display_df = yearly.assign(
-    year=lambda d: d["year"].astype("Int64").astype(str),
-    row_count=lambda d: d["row_count"].round(0).astype("Int64"),
-    positive_rate=lambda d: (d["positive_rate"] * 100).map(lambda x: f"{x:.2f}%"),
-)
-display_df
+display_analysis_table(yearly)
 ```
 
 ### Multi-figure panel
@@ -211,39 +206,48 @@ Apply consistently in all displayed tables and plot axes.
 | Column type | Display format |
 |---|---|
 | `year` | Full integer, e.g. `2024` — never `2,024` or `2024.0` |
-| `count`, `n`, `row_count`, `count(*)` | Integer, zero decimals |
-| rates, proportions, shares, positive rates | Percent string, exactly 2 decimals, e.g. `23.24%` |
+| `count`, `count(*)`, `n`, `row_count`, `rows`, `trades`, `volume`, `violations`, `*_count`, `*_n` | Integer, zero decimals |
+| `rate`, `ratio`, `share`, `pct`, `percent` (name contains any of these) | Percent string, exactly 2 decimals, e.g. `23.24%`; auto-scaled ×100 if values ≤ 1 |
+| all other float columns | 3 decimal string, e.g. `1.234` |
 
-Python helpers:
+Shared helper module — import in every analysis notebook Setup cell:
 
 ```python
-def fmt_year(s):
-    return s.astype("Int64").astype(str)
-
-def fmt_count(s):
-    return s.round(0).astype("Int64")
-
-def fmt_pct(s):
-    return (s * 100).map(lambda x: f"{x:.2f}%")
+import sys
+sys.path.insert(0, "src")
+from table_formatting import format_analysis_table, display_analysis_table
 ```
 
-Auto-formatter for display DataFrames:
+`_doc_/analysis/src/table_formatting.py` is the canonical implementation.
+Functions are also reproduced here for reference:
 
 ```python
+from IPython.display import display
+import pandas as pd
+
+_COUNT_NAMES = {"count", "count(*)", "n", "row_count", "rows", "trades", "volume", "violations"}
+_PCT_TOKENS  = ("rate", "ratio", "share", "pct", "percent")
+
 def format_analysis_table(df):
     out = df.copy()
     for col in out.columns:
         lower = col.lower()
         if lower == "year":
-            out[col] = out[col].astype("Int64").astype(str)
-        elif lower in {"count", "count(*)", "n", "row_count", "rows", "violations"} or lower.endswith("_count"):
-            out[col] = out[col].round(0).astype("Int64")
-        elif any(t in lower for t in ["rate", "ratio", "share", "pct", "percent"]):
+            out[col] = pd.array(out[col], dtype="Int64").astype(str)
+        elif lower in _COUNT_NAMES or lower.endswith("_count") or lower.endswith("_n"):
+            out[col] = pd.array(out[col], dtype="Int64")
+        elif any(t in lower for t in _PCT_TOKENS):
             values = out[col]
-            if values.max(skipna=True) <= 1.0:
-                values = values * 100
-            out[col] = values.map(lambda x: f"{x:.2f}%")
+            if pd.api.types.is_numeric_dtype(values):
+                if pd.notna(values.max(skipna=True)) and values.max(skipna=True) <= 1.0:
+                    values = values * 100
+                out[col] = values.map(lambda x: f"{x:.2f}%" if pd.notna(x) else "—")
+        elif pd.api.types.is_float_dtype(out[col]):
+            out[col] = out[col].map(lambda x: f"{x:.3f}" if pd.notna(x) else "—")
     return out
+
+def display_analysis_table(df):
+    display(format_analysis_table(df).style.hide(axis="index"))
 ```
 
 Axis formatters (matplotlib ticker on seaborn axes):
@@ -271,5 +275,7 @@ Before handing off an analysis notebook, verify:
 - [ ] Every plot cell has `#| label: fig-...` and `#| fig-cap: ...`.
 - [ ] Multi-plot cells use `fig-subcap` or are split into separate labelled cells.
 - [ ] Markdown before each output explains purpose, method, interpretation, and action rule.
-- [ ] Numeric formatting follows project conventions.
+- [ ] Every report table cell ends with `display_analysis_table(df)` — never a bare variable, `display(df)`, `df.head()`, or raw `df.style`.
+- [ ] No pandas index column visible in rendered HTML tables.
+- [ ] Numeric formatting follows project conventions (ratio/rate → `22.33%`, floats → `1.234`, counts → `0` decimals).
 - [ ] Headings and captions are not manually numbered.

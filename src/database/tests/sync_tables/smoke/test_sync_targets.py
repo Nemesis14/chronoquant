@@ -1,13 +1,13 @@
 """Smoke tests for the target sync pipeline.
 
-Verifies that sync_targets writes expected label columns, produces correct
+Verifies that sync_targets writes all fw60 outcome columns, produces correct
 NULL tails (last horizon rows lack sufficient future data), and is idempotent.
 Uses isolated tmp_path stores — no real database required.
 """
 
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import pytest
 
 import database.sync_tables.sync_targets as sync_targets_module
@@ -18,31 +18,44 @@ pytestmark = pytest.mark.smoke
 
 _HORIZON = 60
 
+_FW60_OUTCOME_COLS = [
+    "fw60_close",
+    "fw60_max",
+    "fw60_min",
+    "fw60_close_ret",
+    "fw60_close_logret",
+    "fw60_max_ratio",
+    "fw60_min_ratio",
+    "long_mfe_fw60",
+    "short_mfe_fw60",
+]
+
 
 # %% Test data builders
 
 
-def _build_ohlcv(rows: int = 200) -> pd.DataFrame:
-    open_time = pd.date_range("2024-01-01 00:00:00", periods=rows, freq="min")
-    base      = pd.Series(range(rows), dtype="float64")
-    close     = 100.0 + base * 0.01 + (base % 17) * 0.03
-    open_     = close.shift(1).fillna(close.iloc[0])
-    high      = pd.concat([open_, close], axis=1).max(axis=1) + 0.5
-    low       = pd.concat([open_, close], axis=1).min(axis=1) - 0.5
-    volume    = 1000.0 + (base % 29) * 10
+def _build_ohlcv(rows: int = 200) -> pl.DataFrame:
+    from datetime import datetime, timedelta
+    base_ts = datetime(2024, 1, 1, 0, 0, 0)
+    open_times = [base_ts + timedelta(minutes=i) for i in range(rows)]
+    close = [100.0 + i * 0.01 + (i % 17) * 0.03 for i in range(rows)]
+    open_ = [close[max(0, i - 1)] for i in range(rows)]
+    high  = [max(open_[i], close[i]) + 0.5 for i in range(rows)]
+    low   = [min(open_[i], close[i]) - 0.5 for i in range(rows)]
+    vol   = [1000.0 + (i % 29) * 10 for i in range(rows)]
 
-    return pd.DataFrame(
+    return pl.DataFrame(
         {
-            "open_time"       : open_time,
+            "open_time"       : open_times,
             "open"            : open_,
             "high"            : high,
             "low"             : low,
             "close"           : close,
-            "volume"          : volume,
-            "quote_volume"    : volume * 100,
+            "volume"          : vol,
+            "quote_volume"    : [v * 100 for v in vol],
             "trades"          : [10] * rows,
-            "taker_buy_base"  : volume * 0.4,
-            "taker_buy_quote" : volume * 40,
+            "taker_buy_base"  : [v * 0.4 for v in vol],
+            "taker_buy_quote" : [v * 40 for v in vol],
         }
     )
 
@@ -67,37 +80,14 @@ def _asset_cfg(db_path: Path) -> dict:
     }
 
 
-def _features_cfg() -> dict:
-    return {
-        "database": {
-            "features": {
-                "targets": [
-                    {
-                        "direction"      : "long",
-                        "name"           : "trg_l_fw60_q90",
-                        "rolling_window" : _HORIZON,
-                        "percentile"     : 0.9,
-                    },
-                    {
-                        "direction"      : "short",
-                        "name"           : "trg_s_fw60_q10",
-                        "rolling_window" : _HORIZON,
-                        "percentile"     : 0.1,
-                    },
-                ]
-            }
-        }
-    }
-
-
 # %% Tests
 
 
-def test_sync_targets_writes_expected_columns_and_is_idempotent(
+def test_sync_targets_writes_fw60_outcome_columns(
     tmp_path    : Path,
     monkeypatch : pytest.MonkeyPatch,
 ) -> None:
-    """Verify target sync writes label columns, correct row count, and is idempotent."""
+    """Verify target sync writes all fw60 outcome columns and is idempotent."""
     db_path = tmp_path / "asset.duckdb"
     _seed_ohlcv(str(db_path))
 
@@ -105,18 +95,16 @@ def test_sync_targets_writes_expected_columns_and_is_idempotent(
         sync_targets_module.utils, "load_asset_config",
         lambda asset_id=None: _asset_cfg(db_path),
     )
-    monkeypatch.setattr(
-        sync_targets_module.utils, "load_features_config",
-        lambda asset_id=None: _features_cfg(),
-    )
 
     sync_targets_module.sync_targets()
     sync_targets_module.sync_targets()  # idempotency check
 
     df = query_range(str(db_path), "target")
 
-    assert "trg_l_fw60_q90" in df.columns, "long label column missing"
-    assert "trg_s_fw60_q10" in df.columns, "short label column missing"
+    for col in _FW60_OUTCOME_COLS:
+        assert col in df.columns, f"fw60 outcome column missing: {col}"
+    assert "open_time" in df.columns
+    assert "close" in df.columns
     assert len(df) > 0, "target table is empty"
     assert df["open_time"].is_unique, "open_time must be unique in target"
 
@@ -125,11 +113,7 @@ def test_sync_targets_last_rows_are_null(
     tmp_path    : Path,
     monkeypatch : pytest.MonkeyPatch,
 ) -> None:
-    """Verify the last horizon rows have NULL labels (partial forward window).
-
-    Rows with fewer than `horizon` future bars get NULL — this includes both
-    the completely empty last row and all rows with a partial forward window.
-    """
+    """Verify the last horizon rows have NULL fw60 values (partial forward window)."""
     rows    = 200
     db_path = tmp_path / "asset.duckdb"
     _seed_ohlcv(str(db_path), rows=rows)
@@ -138,51 +122,39 @@ def test_sync_targets_last_rows_are_null(
         sync_targets_module.utils, "load_asset_config",
         lambda asset_id=None: _asset_cfg(db_path),
     )
-    monkeypatch.setattr(
-        sync_targets_module.utils, "load_features_config",
-        lambda asset_id=None: _features_cfg(),
-    )
 
     sync_targets_module.sync_targets()
 
     df         = query_range(str(db_path), "target")
-    null_count = df["trg_l_fw60_q90"].isna().sum()
+    null_count = df["long_mfe_fw60"].isna().sum()
 
     assert null_count == _HORIZON, (
-        f"Expected exactly {_HORIZON} NULL rows (last horizon rows with partial window), got {null_count}"
+        f"Expected exactly {_HORIZON} NULL rows (last horizon rows with partial window), "
+        f"got {null_count}"
     )
-    assert df["trg_l_fw60_q90"].iloc[-1] is None or df["trg_l_fw60_q90"].isna().iloc[-1], \
-        "Last row must have NULL label"
+    assert df["long_mfe_fw60"].iloc[-1] is None or df["long_mfe_fw60"].isna().iloc[-1], \
+        "Last row must have NULL long_mfe_fw60"
 
 
-def test_sync_targets_label_distribution_near_decile(
+def test_sync_targets_fw60_values_are_nonzero(
     tmp_path    : Path,
     monkeypatch : pytest.MonkeyPatch,
 ) -> None:
-    """Positive rate for q90/q10 labels should be near the expected 10% decile."""
+    """fw60 outcome columns should have non-null, meaningful values in valid rows."""
     db_path = tmp_path / "asset.duckdb"
-    _seed_ohlcv(str(db_path), rows=500)
+    _seed_ohlcv(str(db_path), rows=300)
 
     monkeypatch.setattr(
         sync_targets_module.utils, "load_asset_config",
         lambda asset_id=None: _asset_cfg(db_path),
     )
-    monkeypatch.setattr(
-        sync_targets_module.utils, "load_features_config",
-        lambda asset_id=None: _features_cfg(),
-    )
 
     sync_targets_module.sync_targets()
 
     df    = query_range(str(db_path), "target")
-    valid = df[df["trg_l_fw60_q90"].notna()]
+    valid = df[df["long_mfe_fw60"].notna()]
 
-    long_rate  = valid["trg_l_fw60_q90"].mean()
-    short_rate = valid["trg_s_fw60_q10"].mean()
-
-    assert 0.05 <= long_rate <= 0.20, (
-        f"trg_l_fw60_q90 positive rate {long_rate:.3%} outside expected 5-20% range"
-    )
-    assert 0.05 <= short_rate <= 0.20, (
-        f"trg_s_fw60_q10 positive rate {short_rate:.3%} outside expected 5-20% range"
-    )
+    assert len(valid) > 0, "No valid rows with non-null fw60 outcomes"
+    assert bool(valid["long_mfe_fw60"].notna().all()), "long_mfe_fw60 has unexpected NULLs in valid range"  # type: ignore[union-attr]
+    assert bool(valid["short_mfe_fw60"].notna().all()), "short_mfe_fw60 has unexpected NULLs in valid range"  # type: ignore[union-attr]
+    assert bool((valid["fw60_max_ratio"] > 0).all()), "fw60_max_ratio must be positive (price ratio)"

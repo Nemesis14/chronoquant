@@ -12,6 +12,7 @@
 #   run_search(model_id, stage="smoke"|"explore"|"refine", ...)
 # =============================================================================
 
+import contextlib
 import gc
 import hashlib
 import json
@@ -63,7 +64,7 @@ _ES_ROUNDS         = 100   # early stopping patience
 _CURVE_MAX_POINTS  = 100   # max training curve points saved per fold
 
 try:
-    import optuna
+    import optuna  # type: ignore[import-not-found]
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     _HAS_OPTUNA = True
 except ImportError:
@@ -251,7 +252,7 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
     # A threshold of 1e-6 avoids discarding small-valued ratio features
     # (natr, gk_vol, parkinson, lr_slope, return_mean) whose std is small
     # in absolute terms but informative relative to their own scale.
-    removed_const = sorted(c for c in all_feat if stds[c] < 1e-6 and c not in removed_null)
+    removed_const = sorted(c for c in all_feat if stds[c] < 1e-6 and c not in removed_null)  # type: ignore[index]
     removed_dupes = sorted(c for c in all_feat if c in _KNOWN_DUPLICATES
                            and c not in removed_null and c not in removed_const)
 
@@ -265,7 +266,7 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
     if removed_const:
         logger.info(f"[Stage 0] Removed {len(removed_const)} near-constant features:")
         for c in removed_const:
-            logger.info(f"  REMOVED (std={stds[c]:.6f})  {c}")
+            logger.info(f"  REMOVED (std={stds[c]:.6f})  {c}")  # type: ignore[index]
     else:
         logger.info("[Stage 0] No near-constant features")
 
@@ -302,7 +303,7 @@ def _run_feature_audit(asset_id: str | None, search_dir: Path) -> list[str]:
     if act_cols:
         logger.info(f"[Stage 0] Activity features ({len(act_cols)}) null rates:")
         for c in act_cols:
-            r = null_rates.get(c, 0.0)
+            r = null_rates.get(c, 0.0) or 0.0
             logger.info(f"  {c:<55}  null={r*100:.2f}%")
 
     result = {
@@ -464,8 +465,8 @@ def _run_one_trial(
 
         best_iter = getattr(model, "best_iteration_", None) or full_params["n_estimators"]
 
-        train_pred = model.predict_proba(split.X_train)[:, 1]
-        valid_pred = model.predict_proba(split.X_eval)[:, 1]
+        train_pred = model.predict_proba(split.X_train)[:, 1]  # type: ignore[index]
+        valid_pred = model.predict_proba(split.X_eval)[:, 1]  # type: ignore[index]
         tm = binary_classification_metrics(split.y_train, train_pred)
         vm = binary_classification_metrics(split.y_eval,  valid_pred)
 
@@ -509,7 +510,7 @@ def _feature_importance(model, feature_cols: list[str]) -> list[dict]:
     gain_imp  = model.booster_.feature_importance(importance_type="gain")
     rows = [
         {"feature": f, "split": int(s), "gain": float(g)}
-        for f, s, g in zip(feature_cols, split_imp, gain_imp)
+        for f, s, g in zip(feature_cols, split_imp, gain_imp, strict=False)
     ]
     rows.sort(key=lambda x: x["gain"], reverse=True)
     return rows[:20]
@@ -672,7 +673,7 @@ def _search_optuna(
     n_trials, timeout_hours, stage, champion_prauc,
     done_hashes, fail_hashes,
 ) -> dict:
-    import optuna
+    import optuna  # type: ignore[import-not-found]
 
     storage_path = search_dir / "optuna_study.db"
     storage      = f"sqlite:///{storage_path}"
@@ -866,7 +867,7 @@ def _update_best(search_dir: Path, record: dict, current_best: dict | None) -> d
         _write_json(search_dir / "search_best.json", best)
         logger.info(f"  *** NEW BEST  score={score:.6f} ***")
         return best
-    return current_best
+    return current_best  # type: ignore[return-value]
 
 
 def _load_best(search_dir: Path) -> dict | None:
@@ -923,7 +924,7 @@ def _load_champion_prauc(model_id: str, model_dir: Path) -> float | None:
     try:
         df = pd.read_csv(csv_path)
         if "valid_pr_auc" in df.columns:
-            return float(df["valid_pr_auc"].mean())
+            return float(df["valid_pr_auc"].mean())  # type: ignore[arg-type]
     except Exception:
         pass
     return None
@@ -1040,7 +1041,7 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
                 logger.info(f"\nTop-{len(top)} trials by objective score:")
                 for _, row in top.iterrows():
                     logger.info(
-                        f"  #{int(row['trial_no']):04d}  "
+                        f"  #{int(row['trial_no']):04d}  "  # type: ignore[arg-type]
                         f"obj={_fmt(row.get('objective_score'))}  "
                         f"valid_ll={_fmt(row.get('mean_valid_ll'))}  "
                         f"valid_prauc={_fmt(row.get('mean_valid_prauc'))}"
@@ -1074,10 +1075,8 @@ def _iter_jsonl(path: Path):
         for line in f:
             line = line.strip()
             if line:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     yield json.loads(line)
-                except json.JSONDecodeError:
-                    pass
 
 
 def _json_serial(obj):

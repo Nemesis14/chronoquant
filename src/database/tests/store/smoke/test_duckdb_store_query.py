@@ -4,9 +4,11 @@ Verifies schema creation, append-only inserts, native range queries, helper
 metadata calls, and ASOF timestamp alignment.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 import pytest
 
 from database.store.duckdb_query import (
@@ -35,16 +37,14 @@ def _data_dir(tmp_path: Path) -> str:
     return str(tmp_path / "asset_data")
 
 
-def _ohlcv_frame() -> pd.DataFrame:
-    return pd.DataFrame(
+def _ohlcv_frame() -> pl.DataFrame:
+    return pl.DataFrame(
         {
-            "open_time"       : pd.to_datetime(
-                [
-                    "2024-01-01 00:00:00",
-                    "2024-01-01 00:01:00",
-                    "2024-01-01 00:02:00",
-                ]
-            ),
+            "open_time"       : [
+                datetime(2024, 1, 1, 0, 0, 0),
+                datetime(2024, 1, 1, 0, 1, 0),
+                datetime(2024, 1, 1, 0, 2, 0),
+            ],
             "open"            : [10.0, 11.0, 12.0],
             "high"            : [11.0, 12.0, 13.0],
             "low"             : [9.0, 10.0, 11.0],
@@ -58,49 +58,45 @@ def _ohlcv_frame() -> pd.DataFrame:
     )
 
 
-def _feature_frame() -> pd.DataFrame:
-    return pd.DataFrame(
+def _feature_frame() -> pl.DataFrame:
+    return pl.DataFrame(
         {
-            "open_time"       : pd.to_datetime(
-                [
-                    "2024-01-01 00:00:00",
-                    "2024-01-01 00:01:00",
-                    "2024-01-01 00:02:00",
-                ]
-            ),
+            "open_time"       : [
+                datetime(2024, 1, 1, 0, 0, 0),
+                datetime(2024, 1, 1, 0, 1, 0),
+                datetime(2024, 1, 1, 0, 2, 0),
+            ],
             "close"           : [10.5, 11.5, 12.5],
-            "available_ts"    : pd.to_datetime(
-                [
-                    "2023-12-31 23:59:00",
-                    "2024-01-01 00:00:30",
-                    "2024-01-01 00:02:00",
-                ]
-            ),
-            "lookback_end_ts" : pd.to_datetime(
-                [
-                    "2023-12-31 23:59:00",
-                    "2024-01-01 00:00:30",
-                    "2024-01-01 00:02:00",
-                ]
-            ),
+            "available_ts"    : [
+                datetime(2023, 12, 31, 23, 59, 0),
+                datetime(2024, 1, 1, 0, 0, 30),
+                datetime(2024, 1, 1, 0, 2, 0),
+            ],
+            "lookback_end_ts" : [
+                datetime(2023, 12, 31, 23, 59, 0),
+                datetime(2024, 1, 1, 0, 0, 30),
+                datetime(2024, 1, 1, 0, 2, 0),
+            ],
             "feat_rsi_14"     : [40.0, 45.0, 50.0],
             "feat_roc_14"     : [0.1, 0.2, 0.3],
         }
     )
 
 
-def _prediction_frame() -> pd.DataFrame:
-    return pd.DataFrame(
+def _prediction_frame() -> pl.DataFrame:
+    return pl.DataFrame(
         {
-            "open_time"      : pd.to_datetime(
-                ["2024-01-01 00:01:00", "2024-01-01 00:02:00"]
-            ),
+            "open_time"      : [
+                datetime(2024, 1, 1, 0, 1, 0),
+                datetime(2024, 1, 1, 0, 2, 0),
+            ],
             "close"          : [11.5, 12.5],
-            "label_end_ts"   : pd.to_datetime(
-                ["2024-01-01 01:01:00", "2024-01-01 01:02:00"]
-            ),
-            "trg_l_fw60_q90" : [True, False],
-            "trg_s_fw60_q10" : [False, True],
+            "label_end_ts"   : [
+                datetime(2024, 1, 1, 1, 1, 0),
+                datetime(2024, 1, 1, 1, 2, 0),
+            ],
+            "long_mfe_fw60"  : [0.01, 0.02],
+            "short_mfe_fw60" : [-0.01, -0.02],
             "long_pred"      : [0.7, 0.2],
             "short_pred"     : [0.3, 0.8],
         }
@@ -161,11 +157,11 @@ def test_insert_helpers_are_append_only_and_sorted(tmp_path: Path) -> None:
     conn     = get_connection(data_dir)
     try:
         ensure_tables(conn)
-        assert insert_ohlcv(conn, _ohlcv_frame().iloc[[1, 0]]) == 2
-        assert insert_ohlcv(conn, _ohlcv_frame().iloc[[0, 1, 2]]) == 1
-        assert insert_feat_ohlcv_quant(conn, _feature_frame().iloc[[1, 0]]) == 2
+        assert insert_ohlcv(conn, _ohlcv_frame()[[1, 0]]) == 2
+        assert insert_ohlcv(conn, _ohlcv_frame()[[0, 1, 2]]) == 1
+        assert insert_feat_ohlcv_quant(conn, _feature_frame()[[1, 0]]) == 2
         assert insert_feat_ohlcv_quant(conn, _feature_frame()) == 1
-        assert insert_predictions(conn, _prediction_frame().iloc[[0]]) == 1
+        assert insert_predictions(conn, _prediction_frame()[[0]]) == 1
         assert insert_predictions(conn, _prediction_frame()) == 1
     finally:
         conn.close()

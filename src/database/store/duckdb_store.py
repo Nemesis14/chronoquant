@@ -56,12 +56,32 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
             taker_buy_quote DOUBLE
         )
     """)
+    # Migration: drop target table if it has old binary schema (BOOLEAN columns)
+    # New fw60 outcome schema uses only DOUBLE columns — no BOOLEAN expected.
+    try:
+        old_bool_cols = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.columns"
+            " WHERE table_name = 'target' AND data_type = 'BOOLEAN'"
+        ).fetchone()
+        if old_bool_cols and old_bool_cols[0] > 0:
+            conn.execute("DROP TABLE IF EXISTS target")
+            logger.info("Migration: dropped target table (old binary schema → fw60 outcome schema)")
+    except Exception:
+        logger.debug("Migration: target schema check skipped")
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS target (
-            open_time      TIMESTAMP PRIMARY KEY,
-            close          DOUBLE,
-            trg_l_fw60_q90 BOOLEAN,
-            trg_s_fw60_q10 BOOLEAN
+            open_time         TIMESTAMP PRIMARY KEY,
+            close             DOUBLE,
+            fw60_close        DOUBLE,
+            fw60_max          DOUBLE,
+            fw60_min          DOUBLE,
+            fw60_close_ret    DOUBLE,
+            fw60_close_logret DOUBLE,
+            fw60_max_ratio    DOUBLE,
+            fw60_min_ratio    DOUBLE,
+            long_mfe_fw60     DOUBLE,
+            short_mfe_fw60    DOUBLE
         )
     """)
     conn.execute("""
@@ -69,13 +89,13 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
             open_time       TIMESTAMP PRIMARY KEY,
             close           DOUBLE,
             label_end_ts    TIMESTAMP,
-            trg_l_fw60_q90  BOOLEAN,
-            trg_s_fw60_q10  BOOLEAN,
+            long_mfe_fw60   DOUBLE,
+            short_mfe_fw60  DOUBLE,
             long_pred       DOUBLE,
             short_pred      DOUBLE
         )
     """)
-    # Migration: drop legacy split columns if present
+    # Migration: drop legacy split columns from feat_ohlcv_quant and predictions
     for table, col in [
         ("feat_ohlcv_quant", "dataset_split"),
         ("feat_ohlcv_quant", "fold_id"),
@@ -93,6 +113,30 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
                 logger.info("Migration: dropped %s.%s", table, col)
         except Exception:
             logger.debug("Migration skip: %s.%s (table may not exist yet)", table, col)
+
+    # Migration: drop old boolean target cols from predictions, add new double cols
+    try:
+        old_pred_bool_cols = [
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_name = 'predictions' AND data_type = 'BOOLEAN'"
+            ).fetchall()
+        ]
+        for col in old_pred_bool_cols:
+            conn.execute(f'ALTER TABLE predictions DROP COLUMN "{col}"')
+            logger.info("Migration: dropped predictions.%s (old boolean target)", col)
+    except Exception:
+        logger.debug("Migration: predictions boolean target col drop skipped")
+
+    # Migration: add new fw60 target cols to predictions if missing (existing tables)
+    for col in ["long_mfe_fw60", "short_mfe_fw60"]:
+        try:
+            conn.execute(
+                f'ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "{col}" DOUBLE'
+            )
+        except Exception:
+            logger.debug("Migration skip: predictions.%s add", col)
 
     logger.debug("ensure_tables: ohlcv + target + predictions OK")
 
@@ -188,7 +232,8 @@ def _insert_append_only(
         max_row = conn.execute(
             f"SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01') FROM {table}"
         ).fetchone()
-        max_open_time = max_row[0]  # always set due to COALESCE
+        assert max_row is not None  # COALESCE guarantees a row is returned
+        max_open_time = max_row[0]
         count_row = conn.execute(
             "SELECT COUNT(*) FROM _ins_batch WHERE open_time > ?",
             [max_open_time],

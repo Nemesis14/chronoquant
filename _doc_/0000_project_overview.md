@@ -37,7 +37,9 @@ src/
 
   modeling/         ML modeling domain (family structure)
     quantitative/     Active family: LightGBM, features, CV, evaluation
+      sampling/         Sample definitions: config, splits, audit, artifacts, orchestrator
       evaluation/       Backtesting, metrics
+      00_create_sample.py
       01_train_model.py
       02_search_lgbm.py
       03_backtest_strategy.py
@@ -56,11 +58,13 @@ src/
   utils.py          All config loading — single entry point, never read JSON directly
 
 _doc_/              Module documentation mirroring src/ (agent-specific, not preloaded)
-_jira_/              Local task tracking (epics → tasks → stories)
+_jira_/              Local task tracking (epics → tasks → stories); jira.json holds the global epic counter
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
 models/             Generated model artifacts
-database/           DuckDB files (database/solusdt/solusdt.duckdb)
+database/           DuckDB files and sample definitions
+                      database/solusdt/solusdt.duckdb
+                      database/solusdt/samples/<sample_id>/  (metadata.json, folds.json, audit.json, sample.parquet)
 ```
 
 ---
@@ -76,7 +80,7 @@ Currently only one active asset: **solusdt** (SOLUSDT, 1m, futures).
 | Table | Primary Key | Purpose |
 |-------|-------------|---------|
 | `ohlcv` | `open_time` TIMESTAMP | Raw 1-minute candles from Binance |
-| `target` | `open_time` TIMESTAMP | Labels: `trg_l_fw60_q90`, `trg_s_fw60_q10` |
+| `target` | `open_time` TIMESTAMP | fw60 forward outcomes: `long_mfe_fw60`, `short_mfe_fw60` + 8 further fw60 columns |
 | `feat_ohlcv_quant` | `open_time` TIMESTAMP | Quantitative features (`feat_` prefix) |
 | `predictions` | `open_time` TIMESTAMP | Model probability scores + signals |
 
@@ -96,23 +100,28 @@ in business logic.
 
 | Model ID | Direction | Target | Trainer |
 |----------|-----------|--------|---------|
-| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `trg_l_fw60_q90` | `lightgbm_binary` |
-| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `trg_s_fw60_q10` | `lightgbm_binary` |
+| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `long_mfe_fw60` | `lightgbm_binary` |
+| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `short_mfe_fw60` | `lightgbm_binary` |
 
-- **Target semantics:** `fw60` = 60-bar forward window; `q90`/`q10` = top/bottom
-  decile of forward returns → binary label (True/False).
+- **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside/close[t]); `short_mfe_fw60` = log(min downside/close[t]).
 - **Features profile:** `solusdt_fw60` defined in `config/features.json`.
-- **Feature prefix:** `feat_`  |  **Target prefix:** `trg_`
+- **Feature prefix:** `feat_`  |  **Target columns:** `long_mfe_fw60`, `short_mfe_fw60`
 - **t-1 lag mandatory** on all features before training (prevents data leakage).
 - Artifacts stored under `models/<model_id>/` (model.pkl + features.json).
 
 ### Model pipeline
 
 ```
-ohlcv → feat_ohlcv_quant → [sample] → train → model artifact
-                                                    ↓
-                         predictions ← sync_predictions ← predict_proba
+ohlcv → feat_ohlcv_quant → 00_create_sample.py → database/<asset>/samples/<id>/
+                                                          ↓
+                                                     01_train_model.py → model artifact
+                                                                              ↓
+                              predictions ← sync_predictions ← predict_proba
 ```
+
+`00_create_sample.py` runs `audit_feature_table()` to find safe boundaries, then
+`build_expanding_window_splits()`, and writes `metadata.json`, `folds.json`, `audit.json`
+into `database/<asset_id>/samples/<sample_id>/`.
 
 ---
 
@@ -161,4 +170,6 @@ layer changed. Never skip these for non-trivial changes.
 | Database Agent | `src/database/`, `config/assets.json`, DuckDB schema |
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts |
 | UI Agent | `src/ui/`, `src/trading/` |
-| Doc Agent | `.agent/`, tooling, infra, dependencies |
+| Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ kód-referencia fájlok |
+| Analyst Agent | `_doc_/analysis/` — EDA notebooks, sample quality, feature/model analysis |
+| Methodology Agent | `_doc_/` X000, X100 szintek — üzleti rationale, módszertani döntések, paraméter indoklás |

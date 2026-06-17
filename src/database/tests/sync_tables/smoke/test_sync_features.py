@@ -4,9 +4,10 @@ Verifies that sync_features writes expected columns, stays idempotent, and
 uses the correct asset profile. Uses isolated tmp_path stores, not real data.
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import pytest
 
 import database.sync_tables.sync_features as sync_features_module
@@ -19,18 +20,17 @@ pytestmark = pytest.mark.smoke
 # %% Test data builders
 
 
-def _build_ohlcv(rows: int = 500) -> pd.DataFrame:
-    open_time = pd.date_range("2024-01-01 00:00:00", periods=rows, freq="min")
-    base      = pd.Series(range(rows), dtype="float64")
-    close     = 100 + base * 0.01 + (base % 17) * 0.03
-    open_     = close.shift(1).fillna(close.iloc[0])
-    high      = pd.concat([open_, close], axis=1).max(axis=1) + 0.5
-    low       = pd.concat([open_, close], axis=1).min(axis=1) - 0.5
-    volume    = 1000 + (base % 29) * 10
+def _build_ohlcv(rows: int = 500) -> pl.DataFrame:
+    base      = [float(i) for i in range(rows)]
+    close     = [100 + b * 0.01 + (b % 17) * 0.03 for b in base]
+    open_     = [close[0]] + close[:-1]
+    high      = [max(o, c) + 0.5 for o, c in zip(open_, close, strict=True)]
+    low       = [min(o, c) - 0.5 for o, c in zip(open_, close, strict=True)]
+    volume    = [1000.0 + (b % 29) * 10 for b in base]
 
-    return pd.DataFrame(
+    return pl.DataFrame(
         {
-            "open_time" : open_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "open_time" : [datetime(2024, 1, 1) + timedelta(minutes=i) for i in range(rows)],
             "open"      : open_,
             "high"      : high,
             "low"       : low,
@@ -60,20 +60,6 @@ def _asset_cfg(data_dir: Path) -> dict:
 
 
 def _features_cfg() -> dict:
-    targets_cfg = [
-        {
-            "direction"      : "long",
-            "name"           : "trg_l_fw60_q90",
-            "rolling_window" : 60,
-            "percentile"     : 0.9,
-        },
-        {
-            "direction"      : "short",
-            "name"           : "trg_s_fw60_q10",
-            "rolling_window" : 60,
-            "percentile"     : 0.1,
-        },
-    ]
     indicators = {
         "momentum"         : {
             "rsi"        : [{"window": 14}],
@@ -121,7 +107,7 @@ def _features_cfg() -> dict:
             "swing_points" : [{"window": 5}],
         },
     }
-    return {"database": {"features": {"targets": targets_cfg, "indicators": indicators}}}
+    return {"database": {"features": {"indicators": indicators}}}
 
 
 # %% Tests

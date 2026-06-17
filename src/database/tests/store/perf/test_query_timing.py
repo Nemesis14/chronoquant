@@ -7,11 +7,13 @@ Skips automatically when the database is absent or a table is missing.
 import shutil
 import tempfile
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import duckdb
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from database.store.duckdb_store import ensure_tables, get_connection, insert_ohlcv
@@ -95,9 +97,9 @@ def test_timing_ohlcv_rolling_sma60(conn: duckdb.DuckDBPyConnection) -> None:
 def test_timing_insert_100k_rows() -> None:
     n_rows = 100_000
     rng    = np.random.default_rng(42)
-    ts     = pd.date_range("2020-01-01", periods=n_rows, freq="min")
+    ts     = [datetime(2020, 1, 1) + timedelta(minutes=i) for i in range(n_rows)]
     close  = 100.0 + np.cumsum(rng.normal(0, 0.1, n_rows))
-    df_syn = pd.DataFrame({
+    df_syn = pl.DataFrame({
         "open_time":       ts,
         "open":            close * (1 + rng.uniform(-0.001, 0.001, n_rows)),
         "high":            close * (1 + rng.uniform(0, 0.002, n_rows)),
@@ -206,10 +208,10 @@ def test_timing_target_count(conn: duckdb.DuckDBPyConnection) -> None:
 def test_timing_target_label_groupby(conn: duckdb.DuckDBPyConnection) -> None:
     elapsed, _ = _time_ms(
         conn,
-        "SELECT trg_l_fw60_q90, trg_s_fw60_q10, COUNT(*) FROM target"
+        "SELECT long_mfe_fw60 > 0, short_mfe_fw60 < 0, COUNT(*) FROM target"
         " GROUP BY 1, 2 ORDER BY 1, 2",
     )
-    print(f"[perf] target label GROUP BY: {elapsed:.1f} ms")
+    print(f"[perf] target mfe GROUP BY: {elapsed:.1f} ms")
     assert elapsed < 3000, f"Label GROUP BY too slow: {elapsed:.1f} ms"
 
 
@@ -222,7 +224,7 @@ def test_timing_target_range_query_30d(conn: duckdb.DuckDBPyConnection) -> None:
 
     elapsed, rows = _time_ms(
         conn,
-        "SELECT open_time, trg_l_fw60_q90, trg_s_fw60_q10 FROM target"
+        "SELECT open_time, long_mfe_fw60, short_mfe_fw60 FROM target"
         " WHERE open_time BETWEEN ? AND ?",
         [start, end_s],
     )

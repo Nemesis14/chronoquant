@@ -1,14 +1,15 @@
-# sync_targets.py — Target Label Számítás
+# sync_targets.py — fw60 Forward Outcome Számítás
 
 `src/database/sync_tables/sync_targets.py`
 
-Bináris klasszifikációs labelek számítása DuckDB window SQL-lel. Minden `sync_targets` hívás teljes rebuild — DELETE+INSERT az összes tárolt OHLCV bar alapján.
+Minden `sync_targets` hívás teljes rebuild — DELETE+INSERT az összes tárolt OHLCV bar alapján.
+A régi bináris target rendszer (`trg_l_fw60_q90`, `trg_s_fw60_q10`) eltávolítva (epic-011).
 
 ---
 
 ## `sync_targets(asset_id)`
 
-**Célja:** A `target` tábla teljes újraépítése az összes `ohlcv` bar alapján.
+**Célja:** A `target` tábla teljes újraépítése az összes `ohlcv` bar alapján, 10 fw60 forward outcome oszloppal.
 
 **Paraméterek:**
 
@@ -27,39 +28,54 @@ sequenceDiagram
     participant META as solusdt.json
 
     SYNC->>DB: get_connection(db_path)
-    loop minden horizon (config.targets)
-        SYNC->>DB: _compute_target_df(conn, horizon, targets_cfg)
-        DB-->>SYNC: pl.DataFrame (open_time, close, trg_* labelek)
-    end
-    SYNC->>DB: insert_target(conn, target_df)
-    SYNC->>META: _update_metadata_thresholds(thresholds)
+    SYNC->>DB: _compute_outcome_df(conn, horizon=60)
+    DB-->>SYNC: pl.DataFrame (open_time, close, fw60_* és mfe oszlopok)
+    SYNC->>DB: insert_target(conn, df)
+    SYNC->>META: _update_metadata_outcomes(computed_from, computed_to)
 ```
 
 ---
 
-## `_compute_target_df(conn, horizon, targets)`
+## fw60 Forward Outcome Oszlopok
 
-**Célja:** Forward window return számítás és kvantilis alapú labeling SQL-lel.
+| Oszlop | Típus | Definíció |
+|--------|-------|-----------|
+| `close` | DOUBLE | close[t] — jelenlegi bar close ára |
+| `fw60_close` | DOUBLE | close[t+60] — nyers forward close |
+| `fw60_max` | DOUBLE | max(close[t+1:t+60]) — nyers max ár |
+| `fw60_min` | DOUBLE | min(close[t+1:t+60]) — nyers min ár |
+| `fw60_close_ret` | DOUBLE | close[t+60] / close[t] - 1 |
+| `fw60_close_logret` | DOUBLE | log(close[t+60] / close[t]) |
+| `fw60_max_ratio` | DOUBLE | max(close[t+1:t+60]) / close[t] |
+| `fw60_min_ratio` | DOUBLE | min(close[t+1:t+60]) / close[t] |
+| `long_mfe_fw60` | DOUBLE | log(max(close[t+1:t+60]) / close[t]) — **LONG TARGET** |
+| `short_mfe_fw60` | DOUBLE | log(min(close[t+1:t+60]) / close[t]) — **SHORT TARGET** |
 
-**Paraméterek:**
+**Szemantika:**
+- `long_mfe_fw60` pozitív → az ár felment → long kedvező
+- `short_mfe_fw60` negatív → az ár lement → short kedvező
 
-| Paraméter | Típus | Leírás |
-|-----------|-------|--------|
-| `conn` | `duckdb.DuckDBPyConnection` | Nyitott kapcsolat |
-| `horizon` | `int` | Forward window hossza barokban (60) |
-| `targets` | `list[dict]` | Target konfiguráció listája (direction, name, percentile) |
+---
 
-**Visszatérési érték:** `pl.DataFrame` — `open_time`, `close`, és minden `trg_*` label oszlop.
+## `_compute_outcome_df(conn, horizon=60)`
+
+**Célja:** Az összes fw60 outcome oszlop kiszámítása DuckDB window SQL-lel.
+
+**Visszatérési érték:** `pl.DataFrame` — `open_time`, `close`, és mind a 10 fw60 oszlop.
 
 ---
 
 ## `_TARGET_SQL` — A core SQL sablon
 
 ```sql
-WITH returns AS (
+WITH ohlcv_ordered AS (
+    SELECT open_time, close FROM ohlcv ORDER BY open_time
+),
+forward_window AS (
     SELECT
         open_time,
         close,
+        LEAD(close, {horizon}) OVER (ORDER BY open_time) AS fw_close,
         MAX(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
@@ -67,78 +83,85 @@ WITH returns AS (
         MIN(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
-        ) AS fw_min
-    FROM ohlcv
-),
-thresholds AS (
-    SELECT
-        QUANTILE_CONT(fw_max / close - 1, {long_percentile}) AS long_thresh,
-        QUANTILE_CONT(fw_min / close - 1, {short_percentile}) AS short_thresh
-    FROM returns
-    WHERE fw_max IS NOT NULL
+        ) AS fw_min,
+        COUNT(*) OVER (
+            ORDER BY open_time
+            ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
+        ) AS fw_bar_count
+    FROM ohlcv_ordered
 )
 SELECT
-    r.open_time,
-    r.close,
-    CASE
-        WHEN r.fw_max IS NULL THEN NULL
-        WHEN r.fw_max / r.close - 1 >= t.long_thresh THEN TRUE
-        ELSE FALSE
-    END AS {long_label},
-    CASE
-        WHEN r.fw_min IS NULL THEN NULL
-        WHEN r.fw_min / r.close - 1 <= t.short_thresh THEN TRUE
-        ELSE FALSE
-    END AS {short_label}
-FROM returns r, thresholds t
-ORDER BY r.open_time
+    open_time,
+    close,
+    CASE WHEN fw_bar_count >= {horizon} THEN fw_close           ELSE NULL END AS fw60_close,
+    ...
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN LN(fw_max / close)                               ELSE NULL END AS long_mfe_fw60,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN LN(fw_min / close)                               ELSE NULL END AS short_mfe_fw60
+FROM forward_window
+ORDER BY open_time
 ```
 
 **Kritikus invariáns:** `ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING`
 - Az aktuális bar (`t`) **nem szerepel** a forward window-ban
-- Az utolsó `horizon` sor `NULL`-t kap (nincs elegendő jövőbeli adat)
+- Az utolsó `horizon=60` sor `NULL`-t kap (nincs elegendő jövőbeli adat)
 
 ---
 
-## Kvantilis küszöbök
+## NULL sorok
 
-| Label | Kvantilis | Leírás |
-|-------|-----------|--------|
-| `trg_l_fw60_q90` | q90 (0.9) | A legmagasabb 10% forward return → Long signal |
-| `trg_s_fw60_q10` | q10 (0.1) | A legalacsonyabb 10% forward return → Short signal |
+Az utolsó `60` sor minden fw60 oszlopban `NULL` — nincs elegendő jövőbeli adat.
 
-A küszöbök az összes elérhető nem-null return értékből számítódnak (`full history quantile`). Ez biztosítja, hogy ~10% label legyen mindkét irányban.
+```
+                    ┌───────────────────────────────┐
+OUTCOME OSZLOPOK:  │ értékek (DOUBLE) │ NULL (60 sor) │
+                   └───────────────────────────────┘
+                         ↑ fw_bar_count >= 60         ↑ fw_bar_count < 60
+```
 
 ---
 
-## `_update_metadata_thresholds(...)`
+## `_update_metadata_outcomes(...)`
 
-**Célja:** Kvantilis küszöbök perzisztálása audit és reprodukálhatóság céljából.
+**Célja:** fw60 outcome definíciók és számítási időtartomány perzisztálása audit céljából.
 
 **Kimeneti fájl:** `database/<asset_id>/<asset_id>.json`
 
 **Tartalom:**
 ```json
 {
-  "thresholds": {
-    "trg_l_fw60_q90": 0.0234,
-    "trg_s_fw60_q10": -0.0198
-  },
-  "updated_at": "2026-06-15T10:23:45",
-  "horizon": 60,
-  "row_count": 1234567
+  "target_outcomes": {
+    "fw60": {
+      "horizon": 60,
+      "window": "t+1..t+60",
+      "columns": {
+        "close":             "close[t] — reference bar close",
+        "fw60_close":        "close[t+60] — raw forward close",
+        "fw60_max":          "max(close[t+1:t+60]) — raw max price",
+        "fw60_min":          "min(close[t+1:t+60]) — raw min price",
+        "fw60_close_ret":    "close[t+60] / close[t] - 1",
+        "fw60_close_logret": "log(close[t+60] / close[t])",
+        "fw60_max_ratio":    "max(close[t+1:t+60]) / close[t]",
+        "fw60_min_ratio":    "min(close[t+1:t+60]) / close[t]",
+        "long_mfe_fw60":     "log(max(close[t+1:t+60]) / close[t]) — LONG TARGET",
+        "short_mfe_fw60":    "log(min(close[t+1:t+60]) / close[t]) — SHORT TARGET"
+      },
+      "null_tail_rows": 60,
+      "computed_from": "2020-09-14 07:00:00",
+      "computed_to":   "2026-06-17 12:00:00",
+      "computed_at":   "2026-06-17 14:30:00"
+    }
+  }
 }
 ```
 
 ---
 
-## NULL sorok
+## Régi bináris target rendszer (eltávolítva)
 
-Az utolsó `horizon=60` sor label értéke `NULL` — nincs elegendő jövőbeli adat a küszöbhöz. A tesztek (`test_target_window.py`) ezeket a NULL sorokat ellenőrzik invariáns tesztként.
+Az epic-011 előtt a target tábla két bináris oszlopot tartalmazott:
+- `trg_l_fw60_q90 BOOLEAN` — forward max return >= teljes history q90 küszöb
+- `trg_s_fw60_q10 BOOLEAN` — forward min return <= teljes history q10 küszöb
 
-```
-                    ┌──────────────────────────┐
-LABELEK:           │ TRUE/FALSE │ NULL (60 sor) │
-                   └──────────────────────────┘
-                          ↑ fw_max nem NULL      ↑ fw_max IS NULL
-```
+Ezek eltávolítva. Az `ensure_tables` migráció automatikusan felváltja a régi sémát az újra.

@@ -54,7 +54,7 @@ def load_modeling_dataset(
     Only rows where both feature and target data are available are returned.
 
     Args:
-        target_col      : Target column name (e.g. 'trg_l_fw60_q90').
+        target_col      : Target column name (e.g. 'long_mfe_fw60').
         feature_cols    : Feature columns to load. None = all feat_* columns.
         start           : Optional lower bound (inclusive), YYYY-MM-DD HH:MM:SS.
         end             : Optional upper bound (inclusive), YYYY-MM-DD HH:MM:SS.

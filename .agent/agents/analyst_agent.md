@@ -64,11 +64,26 @@ If multiple specs are assigned, produce one notebook per spec and render each.
 
 ---
 
+## Source Material Rule
+
+**Never use an existing `.ipynb` or rendered `.html` file that corresponds to the current spec as source material.**
+
+If a `<slug>.ipynb` or `_doc_/<slug>.html` already exists, ignore it completely when writing or rewriting a notebook. It may be incorrect — that is often exactly why the task was raised. Derive all analysis logic solely from:
+
+- The triggering `.spec.md`
+- Agent manifests and skill files (this file, `analyst_skill.md`, `analysis_presentation_skill.md`)
+- Project documentation (`_doc_/`)
+- Source code under `src/`
+
+Reading the existing notebook or HTML to "understand what it does" is forbidden. Start from the spec.
+
+---
+
 ## Workflow
 
 1. Read the triggering `.spec.md` from `_doc_/analysis/`.
 2. Derive the notebook name: strip `_spec` suffix from the spec filename — no prefix added.
-3. Create `_doc_/analysis/<slug>.ipynb`.
+3. Create `_doc_/analysis/<slug>.ipynb` from scratch — do **not** read or copy from an existing notebook with the same name.
 4. Write: Quarto frontmatter (Raw cell) → Objective → Setup → checks → Summary (structure defined in `analyst_skill.md`).
 5. Apply the ML methodology checklist; document skipped items in their check section.
 6. Execute all cells from a clean kernel.

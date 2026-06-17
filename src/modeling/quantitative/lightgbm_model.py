@@ -189,8 +189,8 @@ def _cross_validate_values(
             model = _build_model(params)
             model.fit(split.X_train, split.y_train)
 
-            train_pred = model.predict_proba(split.X_train)[:, 1]
-            valid_pred = model.predict_proba(split.X_eval)[:, 1]
+            train_pred = model.predict_proba(split.X_train)[:, 1]  # type: ignore[index]
+            valid_pred = model.predict_proba(split.X_eval)[:, 1]  # type: ignore[index]
             train_metrics = binary_classification_metrics(split.y_train, train_pred)
             valid_metrics = binary_classification_metrics(split.y_eval, valid_pred)
 
@@ -238,7 +238,7 @@ def validation_predictions_for_value(
             print(f"Validation predictions fold {fold['fold']} {tuning_param}={tuning_value}", flush=True)
         model = _build_model(params)
         model.fit(split.X_train, split.y_train)
-        valid_pred = model.predict_proba(split.X_eval)[:, 1]
+        valid_pred = model.predict_proba(split.X_eval)[:, 1]  # type: ignore[index]
         valid_time = dataset.open_time.loc[
             between(dataset.open_time, fold["valid_start"], fold["valid_end"])
         ]
@@ -279,8 +279,8 @@ def _fit_final_model(
         print(f"Final fit {tuning_param}={tuning_value}", flush=True)
     model.fit(split.X_train, split.y_train)
 
-    train_pred = model.predict_proba(split.X_train)[:, 1]
-    test_pred = model.predict_proba(split.X_eval)[:, 1]
+    train_pred = model.predict_proba(split.X_train)[:, 1]  # type: ignore[index]
+    test_pred = model.predict_proba(split.X_eval)[:, 1]  # type: ignore[index]
     return (
         model,
         {
@@ -312,7 +312,7 @@ def _select_best_value(cv_df: pd.DataFrame, tuning_param: str) -> int | float:
         valid_pr_auc=("valid_pr_auc", "mean"),
         valid_brier_score=("valid_brier_score", "mean"),
     )
-    summary = summary.sort_values(
+    summary = summary.sort_values(  # type: ignore[call-overload]
         by=["valid_pr_auc", "valid_brier_score", tuning_param],
         ascending=[False, True, True],
     )
@@ -353,7 +353,7 @@ def _feature_importance_rows(
     split_importance = model.booster_.feature_importance(importance_type="split")
     gain_importance = model.booster_.feature_importance(importance_type="gain")
     rows = []
-    for feature, split_value, gain_value in zip(feature_cols, split_importance, gain_importance):
+    for feature, split_value, gain_value in zip(feature_cols, split_importance, gain_importance, strict=False):
         rows.append(
             {
                 "feature": feature,

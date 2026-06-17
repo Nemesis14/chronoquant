@@ -19,8 +19,7 @@
             "target": {
                 "direction": "long",
                 "horizon_minutes": 60,
-                "quantile": 0.9,
-                "column": "trg_l_fw60_q90"
+                "column": "long_mfe_fw60"
             },
             "model": {
                 "family": "lgbm",
@@ -47,8 +46,7 @@
             "target": {
                 "direction": "short",
                 "horizon_minutes": 60,
-                "quantile": 0.1,
-                "column": "trg_s_fw60_q10"
+                "column": "short_mfe_fw60"
             },
             "model": {
                 "family": "lgbm",

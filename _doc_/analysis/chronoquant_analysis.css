@@ -54,6 +54,27 @@ table.dataframe thead th {
   text-align: center !important;
 }
 
+/* ── Táblázat keret: fekete border az egész táblázaton ── */
+table.dataframe {
+  border: 1px solid black !important;
+  border-collapse: collapse !important;
+}
+
+table.dataframe th,
+table.dataframe td {
+  border: 1px solid black !important;
+}
+
+/* ── Fejléc alján vastagabb vonal a data soroktól való elválasztáshoz ── */
+table.dataframe thead th {
+  border-bottom: 2px solid black !important;
+}
+
+/* ── Számok jobbra igazítva az adatsorokban ── */
+table.dataframe tbody td {
+  text-align: right !important;
+}
+
 /* ── Index elrejtése — header sarok + tbody th ── */
 table.dataframe thead tr th:first-child {
   display: none !important;

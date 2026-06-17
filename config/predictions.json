@@ -12,8 +12,8 @@
         "column_docs": {
             "open_time":       "UTC minute timestamp copied from the features dataset.",
             "close":           "Close price copied from the features dataset for display and joins.",
-            "trg_l_fw60_q90":  "Long fact target (binary label): 1 if forward max return over 60 bars >= 90th-percentile threshold. Copied from the features dataset.",
-            "trg_s_fw60_q10":  "Short fact target (binary label): 1 if forward min return over 60 bars <= 10th-percentile threshold. Copied from the features dataset.",
+            "long_mfe_fw60":   "Long target: log(max(close[t+1:t+60]) / close[t]) — log of max upside move over next 60 bars.",
+            "short_mfe_fw60":  "Short target: log(min(close[t+1:t+60]) / close[t]) — log of max downside move over next 60 bars.",
             "long_pred":       "Champion long model probability output. Always reflects the current active long champion regardless of model ID.",
             "short_pred":      "Champion short model probability output. Always reflects the current active short champion regardless of model ID."
         },

@@ -32,8 +32,8 @@ def binary_classification_metrics(
     y_pred = pd.Series(y_pred).astype(float).reset_index(drop=True)
 
     valid_mask = y_true.notna() & y_pred.notna()
-    y_true = y_true[valid_mask].reset_index(drop=True)
-    y_pred = y_pred[valid_mask].clip(1e-15, 1 - 1e-15).reset_index(drop=True)
+    y_true = y_true[valid_mask].reset_index(drop=True)  # type: ignore[union-attr]
+    y_pred = y_pred[valid_mask].clip(1e-15, 1 - 1e-15).reset_index(drop=True)  # type: ignore[union-attr]
 
     if len(y_true) == 0:
         raise ValueError("Cannot compute metrics on an empty sample")
@@ -114,14 +114,14 @@ def calibration_table(y_true, y_pred, n_bins: int = 10) -> list[dict]:
 
     rows = []
     for bin_no, part in df.groupby("bin", dropna=False):
-        if pd.isna(bin_no):
+        if pd.isna(bin_no):  # type: ignore[arg-type]
             continue
         rows.append(
             {
-                "bin": int(bin_no),
+                "bin": int(bin_no),  # type: ignore[arg-type]
                 "n": int(len(part)),
-                "mean_pred": float(part["y_pred"].mean()),
-                "event_rate": float(part["y_true"].mean()),
+                "mean_pred": float(part["y_pred"].mean()),  # type: ignore[arg-type]
+                "event_rate": float(part["y_true"].mean()),  # type: ignore[arg-type]
             }
         )
     return rows

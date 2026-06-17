@@ -34,3 +34,14 @@ For non-trivial implementation work:
   diagnostics when available.
 - Use `sg run` for structural Python searches.
 - Use `rg` for fast text and file searches.
+
+## Subagent Spawn Policy
+
+- For simple lookups (find a file, search for a symbol, read a specific path),
+  use Grep / Glob / Read directly — never spawn an agent.
+- Before spawning any agent for a request that looks simple or narrow in scope,
+  pause and ask the user:
+  > "Ez agent spawn-nal oldható meg, de direkt tool-lal is elég lenne.
+  > Biztos spawnt szeretnél, vagy megpróbálom Grep/Glob/Read-del közvetlenül?"
+- Only spawn if the task is genuinely open-ended, multi-step, or requires
+  parallel independent searches that cannot be expressed as a single tool call.

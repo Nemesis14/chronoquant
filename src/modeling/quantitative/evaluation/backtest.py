@@ -319,8 +319,8 @@ def simulate_long_probability_strategy(
         trades_df=trades_df,
         equity_df=equity_df,
         initial_equity=float(strategy_cfg.get("initial_equity", 10000.0)),
-        start_time=pd.Timestamp(times[0]),
-        end_time=pd.Timestamp(times[-1]),
+        start_time=pd.Timestamp(times[0]),  # type: ignore[arg-type]
+        end_time=pd.Timestamp(times[-1]),  # type: ignore[arg-type]
     )
     return trades_df, equity_df, summary
 
@@ -493,8 +493,8 @@ def _simulate_short_probability_strategy(
         trades_df=trades_df,
         equity_df=equity_df,
         initial_equity=float(strategy_cfg.get("initial_equity", 10000.0)),
-        start_time=pd.Timestamp(times[0]),
-        end_time=pd.Timestamp(times[-1]),
+        start_time=pd.Timestamp(times[0]),  # type: ignore[arg-type]
+        end_time=pd.Timestamp(times[-1]),  # type: ignore[arg-type]
     )
     return trades_df, equity_df, summary
 
@@ -547,15 +547,15 @@ def summarize_trades(
         "trade_count": int(len(trades_df)),
         "winning_trades": int((returns > 0).sum()),
         "losing_trades": int((returns <= 0).sum()),
-        "win_rate": float((returns > 0).mean()),
-        "avg_net_return": float(returns.mean()),
-        "median_net_return": float(returns.median()),
-        "best_trade": float(returns.max()),
-        "worst_trade": float(returns.min()),
-        "profit_factor": _profit_factor(wins, losses),
-        "max_drawdown": float(drawdown.min()),
-        "avg_hold_minutes": float(trades_df["hold_minutes"].mean()),
-        "median_hold_minutes": float(trades_df["hold_minutes"].median()),
+        "win_rate": float((returns > 0).mean()),  # type: ignore[arg-type]
+        "avg_net_return": float(returns.mean()),  # type: ignore[arg-type]
+        "median_net_return": float(returns.median()),  # type: ignore[arg-type]
+        "best_trade": float(returns.max()),  # type: ignore[arg-type]
+        "worst_trade": float(returns.min()),  # type: ignore[arg-type]
+        "profit_factor": _profit_factor(wins, losses),  # type: ignore[arg-type]
+        "max_drawdown": float(drawdown.min()),  # type: ignore[arg-type]
+        "avg_hold_minutes": float(trades_df["hold_minutes"].mean()),  # type: ignore[arg-type]
+        "median_hold_minutes": float(trades_df["hold_minutes"].median()),  # type: ignore[arg-type]
         "avg_minutes_between_entries": float(between_entries.mean()) if not between_entries.empty else None,
         "median_minutes_between_entries": float(between_entries.median()) if not between_entries.empty else None,
         "exposure_pct": float(exposure_minutes / total_minutes),

@@ -24,8 +24,8 @@ src/database/tests/
 ```
 
 Részletes tesztek:
-- Store tesztek → [0231_store_tests.md](0231_store_tests.md)
-- Pipeline tesztek → [0232_pipeline_tests.md](0232_pipeline_tests.md)
+- Store tesztek → [1310_store_tests.md](1310_store_tests.md)
+- Pipeline tesztek → [1320_pipeline_tests.md](1320_pipeline_tests.md)
 
 ---
 

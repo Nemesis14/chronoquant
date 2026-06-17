@@ -1,11 +1,11 @@
-"""Compute and persist binary target labels for all configured targets.
+"""Compute and persist fw60 forward outcome columns for the target table.
 
-Reads OHLCV from the DuckDB ohlcv table, computes forward return windows using
-native DuckDB SQL window functions (t+1..t+k, bar t excluded), derives quantile
-thresholds from the full history, and writes the target table.
+Reads OHLCV from the DuckDB ohlcv table, computes all forward window
+outcomes for a 60-bar horizon using DuckDB SQL window functions (t+1..t+60,
+bar t excluded), and writes the result to the target table.
 
-After writing, updates the per-database metadata JSON with the computed thresholds
-and computation range for audit purposes.
+After writing, updates the per-database metadata JSON with outcome column
+definitions and the computation range.
 
 Pipeline position
 -----------------
@@ -14,9 +14,9 @@ sync_ohlcv  →  sync_targets  →  sync_feat_ohlcv_quant  →  sync_predictions
 Data flow
 ---------
 DuckDB (ohlcv)  →  DuckDB SQL window functions (in-process)
-                →  target DataFrame
+                →  target DataFrame (10 fw60 outcome columns)
                 →  DuckDB (target table)
-                →  database/solusdt/solusdt.json (threshold audit)
+                →  database/solusdt/solusdt.json (outcome audit)
 """
 
 from __future__ import annotations
@@ -31,162 +31,123 @@ from database.store.duckdb_store import ensure_tables, get_connection, insert_ta
 
 logger = logging.getLogger(__name__)
 
+_HORIZON = 60
+
 
 # %% SQL helpers
 
 
 _TARGET_SQL = """
 WITH ohlcv_ordered AS (
-    SELECT
-        open_time,
-        close
+    SELECT open_time, close
     FROM ohlcv
     ORDER BY open_time
 ),
-forward_extrema AS (
+forward_window AS (
     SELECT
         open_time,
         close,
-        -- t+1..t+k: bar t is NOT included in the window
+        LEAD(close, {horizon}) OVER (ORDER BY open_time) AS fw_close,
         MAX(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
-        ) AS future_max_close,
+        ) AS fw_max,
         MIN(close) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
-        ) AS future_min_close,
+        ) AS fw_min,
         COUNT(*) OVER (
             ORDER BY open_time
             ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING
-        ) AS future_bar_count
+        ) AS fw_bar_count
     FROM ohlcv_ordered
-),
-returns AS (
-    SELECT
-        open_time,
-        close,
-        -- NULL where the forward window is incomplete (< horizon bars available)
-        CASE WHEN future_bar_count >= {horizon}
-             THEN future_max_close / NULLIF(close, 0) - 1
-             ELSE NULL
-        END AS future_max_return,
-        CASE WHEN future_bar_count >= {horizon}
-             THEN future_min_close / NULLIF(close, 0) - 1
-             ELSE NULL
-        END AS future_min_return
-    FROM forward_extrema
 )
 SELECT
     open_time,
     close,
-    future_max_return,
-    future_min_return
-FROM returns
+    CASE WHEN fw_bar_count >= {horizon} THEN fw_close           ELSE NULL END AS fw60_close,
+    CASE WHEN fw_bar_count >= {horizon} THEN fw_max             ELSE NULL END AS fw60_max,
+    CASE WHEN fw_bar_count >= {horizon} THEN fw_min             ELSE NULL END AS fw60_min,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN fw_close / close - 1                              ELSE NULL END AS fw60_close_ret,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN LN(fw_close / close)                              ELSE NULL END AS fw60_close_logret,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN fw_max / close                                    ELSE NULL END AS fw60_max_ratio,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN fw_min / close                                    ELSE NULL END AS fw60_min_ratio,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN LN(fw_max / close)                               ELSE NULL END AS long_mfe_fw60,
+    CASE WHEN fw_bar_count >= {horizon} AND close > 0
+         THEN LN(fw_min / close)                               ELSE NULL END AS short_mfe_fw60
+FROM forward_window
 ORDER BY open_time
 """
 
 
-def _compute_target_df(
+def _compute_outcome_df(
     conn    : duckdb.DuckDBPyConnection,
-    horizon : int,
-    targets : list[dict],
+    horizon : int = _HORIZON,
 ) -> pl.DataFrame:
-    """Compute all target columns for the given horizon using DuckDB window functions.
+    """Compute all fw60 outcome columns using DuckDB window functions.
 
     Args:
         conn    : Open read-write DuckDB connection (ohlcv table must exist).
         horizon : Forward window in bars (minutes for 1m data).
-        targets : List of target config dicts with direction/quantile/name keys.
 
     Returns:
-        Polars DataFrame with open_time, close, and one boolean column per target.
-        Last `horizon` rows have NULL target values (insufficient future data).
+        Polars DataFrame with open_time, close, and all fw60 outcome columns.
+        Last `horizon` rows have NULL outcome values (insufficient future data).
     """
     sql = _TARGET_SQL.format(horizon=horizon)
-    df  = conn.execute(sql).pl()
-
-    if df.is_empty():
-        return df
-
-    # --- compute quantile thresholds on full non-null history ---
-    long_returns  = df["future_max_return"].drop_nulls()
-    short_returns = df["future_min_return"].drop_nulls()
-
-    for target_cfg in targets:
-        direction  = target_cfg["direction"]
-        quantile   = target_cfg["quantile"]
-        target_col = target_cfg["name"]
-
-        if direction == "long":
-            if long_returns.is_empty():
-                logger.warning("No long return data available for threshold computation")
-                df = df.with_columns(pl.lit(None).cast(pl.Boolean).alias(target_col))
-                continue
-            threshold = long_returns.quantile(quantile, interpolation="linear")
-            label_col = pl.when(pl.col("future_max_return").is_not_null()).then(
-                pl.col("future_max_return") >= threshold
-            ).otherwise(None).alias(target_col)
-        else:
-            if short_returns.is_empty():
-                logger.warning("No short return data available for threshold computation")
-                df = df.with_columns(pl.lit(None).cast(pl.Boolean).alias(target_col))
-                continue
-            threshold = short_returns.quantile(quantile, interpolation="linear")
-            label_col = pl.when(pl.col("future_min_return").is_not_null()).then(
-                pl.col("future_min_return") <= threshold
-            ).otherwise(None).alias(target_col)
-
-        df = df.with_columns(label_col)
-        target_cfg["_computed_threshold"] = float(threshold)  # type: ignore[assignment]
-        logger.info(
-            "target=%s direction=%s quantile=%.2f threshold=%.6f",
-            target_col, direction, quantile, threshold,
-        )
-
-    return df
+    return conn.execute(sql).pl()
 
 
 # %% Metadata update
 
 
-def _update_metadata_thresholds(
+def _update_metadata_outcomes(
     asset_id     : str | None,
-    targets      : list[dict],
     computed_from: str | None,
     computed_to  : str | None,
+    horizon      : int = _HORIZON,
 ) -> None:
-    """Write computed thresholds and metadata audit fields to the per-DB JSON.
+    """Write fw60 outcome column definitions and range to the per-DB JSON.
 
     Args:
         asset_id      : Asset key; uses default if None.
-        targets       : Target config dicts with _computed_threshold injected.
-        computed_from : Earliest OHLCV timestamp used in threshold computation.
-        computed_to   : Latest OHLCV timestamp used in threshold computation.
+        computed_from : Earliest OHLCV timestamp used in computation.
+        computed_to   : Latest OHLCV timestamp used in computation.
+        horizon       : Forward window in bars.
     """
     computed_at = utils.now_utc_str()
     metadata    = utils.load_database_metadata(asset_id)
 
-    if "targets" not in metadata:
-        metadata["targets"] = {}
+    metadata.pop("targets", None)
 
-    for target_cfg in targets:
-        name      = target_cfg["name"]
-        threshold = target_cfg.get("_computed_threshold")
-        if threshold is None:
-            continue
-        existing = metadata["targets"].get(name, {})
-        existing.update({
-            "direction":        target_cfg["direction"],
-            "horizon":          target_cfg["horizon"],
-            "quantile":         target_cfg["quantile"],
-            "threshold":        threshold,
-            "threshold_metric": "future_max_return" if target_cfg["direction"] == "long" else "future_min_return",
-            "computed_from":    computed_from,
-            "computed_to":      computed_to,
-            "computed_at":      computed_at,
-        })
-        metadata["targets"][name] = existing
+    h = horizon
+    metadata["target_outcomes"] = {
+        f"fw{h}": {
+            "horizon"     : h,
+            "window"      : f"t+1..t+{h}",
+            "columns"     : {
+                "close"             : "close[t] — reference bar close",
+                f"fw{h}_close"      : f"close[t+{h}] — raw forward close",
+                f"fw{h}_max"        : f"max(close[t+1:t+{h}]) — raw max price",
+                f"fw{h}_min"        : f"min(close[t+1:t+{h}]) — raw min price",
+                f"fw{h}_close_ret"  : f"close[t+{h}] / close[t] - 1",
+                f"fw{h}_close_logret": f"log(close[t+{h}] / close[t])",
+                f"fw{h}_max_ratio"  : f"max(close[t+1:t+{h}]) / close[t]",
+                f"fw{h}_min_ratio"  : f"min(close[t+1:t+{h}]) / close[t]",
+                f"long_mfe_fw{h}"   : f"log(max(close[t+1:t+{h}]) / close[t]) — LONG TARGET",
+                f"short_mfe_fw{h}"  : f"log(min(close[t+1:t+{h}]) / close[t]) — SHORT TARGET",
+            },
+            "null_tail_rows": h,
+            "computed_from" : computed_from,
+            "computed_to"   : computed_to,
+            "computed_at"   : computed_at,
+        }
+    }
 
     utils.save_database_metadata(metadata, asset_id)
     logger.info("Metadata frissitve: %s", utils.load_asset_config(asset_id)["database"]["metadata_path"])
@@ -198,89 +159,44 @@ def _update_metadata_thresholds(
 def sync_targets(asset_id: str | None = None) -> None:
     """Rebuild the full target table from OHLCV using DuckDB window functions.
 
-    Targets are defined in config/features.json under the active profile.
-    The forward window uses t+1..t+k — bar t's close is NOT included.
-    Quantile thresholds are computed from the full available OHLCV history.
-    After writing, the computed thresholds are saved to database/<asset>/asset.json.
+    Computes fw60 forward outcome columns for a 60-bar horizon (t+1..t+60,
+    bar t excluded).  Last 60 rows have NULL values (insufficient future data).
+    After writing, the computed time range is saved to the per-asset metadata JSON.
 
     Args:
         asset_id : Asset key from config/assets.json; uses default if None.
     """
-    # --- load configuration ---
-    db_cfg   = utils.load_asset_config(asset_id)
-    feat_cfg = utils.load_features_config(asset_id=asset_id)
-    db_path  = db_cfg["database"]["db_path"]
-
-    raw_targets = feat_cfg["database"]["features"].get("targets", [])
-    if not raw_targets:
-        logger.warning("Nincs target konfig — sync_targets kihagyva")
-        return
-
-    # --- group targets by horizon (each horizon = one DuckDB window pass) ---
-    horizons: dict[int, list[dict]] = {}
-    for t in raw_targets:
-        h = int(t["rolling_window"])
-        name = utils.target_name_from_config(t)
-        horizons.setdefault(h, []).append({
-            "name":      name,
-            "direction": t["direction"],
-            "horizon":   h,
-            "quantile":  float(t["percentile"]),
-        })
+    db_cfg  = utils.load_asset_config(asset_id)
+    db_path = db_cfg["database"]["db_path"]
 
     conn = get_connection(db_path)
     ensure_tables(conn)
 
     try:
-        # --- check ohlcv exists ---
         ohlcv_count = conn.execute("SELECT COUNT(*) FROM ohlcv").fetchone()
         if not ohlcv_count or ohlcv_count[0] == 0:
             logger.warning("Nincs OHLCV adat — sync_targets kihagyva")
             return
 
-        # --- fetch time range for metadata ---
         stats_row = conn.execute(
             "SELECT MIN(open_time), MAX(open_time) FROM ohlcv"
         ).fetchone()
         computed_from = str(stats_row[0]) if stats_row and stats_row[0] else None
         computed_to   = str(stats_row[1]) if stats_row and stats_row[1] else None
 
-        all_targets: list[dict] = []
-        combined_df: pl.DataFrame | None = None
-
-        # --- compute one DataFrame per horizon, join on open_time ---
-        for horizon, horizon_targets in sorted(horizons.items()):
-            logger.info("Targetek szamitasa: horizon=%d bars, %d target", horizon, len(horizon_targets))
-            df = _compute_target_df(conn, horizon, horizon_targets)
-            if df.is_empty():
-                logger.warning("Ures eredmeny: horizon=%d", horizon)
-                continue
-
-            target_cols = [t["name"] for t in horizon_targets]
-            df_subset   = df.select(["open_time", "close"] + target_cols)
-
-            if combined_df is None:
-                combined_df = df_subset
-            else:
-                combined_df = combined_df.join(
-                    df_subset.drop("close"), on="open_time", how="outer"
-                )
-
-            all_targets.extend(horizon_targets)
-
-        if combined_df is None or combined_df.is_empty():
-            logger.warning("Nem szamolhato target adat")
+        logger.info("fw60 outcome szamitasa: horizon=%d, ohlcv_rows=%d", _HORIZON, ohlcv_count[0])
+        df = _compute_outcome_df(conn)
+        if df.is_empty():
+            logger.warning("Ures eredmeny: fw60 outcome szamitas")
             return
 
-        # --- write target table (full replace within range) ---
-        written = insert_target(conn, combined_df)
+        written = insert_target(conn, df)
         logger.info(
             "OK: target tabla frissitve, sorok=%d, uj=%d",
-            len(combined_df), written,
+            len(df), written,
         )
 
-        # --- persist thresholds to metadata JSON ---
-        _update_metadata_thresholds(asset_id, all_targets, computed_from, computed_to)
+        _update_metadata_outcomes(asset_id, computed_from, computed_to)
 
     finally:
         conn.close()

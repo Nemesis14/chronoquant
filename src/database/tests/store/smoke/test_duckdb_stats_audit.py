@@ -4,9 +4,10 @@ Verifies happy-path behaviour with synthetic data and graceful handling of
 missing databases and tables. No real production DB required.
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import pytest
 
 from database.store.duckdb_stats import log_dataset_check, raw_manifest_audit
@@ -24,9 +25,9 @@ def _make_ohlcv_db(tmp_path: Path, n: int = 10) -> str:
     conn = get_connection(db_path)
     try:
         ensure_tables(conn)
-        rows = pd.DataFrame(
+        rows = pl.DataFrame(
             {
-                "open_time"       : pd.date_range("2024-01-01", periods=n, freq="min"),
+                "open_time"       : [datetime(2024, 1, 1) + timedelta(minutes=i) for i in range(n)],
                 "open"            : [100.0] * n,
                 "high"            : [101.0] * n,
                 "low"             : [99.0] * n,

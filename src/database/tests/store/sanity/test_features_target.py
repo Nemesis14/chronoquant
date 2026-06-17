@@ -131,7 +131,7 @@ def test_target_required_columns(conn: duckdb.DuckDBPyConnection) -> None:
             "SELECT column_name FROM information_schema.columns WHERE table_name = 'target'"
         ).fetchall()
     }
-    required = {"open_time", "close", "trg_l_fw60_q90", "trg_s_fw60_q10"}
+    required = {"open_time", "close", "long_mfe_fw60", "short_mfe_fw60"}
     missing  = required - cols
     assert not missing, f"Missing target columns: {missing}"
 
@@ -142,30 +142,34 @@ def test_target_date_range(conn: duckdb.DuckDBPyConnection) -> None:
     print(f"\ntarget range: {row[0]} -> {row[1]}")
 
 
-def test_target_label_distribution_long(conn: duckdb.DuckDBPyConnection) -> None:
-    """trg_l_fw60_q90 positive rate should be ~10% (q90 decile threshold)."""
-    rows = conn.execute(
-        "SELECT trg_l_fw60_q90, COUNT(*) AS n FROM target GROUP BY 1 ORDER BY 1"
-    ).fetchall()
-    dist       = {r[0]: r[1] for r in rows}
-    total      = sum(dist.values())
-    true_ratio = dist.get(True, 0) / total if total else 0
-    print(f"\ntrg_l_fw60_q90 distribution: {dist}, positive rate: {true_ratio:.3%}")
-    assert 0.05 <= true_ratio <= 0.20, \
-        f"Unexpected positive rate for trg_l_fw60_q90: {true_ratio:.3%}"
+def test_target_long_mfe_range(conn: duckdb.DuckDBPyConnection) -> None:
+    """long_mfe_fw60 values should be log returns — mostly in a reasonable range."""
+    row = conn.execute(
+        "SELECT MIN(long_mfe_fw60), MAX(long_mfe_fw60), AVG(long_mfe_fw60) FROM target"
+        " WHERE long_mfe_fw60 IS NOT NULL"
+    ).fetchone()
+    if not row or row[0] is None:
+        pytest.skip("No non-null long_mfe_fw60 values")
+    min_val, max_val, avg_val = row
+    print(f"\nlong_mfe_fw60: min={min_val:.4f} max={max_val:.4f} avg={avg_val:.4f}")
+    assert min_val > -2.0, f"long_mfe_fw60 min={min_val:.4f} seems unrealistically low"
+    assert max_val < 2.0, f"long_mfe_fw60 max={max_val:.4f} seems unrealistically high"
+    assert avg_val > 0, "long_mfe_fw60 average should be positive (prices generally move up)"
 
 
-def test_target_label_distribution_short(conn: duckdb.DuckDBPyConnection) -> None:
-    """trg_s_fw60_q10 positive rate should be ~10% (q10 decile threshold)."""
-    rows = conn.execute(
-        "SELECT trg_s_fw60_q10, COUNT(*) AS n FROM target GROUP BY 1 ORDER BY 1"
-    ).fetchall()
-    dist       = {r[0]: r[1] for r in rows}
-    total      = sum(dist.values())
-    true_ratio = dist.get(True, 0) / total if total else 0
-    print(f"\ntrg_s_fw60_q10 distribution: {dist}, positive rate: {true_ratio:.3%}")
-    assert 0.05 <= true_ratio <= 0.20, \
-        f"Unexpected positive rate for trg_s_fw60_q10: {true_ratio:.3%}"
+def test_target_short_mfe_range(conn: duckdb.DuckDBPyConnection) -> None:
+    """short_mfe_fw60 values should be negative log returns (downward moves)."""
+    row = conn.execute(
+        "SELECT MIN(short_mfe_fw60), MAX(short_mfe_fw60), AVG(short_mfe_fw60) FROM target"
+        " WHERE short_mfe_fw60 IS NOT NULL"
+    ).fetchone()
+    if not row or row[0] is None:
+        pytest.skip("No non-null short_mfe_fw60 values")
+    min_val, max_val, avg_val = row
+    print(f"\nshort_mfe_fw60: min={min_val:.4f} max={max_val:.4f} avg={avg_val:.4f}")
+    assert min_val > -2.0, f"short_mfe_fw60 min={min_val:.4f} seems unrealistically low"
+    assert max_val < 0.1, f"short_mfe_fw60 max={max_val:.4f} should be near zero or negative"
+    assert avg_val < 0, "short_mfe_fw60 average should be negative (minimum move is down)"
 
 
 def test_target_row_count_matches_features(conn: duckdb.DuckDBPyConnection) -> None:

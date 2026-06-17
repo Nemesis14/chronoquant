@@ -42,7 +42,7 @@ def test_predictions_required_columns(conn: duckdb.DuckDBPyConnection) -> None:
         ).fetchall()
     }
     required = {"open_time", "close", "label_end_ts",
-                "trg_l_fw60_q90", "trg_s_fw60_q10", "long_pred", "short_pred"}
+                "long_mfe_fw60", "short_mfe_fw60", "long_pred", "short_pred"}
     missing = required - cols
     assert not missing, f"Missing predictions columns: {missing}"
 

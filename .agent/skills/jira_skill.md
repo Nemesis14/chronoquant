@@ -58,7 +58,7 @@ todo_s2_slug.md  →  (broken into tasks)  →  delete when all tasks done
 epic: epic_{id}
 id: t{n}
 title: Short imperative title
-assignee: database_agent | modeling_agent | ui_agent | doc_agent | validator_agent
+assignee: database_agent | modeling_agent | ui_agent | code_doc_agent | methodology_agent | analyst_agent | validator_agent
 status: todo
 blocks: []        # optional: task IDs this blocks
 blocked_by: []    # optional: task IDs this depends on
@@ -104,9 +104,27 @@ Design decisions, open questions.
 
 ## Epic Folder Convention
 
-- Name: `epic_{id}_{slug}` where slug is 2-5 words, lowercase, underscores
+- Name: `epic_{id}_{slug}` where `{id}` is a **3-digit zero-padded number** (e.g. `epic_011_slug`) and `{slug}` is 2-5 words, lowercase, underscores
 - Create the epic folder before creating child tasks or stories
 - No separate epic definition file — the folder name and its contents define the epic
+- Completed epics (all tasks in `done_` state) are moved to `_jira_/archive/`
+
+## Epic Counter (`_jira_/jira.json`)
+
+`_jira_/jira.json` holds the global epic counter. **Always read it before creating a new epic.**
+
+```json
+{
+  "epic_counter": 11
+}
+```
+
+Workflow:
+1. Read `_jira_/jira.json` → get `epic_counter` value (e.g. `11`)
+2. Create the epic folder: `_jira_/epic_011_<slug>/`
+3. Write new `epic_counter` value back: `12`
+
+The counter is the **source of truth** for the next epic ID. Never derive the ID by scanning folder names.
 
 ---
 
@@ -115,7 +133,7 @@ Design decisions, open questions.
 **Orchestrator**: creates epics, tasks, stories; renames files on state change;
 deletes `done_` files.
 
-**Developer agents** (database_agent, modeling_agent, ui_agent, doc_agent):
+**Developer agents** (database_agent, modeling_agent, ui_agent, code_doc_agent, methodology_agent, analyst_agent):
 update `## Notes` on their active task; rename `todo_` → `pr_` when done.
 
 **Validator agent**: works only on `pr_` tasks; runs static analysis and tests;

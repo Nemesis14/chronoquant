@@ -4,9 +4,10 @@ Verifies that the stats report is callable, handles missing databases gracefully
 and collects basic metrics on populated data.
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import pytest
 
 from database.store.duckdb_stats import collect_duckdb_stats_report, format_duckdb_stats_report
@@ -31,9 +32,9 @@ def test_stats_report_collects_counts_ranges_and_timings(tmp_path: Path) -> None
     conn     = get_connection(data_dir)
     try:
         ensure_tables(conn)
-        rows = pd.DataFrame(
+        rows = pl.DataFrame(
             {
-                "open_time"       : pd.date_range("2024-01-01", periods=48, freq="h"),
+                "open_time"       : [datetime(2024, 1, 1) + timedelta(hours=i) for i in range(48)],
                 "open"            : [100.0] * 48,
                 "high"            : [101.0] * 48,
                 "low"             : [99.0] * 48,

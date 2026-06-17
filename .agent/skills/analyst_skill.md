@@ -114,10 +114,27 @@ never from visual inspection of plot images.
 - **Display/plotting inputs:** pandas only for small final display frames.
 - **Charting:** seaborn (primary); matplotlib as fallback/customization layer (axis formatters, reference lines). Plotly forbidden unless spec explicitly requests interactive HTML.
 - Use `duckdb.connect(db_path, read_only=True)` — never write to the DB.
-- Every table cell must end with a displayed dataframe.
 - Every chart cell must call `plt.show()`.
 - No bare `print()` — use displayed tables, generated Markdown, or `logger.*`.
 - No manual numbering in headings, captions, or labels. Let Quarto handle it.
+
+### Displayed table rules (mandatory)
+
+Every report table cell **must** end with `display_analysis_table(df)`.
+
+**Never** use:
+- a bare dataframe variable as the last expression (`summary_df`, `gaps_df`, etc.)
+- `display(df)` or `display(df.head())` directly on a raw DataFrame
+- `df.style` directly without going through `format_analysis_table`
+- `df.head()` as the final cell expression
+
+**Always:**
+- call `display_analysis_table(df)` as the last statement in every table cell
+- import at top of Setup cell: `from table_formatting import format_analysis_table, display_analysis_table`
+- add the src path before importing: `sys.path.insert(0, "src")`
+
+`display_analysis_table` hides the pandas index and enforces all numeric formatting rules
+(see `analysis_presentation_skill.md` — Numeric Formatting section).
 
 ### Return and Volatility Distribution
 

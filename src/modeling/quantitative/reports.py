@@ -151,7 +151,7 @@ def cv_summary(
         if valid_col in cv_df.columns:
             aggregations[valid_col] = (valid_col, "mean")
 
-    return cv_df.groupby(tuning_param, as_index=False).agg(**aggregations)
+    return cv_df.groupby(tuning_param, as_index=False).agg(**aggregations)  # type: ignore[return-value]
 
 
 # =============================================================================
@@ -236,13 +236,13 @@ def validation_calibration_summary(
     df = predictions_df[["y_true", "y_pred"]].copy()
     df["y_true"] = pd.to_numeric(df["y_true"], errors="coerce")
     df["y_pred"] = pd.to_numeric(df["y_pred"], errors="coerce")
-    df = df.dropna(subset=["y_true", "y_pred"]).sort_values("y_pred").reset_index(drop=True)
+    df = df.dropna(subset=["y_true", "y_pred"]).sort_values("y_pred").reset_index(drop=True)  # type: ignore[call-overload]
     if df.empty:
         return pd.DataFrame()
 
     bin_count = min(n_bins, len(df))
-    df["bin"] = pd.qcut(df.index, q=bin_count, labels=False, duplicates="drop") + 1
-    base_rate = float(df["y_true"].mean())
+    df["bin"] = pd.qcut(df.index, q=bin_count, labels=False, duplicates="drop") + 1  # type: ignore[operator]
+    base_rate = float(df["y_true"].mean())  # type: ignore[arg-type]
     summary = df.groupby("bin", as_index=False).agg(
         n=("y_true", "size"),
         pred_min=("y_pred", "min"),
@@ -250,9 +250,9 @@ def validation_calibration_summary(
         pred_mean=("y_pred", "mean"),
         target_rate=("y_true", "mean"),
     )
-    summary["baseline_target_rate"] = base_rate
-    summary["lift"] = summary["target_rate"] / base_rate if base_rate > 0 else None
-    return summary[
+    summary["baseline_target_rate"] = base_rate  # type: ignore[index]
+    summary["lift"] = summary["target_rate"] / base_rate if base_rate > 0 else None  # type: ignore[index]
+    return summary[  # type: ignore[return-value]
         [
             "bin",
             "n",

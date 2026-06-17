@@ -5,6 +5,7 @@ idempotent, and handles champion model resolution. Champion model loading
 is mocked — no real model artifacts required.
 """
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -42,42 +43,43 @@ class _MockModel:
 # %% Test data builders
 
 
-def _build_ohlcv(rows: int = 150) -> pd.DataFrame:
-    open_time = pd.date_range("2024-01-01 00:00:00", periods=rows, freq="min")
-    close     = pd.Series(100.0 + np.arange(rows) * 0.01)
-    open_     = close.shift(1).fillna(close.iloc[0])
-    return pd.DataFrame(
+def _build_ohlcv(rows: int = 150) -> pl.DataFrame:
+    close = [100.0 + i * 0.01 for i in range(rows)]
+    open_ = [close[0]] + close[:-1]
+    return pl.DataFrame(
         {
-            "open_time"       : open_time,
+            "open_time"       : [datetime(2024, 1, 1) + timedelta(minutes=i) for i in range(rows)],
             "open"            : open_,
-            "high"            : close + 0.5,
-            "low"             : close - 0.5,
+            "high"            : [c + 0.5 for c in close],
+            "low"             : [c - 0.5 for c in close],
             "close"           : close,
-            "volume"          : 1000.0,
-            "quote_volume"    : 100_000.0,
-            "trades"          : 10,
-            "taker_buy_base"  : 400.0,
-            "taker_buy_quote" : 40_000.0,
+            "volume"          : [1000.0] * rows,
+            "quote_volume"    : [100_000.0] * rows,
+            "trades"          : [10] * rows,
+            "taker_buy_base"  : [400.0] * rows,
+            "taker_buy_quote" : [40_000.0] * rows,
         }
     )
 
 
-def _build_features(ohlcv: pd.DataFrame, feat_cols: list[str]) -> pd.DataFrame:
+def _build_features(ohlcv: pl.DataFrame, feat_cols: list[str]) -> pl.DataFrame:
     rows   = len(ohlcv)
-    result = pd.DataFrame(ohlcv[["open_time", "close"]].copy())
-    result["available_ts"]    = result["open_time"]
-    result["lookback_end_ts"] = result["open_time"]
+    rng    = np.random.default_rng(42)
+    result = ohlcv.select(["open_time", "close"]).with_columns([
+        pl.col("open_time").alias("available_ts"),
+        pl.col("open_time").alias("lookback_end_ts"),
+    ])
     for col in feat_cols:
-        result[col] = np.random.default_rng(42).uniform(0, 1, rows)
+        result = result.with_columns(pl.Series(col, rng.uniform(0, 1, rows)))
     return result
 
 
-def _build_target(ohlcv: pd.DataFrame) -> pl.DataFrame:
+def _build_target(ohlcv: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame({
-        "open_time"       : ohlcv["open_time"].values,
-        "close"           : ohlcv["close"].values,
-        "trg_l_fw60_q90"  : [i % 10 == 0 for i in range(len(ohlcv))],
-        "trg_s_fw60_q10"  : [i % 10 == 1 for i in range(len(ohlcv))],
+        "open_time"      : ohlcv["open_time"].to_list(),
+        "close"          : ohlcv["close"].to_list(),
+        "long_mfe_fw60"  : [float(i) * 0.001 for i in range(len(ohlcv))],
+        "short_mfe_fw60" : [float(-i) * 0.001 for i in range(len(ohlcv))],
     })
 
 
@@ -107,20 +109,7 @@ def _features_cfg() -> dict:
     return {
         "database": {
             "features": {
-                "targets": [
-                    {
-                        "direction"      : "long",
-                        "name"           : "trg_l_fw60_q90",
-                        "rolling_window" : _HORIZON,
-                        "percentile"     : 0.9,
-                    },
-                    {
-                        "direction"      : "short",
-                        "name"           : "trg_s_fw60_q10",
-                        "rolling_window" : _HORIZON,
-                        "percentile"     : 0.1,
-                    },
-                ]
+                "indicators": {}
             }
         }
     }
@@ -131,7 +120,7 @@ def _models_cfg() -> dict:
         "models": {
             "lgbm_solusdt_l_fw60_q90_local_v4": {
                 "active"     : True,
-                "target_name": "trg_l_fw60_q90",
+                "target_name": "long_mfe_fw60",
                 "trainer"    : "lightgbm_binary",
                 "predict"    : {"method": "predict_proba"},
                 "paths"      : {
@@ -142,7 +131,7 @@ def _models_cfg() -> dict:
             },
             "lgbm_solusdt_s_fw60_q10_local_v4": {
                 "active"     : True,
-                "target_name": "trg_s_fw60_q10",
+                "target_name": "short_mfe_fw60",
                 "trainer"    : "lightgbm_binary",
                 "predict"    : {"method": "predict_proba"},
                 "paths"      : {

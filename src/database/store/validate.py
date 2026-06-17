@@ -115,7 +115,7 @@ def check_target_no_current_bar(db_path: str) -> int:
         # Last `horizon` rows must have NULL targets (insufficient future data)
         # This is enforced by sync_targets — we verify the table has any NULLs at the tail.
         row = con.execute(
-            "SELECT COUNT(*) FROM target WHERE trg_l_fw60_q90 IS NULL"
+            "SELECT COUNT(*) FROM target WHERE long_mfe_fw60 IS NULL"
         ).fetchone()
         null_count = int(row[0]) if row else 0
         if null_count == 0:

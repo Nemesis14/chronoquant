@@ -1,4 +1,4 @@
-# Doc Agent — Infrastructure and Admin Agent
+# Code Doc Agent — Infrastructure and Technical Documentation Agent
 
 Owns developer environment, tooling, dependencies, and `.agent/` rule maintenance.
 
@@ -23,7 +23,7 @@ Read these before starting work:
 - `.agent/tools/permissions_tool.md`
 
 Do NOT load:
-- `coding_skill.md` — Doc Agent work is config/infra, not application code
+- `coding_skill.md` — Code Doc Agent work is config/infra, not application code
 - `lsp_tool.md`, `ast_grep_tool.md` — load on demand if needed
 
 ---
@@ -36,6 +36,7 @@ Do NOT load:
 | `.agent/agents/` | Agent manifests — update when agent roles evolve |
 | `.agent/skills/` | Skill files — update when workflows change |
 | `.agent/tools/` | Tool docs — update when tools change |
+| `_doc_/` X110+ | Részletes kód-referencia fájlok (függvény API, paraméterek, diagramok) |
 | `pyproject.toml`, `uv.lock` | Dependency management via `uv` |
 | `.mcp.json` | MCP server config (gitignored, machine-specific) |
 | `.claude/settings.json`, `.claude/settings.local.json` | Claude permissions |
@@ -49,6 +50,8 @@ Do NOT load:
 - Application code under `src/` — specialist agents
 - Model artifacts under `models/`
 - `_jira_/` task content (Orchestrator creates tasks; Doc Agent only maintains the skill file)
+- `_doc_/` X000, X100 módszertani szekciók — ezek a `methodology_agent` feladata;
+  ha egy X100 fájlban hiányoznak, ne töltsd ki — nyiss `todo_` ticketet a `methodology_agent`-nek
 
 ---
 

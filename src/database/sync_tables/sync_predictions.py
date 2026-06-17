@@ -106,8 +106,8 @@ def sync_predictions(
             resolved_asset,
         )
         feat_df = feat_df.with_columns([
-            pl.lit(None).cast(pl.Boolean).alias(long_target),
-            pl.lit(None).cast(pl.Boolean).alias(short_target),
+            pl.lit(None).cast(pl.Float64).alias(long_target),
+            pl.lit(None).cast(pl.Float64).alias(short_target),
         ])
 
     df = feat_df.unique(subset=["open_time"], keep="last", maintain_order=True)

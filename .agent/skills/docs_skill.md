@@ -34,6 +34,30 @@ _doc_/
 
 ## Doc File Naming
 
+Files in `_doc_/` use a **hierarchikus számozási séma**:
+
+| Szint | Minta | Példa | Leírás |
+|-------|-------|-------|--------|
+| Fejezet | `X000` | `3000_modelling.md` | Teljes domain áttekintője |
+| Alfejezet | `X100` | `3100_sampling.md` | Almodul áttekintője |
+| Részletes fájl | `X110` | `3110_sampling_config.md` | Egy Python fájl / komponens |
+| Globális | `0000` | `0000_project_overview.md` | Kivétel — project-szintű |
+
+### Chapter assignment
+
+| Tartomány | Domain |
+|-----------|--------|
+| `0000` | project overview (reserved) |
+| `1000` | database |
+| `2000` | (jövőbeli) |
+| `3000` | modeling |
+| `4000+` | (jövőbeli) |
+
+**Backward compatibility:** a meglévő `0001–0232` számozású fájlok átnevezése
+az `epic_8` feladata. Addig a régi és az új séma párhuzamosan él.
+
+### Régi elnevezési szabályok (0001–0232 fájlokra)
+
 - One file per logical topic within the module directory
 - Names: lowercase, underscores, descriptive — `sync_flow.md`, `schema.md`, `partitioning.md`
 - No date prefixes; content should be evergreen
@@ -179,6 +203,21 @@ then drills down into subsections. Never start with details.
 2. Subsection per table / function / component
 3. Each subsection has its own focused diagram
 ```
+
+---
+
+## Methodology Rule: X000 és X100 fájlok módszertani szekciói
+
+**Az X000 és X100 szintű fájlok üzleti és módszertani szekciói a `methodology_agent`
+feladata — a code_doc_agent CSAK X110+ fájlokat ír.**
+
+Ha egy X100 fájlban hiányzik az `## Üzleti és módszertani háttér` szekció:
+- Ne töltsd ki
+- Nyiss `todo_` ticketet a `methodology_agent`-nek
+- Az X110 fájlokat addig ne írd meg
+
+Az X100 fájlokban kötelező hat szekció részletes specifikációja:
+→ `.agent/skills/methodology_doc_skill.md`
 
 ---
 

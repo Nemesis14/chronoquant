@@ -1,4 +1,4 @@
-# 3300 — Target Layer
+﻿# 3000 — Target Layer
 
 A target layer a ChronoQuant ML pipeline label-rétege: a `target` DuckDB tábla tárolja az objektív forward outcome-okat, amelyek alapján a modellek taníthatók és értékelhetők.
 
@@ -19,8 +19,8 @@ flowchart TD
 
 **Aktív target oszlopok:** `long_mfe_fw60`, `short_mfe_fw60` — 60-perces forward logreturn outcome-ok.
 
-**Implementáció:** [`src/database/sync_tables/sync_targets.py`](src/database/sync_tables/sync_targets.py)
-**Kód referencia:** [`_doc_/1240_sync_targets.md`](_doc_/1240_sync_targets.md)
+**Implementáció:** [`src/data_handling/sync_tables/sync_targets.py`](src/data_handling/sync_tables/sync_targets.py)
+**Kód referencia:** [`_doc_/3100_sync_targets.md`](_doc_/3100_sync_targets.md)
 
 ---
 
@@ -156,7 +156,7 @@ A logreturn additív természete lehetővé teszi, hogy multi-period outlookokat
 | Rezsimváltás eltérő target eloszlást okoz | Alacsony volatilitású periódusban a `long_mfe_fw60` p90 kisebb mint magas volatilitású periódusban | Expanding window CV kezeli; az expanding train hatókör követi a rezsimeket |
 | `fw60_max` és `fw60_min` szimmetriája | A két outcome ugyanazon a skálán van, de long és short értelmezésük ellentétes | Dokumentált szimmetria: `long_mae_fw60` numerikusan = `short_mfe_fw60` |
 | Kis log value értelmezése | `long_mfe_fw60 = 0.003` → `exp(0.003) − 1 ≈ 0.30%` — konfúzió a magnitude körül | Model card-on és reporting-ban mindig % formában is feltüntetni |
-| Legacy target referencia örökség | Régi docs (`docs/data/dictionary/features.md`, `docs/concepts/targets.md`) még `trg_l_fw60_q90`-re hivatkoznak | Elavultként kezelni; ground truth: `_doc_/1240_sync_targets.md` és a forráskód |
+| Legacy target referencia örökség | Régi docs (`docs/data/dictionary/features.md`, `docs/concepts/targets.md`) még `trg_l_fw60_q90`-re hivatkoznak | Elavultként kezelni; ground truth: `_doc_/3100_sync_targets.md` és a forráskód |
 
 ### Validációs checklist
 

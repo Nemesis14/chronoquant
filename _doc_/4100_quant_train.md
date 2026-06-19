@@ -1,4 +1,4 @@
-# 1260 — quant_train Table
+﻿# 4100 — quant_train Table
 
 Model-ready join tábla: `feat_ohlcv_quant` + `target` → tanítási adatforrás.
 
@@ -90,10 +90,10 @@ Mindkét mód **idempotens** — többszöri futtatás azonos eredményt ad.
 
 ```powershell
 # Full rebuild (alapértelmezett)
-uv run python src/database/03_build_quant_train.py
+uv run python src/data_handling/03_build_quant_train.py
 
 # Range rebuild
-uv run python src/database/03_build_quant_train.py --start 2024-01-01 --end 2024-12-31
+uv run python src/data_handling/03_build_quant_train.py --start 2024-01-01 --end 2024-12-31
 ```
 
 ---
@@ -102,9 +102,9 @@ uv run python src/database/03_build_quant_train.py --start 2024-01-01 --end 2024
 
 | Fájl | Szerepe |
 |------|---------|
-| [`src/database/store/duckdb_store.py`](src/database/store/duckdb_store.py) | `rebuild_quant_train(conn, start_time, end_time)` — core rebuild logika |
-| [`src/database/sync_tables/sync_quant_train.py`](src/database/sync_tables/sync_quant_train.py) | `sync_quant_train(asset_id, start_time, end_time)` — asset-szintű wrapper |
-| [`src/database/03_build_quant_train.py`](src/database/03_build_quant_train.py) | Standalone CLI |
+| [`src/data_handling/store/duckdb_store.py`](src/data_handling/store/duckdb_store.py) | `rebuild_quant_train(conn, start_time, end_time)` — core rebuild logika |
+| [`src/data_handling/sync_tables/sync_quant_train.py`](src/data_handling/sync_tables/sync_quant_train.py) | `sync_quant_train(asset_id, start_time, end_time)` — asset-szintű wrapper |
+| [`src/data_handling/03_build_quant_train.py`](src/data_handling/03_build_quant_train.py) | Standalone CLI |
 
 ---
 
@@ -112,6 +112,6 @@ uv run python src/database/03_build_quant_train.py --start 2024-01-01 --end 2024
 
 - [`_doc_/1000_database.md`](_doc_/1000_database.md) — teljes DuckDB séma áttekintő
 - [`_doc_/1110_duckdb_store.md`](_doc_/1110_duckdb_store.md) — store réteg
-- [`_doc_/1240_sync_targets.md`](_doc_/1240_sync_targets.md) — target tábla és fw60 outcome-ok
-- [`_doc_/3300_targets.md`](_doc_/3300_targets.md) — target layer módszertani háttér
-- [`_doc_/3100_sampling.md`](_doc_/3100_sampling.md) — sampling modul (downstream fogyasztó)
+- [`_doc_/3100_sync_targets.md`](_doc_/3100_sync_targets.md) — target tábla és fw60 outcome-ok
+- [`_doc_/3000_targets.md`](_doc_/3000_targets.md) — target layer módszertani háttér
+- [`_doc_/5400_sampling.md`](_doc_/5400_sampling.md) — sampling modul (downstream fogyasztó)

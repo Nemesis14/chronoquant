@@ -1,4 +1,4 @@
-# 3101 — Yearly Random-Hour Sampling
+﻿# 5010 — Yearly Random-Hour Sampling
 
 Az éves, random-óra-alapú sampling stratégia lényege: egy naptári évre pontosan egy
 random percet választ óránként (~8 760 sor/év), majd 12 hónaponkénti validációs hetet
@@ -15,15 +15,12 @@ flowchart TD
   A --> B[select_monthly_validation_weeks\nyearly_sampler.py]
   B --> C[assign_segments\nyearly_sampler.py]
   C --> D[write_yearly_artifacts\nartifacts.py]
-  D --> E[database/asset/samples/id/\nmetadata.json\naudit.json\nsample.parquet]
-  C --> M[materialize_sample_table\nduckdb_store.py]
-  M --> T[(DuckDB\nsample_sample_id)]
+  D --> E[database/asset/samples/id/\nmetadata.json\naudit.json\nsample_train_valid.parquet]
 ```
 
 A pipeline input-ja a `quant_train` tábla (feat_* + target oszlopok, NULL target sorok
 kizárva); kimenetei:
-- `database/<asset>/samples/<sample_id>/metadata.json`, `audit.json`, `sample.parquet`
-- DuckDB tábla: `sample_<sample_id>` — elsődleges modellezési handoff
+- `database/<asset>/samples/<sample_id>/metadata.json`, `audit.json`, `sample_train_valid.parquet`
 
 ---
 
@@ -139,12 +136,11 @@ marad, nem "néz bele" a válida ablak előtti percekbe.
 
 | Érték | Leírás |
 |-------|--------|
-| `train` | Minden sor, amely nincs valid, purge és test ablakban |
-| `valid` | Pontosan a 12 validációs hét (Mon 00:00 → Sun 23:59), test hónapok kizárva |
+| `train` | Minden sor, amely nincs valid vagy purge ablakban |
+| `valid` | Pontosan a 12 validációs hét (Mon 00:00 → Sun 23:59) |
 | `purge` | ±240 perces zóna minden validációs hét határán (nem fed át validdal) |
-| `test` | Az év utolsó `test_months` hónapja (holdout) — nem kerül train/valid/purge-ba |
 
-Prioritási sorrend az assign_segments logikájában: test > valid > purge > train.
+Prioritási sorrend az assign_segments logikájában: valid > purge > train.
 
 ---
 
@@ -155,6 +151,7 @@ Prioritási sorrend az assign_segments logikájában: test > valid > purge > tra
 | `purge_minutes` | `240` | Max feature lookback = 140 perc; 240 perc ~71%-os biztonsági margó; biztonságos default a jövőbeli feature-bővítésekre is |
 | `seed` | `42 + year` | Évenként eltérő seed → különböző óra- és hétválasztás; reprodukálható, dokumentálható; 42 konvencionális ML alap |
 | `target_cols` | `("long_mfe_fw60", "short_mfe_fw60")` | Aktív target páros a v4 modellekhez; tuple → immutable config |
+| `feature_cols` | `()` | Üres tuple = minden `feat_*` oszlop auto-discovery quant_train-ből futásidőben |
 | `sample_id` | `{asset_id}_fw60_yearly_{year}` | Emberi olvashatóság + programmatikus parse-olhatóság; egyértelműen azonosítja az évet és stratégiát |
 
 ---
@@ -167,23 +164,22 @@ Prioritási sorrend az assign_segments logikájában: test > valid > purge > tra
 | Szökőév (pl. 2024) módosítja a purge számot | 2024-ben purge=84 (nem 96) — év-határon átnyúló purge ablakok rövidülnek | Elfogadott; dokumentált; modell-összehasonlításhoz az éves row count-okat rögzíteni kell |
 | Hiányzó DB adatok az évben | `missing_hours > 0` az audit-ban | Ellenőrizd az audit.json-t minden generált sample-nál; ne használd ha `missing_hours > 500` |
 | Random hour selection nem fed le minden intraday mintát | Szisztematikus intraday anomáliák (pl. funding hour spike) alulreprezentáltak | Elfogadott — a hash-based random egyenletes eloszlást közelít; manuális audit ajánlott ha intraday pattern ismert |
-| Expanding window pipeline nem kompatibilis az új sample formátummal | `lightgbm_model.py` `load_sample_definition` (`folds.json`) szintaxist vár | A new training pipeline (yearly format aware) külön epic feladata; addig ne futtass train-t yearly sample-en a régi pipeline-nal |
+| Régi expanding window pipeline nem kompatibilis a yearly formátummal | `lightgbm_model.py` `load_sample_definition` (`folds.json`) szintaxist vár | Az új training pipeline (yearly format aware) külön epic feladata; addig ne futtass train-t yearly sample-en a régi pipeline-nal |
 
 ---
 
 ### Validációs checklist
 
-- [ ] `sample.parquet` és `sample_<sample_id>` DuckDB tábla létezik
-- [ ] `metadata.json` tartalmaz: `year`, `seed`, `selected_valid_weeks` (12 elem), `row_counts` szegmensenként, `sample_table_name`
+- [ ] `sample_train_valid.parquet` létezik a sample könyvtárban
+- [ ] `metadata.json` tartalmaz: `year`, `seed`, `selected_valid_weeks` (12 elem), `row_counts` szegmensenként
 - [ ] `audit.json` tartalmaz: `missing_hours`, `total_quant_train_rows_in_year`, `actual_hourly_rows`
-- [ ] Standard évben (1 test hónap): `valid = 2016`, `purge = 96` (kb.), `test` = utolsó hónap sorai
-- [ ] Szökőévben (2024): `valid = 2016`, `purge ≤ 96`
+- [ ] Standard évben: `valid ≈ 2016` (12 hét × 168 óra), `purge ≈ 96` (kb.)
+- [ ] Szökőévben (2024): `valid ≈ 2016`, `purge ≤ 96`
 - [ ] Nincs `open_time` átfedés train és valid szegmens között
 - [ ] Purge sorok sem trainben, sem validban nem szerepelnek
-- [ ] `segment` oszlop értékkészlete: `{"train", "valid", "purge", "test"}` — semmi más
-- [ ] Azonos seed + év → azonos `sample.parquet` (reprodukálhatósági teszt)
+- [ ] `segment` oszlop értékkészlete: `{"train", "valid", "purge"}` — semmi más
+- [ ] Azonos seed + év → azonos `sample_train_valid.parquet` (reprodukálhatósági teszt)
 - [ ] `missing_hours < 500` (ha felette van: vizsgáld meg az adatbázis hiányait)
-- [ ] `check_sample_table(db_path, sample_id)` lefut hiba nélkül
 
 ---
 
@@ -191,7 +187,7 @@ Prioritási sorrend az assign_segments logikájában: test > valid > purge > tra
 
 | Szám | Fájl | Tartalom |
 |------|------|----------|
-| 3100 | [3100_sampling.md](3100_sampling.md) | Expanding window CV metodológia (legacy — archív referencia) |
-| 3110 | [3110_sampling_config.md](3110_sampling_config.md) | YearlySamplingConfig dataclass |
-| 3140 | [3140_sampling_artifacts.md](3140_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample |
-| 3150 | [3150_create_sample.md](3150_create_sample.md) | create_yearly_sample orchestrator + CLI |
+| 5100 | [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig dataclass |
+| 5200 | [5200_sampling_artifacts.md](5200_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample |
+| 5300 | [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample orchestrator + CLI |
+| 5400 | [5400_sampling.md](5400_sampling.md) | **LEGACY** — expanding window CV (archív, nem aktív) |

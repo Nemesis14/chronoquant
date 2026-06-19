@@ -1,4 +1,4 @@
-# 3200 — Feature Layer
+﻿# 2000 — Feature Layer
 
 A feature layer a ChronoQuant ML pipeline bemeneti adatrétege: minden modellezési döntés egy feature profilt feltételez, amelyet a `feat_ohlcv_quant` DuckDB tábla szolgáltat ki.
 
@@ -17,11 +17,11 @@ flowchart TD
   C --> F[sync_predictions\nlive predict_proba]
 ```
 
-**Aktív feature profil:** `solusdt_fw60` — 202 feature, 24 csoport, 1 perces SOLUSDT OHLCV báron.
+**Aktív feature profil:** `solusdt_fw60` — 208 feature, 25 csoport, 1 perces SOLUSDT OHLCV báron.
 
-**Implementáció:** [`src/database/sync_tables/_features_polars.py`](src/database/sync_tables/_features_polars.py)
+**Implementáció:** [`src/data_handling/sync_tables/_features_polars.py`](src/data_handling/sync_tables/_features_polars.py)
 **Konfiguráció:** [`config/features.json`](config/features.json)
-**Kód referencia:** [`_doc_/1250_features_polars.md`](_doc_/1250_features_polars.md)
+**Kód referencia:** [`_doc_/2200_features_polars.md`](_doc_/2200_features_polars.md)
 
 ---
 
@@ -53,6 +53,7 @@ flowchart TD
 | 22 | Ichimoku | 7 | built-in: 9, 26, 52 (tenkan, kijun, senkou_b, cloud) |
 | 23 | Donchian | 9 | w=10, 30, 60 (width, position, breakout) |
 | 24 | Linear Regression | 9 | w=10, 30, 60 (slope, R², residual) |
+| 25 | Session Relative | 4 | ablak nélkül (day_range_position, day_open_return, bars_into_session_norm, weekly_open_return) |
 
 ---
 
@@ -96,7 +97,7 @@ graph TD
 
 A `_apply_t1_lag_pl()` függvény minden feature oszlopot egységesen `shift(1)`-gyel tol el. Ez azt jelenti, hogy a tárolt `feat_` érték az előző bar indikátorát tartalmazza — ezáltal a modell tanulása és live inferenciája teljesen konzisztens.
 
-**Kivétel:** Time/Session feature-ök (`T_MINUS_1_SKIP` tag) — ezek az `open_time` timestamp-ből deterministikusan számolódnak, nem tartalmaznak piacadatot, így lookahead-mentes lag nélkül is.
+**Kivétel:** Time/Session és Session Relative feature-ök (`T_MINUS_1_SKIP` tag) — ezek az `open_time` timestamp-ből vagy a nap/hét nyitójából deterministikusan számolódnak, és nem hordoznak jövőbeli piacadatot, ezért lag nélkül is lookahead-mentesek.
 
 **Szabály:** Minden új feature-t `_apply_t1_lag_pl()` hatókörén belül kell definiálni, kivéve ha explicit `T_MINUS_1_SKIP` annotációval van ellátva.
 

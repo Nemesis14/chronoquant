@@ -214,11 +214,11 @@ Shared helper module — import in every analysis notebook Setup cell:
 
 ```python
 import sys
-sys.path.insert(0, "src")
+sys.path.insert(0, "analyst/src")
 from table_formatting import format_analysis_table, display_analysis_table
 ```
 
-`_doc_/analysis/src/table_formatting.py` is the canonical implementation.
+`_doc_/analyst/src/table_formatting.py` is the canonical implementation.
 Functions are also reproduced here for reference:
 
 ```python
@@ -267,14 +267,13 @@ ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%d"))
 
 Before handing off an analysis notebook, verify:
 
-- [ ] One spec produced one notebook.
 - [ ] Notebook executed from a clean kernel.
 - [ ] Quarto render succeeded and HTML is at `_doc_/<slug>.html`.
 - [ ] No forbidden placeholder text remains (`futtatás után kitöltendő`, etc.).
 - [ ] Every table cell has `#| label: tbl-...` and `#| tbl-cap: ...`.
 - [ ] Every plot cell has `#| label: fig-...` and `#| fig-cap: ...`.
 - [ ] Multi-plot cells use `fig-subcap` or are split into separate labelled cells.
-- [ ] Markdown before each output explains purpose, method, interpretation, and action rule.
+- [ ] Markdown before each output explains purpose, method, and interpretation.
 - [ ] Every report table cell ends with `display_analysis_table(df)` — never a bare variable, `display(df)`, `df.head()`, or raw `df.style`.
 - [ ] No pandas index column visible in rendered HTML tables.
 - [ ] Numeric formatting follows project conventions (ratio/rate → `22.33%`, floats → `1.234`, counts → `0` decimals).

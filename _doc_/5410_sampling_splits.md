@@ -1,4 +1,4 @@
-# 3120 — Expanding Window Splits
+﻿# 5410 — Expanding Window Splits
 
 Pure date-math modul: nincs IO, nincs adatbázis-hozzáférés, nincs projekt-import.
 Bemenete és kimenete `YYYY-MM-DD HH:MM:SS` formátumú stringek.

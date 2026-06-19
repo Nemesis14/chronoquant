@@ -25,7 +25,9 @@ class FeatureEngineeringConfig:
         max_spearman_leakage  : Flag leakage suspicion if |Spearman ρ| with a target
                                 exceeds this value.
         pearson_cluster_thr   : Pearson |r| threshold for grouping redundant features.
-        spearman_cluster_thr  : Spearman |ρ| threshold for grouping redundant features.
+        redundancy_max_rows   : Row cap for loading feat_* into numpy for correlation
+                                matrix computation.  Sampling keeps RAM under control
+                                without affecting accuracy at the 0.95 threshold.
         stability_bucket_days : Number of days per rolling time bucket for stability checks.
         max_drift_threshold   : Flag as unstable if mean-normalised drift across buckets
                                 exceeds this value for either target correlation.
@@ -47,7 +49,7 @@ class FeatureEngineeringConfig:
 
     # --- redundancy ---
     pearson_cluster_thr   : float = 0.95
-    spearman_cluster_thr  : float = 0.95
+    redundancy_max_rows   : int   = 500_000
 
     # --- stability ---
     stability_bucket_days : int   = 90

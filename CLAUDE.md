@@ -166,12 +166,14 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 
 | Domain | Agent |
 |--------|-------|
-| `src/database/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
-| `src/modeling/` (quantitative, elliott), features, predictions | `modeling_agent` |
-| `src/ui/`, `src/trading/` | `ui_agent` |
+| `src/data_handling/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
+| `src/modeling/` (sampling, training, evaluation, feature_engineering), model artifacts | `modeling_agent` |
+| `src/trading/` (strategy calibration, live service, journal) | `ui_agent` |
+| `src/ui/` (Streamlit dashboard, pages, components) | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies | `code_doc_agent` |
 | `_doc_/analysis/`, ML EDA, feature/model analysis notebooks | `analyst_agent` |
 | `_doc_/` X000, X100 szintek — módszertani háttér és üzleti rationale | `methodology_agent` |
+| `research/` | `analyst_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 
 Ha egy task több domaint érint: bontsd szét több taskra, minden taskhoz egy agent.

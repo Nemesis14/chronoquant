@@ -1,4 +1,4 @@
-# ChronoQuant — Project Overview
+﻿# ChronoQuant — Project Overview
 
 Single source of truth for the orchestrator. Agents load their own module docs
 from `_doc_/<module>/`; this file is for cross-domain context only.
@@ -14,13 +14,95 @@ futures on Binance**. The core loop:
 2. Compute quantitative features (momentum, volume, volatility) over that data.
 3. Train LightGBM binary classifiers to predict whether the next 60-bar forward
    return exceeds a directional threshold (long) or falls below one (short).
-4. Emit probability scores as live signals; a threshold-based strategy decides
-   ENTER_LONG / ENTER_SHORT / HOLD / EXIT.
-5. A Streamlit dashboard exposes the pipeline, predictions, backtests, and
-   live trading controls in one UI.
+4. The trading module calibrates entry/exit rules against out-of-sample model
+   output, producing a strategy artifact.
+5. A Streamlit dashboard consumes live predictions and strategy rules, shows
+   signals, and exposes live trading controls.
 
-Elliott wave analysis (`src/elliott_waves/`) is a parallel research module —
+Elliott wave analysis (`research/elliott/`) is a parallel research module —
 it does not feed the live trading pipeline.
+
+---
+
+## Module Architecture
+
+Four production modules with clear, non-overlapping responsibilities:
+
+### `src/data_handling/` — Operational data layer
+Owns all live data: ingestion, storage, sync, and validation.
+- Syncs raw OHLCV from Binance
+- Computes and syncs features, targets, predictions into DuckDB
+- No modeling logic; no strategy logic
+
+### `src/modeling/` — Offline ML development
+Produces model artifacts from historical data. Runs ad-hoc, not in production.
+- Creates yearly samples (parquet), searches hyperparameters, fits final models
+- Outputs: `model.pkl`, `features.json`, `sample_oos.parquet`, `model_card.md`
+- Does not operate live; does not decide thresholds or rules
+
+### `src/trading/` — Strategy + live operations
+Consumes model artifacts to calibrate strategy rules, then runs them live.
+- Measures strategy performance on OOF predictions → produces strategy artifact
+- Runs the live trading loop: reads `predictions` table, applies rules, journals trades
+- Owns: thresholds, cut-offs, position sizing, cooldowns, hold times
+
+### `src/ui/` — Display layer
+Reads from the database and from artifacts; does not write business data.
+- Shows live predictions, signals, equity curve, trade journal
+- Exposes live trading controls (start/stop, parameter overrides)
+
+### `research/` — Sandbox
+Exploratory code, prototypes, and ideas not yet ready for production.
+- `research/elliott/` — Elliott wave parser, validators, scanners (isolated)
+- No code here feeds the live pipeline
+
+---
+
+## Data Flow
+
+```
+Binance API
+    │
+    ▼
+database/  ──sync──▶  ohlcv  ──sync──▶  feat_ohlcv_quant  ──sync──▶  target
+                                                │                         │
+                                                └──────────┬─────────────┘
+                                                           │
+modeling/                                           quant_train (ad-hoc build)
+  0_create_sample   ◀──────────────────────────────────────┘
+  1_feature_engineering
+  2_hyper_param_search
+  3_fit_model  ──────────▶  model artifact (model.pkl + features.json)
+               ──────────▶  sample_oos.parquet
+
+trading/
+  0_measure_strategy  ◀──  sample_oos.parquet
+                      ──▶  strategy artifact (thresholds, rules)
+  live loop           ◀──  predictions table (database sync)
+                      ◀──  strategy artifact
+                      ──▶  trade journal
+
+database/  ◀──  prediction sync uses model artifact  ──▶  predictions table
+
+ui/  ◀──  predictions table + strategy artifact + trade journal
+```
+
+---
+
+## Persistence Rules
+
+| Data type | Where | Reason |
+|-----------|-------|--------|
+| Live OHLCV, features, targets, predictions | DuckDB | Synced, queryable, updatable |
+| `quant_train` | DuckDB | Ad-hoc join table, rebuilt before training |
+| Yearly samples | Parquet (`database/<asset>/samples/<id>/`) | Static snapshots, not synced |
+| OOS predictions | Parquet (`database/<asset>/samples/<sample_id>/sample_oos.parquet`) | Static, per-model OOS output |
+| Feature engineering analysis | Parquet + `.md` (`database/<asset>/feature_engineering/<run_id>/`) | Ad-hoc, analyst output |
+| Model artifacts | `models/<model_id>/` | Runtime use by prediction sync |
+| Strategy artifacts | `models/<model_id>/strategy/` | Runtime use by trading loop |
+
+**Rule:** if a table needs to be synced incrementally → DuckDB. If it is a static
+snapshot produced by a modeling or analysis run → Parquet.
 
 ---
 
@@ -28,50 +110,56 @@ it does not feed the live trading pipeline.
 
 ```
 src/
-  database/         DuckDB domain
+  data_handling/    Operational data layer
     store/            DuckDB store, queries, validation, stats
     sync_tables/      OHLCV sync, feature sync, prediction sync, target sync
     tests/            Tests (store/, sync_tables/ — smoke, sanity, perf, integration)
     01_validate_stats.py
     02_sync_pipeline.py
 
-  modeling/         ML modeling domain (family structure)
-    quantitative/     Active family: LightGBM, features, CV, evaluation
-      sampling/         Sample definitions: config, splits, audit, artifacts, orchestrator
-      evaluation/       Backtesting, metrics
-      00_create_sample.py
-      01_train_model.py
-      02_search_lgbm.py
-      03_backtest_strategy.py
-      04_sweep_strategy.py
-      05_generate_model_card.py
-    feature_engineering/  Feature quality, target-relation, redundancy, stability analysis
-    elliott/          Research family: Elliott wave parser, validators, scanners
-    text/             Future family placeholder
-    blockchain/       Future family placeholder
-    assembly/         Future family placeholder
+  modeling/         Offline ML development
+    sampling/           Yearly sample creation: config, sampler, audit, artifacts
+    training/           LightGBM trainer, CV, datasets, metrics, reports, artifacts
+    evaluation/         Backtest runner, metrics
+    search/             Hyperparameter search (LightGBM + Optuna)
+    feature_engineering/  Feature quality, target-relation, redundancy, stability library
+    text/               Future placeholder
+    00_create_sample.py
+    01_feature_engineering.ipynb
+    02_hyper_param_search.py
+    03_fit_model.py
+    04_generate_model_card.py
 
-  trading/          Live trading service, strategy, exchange wrapper, journal
-    simulation/       Future: strategy-level backtest logic
-    01_run_service.py
+  trading/          Strategy calibration + live operations
+    00_measure_strategy.py
+    01_sweep_strategy.py
+    02_run_service.py
 
   ui/               Streamlit dashboard (pages, components, data loading)
   utils.py          All config loading — single entry point, never read JSON directly
 
-_doc_/              Module documentation mirroring src/ (agent-specific, not preloaded)
-_jira_/              Local task tracking (epics → tasks → stories); jira.json holds the global epic counter
+research/           Sandbox — explorations not yet production-ready
+  elliott/            Elliott wave parser, validators, scanners, backtest
+
+_doc_/              Module documentation + analyst notebooks
+  XXXX_*.ipynb        Analyst notebookok (közvetlenül itt, nem analysis/ alatt)
+  XXXX_*.html         Quarto-rendered HTML output
+  analysis/           Quarto config (_quarto.yml) + CSS (régi notebookok)
+  analyst/src/        Analyst Python segédmodulok (XXXX_ prefix = notebook sorszáma)
+_jira_/             Local task tracking (epics → tasks → stories); jira.json = epic counter
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
-models/             Generated model artifacts
-database/           DuckDB files and sample definitions
-                      database/solusdt/solusdt.duckdb
-                      database/solusdt/samples/<sample_id>/  (metadata.json, audit.json, sample.parquet)
-                      database/solusdt/feature_engineering/<run_id>/  (feature_set.json, analyst_report.md)
+models/             Generated model and strategy artifacts
+database/           DuckDB files, samples, OOF outputs, feature engineering runs
+  solusdt/
+    solusdt.duckdb
+    samples/<sample_id>/          metadata.json, audit.json, sample_train_valid.parquet, sample_oos.parquet
+    feature_engineering/<run_id>/ feature_set.json, analyst_report.md
 ```
 
 ---
 
-## Database
+## Database (DuckDB)
 
 **One DuckDB file per asset:** `database/<asset_id>/<asset_id>.duckdb`
 
@@ -82,77 +170,100 @@ Currently only one active asset: **solusdt** (SOLUSDT, 1m, futures).
 | Table | Primary Key | Purpose |
 |-------|-------------|---------|
 | `ohlcv` | `open_time` TIMESTAMP | Raw 1-minute candles from Binance |
-| `target` | `open_time` TIMESTAMP | fw60 forward outcomes: `long_mfe_fw60`, `short_mfe_fw60` + 8 further fw60 columns |
+| `target` | `open_time` TIMESTAMP | fw60 forward outcomes: `long_mfe_fw60`, `short_mfe_fw60` + 8 further columns |
 | `feat_ohlcv_quant` | `open_time` TIMESTAMP | Quantitative features (`feat_` prefix) |
 | `predictions` | `open_time` TIMESTAMP | Model probability scores + signals |
-| `quant_train` | `open_time` TIMESTAMP | Model-ready join: all `feat_*` + `long_mfe_fw60` + `short_mfe_fw60`; NULL targets excluded |
-| `sample_<sample_id>` | `open_time` TIMESTAMP | Materialized yearly sample: `open_time`, `fold_id`, `segment`, selected `feat_*`, targets |
+| `quant_train` | `open_time` TIMESTAMP | Ad-hoc join: all `feat_*` + `long_mfe_fw60` + `short_mfe_fw60`; NULL targets excluded |
 
-`quant_train` is built ad-hoc before training runs via `src/database/03_build_quant_train.py` —
-it is **not** part of the live sync pipeline.  Full rebuild = `CREATE OR REPLACE TABLE`;
-range rebuild = DELETE + INSERT for the specified `open_time` window.
+`quant_train` is rebuilt ad-hoc before training via `src/data_handling/03_build_quant_train.py`.
+Full rebuild = `CREATE OR REPLACE TABLE`; range rebuild = DELETE + INSERT.
 
-All timestamps are **UTC, format `YYYY-MM-DD HH:MM:SS`** (naive strings treated
-as UTC). Epoch milliseconds used internally as `open_time_ms`.
+All timestamps are **UTC, format `YYYY-MM-DD HH:MM:SS`** (naive strings treated as UTC).
+Epoch milliseconds used internally as `open_time_ms`.
 
 All sync operations are **idempotent upserts keyed on `open_time`** — safe to re-run.
 
-Config is always accessed via `src/utils.py` — never read JSON config files directly
-in business logic.
+Config is always accessed via `src/utils.py` — never read JSON config files directly.
 
 ---
 
-## ML Models
+## Modeling Pipeline
 
 ### Active models (v4)
 
-| Model ID | Direction | Target | Trainer |
-|----------|-----------|--------|---------|
-| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `long_mfe_fw60` | `lightgbm_binary` |
-| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `short_mfe_fw60` | `lightgbm_binary` |
+| Model ID | Direction | Target |
+|----------|-----------|--------|
+| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `long_mfe_fw60` |
+| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `short_mfe_fw60` |
 
-- **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside/close[t]); `short_mfe_fw60` = log(min downside/close[t]).
-- **Features profile:** `solusdt_fw60` defined in `config/features.json`.
-- **Feature prefix:** `feat_`  |  **Target columns:** `long_mfe_fw60`, `short_mfe_fw60`
-- **t-1 lag mandatory** on all features before training (prevents data leakage).
-- Artifacts stored under `models/<model_id>/` (model.pkl + features.json).
+- **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]).
+- **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
+- Artifacts stored under `models/<model_id>/`.
 
-### Model pipeline
+### Script pipeline (runs offline, in order)
+
+| Script | Input | Output |
+|--------|-------|--------|
+| `00_create_sample.py` | `quant_train` table | `sample_train_valid.parquet`, `metadata.json`, `audit.json` |
+| `01_feature_engineering.ipynb` | `quant_train` table | `feature_set.json` |
+| `02_hyper_param_search.py` | `sample_train_valid.parquet` + `feature_set.json` | `best_params.json` |
+| `03_fit_model.py` | `sample_train_valid.parquet` + `best_params.json` + OOS year | `model.pkl`, `features.json`, `sample_oos.parquet` |
+| `04_generate_model_card.py` | model artifact + OOS results | `model_card.md` |
+
+### Yearly sample model
+
+One sample = one calendar year. Sample ID: `{asset_id}_fw60_yearly_{year}`.
+
+**Segments:** `train` / `valid` / `purge` — no test holdout within the sample.
+Test evaluation uses a separate future-year OOS (see OOS Evaluation section).
 
 ```
-ohlcv → feat_ohlcv_quant → 00_create_sample.py → database/<asset>/samples/<id>/
-                                                          ↓
-                                                     01_train_model.py → model artifact
-                                                                              ↓
-                              predictions ← sync_predictions ← predict_proba
+sample_train_valid.parquet columns:
+  open_time | feat_* | long_mfe_fw60 | short_mfe_fw60 | segment | fold_id
+
+sample_oos.parquet columns (written by 03_fit_model.py):
+  open_time | pred_long | pred_short | long_mfe_fw60 | short_mfe_fw60
 ```
 
-`00_create_sample.py` generates a yearly random-hour sample: selects one random minute
-per hour for the given calendar year, assigns monthly validation weeks (excluding the
-test-holdout months), applies a ±240-minute purge buffer, writes `metadata.json`,
-`audit.json`, `sample.parquet` into `database/<asset_id>/samples/<sample_id>/`, and
-materializes a DuckDB table `sample_<sample_id>` in the asset database.
+Features are NOT stored in the sample — loaded from `quant_train` at training time.
+Samples are parquet only — no DuckDB materialization.
+Methodology details: `_doc_/5010_sampling_yearly.md`.
 
-Source table: `quant_train` (feat_* + target columns; NULL targets excluded).
+### OOS evaluation
 
-Sample ID format: `{asset_id}_fw60_yearly_{year}` (e.g. `solusdt_fw60_yearly_2024`).
-`sample.parquet` columns: `open_time`, `fold_id` (Int16, nullable), `segment` (train/valid/purge/test),
-selected `feat_*` columns, `long_mfe_fw60`, `short_mfe_fw60`.
-`fold_id`: 0-based index of the corresponding validation week for valid/purge rows; null for train/test rows.
-`test_months` (default 1): last N months of the year are segment='test' holdout, excluded from CV folds.
-CLI: `uv run python src/modeling/quantitative/00_create_sample.py --year 2024 --asset-id solusdt`
+OOS (out-of-sample) is always a **separate, future calendar year** — not a holdout
+month from the training year. This ensures all seasonal effects are represented in
+the training data, and the OOS is a genuinely unseen period.
+
+```
+2021 model  →  trained on 2021 sample  →  OOS scored on 2022
+2022 model  →  trained on 2022 sample  →  OOS scored on 2023
+...
+```
+
+`3_fit_model.py --year 2021 --oos-year 2022` produces:
+1. Final model refitted on all train+valid rows of the 2021 sample.
+2. `sample_oos.parquet` — predict_proba applied to the full 2022 dataset.
+
+The trading module uses `sample_oos.parquet` for strategy calibration.
 
 ---
 
 ## Trading Strategy
 
-Probability-threshold state machine (`src/trading/strategy.py`):
+The trading module calibrates strategy rules offline, then runs them live.
 
+**Offline calibration (`0_measure_strategy.py`):**
+- Reads `sample_oos.parquet` (model probs + actual targets for OOS year)
+- Sweeps entry/exit thresholds, hold times, cooldowns
+- Produces `strategy_artifact.json` with the optimal rule set
+
+**Live state machine (`src/trading/strategy.py`):**
 - **States:** FLAT → LONG / SHORT → COOLDOWN → FLAT
 - **Entry:** `pred_long >= entry_threshold` → ENTER_LONG (long has priority if both fire)
 - **Exit:** max hold time elapsed OR stop-loss triggered → EXIT, enter COOLDOWN
 - **Rearm:** both model probs must cool below `rearm_threshold` before next entry
-- Thresholds and cooldowns are config-driven (`config/strategies.json`, `config/trading.json`)
+- All thresholds and cooldowns come from `strategy_artifact.json`
 
 ---
 
@@ -162,12 +273,11 @@ Probability-threshold state machine (`src/trading/strategy.py`):
 |-------------|------|
 | `uv run pyright src/<module>/` | After any type-annotated change |
 | `ruff check src/<module>/ --fix` | Before committing any Python file |
-| `uv run pytest src/database/tests/ -v` | Store or pipeline changes (smoke/sanity/perf) |
-| `uv run pytest src/modeling/ -k "feature or model or backtest" -v` | Modeling changes |
+| `uv run pytest src/data_handling/tests/ -v` | Store or pipeline changes |
+| `uv run pytest src/modeling/ -v` | Modeling changes |
 | `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
 
-Always run pyright and ruff for the affected module. Pytest scope depends on which
-layer changed. Never skip these for non-trivial changes.
+Always run pyright and ruff for the affected module. Never skip for non-trivial changes.
 
 ---
 
@@ -178,7 +288,8 @@ layer changed. Never skip these for non-trivial changes.
 - **Polars for features:** feature computation uses Polars; pandas allowed elsewhere
 - **No print() in library code** — use `logging` or `st.*`
 - **Upserts only** — no delete/truncate patterns in sync operations
-- **Elliott waves is isolated** — does not connect to the live prediction or trading flow
+- **DuckDB = synced/live, Parquet = static snapshots** — never invert this
+- **Elliott and research are isolated** — nothing in `research/` feeds the live pipeline
 
 ---
 
@@ -186,9 +297,10 @@ layer changed. Never skip these for non-trivial changes.
 
 | Agent | Owns |
 |-------|------|
-| Database Agent | `src/database/`, `config/assets.json`, DuckDB schema |
+| Database Agent | `src/data_handling/`, `config/assets.json`, DuckDB schema |
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts |
 | UI Agent | `src/ui/`, `src/trading/` |
-| Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ kód-referencia fájlok |
-| Analyst Agent | `_doc_/analysis/` — EDA notebooks, sample quality, feature/model analysis |
-| Methodology Agent | `_doc_/` X000, X100 szintek — üzleti rationale, módszertani döntések, paraméter indoklás |
+| Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ code reference files |
+| Analyst Agent | `_doc_/XXXX_*.ipynb` (elemzési notebookok), `_doc_/analyst/src/` (Python segédmodulok); user-célból indul, nem spec-ből; interaktív session |
+| Methodology Agent | `_doc_/` X000, X100 levels — business rationale, methodological decisions, parameter justification |
+| Validator Agent | `pr_` ticket validation: ruff + pyright + pytest, then `done_` promotion |

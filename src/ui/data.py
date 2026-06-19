@@ -17,7 +17,7 @@ import duckdb
 import pandas as pd
 
 import utils
-from database.store.duckdb_query import latest_open_time, query_range
+from data_handling.store.duckdb_query import latest_open_time, query_range
 
 
 # =============================================================================

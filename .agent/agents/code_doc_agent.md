@@ -36,12 +36,29 @@ Do NOT load:
 | `.agent/agents/` | Agent manifests — update when agent roles evolve |
 | `.agent/skills/` | Skill files — update when workflows change |
 | `.agent/tools/` | Tool docs — update when tools change |
-| `_doc_/` X110+ | Részletes kód-referencia fájlok (függvény API, paraméterek, diagramok) |
+| `_doc_/` X110+ | Részletes kód-referencia fájlok: függvény API, paraméterek, CLI, diagramok — teljes .py szintű leírás |
 | `pyproject.toml`, `uv.lock` | Dependency management via `uv` |
 | `.mcp.json` | MCP server config (gitignored, machine-specific) |
 | `.claude/settings.json`, `.claude/settings.local.json` | Claude permissions |
 | `pyrightconfig.json` | Type-check configuration |
 | `CLAUDE.md` | Agent entry point |
+
+### Dokumentációs rendező elv (kötelező betartani)
+
+Az egész `_doc_/` egy egységes dokumentáció ahol a sorrend:
+**Overview (X000) → Metodológia (X100) → Technikai referencia (X110+)**
+
+- **X000** fájl = domain flowchart + almodulok listája (rövid, átfogó)
+- **X100** fájl = alfejezet overview + 6 metodológiai szekció (methodology_agent írja!)
+- **X110+** fájl = teljes kód referencia: függvények, paraméterek, diagramok
+
+A code_doc_agent **CSAK X110+ fájlokat ír**. Ha egy X100 hiányzik vagy hiányos,
+nyiss `todo_` ticketet a `methodology_agent`-nek — ne töltsd ki maga.
+
+Az X110 fájlban az `## Overview` szekcióban mindig szerepeljen egy flowchart vagy
+sequenceDiagram, amely megmutatja, hol kapcsolódik a .py fájl a pipeline-ba.
+Redundancia tilos: az X110 nem ismétli meg az X100 metodológiai tartalmát —
+cross-reference linkkel hivatkozzon rá.
 
 ---
 

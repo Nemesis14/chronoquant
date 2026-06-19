@@ -1,146 +1,69 @@
-# 3140 — Sampling Artifacts
+﻿# 5200 — Sampling Artifacts
 
-Artifact IO modul: három JSON fájlt ír, olvas be és validál. Nincs pandas import —
-stdlib only (`json`, `pathlib`, `datetime`).
-Forrás: [sampling/artifacts.py](../src/modeling/quantitative/sampling/artifacts.py)
+Artifact IO modul: yearly formátumhoz `write_yearly_artifacts` / `load_yearly_sample`;
+legacy expanding-window formátumhoz `write_sample_artifacts` / `load_sample_definition`
+(visszafele kompatibilitás). Forrás: [sampling/artifacts.py](../src/modeling/sampling/artifacts.py)
 
 ---
 
-## Overview
+## Yearly formátum (aktív)
+
+### `write_yearly_artifacts()`
+
+Kiírja a sample könyvtárba: `metadata.json`, `audit.json`, `sample_train_valid.parquet`.
+Automatikusan létrehozza a könyvtárat ha nem létezik.
 
 ```mermaid
 flowchart TD
-  A[write_sample_artifacts\nsample_dir, metadata, folds, audit] --> B[metadata.json\n+ generated_at injektálás]
-  A --> C[folds.json\nexpanding window splits]
-  A --> D[audit.json\nfeature table metrics]
-  B --> E[database/asset_id/samples/sample_id/]
-  C --> E
-  D --> E
+  A[write_yearly_artifacts\nsample_dir, metadata, segment_df, audit] --> B[metadata.json\n+ generated_at]
+  A --> C[audit.json]
+  A --> D[sample_train_valid.parquet\nZSTD tömörítve]
+  B & C & D --> E[database/asset_id/samples/sample_id/]
 ```
-
----
-
-## `write_sample_artifacts()`
-
-Kiírja a három JSON fájlt a sample könyvtárba. Automatikusan létrehozza a könyvtárat
-ha nem létezik.
 
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
 | `sample_dir` | `Path` | Célkönyvtár (létrehozza ha nincs) |
-| `metadata` | `dict` | Sample metadata (sample_id, asset_id, paraméterek, adathatárok, …) |
-| `folds` | `dict` | `build_expanding_window_splits` kimenete — `{"folds": [...], "test": {...}}` |
-| `audit` | `dict` | `audit_feature_table` kimenete |
+| `metadata` | `dict` | Sample metadata (sample_id, year, seed, selected_valid_weeks, row_counts, …) |
+| `segment_df` | `pl.DataFrame` | Polars DataFrame open_time + target oszlopok + `segment` + `fold_id` |
+| `audit` | `dict` | Forrásadat minőségi metrikák (missing_hours, actual_hourly_rows, …) |
 
-**`generated_at` injektálás:** a `metadata` dict-be automatikusan bekerül az
-aktuális UTC ISO timestamp mielőtt kiíródna — a hívónak nem kell ezt megadni.
+**`generated_at` injektálás:** automatikusan bekerül az aktuális UTC ISO timestamp.
+
+---
+
+### `load_yearly_sample()`
+
+Beolvassa a `metadata.json`-t és ellenőrzi, hogy a `sample_train_valid.parquet` létezik.
 
 ```python
-meta_out = {
-    **metadata,
-    "generated_at": datetime.now(UTC).isoformat(),
-}
+sample = load_yearly_sample("database/solusdt/samples/solusdt_fw60_yearly_2021")
+# sample["sample_parquet_path"] → "database/.../sample_train_valid.parquet"
 ```
 
----
-
-## `load_sample_definition()`
-
-Beolvassa a sample definíciót az artifact könyvtárból. Egyesíti a `metadata.json`
-és `folds.json` tartalmát egyetlen dict-be.
-
-```mermaid
-sequenceDiagram
-  participant C as lightgbm_model / lgbm_search
-  participant L as load_sample_definition
-  participant FS as fájlrendszer
-
-  C ->> L: sample_dir path
-  L ->> FS: metadata.json olvasás
-  FS -->> L: metadata dict
-  L ->> FS: folds.json olvasás
-  FS -->> L: folds dict
-  L ->> L: merge: {**metadata, folds: [...], test: {...}}
-  L -->> C: merged sample dict
-```
-
-### Return dict struktúra
-
-A merged dict kulcsai, amelyeket a `lightgbm_model` és `lgbm_search` vár:
-
-| Kulcs | Forrás | Leírás |
-|-------|--------|--------|
-| `sample_id` | metadata | Egyedi azonosító |
-| `asset_id` | metadata | Asset kulcs |
-| `target_col` | metadata | Target oszlop neve |
-| `data.start` | metadata | Biztonságos adatkezdés |
-| `data.end` | metadata | Biztonságos adatvég |
-| `n_folds` | metadata | Fold-ok száma |
-| `parameters` | metadata | Összes sampling paraméter |
-| `folds` | folds.json | Lista fold dict-ekből |
-| `test` | folds.json | `{"start": ..., "end": ...}` |
-
-**Raises:** `FileNotFoundError` ha a `metadata.json` vagy `folds.json` hiányzik.
+**Raises:** `FileNotFoundError` ha `metadata.json` vagy `sample_train_valid.parquet` hiányzik.
 
 ---
 
-## `validate_sample_definition()`
-
-Ellenőrzi a folds és test range kronológiai sorrendjét és átfedés-mentességét.
-
-| Ellenőrzés | Feltétel | Hiba |
-|------------|----------|------|
-| Test range | `test_end > test_start` | `"Test end must be after test start"` |
-| Fold sorrend | `train_start < train_end < valid_start < valid_end < test_start` | `"Invalid or overlapping fold: {fold}"` |
-
----
-
-## A három JSON fájl sémája
+## Artifact fájlok sémája
 
 ### `metadata.json`
 
 ```json
 {
-  "sample_id": "solusdt_fw60_v1",
-  "asset_id": "solusdt",
-  "target_col": "trg_l_fw60_q90",
-  "target_horizon_minutes": 60,
-  "split_type": "expanding_window",
-  "embargo_minutes": 60,
-  "data": { "start": "2021-06-01 00:00:00", "end": "2024-11-30 23:59:00" },
-  "parameters": {
-    "min_train_days": 730,
-    "valid_days": 180,
-    "step_days": 180,
-    "test_days": 365
-  },
-  "n_folds": 5,
-  "source": {
-    "db_relative_path": "database/solusdt/solusdt.duckdb",
-    "feature_table": "feat_ohlcv_quant",
-    "target_table": "target"
-  },
-  "generated_at": "2024-12-01T10:00:00+00:00"
-}
-```
-
-### `folds.json`
-
-```json
-{
-  "folds": [
-    {
-      "fold": 1,
-      "train_start": "2021-06-01 00:00:00",
-      "train_end":   "2023-05-31 23:00:00",
-      "valid_start": "2023-06-01 00:00:00",
-      "valid_end":   "2023-11-29 23:59:00"
-    }
+  "sample_id"           : "solusdt_fw60_yearly_2021",
+  "asset_id"            : "solusdt",
+  "year"                : 2021,
+  "seed"                : 2063,
+  "purge_minutes"       : 240,
+  "target_cols"         : ["long_mfe_fw60", "short_mfe_fw60"],
+  "feature_cols"        : ["feat_rsi_14", "feat_vol_200"],
+  "selected_valid_weeks": [
+    {"start": "2021-01-04", "end": "2021-01-10"},
+    "..."
   ],
-  "test": {
-    "start": "2023-12-01 00:00:00",
-    "end":   "2024-11-30 23:59:00"
-  }
+  "row_counts"          : {"train": 7012, "valid": 2016, "purge": 96},
+  "generated_at"        : "2025-06-01T10:00:00+00:00"
 }
 ```
 
@@ -148,14 +71,45 @@ Ellenőrzi a folds és test range kronológiai sorrendjét és átfedés-mentess
 
 ```json
 {
-  "data_start_safe": "2021-06-01 00:00:00",
-  "data_end_safe": "2024-11-30 23:59:00",
-  "row_count": 1814400,
-  "unique_timestamps": 1814400,
-  "duplicate_count": 0,
-  "target_null_count": 60,
-  "feature_null_summary": { "feat_rsi_14": 0.0, "feat_vol_200": 0.0 },
-  "gap_count": 3,
-  "gap_minutes_total": 12
+  "total_quant_train_rows_in_year": 525600,
+  "source_rows_with_valid_targets": 525480,
+  "expected_hours"                : 8760,
+  "actual_hourly_rows"            : 8760,
+  "missing_hours"                 : 0
 }
 ```
+
+### `sample_train_valid.parquet`
+
+| Oszlop | Típus | Leírás |
+|--------|-------|--------|
+| `open_time` | `Datetime` | Timestamp (UTC) |
+| `feat_*` | `Float64` | Kvantitatív feature-ök |
+| `long_mfe_fw60` | `Float64` | Long target |
+| `short_mfe_fw60` | `Float64` | Short target |
+| `segment` | `Utf8` | `train` / `valid` / `purge` |
+| `fold_id` | `Int16` (nullable) | Validációs hét indexe (0-based); train sorokra null |
+
+---
+
+## Legacy formátum (expanding window — archív)
+
+A `write_sample_artifacts` / `load_sample_definition` / `validate_sample_definition`
+funkciók az expanding window CV sample formátumhoz tartoznak. Ezek csak visszafele
+kompatibilitás miatt maradnak a kódban — új munkában ne használd.
+
+| Fájl | Leírás |
+|------|--------|
+| `metadata.json` | Expanding window paraméterek (min_train_days, valid_days, …) |
+| `folds.json` | `{"folds": [...], "test": {...}}` — fold határok |
+| `audit.json` | Feature table audit (data_start_safe, data_end_safe, gap_count, …) |
+
+---
+
+## Kapcsolódó fájlok
+
+| Fájl | Tartalom |
+|------|----------|
+| [5010_sampling_yearly.md](5010_sampling_yearly.md) | Yearly sampling teljes metodológiája |
+| [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig dataclass |
+| [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample orchestrator |

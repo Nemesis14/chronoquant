@@ -1,6 +1,6 @@
 # _features_polars.py — Feature Computation Engine
 
-`src/database/sync_tables/_features_polars.py`
+`src/data_handling/sync_tables/_features_polars.py`
 
 A fő feature számítási motor. 30+ indikátor csoport, Polars LazyFrame API, t-1 lag kötelezően, numpy helpers a rolling statisztikákhoz. Ez a modul a lookahead bias elleni legfontosabb védelmi vonal.
 

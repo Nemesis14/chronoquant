@@ -352,7 +352,7 @@ class TradingService:
         Returns:
             Tuple of (bar_open_time, pred_long, pred_short, close_price) or None.
         """
-        from database.store.duckdb_query import latest_open_time, query_range
+        from data_handling.store.duckdb_query import latest_open_time, query_range
 
         db_path = utils.load_asset_config(self.asset_id)["database"]["db_path"]
         if latest_open_time(db_path, "predictions") is None:

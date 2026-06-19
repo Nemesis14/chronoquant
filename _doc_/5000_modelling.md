@@ -1,4 +1,4 @@
-# 3000 — Modeling
+﻿# 5000 — Modeling
 
 A modeling domain a ChronoQuant ML pipeline szíve: nyers OHLCV adatokból valószínűségi
 kereskedési jelzéseket állít elő LightGBM bináris osztályozókkal.
@@ -40,17 +40,19 @@ flowchart TD
 
 ## Fejezetek
 
-| Szám | Fájl | Tartalom | Állapot |
-|------|------|----------|---------|
-| 3100 | [3100_sampling.md](3100_sampling.md) | Sampling almodul áttekintő | kész |
-| 3110 | [3110_sampling_config.md](3110_sampling_config.md) | SamplingConfig dataclass | kész |
-| 3120 | [3120_sampling_splits.md](3120_sampling_splits.md) | Expanding window splits | kész |
-| 3130 | [3130_sampling_audit.md](3130_sampling_audit.md) | Feature table audit | kész |
-| 3140 | [3140_sampling_artifacts.md](3140_sampling_artifacts.md) | Artifact IO | kész |
-| 3150 | [3150_create_sample.md](3150_create_sample.md) | CLI orchestrator | kész |
-| 3200 | [3200_features.md](3200_features.md) | Feature layer metodológia | kész |
-| 3300 | [3300_targets.md](3300_targets.md) | Target layer metodológia | kész |
-| 3400 | — | LightGBM model | tervezett |
-| 3450 | — | Hyperparameter search | tervezett |
-| 3500 | — | Evaluation / backtest | tervezett |
-| 3600 | — | Elliott waves (kutatás) | tervezett |
+| Szám | Fájl | Tartalom | Szint | Állapot |
+|------|------|----------|-------|---------|
+| 5010 | [5010_sampling_yearly.md](5010_sampling_yearly.md) | Yearly random-hour sampling — teljes metodológia | X100 | kész |
+| 5100 | [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig dataclass | X110 | kész |
+| 5200 | [5200_sampling_artifacts.md](5200_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample | X110 | kész |
+| 5300 | [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample orchestrator + CLI | X110 | kész |
+| 2000 | [2000_features.md](2000_features.md) | Feature layer metodológia (208 feat, 25 csoport) | X100 | kész |
+| 2010 | [2010_feature_engineering.md](2010_feature_engineering.md) | Feature selection — quality, target relation, redundancy, stability | X100 | kész |
+| 3000 | [3000_targets.md](3000_targets.md) | Target layer metodológia (fw60 logreturn outcome-ok) | X100 | kész |
+| 4000 | [4000_quant_train.md](4000_quant_train.md) | quant_train table — INNER JOIN handoff, rebuild szemantika | X100 | kész |
+| — | — | LightGBM model (training, CV, hyperparameter search) | X100 | tervezett |
+| — | — | Evaluation / backtest | X100 | tervezett |
+| — | — | Elliott waves (kutatás, izolált) | X100 | tervezett |
+| 5400 | [5400_sampling.md](5400_sampling.md) | **ARCHÍV** — expanding window CV (nem aktív) | archív | archív |
+| 5410 | [5410_sampling_splits.md](5410_sampling_splits.md) | **ARCHÍV** — expanding window splits | archív | archív |
+| 5420 | [5420_sampling_audit.md](5420_sampling_audit.md) | **ARCHÍV** — feature table audit | archív | archív |

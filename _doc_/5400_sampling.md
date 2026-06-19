@@ -1,4 +1,14 @@
-# 3100 — Sampling
+﻿# 5400 — Sampling (LEGACY — Expanding Window CV)
+
+> **ARCHÍV DOKUMENTUM.** Ez a fájl az expanding window CV alapú sampling megközelítést
+> írja le, amelyet felváltott a yearly random-hour sampling.
+> Az aktív metodológia: [5010_sampling_yearly.md](5010_sampling_yearly.md)
+>
+> A kódban a legacy funkciók (`write_sample_artifacts`, `load_sample_definition`,
+> `validate_sample_definition`, `audit_feature_table`, `build_expanding_window_splits`)
+> visszafele kompatibilitás miatt megmaradnak, de új munkában ne használd őket.
+
+---
 
 A sampling almodul időalapú keresztvalidációs sample definíciókat generál. Kimenet:
 három JSON fájl (metadata, folds, audit) és egy Parquet fájl (`sample.parquet`) a
@@ -307,8 +317,8 @@ df = (
 
 | Szám | Fájl | Tartalom |
 |------|------|----------|
-| 3110 | [3110_sampling_config.md](3110_sampling_config.md) | SamplingConfig dataclass |
-| 3120 | [3120_sampling_splits.md](3120_sampling_splits.md) | build_expanding_window_splits |
-| 3130 | [3130_sampling_audit.md](3130_sampling_audit.md) | audit_feature_table |
-| 3140 | [3140_sampling_artifacts.md](3140_sampling_artifacts.md) | write / load / validate artifacts |
-| 3150 | [3150_create_sample.md](3150_create_sample.md) | create_sample orchestrator + CLI |
+| 5100 | [5100_sampling_config.md](5100_sampling_config.md) | SamplingConfig dataclass |
+| 5410 | [5410_sampling_splits.md](5410_sampling_splits.md) | build_expanding_window_splits |
+| 5420 | [5420_sampling_audit.md](5420_sampling_audit.md) | audit_feature_table |
+| 5200 | [5200_sampling_artifacts.md](5200_sampling_artifacts.md) | write / load / validate artifacts |
+| 5300 | [5300_create_sample.md](5300_create_sample.md) | create_sample orchestrator + CLI |

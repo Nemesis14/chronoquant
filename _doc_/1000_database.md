@@ -1,4 +1,4 @@
-# Database — DuckDB Schema
+﻿# Database — DuckDB Schema
 
 A ChronoQuant egyetlen DuckDB fájlban tárolja az összes piaci adatot, feature-t és predikciót egy assetenként.
 
@@ -24,9 +24,15 @@ erDiagram
     target {
         TIMESTAMP open_time PK
         DOUBLE close
-        DOUBLE long_mfe_fw60 "log(max_fw60/close)"
-        DOUBLE short_mfe_fw60 "log(min_fw60/close)"
-        DOUBLE fw60_cols "8 további fw60 outcome oszlop"
+        DOUBLE long_mfe_fw60 "log(max_fw60/close) — LONG TARGET"
+        DOUBLE short_mfe_fw60 "log(min_fw60/close) — SHORT TARGET"
+        DOUBLE fw60_close "close[t+60]"
+        DOUBLE fw60_max "max(close[t+1..t+60])"
+        DOUBLE fw60_min "min(close[t+1..t+60])"
+        DOUBLE fw60_close_ret "simple return"
+        DOUBLE fw60_close_logret "log return"
+        DOUBLE fw60_max_ratio "max/close"
+        DOUBLE fw60_min_ratio "min/close"
     }
 
     feat_ohlcv_quant {
@@ -41,8 +47,8 @@ erDiagram
         TIMESTAMP open_time PK
         DOUBLE close
         TIMESTAMP label_end_ts
-        DOUBLE long_pred
-        DOUBLE short_pred
+        DOUBLE long_pred "predict_proba long [0,1]"
+        DOUBLE short_pred "predict_proba short [0,1]"
     }
 
     quant_train {
@@ -111,29 +117,43 @@ CREATE TABLE IF NOT EXISTS ohlcv (
 
 ### target
 
-**Cél:** Bináris klasszifikációs labelek. Az `ohlcv.close` alapján, DuckDB SQL ablakfüggvényekkel számítva. Teljes rebuild minden `sync_targets` híváskor.
+**Cél:** Folytonos forward logreturn outcome-ok (fw60). Az `ohlcv.close` alapján, DuckDB SQL ablakfüggvényekkel számítva. Teljes rebuild minden `sync_targets` híváskor.
 
-**Beírási mód:** DELETE + INSERT a teljes tartományra (`insert_target`). Az előre definiált időablakban (`ROWS BETWEEN 1 FOLLOWING AND {horizon} FOLLOWING`) a t. bar NEM szerepel a forward window-ban.
+**Beírási mód:** DELETE + INSERT a teljes tartományra (`insert_target`). Az előre definiált időablakban (`ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING`) az aktuális bar (`t`) NEM szerepel a forward window-ban.
 
-**NULL sorok:** Az utolsó `horizon` (=60) sor `trg_*` értéke NULL — nincs elegendő jövőbeli adat a küszöb kiszámításához.
+**NULL sorok:** Az utolsó 60 sor minden fw60 outcome oszlopban `NULL` — nincs elegendő jövőbeli adat.
+
+**Kód referencia:** [`_doc_/3100_sync_targets.md`](_doc_/3100_sync_targets.md) | **Metodológia:** [`_doc_/3000_targets.md`](_doc_/3000_targets.md)
 
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|
 | `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC |
-| `close` | `DOUBLE` | Bar záróára (referencia) |
-| `trg_l_fw60_q90` | `BOOLEAN` | Long label: a következő 60 bar `max(close)/close - 1` >= q90 küszöb |
-| `trg_s_fw60_q10` | `BOOLEAN` | Short label: a következő 60 bar `min(close)/close - 1` <= q10 küszöb |
+| `close` | `DOUBLE` | Bar záróára (referencia close[t]) |
+| `fw60_close` | `DOUBLE` | close[t+60] — nyers forward close |
+| `fw60_max` | `DOUBLE` | max(close[t+1:t+60]) |
+| `fw60_min` | `DOUBLE` | min(close[t+1:t+60]) |
+| `fw60_close_ret` | `DOUBLE` | close[t+60] / close[t] − 1 |
+| `fw60_close_logret` | `DOUBLE` | log(close[t+60] / close[t]) |
+| `fw60_max_ratio` | `DOUBLE` | max(close[t+1:t+60]) / close[t] |
+| `fw60_min_ratio` | `DOUBLE` | min(close[t+1:t+60]) / close[t] |
+| **`long_mfe_fw60`** | **`DOUBLE`** | **log(max(close[t+1:t+60]) / close[t]) — LONG TARGET** |
+| **`short_mfe_fw60`** | **`DOUBLE`** | **log(min(close[t+1:t+60]) / close[t]) — SHORT TARGET** |
 
 ```sql
 CREATE TABLE IF NOT EXISTS target (
-    open_time      TIMESTAMP PRIMARY KEY,
-    close          DOUBLE,
-    trg_l_fw60_q90 BOOLEAN,
-    trg_s_fw60_q10 BOOLEAN
+    open_time        TIMESTAMP PRIMARY KEY,
+    close            DOUBLE,
+    fw60_close       DOUBLE,
+    fw60_max         DOUBLE,
+    fw60_min         DOUBLE,
+    fw60_close_ret   DOUBLE,
+    fw60_close_logret DOUBLE,
+    fw60_max_ratio   DOUBLE,
+    fw60_min_ratio   DOUBLE,
+    long_mfe_fw60    DOUBLE,
+    short_mfe_fw60   DOUBLE
 )
 ```
-
-**Küszöbök:** a q90/q10 kvantilisek az összes elérhető nem-null visszatérés alapján számítódnak, és a `database/solusdt/solusdt.json` metadata fájlba is kikerülnek audit célból.
 
 ---
 
@@ -168,24 +188,20 @@ Az ASOF join (`predictions` ↔ `feat_ohlcv_quant`) az `available_ts` oszlopon a
 | `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC |
 | `close` | `DOUBLE` | Bar záróára (az `ohlcv.close`-val egyezik) |
 | `label_end_ts` | `TIMESTAMP` | A forward window vége: `open_time + fw_minutes` |
-| `trg_l_fw60_q90` | `BOOLEAN` | Long label (ha rendelkezésre áll a target táblában) |
-| `trg_s_fw60_q10` | `BOOLEAN` | Short label (ha rendelkezésre áll a target táblában) |
 | `long_pred` | `DOUBLE` | Long modell predict_proba értéke [0, 1] |
 | `short_pred` | `DOUBLE` | Short modell predict_proba értéke [0, 1] |
 
 ```sql
 CREATE TABLE IF NOT EXISTS predictions (
-    open_time       TIMESTAMP PRIMARY KEY,
-    close           DOUBLE,
-    label_end_ts    TIMESTAMP,
-    trg_l_fw60_q90  BOOLEAN,
-    trg_s_fw60_q10  BOOLEAN,
-    long_pred       DOUBLE,
-    short_pred      DOUBLE
+    open_time    TIMESTAMP PRIMARY KEY,
+    close        DOUBLE,
+    label_end_ts TIMESTAMP,
+    long_pred    DOUBLE,
+    short_pred   DOUBLE
 )
 ```
 
-**Legacy oszlopok:** `dataset_split` és `fold_id` — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
+**Legacy oszlopok:** `dataset_split`, `fold_id`, `trg_l_fw60_q90`, `trg_s_fw60_q10` — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
 
 ---
 
@@ -201,7 +217,7 @@ CREATE TABLE IF NOT EXISTS predictions (
 
 **CLI:** `uv run python src/database/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
 
-**Kód referencia:** [`_doc_/1260_quant_train.md`](_doc_/1260_quant_train.md)
+**Kód referencia:** [`_doc_/4100_quant_train.md`](_doc_/4100_quant_train.md)
 
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|

@@ -7,7 +7,9 @@ Numbering belongs in Quarto config — never write "Figure 1", "Table 2", etc. m
 
 ## `_quarto.yml`
 
-Lives at `_doc_/analysis/_quarto.yml`. Quarto picks it up automatically when rendering notebooks from that directory. No root-level config needed. Key settings:
+Lives at `_doc_/analysis/_quarto.yml`. Used only for notebooks inside `_doc_/analysis/`
+(backward compatibility). New notebooks in `_doc_/` use self-contained Raw-cell frontmatter
+instead — do not rely on this project config for new notebooks. Key settings (reference only):
 
 ```yaml
 project:
@@ -101,11 +103,15 @@ Panel caption
 Always render after executing a notebook:
 
 ```bash
-quarto render _doc_/analysis/analysis_<slug>.ipynb --execute
+quarto render _doc_\XXXX_<slug>.ipynb --execute
 ```
 
-The rendered HTML is placed at `_doc_/<slug>.html` (one level above `analysis/`).
+The rendered HTML is placed at `_doc_/XXXX_<slug>.html` (same directory as the notebook).
 Rendering must succeed before the task is complete. If it fails, fix the notebook.
+
+Each notebook is self-contained: the full Quarto config lives in the Raw-cell frontmatter
+(see `analyst_skill.md`). No `_quarto.yml` project discovery needed.
+The CSS is referenced as `analysis/chronoquant_analysis.css` relative to `_doc_/`.
 
 ---
 

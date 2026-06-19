@@ -1,12 +1,12 @@
-# 3150 — create_sample Orchestrator és CLI
+﻿# 5300 — create_yearly_sample Orchestrator és CLI
 
-A sampling orchestrator összefogja az audit → splits → write lépéseket egyetlen
-`create_sample(config)` hívásba. Csak ez a modul importálja a `utils`-t — az
-altmodulok (audit, splits, artifacts) projekt-agnosztikusak.
+A sampling orchestrator összefogja a DB load → hourly select → segment assign → write
+lépéseket egyetlen `create_yearly_sample(config)` hívásba. Csak ez a modul importálja
+a `utils`-t és DuckDB-t — az altmodulok (yearly_sampler, artifacts) projekt-agnosztikusak.
 
 Forrás:
-- [sampling/create_sample.py](../src/modeling/quantitative/sampling/create_sample.py)
-- [00_create_sample.py](../src/modeling/quantitative/00_create_sample.py)
+- [sampling/create_sample.py](../src/modeling/sampling/create_sample.py)
+- [00_create_sample.py](../src/modeling/00_create_sample.py)
 
 ---
 
@@ -15,58 +15,54 @@ Forrás:
 ```mermaid
 sequenceDiagram
   participant CLI as 00_create_sample.py
-  participant CS as create_sample()
+  participant CS as create_yearly_sample()
   participant U as utils.load_asset_config
-  participant A as audit_feature_table
-  participant S as build_expanding_window_splits
-  participant W as write_sample_artifacts
-  participant LD as load_sample_definition
+  participant DB as DuckDB (quant_train)
+  participant HS as select_hourly_observations
+  participant MV as select_monthly_validation_weeks
+  participant AS as assign_segments
+  participant W as write_yearly_artifacts
 
-  CLI ->> CS: SamplingConfig
+  CLI ->> CS: YearlySamplingConfig
   CS ->> U: config.asset_id
-  U -->> CS: db_path, db_path_raw
-  CS ->> A: db_path, config.target_col
-  A -->> CS: audit dict
-  CS ->> S: data_start_safe, data_end_safe, paraméterek
-  S -->> CS: splits dict (folds + test)
-  CS ->> CS: metadata dict összeállítása
-  CS ->> W: sample_dir, metadata, splits, audit
-  W -->> CS: kész (3 JSON fájl)
-  CS -->> CLI: return (None)
-  CLI ->> LD: sample_dir
-  LD -->> CLI: merged sample dict
-  CLI ->> CLI: print összefoglaló
+  U -->> CS: db_path
+  CS ->> DB: SELECT feat_* + target FROM quant_train WHERE year = config.year
+  DB -->> CS: pl.DataFrame (~525 000 sor)
+  CS ->> HS: df, config.year, config.seed
+  HS -->> CS: hourly_df (~8 760 sor)
+  CS ->> MV: hourly_df, config.year, config.seed
+  MV -->> CS: 12 (week_start, week_end) tuple
+  CS ->> AS: hourly_df, valid_weeks, config.purge_minutes
+  AS -->> CS: segment_df (train/valid/purge + fold_id)
+  CS ->> CS: audit dict + metadata dict összeállítása
+  CS ->> W: sample_dir, metadata, segment_df, audit
+  W -->> CS: kész (metadata.json, audit.json, sample_train_valid.parquet)
+  CS -->> CLI: return None
+  CLI ->> CLI: load_yearly_sample → print összefoglaló
 ```
 
 ---
 
-## `create_sample(config)`
-
-Generál és perzisztál egy time-based CV sample definíciót a megadott konfigurációhoz.
+## `create_yearly_sample(config)`
 
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
-| `config` | `SamplingConfig` | Frozen dataclass az összes paraméterrel |
+| `config` | `YearlySamplingConfig` | Frozen dataclass az összes paraméterrel |
 
 ### Lépések
 
-1. **Útvonalak feloldása** — `utils.load_asset_config(asset_id)` hívja be a
-   `db_path`-t a `config/assets.json`-ból; a `sample_dir` a
-   `database/<asset_id>/samples/<sample_id>/` path lesz
-2. **Embargó feloldása** — `embargo_minutes = config.embargo_minutes or config.target_horizon_minutes`
-3. **Audit futtatása** — `audit_feature_table(db_path, target_col)` meghatározza
-   a biztonságos határokat
-4. **Splits generálása** — `build_expanding_window_splits(...)` a safe boundary-k alapján
-5. **Metadata összeállítása** — `sample_id`, `asset_id`, `target_col`, `split_type`,
-   `embargo_minutes`, `data.start/end`, `parameters`, `n_folds`, `source`
-6. **Kiírás** — `write_sample_artifacts(sample_dir, metadata, splits, audit)`
-
-**Miért csak itt van `utils` import?** Az audit, splits, és artifacts modulok
-szándékosan projekt-agnosztikusak — tesztelhetők és újrafelhasználhatók projekt
-kontextus nélkül. Csak az orchestrator ismeri a projekt-specifikus path-konvenciókat.
+1. **Útvonalak feloldása** — `utils.load_asset_config(asset_id)` → `db_path`; `sample_dir` = `database/<asset_id>/samples/<sample_id>/`
+2. **DB betöltés** — `quant_train`-ből év-szűrt sorok, NULL target sorok kizárva
+3. **Feature column feloldás** — `config.feature_cols` ha nem üres; különben auto-discovery minden `feat_*` oszlop
+4. **Óránkénti kiválasztás** — `select_hourly_observations` → ~8 760 sor/év
+5. **Validációs hetek** — `select_monthly_validation_weeks` → 12 hét (mind a 12 hónapból)
+6. **Szegmens hozzárendelés** — `assign_segments` → `train` / `valid` / `purge` + `fold_id`
+7. **Audit** — `missing_hours`, `actual_hourly_rows`, `total_quant_train_rows_in_year`
+8. **Kiírás** — `write_yearly_artifacts` → `metadata.json`, `audit.json`, `sample_train_valid.parquet`
 
 **Raises:**
-- `ValueError` ha a safe data boundaries nem meghatározhatók (üres feature/target tábla)
+- `ValueError` ha a `quant_train`-nek nincs sora érvényes targettel az adott évre
+- `RuntimeError` ha a `quant_train` tábla nem létezik
 
 ---
 
@@ -76,37 +72,47 @@ kontextus nélkül. Csak az orchestrator ismeri a projekt-specifikus path-konven
 
 | Argument | Kötelező | Default | Leírás |
 |----------|----------|---------|--------|
-| `--sample-id` | igen | — | Egyedi sample azonosító |
+| `--year` | igen | — | Naptári év (pl. `2021`) |
 | `--asset-id` | igen | — | Asset kulcs (`config/assets.json`-ból) |
-| `--target-col` | igen | — | Target oszlop neve |
-| `--target-horizon-minutes` | igen | — | Forward-return ablak percben |
-| `--min-train-days` | nem | `730` | Minimális training ablak napban |
-| `--valid-days` | nem | `180` | Validációs ablak napban |
-| `--step-days` | nem | `180` | Fold lépés napban |
-| `--test-days` | nem | `365` | Holdout ablak napban |
-| `--embargo-minutes` | nem | `None` | Embargó percben (default: target-horizon) |
+| `--seed` | nem | `42 + year` | Véletlenszám seed |
 
 ### Példa CLI hívás
 
 ```bash
-uv run src/modeling/quantitative/00_create_sample.py \
-  --sample-id solusdt_fw60_v1 \
-  --asset-id solusdt \
-  --target-col trg_l_fw60_q90 \
-  --target-horizon-minutes 60 \
-  --min-train-days 730 \
-  --valid-days 180 \
-  --step-days 180 \
-  --test-days 365
+uv run python src/modeling/00_create_sample.py --year 2021 --asset-id solusdt
+uv run python src/modeling/00_create_sample.py --year 2022 --asset-id solusdt --seed 100
 ```
 
 ### Output summary
 
-Sikeres futás után a CLI három sort nyomtat:
+Sikeres futás után a CLI összefoglalót nyomtat:
 
 ```
-OK: Sample created at database/solusdt/samples/solusdt_fw60_v1
-    n_folds        = 5
-    data_start_safe= 2021-06-01 00:00:00
-    data_end_safe  = 2024-11-30 23:59:00
+OK: Sample created at database/solusdt/samples/solusdt_fw60_yearly_2021
+    year         = 2021
+    seed         = 2063
+    valid_weeks  = 12
+    feature_cols = 208
+    total_rows   = 9124
+      train      = 7012
+      valid      = 2016
+      purge      = 96
 ```
+
+---
+
+## Miért csak az orchestratorban van `utils` import?
+
+Az `yearly_sampler` és `artifacts` modulok szándékosan projekt-agnosztikusak —
+tesztelhetők és újrafelhasználhatók projekt kontextus nélkül. Csak az orchestrator
+ismeri a projekt-specifikus path-konvenciókat és config formátumot.
+
+---
+
+## Kapcsolódó fájlok
+
+| Fájl | Tartalom |
+|------|----------|
+| [5010_sampling_yearly.md](5010_sampling_yearly.md) | Yearly sampling teljes metodológiája |
+| [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig dataclass |
+| [5200_sampling_artifacts.md](5200_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample |

@@ -1,7 +1,7 @@
-# 3110 — SamplingConfig
+﻿# 5100 — YearlySamplingConfig
 
-Immutable dataclass, amely az összes paramétert tartalmazza egy time-based CV sample
-generálásához. Forrás: [sampling/config.py](../src/modeling/quantitative/sampling/config.py)
+Immutable dataclass, amely az összes paramétert tartalmazza egy éves random-óra sample
+generálásához. Forrás: [sampling/config.py](../src/modeling/sampling/config.py)
 
 ---
 
@@ -9,16 +9,14 @@ generálásához. Forrás: [sampling/config.py](../src/modeling/quantitative/sam
 
 ```mermaid
 classDiagram
-  class SamplingConfig {
+  class YearlySamplingConfig {
     +str sample_id
     +str asset_id
-    +str target_col
-    +int target_horizon_minutes
-    +int min_train_days = 730
-    +int valid_days = 180
-    +int step_days = 180
-    +int test_days = 365
-    +int|None embargo_minutes = None
+    +int year
+    +int seed
+    +int purge_minutes = 240
+    +tuple target_cols = ("long_mfe_fw60", "short_mfe_fw60")
+    +tuple feature_cols = ()
   }
 ```
 
@@ -30,45 +28,47 @@ classDiagram
 |------|-------|---------|--------|
 | `sample_id` | `str` | — | Egyedi azonosító; ez lesz a `samples/` alkönyvtár neve |
 | `asset_id` | `str` | — | Asset kulcs a `config/assets.json`-ból (pl. `solusdt`) |
-| `target_col` | `str` | — | Target oszlop neve (pl. `trg_l_fw60_q90`) |
-| `target_horizon_minutes` | `int` | — | Forward-return ablak percben; embargó fallback értéke |
-| `min_train_days` | `int` | `730` | Első training fold minimális hossza naptári napban |
-| `valid_days` | `int` | `180` | Validációs ablak hossza naptári napban |
-| `step_days` | `int` | `180` | Egymást követő fold-ok közti lépés naptári napban |
-| `test_days` | `int` | `365` | Végső holdout ablak hossza naptári napban |
-| `embargo_minutes` | `int \| None` | `None` | Embargó gap train→valid között; `None` → `target_horizon_minutes` értéke |
+| `year` | `int` | — | Naptári év, amelyből a sample készül (pl. `2021`) |
+| `seed` | `int` | — | Véletlenszám-generátor seedje; minden óra- és hétválasztás ebből származik |
+| `purge_minutes` | `int` | `240` | Purge zóna szélessége percben minden validációs hét határán |
+| `target_cols` | `tuple[str, ...]` | `("long_mfe_fw60", "short_mfe_fw60")` | Target oszlopok, amelyek a sample_train_valid.parquet-be kerülnek |
+| `feature_cols` | `tuple[str, ...]` | `()` | Feature oszlopok; üres tuple = minden `feat_*` auto-discovery futásidőben |
 
-### `embargo_minutes` None-szemantikája
+### `purge_minutes` default indoklása
 
-Ha `embargo_minutes` értéke `None`, a `create_sample` orchestrator automatikusan
-a `target_horizon_minutes` értékét használja fallback-ként:
+A `feat_ohlcv_quant`-ban a leghosszabb rolling ablak 140 bar (= 140 perc 1m chart-on).
+A 240 perces default ~71%-os biztonsági margót ad, hogy a jövőbeli feature-bővítések
+is biztonságban legyenek purge csökkentés nélkül.
 
-```python
-embargo_minutes = config.embargo_minutes or config.target_horizon_minutes
-```
+### `feature_cols` üres tuple szemantikája
 
-Ez biztosítja, hogy az embargó legalább akkora legyen, mint a target kiszámításához
-felhasznált előre néző ablak — megakadályozva az adatszivárgást.
+Ha `feature_cols` üres, a `create_yearly_sample` orchestrator futásidőben felfedezi
+az összes `feat_*` oszlopot a `quant_train` sémájából — ez az ajánlott működési mód.
+Explicit lista csak akkor szükséges, ha feature-szelekcióval korlátozott sample kell.
 
 ---
 
 ## Példa inicializálás
 
 ```python
-from modeling.quantitative.sampling import SamplingConfig
+from modeling.sampling.config import YearlySamplingConfig
 
-config = SamplingConfig(
-    sample_id              = "solusdt_fw60_v1",
-    asset_id               = "solusdt",
-    target_col             = "trg_l_fw60_q90",
-    target_horizon_minutes = 60,
-    min_train_days         = 730,
-    valid_days             = 180,
-    step_days              = 180,
-    test_days              = 365,
-    # embargo_minutes=None → 60 perc lesz az embargo
+config = YearlySamplingConfig(
+    sample_id = "solusdt_fw60_yearly_2021",
+    asset_id  = "solusdt",
+    year      = 2021,
+    seed      = 42 + 2021,   # 2063
 )
 ```
 
 A `frozen=True` miatt a dataclass példányosítás után nem módosítható — minden
-paraméter-változtatáshoz új `SamplingConfig` példányt kell létrehozni.
+paraméter-változtatáshoz új `YearlySamplingConfig` példányt kell létrehozni.
+
+---
+
+## Kapcsolódó fájlok
+
+| Fájl | Tartalom |
+|------|----------|
+| [5010_sampling_yearly.md](5010_sampling_yearly.md) | Yearly sampling teljes metodológiája |
+| [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample orchestrator és CLI |

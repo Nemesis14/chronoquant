@@ -64,11 +64,17 @@ def analyze_redundancy(
         logger.warning("analyze_redundancy: no feat_* columns in quant_train")
         return pl.DataFrame(schema=_SCHEMA)
 
-    logger.info("analyze_redundancy: loading %d feature columns", len(feat_cols))
+    n_rows: int = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()[0]  # type: ignore[index]
+    sample_n = min(n_rows, cfg.redundancy_max_rows)
+    logger.info(
+        "analyze_redundancy: loading %d feature columns, sample=%d / %d rows",
+        len(feat_cols), sample_n, n_rows,
+    )
 
     # --- load feat_* into Polars; fill NaN/NULL with column mean ---
     cols_sql = ", ".join(f'"{c}"' for c in feat_cols)
-    df = conn.execute(f"SELECT {cols_sql} FROM quant_train").pl()
+    sample_clause = f"USING SAMPLE {sample_n} ROWS" if sample_n < n_rows else ""
+    df = conn.execute(f"SELECT {cols_sql} FROM quant_train {sample_clause}").pl()
 
     filled = df.with_columns([
         pl.col(c).fill_nan(None).fill_null(strategy="mean")

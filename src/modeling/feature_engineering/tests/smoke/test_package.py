@@ -7,8 +7,8 @@ schema; does not validate business correctness (that belongs in sanity tests).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import FrozenInstanceError
-from pathlib import Path
 
 import duckdb
 import pytest
@@ -23,7 +23,7 @@ _N_ROWS = 1000  # synthetic row count — enough to exercise all branches
 # --------------------------------------------------------------------------- #
 
 @pytest.fixture(scope="module")
-def mem_conn() -> duckdb.DuckDBPyConnection:
+def mem_conn() -> Iterator[duckdb.DuckDBPyConnection]:
     """In-memory DuckDB with a minimal quant_train table (2 features, 1000 rows)."""
     conn = duckdb.connect(":memory:")
     conn.execute("""
@@ -66,7 +66,6 @@ def test_public_imports() -> None:
         analyze_redundancy,
         analyze_stability,
         analyze_target_relation,
-        generate_outputs,
     )
 
 
@@ -205,52 +204,3 @@ def test_stability_has_buckets_for_each_feature(mem_conn, cfg) -> None:
     assert set(features) == {"feat_rsi_14", "feat_roc_10"}
 
 
-# --------------------------------------------------------------------------- #
-# generate_outputs                                                             #
-# --------------------------------------------------------------------------- #
-
-def test_generate_outputs_writes_files(tmp_path: Path, mem_conn, cfg) -> None:
-    from modeling.feature_engineering import (
-        analyze_quality,
-        analyze_redundancy,
-        analyze_stability,
-        analyze_target_relation,
-        generate_outputs,
-    )
-
-    q  = analyze_quality(mem_conn, cfg)
-    r  = analyze_target_relation(mem_conn, cfg)
-    rd = analyze_redundancy(mem_conn, cfg)
-    s  = analyze_stability(mem_conn, cfg)
-
-    generate_outputs(q, r, rd, s, cfg, tmp_path)
-
-    assert (tmp_path / "feature_set.json").exists()
-    assert (tmp_path / "analyst_report.md").exists()
-
-
-def test_generate_outputs_feature_set_schema(tmp_path: Path, mem_conn, cfg) -> None:
-    import json
-
-    from modeling.feature_engineering import (
-        analyze_quality,
-        analyze_redundancy,
-        analyze_stability,
-        analyze_target_relation,
-        generate_outputs,
-    )
-
-    q  = analyze_quality(mem_conn, cfg)
-    r  = analyze_target_relation(mem_conn, cfg)
-    rd = analyze_redundancy(mem_conn, cfg)
-    s  = analyze_stability(mem_conn, cfg)
-    generate_outputs(q, r, rd, s, cfg, tmp_path)
-
-    fs = json.loads((tmp_path / "feature_set.json").read_text())
-    assert "selected" in fs
-    assert "dropped" in fs
-    assert "review" in fs
-    assert "target_cols" in fs
-    assert "thresholds" in fs
-    assert fs["asset_id"] == cfg.asset_id
-    assert fs["run_id"]   == cfg.run_id

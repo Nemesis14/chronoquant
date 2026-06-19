@@ -76,6 +76,24 @@ döntéshez legyen saját diagram.
 - `_doc_/analysis/` — analyst_agent territory
 - `src/` — specialist agents
 
+### Dokumentációs rendező elv (kötelező betartani)
+
+Az egész `_doc_/` hierarchia rendező elve:
+**Overview (X000) → Metodológia (X100) → Technikai referencia (X110+)**
+
+- **X000** = domain flowchart + almodulok listája; domain-szintű business rationale
+- **X100** = alfejezet overview + a 6 kötelező metodológiai szekció; ez a methodology_agent fő outputja
+- **X110+** = code_doc_agent territory; ne lépj bele
+
+**Redundancia-szabály:** Az X100 nem ismétli az X000 tartalmát szó szerint.
+Az X000 a high-level logikát és struktúrát írja le, az X100 a részleteket fejti ki.
+Cross-reference linkkel hivatkozzon egymásra a két szint.
+
+**Mermaid-first szabály:** Minden X100 fájlban minimum 2–3 Mermaid diagram kötelező:
+- `## Overview`-ban: pipeline flowchart (upstream → modul → downstream)
+- `### Miért ezt a megközelítést?`-ban: alternatívák összehasonlítása (flowchart LR)
+- Minden kulcsfogalom szekcióban: mechanizmust illusztráló diagram
+
 ---
 
 ## Entry Gate Rule

@@ -150,6 +150,8 @@ Align `:` to longest parameter name:
 
 ## Code Organization
 
+### Within a file
+
 ```python
 # 1. Header docstring
 # 2. Imports (stdlib → third-party → internal)
@@ -157,6 +159,41 @@ Align `:` to longest parameter name:
 # 4. Helper functions
 # 5. Main classes / functions
 ```
+
+### Module / Directory Layout
+
+Each domain module lives in its own folder. Scripts at the module root call into
+submodule folders; library code never lives loose at the root.
+
+```
+src/<domain>/               ← module root
+  <submodule_a>/            ← library code, grouped by topic
+    __init__.py
+    foo.py
+    bar.py
+  <submodule_b>/
+    __init__.py
+    baz.py
+  tests/                    ← all tests for this module
+    <submodule_a>/
+      smoke/
+        test_foo.py
+    <submodule_b>/
+      smoke/
+        test_baz.py
+  00_first_step.py          ← numbered entry-point scripts (if order matters)
+  01_second_step.py
+  __init__.py
+```
+
+**Rules:**
+- The module root contains **only** scripts (`NN_name.py`) and `__init__.py` — no loose library `.py` files.
+- Scripts are thin CLI wrappers; all reusable logic belongs in a submodule folder.
+- Scripts are numbered (`00_`, `01_`, …) when execution order is defined.
+- Submodule folders group files **by topic** (e.g., `sampling/`, `training/`, `search/`, `evaluation/`).
+- Tests mirror the submodule structure: `tests/<submodule>/<type>/test_*.py`.
+
+**Reference implementation:** `src/database/` and `src/modeling/quantitative/`.
 
 ---
 

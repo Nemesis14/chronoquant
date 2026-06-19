@@ -1,4 +1,4 @@
-# 3130 — Feature Table Audit
+﻿# 5420 — Feature Table Audit
 
 A feature tábla auditor meghatározza a biztonságos adathatárokat és minőségi
 metrikákat a `feat_ohlcv_quant` és `target` táblákra. Csak read-only DuckDB

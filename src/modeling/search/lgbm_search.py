@@ -17,7 +17,6 @@ import gc
 import hashlib
 import json
 import logging
-import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,16 +30,15 @@ import utils
 from data_handling.store.duckdb_query import query_range_pl
 from modeling.sampling import load_yearly_sample
 from modeling.training.datasets import ModelingDataset
-from modeling.training.metrics import binary_classification_metrics
 from modeling.training.training_windows import DatasetSplit
 
 logger = logging.getLogger("lgbm_search")
 
 # ─── Fixed LightGBM parameters (not tuned) ───────────────────────────────────
 _FIXED_PARAMS: dict = {
-    "objective":      "binary",
+    "objective":      "regression",
     "boosting_type":  "gbdt",
-    "metric":         "binary_logloss",
+    "metric":         "rmse",
     "n_estimators":   3000,
     "subsample_freq": 1,
     "force_col_wise": True,
@@ -49,7 +47,7 @@ _FIXED_PARAMS: dict = {
 }
 
 # ─── Objective penalty weights ────────────────────────────────────────────────
-# score = mean(valid_ll) + STAB_W * std(valid_ll) + GAP_W * max(0, gap - ALLOWED_GAP)
+# score = mean(valid_rmse) + STAB_W * std(valid_rmse) + GAP_W * max(0, gap - ALLOWED_GAP)
 _ALLOWED_GAP  = 0.03
 _STAB_W       = 0.25
 _GAP_W        = 0.10
@@ -117,14 +115,13 @@ def run_search(
     )
 
     feature_cols  = _load_feature_cols(artifact_dir)
-    q_threshold   = _parse_quantile(model_id)
     sample_meta   = load_yearly_sample(sample_dir)
     all_weeks     = sample_meta["selected_valid_weeks"]
     folds         = all_weeks[:fold_limit] if fold_limit else all_weeks
 
     logger.info("=" * 72)
     logger.info(f"LGBM SEARCH  model={model_id}")
-    logger.info(f"  target={target_col}  stage={stage}  q_threshold={q_threshold:.2f}")
+    logger.info(f"  target={target_col}  stage={stage}")
     logger.info(f"  n_trials={n_trials}  row_stride={row_stride}  folds={len(folds)}/{len(all_weeks)}")
     logger.info(f"  engine={'optuna-TPE' if _HAS_OPTUNA else 'seeded-random'}")
     logger.info(f"  search_dir={search_dir}")
@@ -136,11 +133,10 @@ def run_search(
         feature_cols = feature_cols,
         asset_id     = asset_id,
         row_stride   = row_stride,
-        q_threshold  = q_threshold,
     )
-    pos_rate = float(sd.dataset.y.mean())
     logger.info(
-        f"[Data] {len(sd.dataset.y):,} rows  pos_rate={pos_rate:.4f}  "
+        f"[Data] {len(sd.dataset.y):,} rows  "
+        f"target_mean={float(sd.dataset.y.mean()):.6f}  "
         f"n_features={len(feature_cols)}"
     )
 
@@ -206,19 +202,6 @@ def _load_feature_cols(artifact_dir: Path) -> list[str]:
 
 
 # =============================================================================
-# Quantile parsing
-# =============================================================================
-def _parse_quantile(model_id: str) -> float:
-    m = re.search(r"_q(\d+)(?:_|$)", model_id)
-    if not m:
-        raise ValueError(
-            f"Cannot parse quantile from model_id '{model_id}'. "
-            "Expected pattern _q{{N}}_ (e.g. _q90_ or _q10_)"
-        )
-    return int(m.group(1)) / 100.0
-
-
-# =============================================================================
 # Dataset loading — sample parquet × DuckDB features
 # =============================================================================
 def _load_search_dataset(
@@ -227,7 +210,6 @@ def _load_search_dataset(
     feature_cols: list[str],
     asset_id:     str,
     row_stride:   int,
-    q_threshold:  float,
 ) -> _SearchDataset:
     parquet_path = sample_dir / "sample_train_valid.parquet"
     sample_pl = pl.read_parquet(parquet_path, columns=["open_time", "segment", target_col])
@@ -251,26 +233,14 @@ def _load_search_dataset(
     merged    = merged_pl.to_pandas().reset_index(drop=True)
     merged["open_time"] = pd.to_datetime(merged["open_time"])
 
-    # Binary label — threshold from train segment only (no leakage from valid)
-    train_mask = merged["segment"] == "train"
-    train_y    = merged.loc[train_mask, target_col]
-    threshold  = float(np.quantile(train_y, q_threshold))
-
-    if q_threshold >= 0.5:  # long model: top (1-q)% → y >= threshold
-        binary_y = (merged[target_col] >= threshold).astype(np.int8)
-    else:                   # short model: bottom q% → y <= threshold
-        binary_y = (merged[target_col] <= threshold).astype(np.int8)
-
-    pos_train = float(binary_y[train_mask].mean())
     logger.info(
-        f"[Data] threshold={threshold:.5f} (q{q_threshold:.0%} of train rows)  "
-        f"pos_rate_train={pos_train:.4f}  total_rows={len(merged):,}"
+        f"[Data] target={target_col}  total_rows={len(merged):,}"
     )
 
     dataset = ModelingDataset(
         open_time    = pd.Series(merged["open_time"]),
         X            = pd.DataFrame(merged[feature_cols]),
-        y            = pd.Series(binary_y, name=target_col),
+        y            = pd.Series(merged[target_col].astype(float), name=target_col),
         target_col   = target_col,
         feature_cols = feature_cols,
     )
@@ -332,7 +302,7 @@ def _run_one_trial(
             lgb.record_evaluation(eval_result),
         ]
 
-        model = lgb.LGBMClassifier(**full_params)
+        model = lgb.LGBMRegressor(**full_params)
         model.fit(
             split.X_train, split.y_train,
             eval_set   = [(split.X_train, split.y_train), (split.X_eval, split.y_eval)],
@@ -341,10 +311,18 @@ def _run_one_trial(
         )
 
         best_iter  = getattr(model, "best_iteration_", None) or full_params["n_estimators"]
-        train_pred = model.predict_proba(split.X_train)[:, 1]  # type: ignore[index]
-        valid_pred = model.predict_proba(split.X_eval)[:, 1]   # type: ignore[index]
-        tm = binary_classification_metrics(split.y_train, train_pred)
-        vm = binary_classification_metrics(split.y_eval,  valid_pred)
+        train_pred = pd.Series(model.predict(split.X_train))
+        valid_pred = pd.Series(model.predict(split.X_eval))
+
+        y_tr = split.y_train.to_numpy(dtype=float)
+        y_va = split.y_eval.to_numpy(dtype=float)
+        p_tr = train_pred.to_numpy(dtype=float)
+        p_va = valid_pred.to_numpy(dtype=float)
+
+        train_rmse = float(np.sqrt(np.mean((y_tr - p_tr) ** 2)))
+        valid_rmse = float(np.sqrt(np.mean((y_va - p_va) ** 2)))
+        train_mae  = float(np.mean(np.abs(y_tr - p_tr)))
+        valid_mae  = float(np.mean(np.abs(y_va - p_va)))
 
         fi = _feature_importance(model, sd.dataset.feature_cols)
 
@@ -358,20 +336,13 @@ def _run_one_trial(
         fold_results.append({
             "fold":           fold_idx + 1,
             "fold_week":      f"{fold['start']}_{fold['end']}",
-            "train_log_loss": tm["log_loss"],
-            "valid_log_loss": vm["log_loss"],
-            "train_pr_auc":   tm["pr_auc"],
-            "valid_pr_auc":   vm["pr_auc"],
-            "train_roc_auc":  tm["roc_auc"],
-            "valid_roc_auc":  vm["roc_auc"],
-            "train_brier":    tm["brier_score"],
-            "valid_brier":    vm["brier_score"],
+            "train_rmse":     train_rmse,
+            "valid_rmse":     valid_rmse,
+            "train_mae":      train_mae,
+            "valid_mae":      valid_mae,
             "train_n":        int(len(split.y_train)),
             "valid_n":        int(len(split.y_eval)),
             "best_iteration": best_iter,
-            "lift_1pct":      vm["lift"].get("top_1pct", {}).get("lift"),
-            "lift_5pct":      vm["lift"].get("top_5pct", {}).get("lift"),
-            "lift_10pct":     vm["lift"].get("top_10pct", {}).get("lift"),
             "top20_features": fi,
         })
 
@@ -381,7 +352,7 @@ def _run_one_trial(
     return {"fold_metrics": fold_results}
 
 
-def _feature_importance(model: lgb.LGBMClassifier, feature_cols: list[str]) -> list[dict]:
+def _feature_importance(model: lgb.LGBMRegressor, feature_cols: list[str]) -> list[dict]:
     split_imp = model.booster_.feature_importance(importance_type="split")
     gain_imp  = model.booster_.feature_importance(importance_type="gain")
     rows = [
@@ -408,41 +379,35 @@ def _compact_curves(eval_result: dict, trial_no: int, fold_no: int) -> dict:
 # =============================================================================
 def _compute_objective(fold_metrics: list[dict]) -> dict:
     """
-    score = mean(valid_ll) + 0.25 * std(valid_ll)
-            + 0.10 * max(0, mean(valid_ll - train_ll) - 0.03)
+    score = mean(valid_rmse) + STAB_W * std(valid_rmse)
+            + GAP_W * max(0, mean(valid_rmse - train_rmse) - ALLOWED_GAP)
 
     Lower is better (matches Optuna direction='minimize').
     """
-    valid_lls  = [f["valid_log_loss"] for f in fold_metrics if f["valid_log_loss"] is not None]
-    train_lls  = [f["train_log_loss"] for f in fold_metrics if f["train_log_loss"] is not None]
-    valid_prcs = [f["valid_pr_auc"]   for f in fold_metrics if f["valid_pr_auc"]   is not None]
-    train_prcs = [f["train_pr_auc"]   for f in fold_metrics if f["train_pr_auc"]   is not None]
+    valid_rmses = [f["valid_rmse"] for f in fold_metrics if f.get("valid_rmse") is not None]
+    train_rmses = [f["train_rmse"] for f in fold_metrics if f.get("train_rmse") is not None]
+    valid_maes  = [f["valid_mae"]  for f in fold_metrics if f.get("valid_mae")  is not None]
+    train_maes  = [f["train_mae"]  for f in fold_metrics if f.get("train_mae")  is not None]
 
-    if not valid_lls:
+    if not valid_rmses:
         return {"objective_score": float("inf")}
 
-    mean_v   = float(np.mean(valid_lls))
-    std_v    = float(np.std(valid_lls))
-    mean_t   = float(np.mean(train_lls)) if train_lls else None
+    mean_v   = float(np.mean(valid_rmses))
+    std_v    = float(np.std(valid_rmses))
+    mean_t   = float(np.mean(train_rmses)) if train_rmses else None
     mean_gap = float(mean_v - mean_t) if mean_t is not None else 0.0
     penalty  = max(0.0, mean_gap - _ALLOWED_GAP)
     score    = mean_v + _STAB_W * std_v + _GAP_W * penalty
 
     return {
-        "mean_valid_ll":     mean_v,
-        "std_valid_ll":      std_v,
-        "mean_train_ll":     mean_t,
-        "mean_gap":          mean_gap,
-        "gap_penalty":       penalty,
-        "objective_score":   score,
-        "mean_valid_prauc":  float(np.mean(valid_prcs)) if valid_prcs else None,
-        "mean_train_prauc":  float(np.mean(train_prcs)) if train_prcs else None,
-        "mean_valid_roc":    float(np.mean([f["valid_roc_auc"] for f in fold_metrics
-                                            if f.get("valid_roc_auc")])) or None,
-        "mean_lift_5pct":    float(np.mean([f["lift_5pct"] for f in fold_metrics
-                                            if f.get("lift_5pct")])) or None,
-        "mean_lift_10pct":   float(np.mean([f["lift_10pct"] for f in fold_metrics
-                                            if f.get("lift_10pct")])) or None,
+        "mean_valid_rmse":  mean_v,
+        "std_valid_rmse":   std_v,
+        "mean_train_rmse":  mean_t,
+        "mean_gap":         mean_gap,
+        "gap_penalty":      penalty,
+        "objective_score":  score,
+        "mean_valid_mae":   float(np.mean(valid_maes)) if valid_maes else None,
+        "mean_train_mae":   float(np.mean(train_maes)) if train_maes else None,
     }
 
 
@@ -755,16 +720,16 @@ def _persist_completed(
     _write_json(logs_dir / f"trial_{trial_no:04d}.json", log_record)
 
     compact = {
-        "trial_no":         record["trial_no"],
-        "param_hash":       record["param_hash"],
-        "params":           record["params"],
-        "objective_score":  record.get("objective_score"),
-        "mean_valid_ll":    record.get("mean_valid_ll"),
-        "std_valid_ll":     record.get("std_valid_ll"),
-        "mean_train_ll":    record.get("mean_train_ll"),
-        "mean_gap":         record.get("mean_gap"),
-        "mean_valid_prauc": record.get("mean_valid_prauc"),
-        "elapsed_s":        record.get("elapsed_s"),
+        "trial_no":          record["trial_no"],
+        "param_hash":        record["param_hash"],
+        "params":            record["params"],
+        "objective_score":   record.get("objective_score"),
+        "mean_valid_rmse":   record.get("mean_valid_rmse"),
+        "std_valid_rmse":    record.get("std_valid_rmse"),
+        "mean_train_rmse":   record.get("mean_train_rmse"),
+        "mean_gap":          record.get("mean_gap"),
+        "mean_valid_mae":    record.get("mean_valid_mae"),
+        "elapsed_s":         record.get("elapsed_s"),
     }
     _append_jsonl(search_dir / "search_trials.jsonl", compact)
     _update_summary_csv(search_dir, compact, record["params"])
@@ -851,19 +816,19 @@ def _write_best_params(search_dir: Path, best: dict) -> None:
 def _log_trial_result(
     trial_no: int, params: dict, record: dict, best: dict | None
 ) -> None:
-    vll  = record.get("mean_valid_ll")
-    tll  = record.get("mean_train_ll")
-    gap  = record.get("mean_gap")
-    vprc = record.get("mean_valid_prauc")
-    obj  = record.get("objective_score")
-    std  = record.get("std_valid_ll")
+    vrmse = record.get("mean_valid_rmse")
+    trmse = record.get("mean_train_rmse")
+    gap   = record.get("mean_gap")
+    vmae  = record.get("mean_valid_mae")
+    obj   = record.get("objective_score")
+    std   = record.get("std_valid_rmse")
     best_obj = (best or {}).get("objective_score")
 
     logger.info(
-        f"  valid_ll={_fmt(vll)}  train_ll={_fmt(tll)}  "
+        f"  valid_rmse={_fmt(vrmse)}  train_rmse={_fmt(trmse)}  "
         f"gap={_fmt(gap)}  std={_fmt(std)}"
     )
-    logger.info(f"  valid_prauc={_fmt(vprc)}  objective={_fmt(obj)}")
+    logger.info(f"  valid_mae={_fmt(vmae)}  objective={_fmt(obj)}")
 
     if best_obj is not None:
         delta  = (obj or float("inf")) - best_obj
@@ -877,9 +842,9 @@ def _log_trial_result(
     for f in record.get("fold_metrics", []):
         logger.info(
             f"    fold {f['fold']} ({f.get('fold_week', '')})  "
-            f"valid_ll={_fmt(f.get('valid_log_loss'))}  "
-            f"train_ll={_fmt(f.get('train_log_loss'))}  "
-            f"valid_prauc={_fmt(f.get('valid_pr_auc'))}  "
+            f"valid_rmse={_fmt(f.get('valid_rmse'))}  "
+            f"train_rmse={_fmt(f.get('train_rmse'))}  "
+            f"valid_mae={_fmt(f.get('valid_mae'))}  "
             f"best_iter={f.get('best_iteration')}  "
             f"n_valid={f.get('valid_n', 0):,}"
         )
@@ -910,9 +875,9 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
 
     logger.info(f"Best trial: #{best.get('trial_no')}  hash={best.get('param_hash')}")
     logger.info(f"  objective_score  = {_fmt(best.get('objective_score'))}  (lower=better)")
-    logger.info(f"  mean_valid_ll    = {_fmt(best.get('mean_valid_ll'))}  std={_fmt(best.get('std_valid_ll'))}")
-    logger.info(f"  mean_train_ll    = {_fmt(best.get('mean_train_ll'))}  gap={_fmt(best.get('mean_gap'))}")
-    logger.info(f"  mean_valid_prauc = {_fmt(best.get('mean_valid_prauc'))}")
+    logger.info(f"  mean_valid_rmse  = {_fmt(best.get('mean_valid_rmse'))}  std={_fmt(best.get('std_valid_rmse'))}")
+    logger.info(f"  mean_train_rmse  = {_fmt(best.get('mean_train_rmse'))}  gap={_fmt(best.get('mean_gap'))}")
+    logger.info(f"  mean_valid_mae   = {_fmt(best.get('mean_valid_mae'))}")
     logger.info(f"  elapsed_s        = {best.get('elapsed_s')}")
     logger.info("\nBest parameters:")
     for k, v in sorted(best.get("params", {}).items()):
@@ -921,9 +886,9 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
     for f in best.get("fold_summary", []):
         logger.info(
             f"  fold {f['fold']}  "
-            f"valid_ll={_fmt(f.get('valid_log_loss'))}  "
-            f"train_ll={_fmt(f.get('train_log_loss'))}  "
-            f"valid_prauc={_fmt(f.get('valid_pr_auc'))}"
+            f"valid_rmse={_fmt(f.get('valid_rmse'))}  "
+            f"train_rmse={_fmt(f.get('train_rmse'))}  "
+            f"valid_mae={_fmt(f.get('valid_mae'))}"
         )
 
     csv_path = search_dir / "search_summary.csv"
@@ -937,8 +902,8 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
                     logger.info(
                         f"  #{int(row['trial_no']):04d}  "  # type: ignore[arg-type]
                         f"obj={_fmt(row.get('objective_score'))}  "
-                        f"valid_ll={_fmt(row.get('mean_valid_ll'))}  "
-                        f"valid_prauc={_fmt(row.get('mean_valid_prauc'))}"
+                        f"valid_rmse={_fmt(row.get('mean_valid_rmse'))}  "
+                        f"valid_mae={_fmt(row.get('mean_valid_mae'))}"
                     )
 
     logger.info("\nArtifacts:")
@@ -974,9 +939,9 @@ def _iter_jsonl(path: Path):
 
 def _json_serial(obj: object) -> int | float | bool:
     if isinstance(obj, np.integer):
-        return int(obj)
+        return int(obj)  # type: ignore[arg-type]
     if isinstance(obj, np.floating):
-        return float(obj)
+        return float(obj)  # type: ignore[arg-type]
     if isinstance(obj, np.bool_):
         return bool(obj)
     raise TypeError(f"Not serializable: {type(obj)}")

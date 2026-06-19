@@ -28,7 +28,7 @@ flowchart TD
 
 ## Fájlok
 
-### [duckdb_store.py](0211_duckdb_store.md)
+### [duckdb_store.py](1110_duckdb_store.md)
 
 DuckDB kapcsolat kezelés, séma inicializálás és adatbeírás.
 
@@ -44,7 +44,7 @@ DuckDB kapcsolat kezelés, séma inicializálás és adatbeírás.
 
 ---
 
-### [duckdb_query.py](0212_duckdb_query.md)
+### [duckdb_query.py](1120_duckdb_query.md)
 
 Read-only lekérdezések pandas és Polars DataFrame kimenettel.
 
@@ -60,7 +60,7 @@ Read-only lekérdezések pandas és Polars DataFrame kimenettel.
 
 ---
 
-### [duckdb_stats.py](0213_duckdb_stats.md)
+### [duckdb_stats.py](1130_duckdb_stats.md)
 
 DB egészség-statisztikák gyűjtése, formázása és dataset audit.
 
@@ -74,7 +74,7 @@ DB egészség-statisztikák gyűjtése, formázása és dataset audit.
 
 ---
 
-### [validate.py](0214_validate.md)
+### [validate.py](1140_validate.md)
 
 Integritás invariánsok ellenőrzése AssertionError-ral.
 
@@ -85,7 +85,7 @@ Integritás invariánsok ellenőrzése AssertionError-ral.
 
 ---
 
-### [toolkit.py](0217_toolkit.md)
+### [toolkit.py](1150_toolkit.md)
 
 DS workflow segédek — dataset inspekció és összefoglalók.
 

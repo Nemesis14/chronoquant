@@ -2,7 +2,7 @@
 
 A hyperparameter search az éves sample és a feature_engineering kimenete alapján
 keresi az optimális LightGBM modell paraméterkészletet. Optuna TPE (vagy seeded
-random fallback) alapú keresés, stability-penalized log loss célértékkel.
+random fallback) alapú keresés, stability-penalized RMSE célértékkel.
 
 ---
 
@@ -20,8 +20,8 @@ flowchart TD
 
 **Entry point:**
 ```bash
-uv run python src/modeling/02_hyper_param_search.py --model lgbm_solusdt_l_fw60_q90_2021 --stage smoke
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage explore
+uv run python src/modeling/02_hyper_param_search.py --model lgbm_solusdt_l_fw60_2021 --stage smoke
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage explore
 ```
 
 ---
@@ -40,25 +40,19 @@ feature-öket használja — nem fut újabb feature auditet, nem hasznal hardcod
 
 ---
 
-## Bináris label generálás
+## Target
 
 A `long_mfe_fw60` és `short_mfe_fw60` target oszlopok folytonos értékek (log-return).
-A bináris klasszifikációhoz a **train szegmens** eloszlásából számított quantile
-alapján kerülnek binarizálásra:
+A search ezeket **közvetlenül** használja regressziós targetként — nincs binarizálás,
+nincs percentilis küszöb.
 
-| Model típus | Quantile forrás | Bináris szabály | Pozitív osztály |
-|------------|----------------|-----------------|-----------------|
-| Long (`_l_`, `q90`) | `q = 0.90` | `long_mfe_fw60 >= quantile(train, 0.90)` | Top 10% upside |
-| Short (`_s_`, `q10`) | `q = 0.10` | `short_mfe_fw60 <= quantile(train, 0.10)` | Bottom 10% downside |
+| Model típus | Target oszlop | Modell típusa |
+|------------|--------------|---------------|
+| Long (`_l_`) | `long_mfe_fw60` | `LGBMRegressor` |
+| Short (`_s_`) | `short_mfe_fw60` | `LGBMRegressor` |
 
-A `q` értéke a model ID-ből parsolt: `_q90_` → `0.90`, `_q10_` → `0.10`.
-
-**Miért train-only threshold?** A valid szegmens adatainak eloszlása ne befolyásolja
-a pozitív osztály definícióját — ez szivárgás lenne. A threshold egyszer kerül
-kiszámításra a teljes train szegmensből, majd az összes fold és a valid sorokra is
-ugyanaz a threshold érvényes.
-
-**Várható pozitív arány:** ~10% (mindkét irányban).
+A `long_mfe_fw60` értéke pozitív ha az ár felfelé ment (long kedvező); a
+`short_mfe_fw60` értéke negatív ha az ár lefelé ment (short kedvező).
 
 ---
 
@@ -101,15 +95,15 @@ A `row_stride` paraméter alapértéke **1** minden stage-nél (a sample már ho
 A search az alábbi penalizált célfüggvényt minimalizálja (lower = better):
 
 ```
-score = mean(valid_log_loss)
-      + 0.25 × std(valid_log_loss)        # stabilitás penalizálás
-      + 0.10 × max(0, gap - 0.03)         # overfitting penalizálás
+score = mean(valid_rmse)
+      + 0.25 × std(valid_rmse)         # stabilitás penalizálás
+      + 0.10 × max(0, gap - 0.03)      # overfitting penalizálás
 ```
 
-ahol `gap = mean(valid_ll) - mean(train_ll)`.
+ahol `gap = mean(valid_rmse) - mean(train_rmse)`.
 
 **Miért stabilitást bünteti?** Egy magas variance-ű modell (jó néhány foldon, rossz
-másokon) az éles kereskedésben megbízhatatlan. A std(valid_ll) büntetés preferálja
+másokon) az éles kereskedésben megbízhatatlan. A std(valid_rmse) büntetés preferálja
 a konzisztensen közepes modelleket az ingadozó jókkal szemben.
 
 **Miért gap-et bünteti?** Egy 0.03-nál nagyobb train-valid rés overfittingre utal.
@@ -147,8 +141,17 @@ megszakítás után folytatható (`--resume` nem szükséges — automatikus).
 | `path_smooth` | [1e-3, 10] | log-float |
 | `extra_trees` | {True, False} | kategória |
 
-Rögzített (nem keresett): `objective=binary`, `metric=binary_logloss`,
+Rögzített (nem keresett): `objective=regression`, `metric=rmse`,
 `n_estimators=3000`, `early_stopping=100`, `n_jobs=4`.
+
+---
+
+## Fold metrikák
+
+| Metrika | Leírás |
+|---------|--------|
+| `rmse` | Root mean squared error — elsődleges optimalizálási metrika |
+| `mae` | Mean absolute error — referencia metrika |
 
 ---
 
@@ -157,7 +160,7 @@ Rögzített (nem keresett): `objective=binary`, `metric=binary_logloss`,
 | Fájl | Tartalom |
 |------|----------|
 | `search/search_best.json` | Teljes best trial rekord: params, metrics, fold summary |
-| `search/best_params.json` | Csak a tunable paraméter dict — training step input |
+| `search/best_params.json` | Csak a tunable paraméter dict — az ugyanazon `model_id` fit lépésének inputja |
 | `search/search_trials.jsonl` | Compact rekord minden befejezett trialhoz |
 | `search/search_summary.csv` | CSV: trial_no, objective_score, params_* — elemzéshez |
 | `search/trial_logs/trial_NNNN.json` | Teljes trial rekord fold metricsekkel |

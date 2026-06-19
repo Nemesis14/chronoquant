@@ -1,0 +1,15 @@
+{
+  "num_leaves": 18,
+  "max_depth": 5,
+  "min_child_samples": 256,
+  "min_child_weight": 0.03916766852357075,
+  "min_split_gain": 0.006158459876169438,
+  "reg_alpha": 1.640471562103581,
+  "reg_lambda": 31.060757433380253,
+  "subsample": 0.5115572742474129,
+  "colsample_bytree": 0.7376735962270203,
+  "learning_rate": 0.01064697472301876,
+  "max_bin": 63,
+  "path_smooth": 5.094011902587738,
+  "extra_trees": true
+}

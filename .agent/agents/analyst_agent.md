@@ -54,7 +54,7 @@ Python segédmodulok importja a notebookban:
 
 ```python
 import sys
-sys.path.insert(0, str(_root / "src"))
+sys.path.insert(0, str(_root))
 from analyst.table_formatting import display_analysis_table
 import analyst.plot_utils as pu
 import analyst.db_utils as dbu
@@ -111,7 +111,7 @@ Notebook felépítése (részletes szabályok: `analyst_skill.md`):
 ### 5. Kód és segédmodulok
 
 - Az elemzési Python kód a notebook code cell-jeibe kerül.
-- Ha ugyanaz a logika több szekciót is érintene: emeld ki `src/analyst/XXXX_<name>.py`-ba.
+- Ha ugyanaz a logika több szekciót is érintene: emeld ki `analyst/XXXX_<name>.py`-ba.
 - A helper fájlnév prefixe = a notebook sorszáma (pl. `3200_target_helpers.py`).
 - Minden publikus helper függvény típusannotált, Google-style docstring-gel (ld. `coding_skill.md`).
 

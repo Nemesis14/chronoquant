@@ -14,7 +14,7 @@ flowchart TD
   B --> C[feat_ohlcv_quant tábla\n202 feat_ oszlop]
   C --> D[sampling modul\n00_create_sample.py]
   D --> E[LightGBM tanítás\n01_train_model.py]
-  C --> F[sync_predictions\nlive predict_proba]
+  C --> F[sync_predictions\nlive predict / predict_proba]
 ```
 
 **Aktív feature profil:** `solusdt_fw60` — 208 feature, 25 csoport, 1 perces SOLUSDT OHLCV báron.

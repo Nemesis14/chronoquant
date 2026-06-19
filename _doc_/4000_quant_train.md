@@ -11,9 +11,9 @@ flowchart TD
   F[feat_ohlcv_quant\nopen_time + feat_* + metaadatok]
   T[target\nopen_time + fw60 outcome-ok]
   QT[(quant_train\nopen_time + feat_* + long_mfe_fw60 + short_mfe_fw60)]
-  FE[01_feature_engineering.py\nfeature szelekció + minőség]
+  FE[01_feature_engineering.ipynb\nfeature szelekció + minőség]
   SM[00_create_sample.py\nyearly random-hour sampling]
-  LGBM[01_train_model.py\nLightGBM tanítás]
+  LGBM[03_fit_model.py\nLightGBM tanítás]
 
   F -->|INNER JOIN\non open_time\nNULL target kizárva| QT
   T -->|INNER JOIN\non open_time| QT
@@ -34,7 +34,7 @@ A `quant_train` kizárja az `available_ts`, `lookback_end_ts`, `close`, és mind
 
 ### Miért kritikus ez a lépés?
 
-A `quant_train` az ML pipeline egyetlen handoff-pontja az adat-réteg és a modellező réteg között. Ha ez a tábla sérült (pl. NULL targeteket tartalmaz, vagy hiányzó feature oszlopai vannak), az összes downstream munka — feature engineering, sampling, LightGBM tanítás — helytelen vagy félrevezető eredményt ad, és a hiba az outputban (model.pkl, sample_oos.parquet) jelenik meg, nem a tanításban.
+A `quant_train` az ML pipeline stabil handoff-pontja az adat-réteg és a modellező réteg között. Ha ez a tábla sérült (pl. NULL targeteket tartalmaz, vagy hiányzó feature oszlopai vannak), az összes downstream munka — feature engineering, sampling, LightGBM tanítás — helytelen vagy félrevezető eredményt ad, és a hiba a későbbi artifactokban jelenik meg, nem a tábla építésekor.
 
 A NULL target sorok kizárása ezen a szinten kritikus: ha az utolsó 60 sor (ahol nincs elegendő forward data) bekerülne a tanítóba, a modell `0`-ként tanulná meg ezeket, holott ezek ismeretlen állapotú sorok.
 
@@ -102,7 +102,7 @@ A `quant_train` szándékosan szűk scope-ú:
 
 | Paraméter | Érték | Indoklás |
 |---|---|---|
-| Target oszlopok | `long_mfe_fw60`, `short_mfe_fw60` | Aktív fw60 logreturn target páros a v4 modellekhez; bővítés esetén új rebuild szükséges |
+| Target oszlopok | `long_mfe_fw60`, `short_mfe_fw60` | Aktív fw60 logreturn target páros; bővítés esetén új rebuild szükséges |
 | NULL szűrés | `IS NOT NULL` mindkét targetre | Védi a modellt a forward-edge soroktól; soha ne imputálj 0-val |
 | Rebuild mód default | Full rebuild | Biztonságos és determinisztikus; range rebuild csak ha tanítás-előtti inkrementális frissítés szükséges |
 | DuckDB táblanév | `quant_train` | Fix — a downstream pipeline (sampling, training) erre a névre hivatkozik |
@@ -115,7 +115,7 @@ A `quant_train` szándékosan szűk scope-ú:
 | Schema drift (új feature oszlop `feat_ohlcv_quant`-ban) | Hiányzó feature oszlop a `quant_train`-ben | Full rebuild kötelező ha `sync_features` megváltozott |
 | Range rebuild időablak túl szűk | Overlap az INNER JOIN-nal, NULL sorok maradnak | Rebuild a target sync teljes tartományán futtasd, ne csak az OHLCV tartományán |
 | `feat_ohlcv_quant` és `target` eltérő adathatárok | Kevesebb sor a quant_train-ben mint várható | Ellenőrizd mindkét tábla `MAX(open_time)`-ját; futtasd mindkét sync-et az újraépítés előtt |
-| `quant_train` vs `sample_<id>` DuckDB tábla konfúzió | A `sample_<id>` tábla a sampling materializálása, nem a `quant_train` | Soha ne olvasd a `sample_<id>` táblát közvetlenül training célra — az orchestrator tölti be |
+| `quant_train` vs yearly sample artifact konfúzió | A sample parquet csak `open_time`, `segment`, `fold_id` és target adatot ad; a feature mátrix DuckDB-ből töltődik vissza | Training célra ne feltételezz materializált sample DuckDB táblát |
 
 ### Validációs checklist
 

@@ -91,14 +91,14 @@ A feature computation (`sync_features.py`) ezt használja a OHLCV adatok betölt
 
 **SQL logika:**
 ```sql
-SELECT p.open_time, p.close, p.long_pred, p.short_pred,
-       p.trg_l_fw60_q90, p.trg_s_fw60_q10,
+SELECT p.open_time AS prediction_ts,
+       f.available_ts AS lookback_end_ts,
        f.feat_col1, f.feat_col2, ...
 FROM predictions p
 ASOF LEFT JOIN feat_ohlcv_quant f
     ON p.open_time >= f.available_ts
 WHERE p.open_time BETWEEN ? AND ?
-ORDER BY p.open_time
+ORDER BY prediction_ts
 ```
 
 Az `available_ts` biztosítja, hogy minden predikció sorhoz csak már elérhető feature-ök csatlakoznak.

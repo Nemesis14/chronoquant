@@ -15,15 +15,14 @@ data audit -> sample/split -> model registry entry -> feature audit
 - Use chronological splits only.
 - Keep final holdout untouched during feature/model/trigger selection.
 - Reuse `sample_id` for comparable long/short or candidate variants.
-- Keep generated artifacts under `models/<model_id>/`.
+- Keep generated artifacts under `artifacts/<model_id>/`.
 - Document serious candidates with a model card.
 
 ## Documents
 
 | Document | Purpose |
 |---|---|
-| `sampling.md` | Sample, split, embargo, holdout policy |
-| `lightgbm_development.md` | LightGBM search and promotion workflow |
+| `_doc_/5010_sampling_yearly.md` | Active yearly sample methodology |
+| `_doc_/5500_hyper_param_search.md` | Active LightGBM search workflow |
 | `model_validation.md` | Validation checklist and acceptance criteria |
 | `model_cards/_template.md` | Model card template |
-

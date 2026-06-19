@@ -1,164 +1,174 @@
 {
     "schema_version": 4,
     "models": {
-        "lgbm_solusdt_l_fw60_q90_2021": {
-            "display_name": "SOL Long q90 LightGBM 2021",
+        "lgbm_solusdt_l_fw60_2021": {
+            "display_name": "SOL Long LightGBM 2021",
             "description": "LightGBM long model trained on yearly 2021 sample.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_q90_2021",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2021",
+            "oos_year": 2022,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2021",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2021",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_l_fw60_q90_2022": {
-            "display_name": "SOL Long q90 LightGBM 2022",
+        "lgbm_solusdt_l_fw60_2022": {
+            "display_name": "SOL Long LightGBM 2022",
             "description": "LightGBM long model trained on yearly 2022 sample.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_q90_2022",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2022",
+            "oos_year": 2023,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2022",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2022",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_l_fw60_q90_2023": {
-            "display_name": "SOL Long q90 LightGBM 2023",
+        "lgbm_solusdt_l_fw60_2023": {
+            "display_name": "SOL Long LightGBM 2023",
             "description": "LightGBM long model trained on yearly 2023 sample.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_q90_2023",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2023",
+            "oos_year": 2024,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2023",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2023",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_l_fw60_q90_2024": {
-            "display_name": "SOL Long q90 LightGBM 2024",
+        "lgbm_solusdt_l_fw60_2024": {
+            "display_name": "SOL Long LightGBM 2024",
             "description": "LightGBM long model trained on yearly 2024 sample.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_q90_2024",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2024",
+            "oos_year": 2025,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2024",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2024",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_l_fw60_q90_2025": {
-            "display_name": "SOL Long q90 LightGBM 2025",
+        "lgbm_solusdt_l_fw60_2025": {
+            "display_name": "SOL Long LightGBM 2025",
             "description": "LightGBM long model trained on yearly 2025 sample.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_q90_2025",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2025",
+            "oos_year": null,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2025",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2025",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_s_fw60_q10_2021": {
-            "display_name": "SOL Short q10 LightGBM 2021",
+        "lgbm_solusdt_s_fw60_2021": {
+            "display_name": "SOL Short LightGBM 2021",
             "description": "LightGBM short model trained on yearly 2021 sample.",
             "asset_id": "solusdt",
             "target_name": "short_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_q10_2021",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2021",
+            "oos_year": 2022,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2021",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2021",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_s_fw60_q10_2022": {
-            "display_name": "SOL Short q10 LightGBM 2022",
+        "lgbm_solusdt_s_fw60_2022": {
+            "display_name": "SOL Short LightGBM 2022",
             "description": "LightGBM short model trained on yearly 2022 sample.",
             "asset_id": "solusdt",
             "target_name": "short_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_q10_2022",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2022",
+            "oos_year": 2023,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2022",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2022",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_s_fw60_q10_2023": {
-            "display_name": "SOL Short q10 LightGBM 2023",
+        "lgbm_solusdt_s_fw60_2023": {
+            "display_name": "SOL Short LightGBM 2023",
             "description": "LightGBM short model trained on yearly 2023 sample.",
             "asset_id": "solusdt",
             "target_name": "short_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_q10_2023",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2023",
+            "oos_year": 2024,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2023",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2023",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_s_fw60_q10_2024": {
-            "display_name": "SOL Short q10 LightGBM 2024",
+        "lgbm_solusdt_s_fw60_2024": {
+            "display_name": "SOL Short LightGBM 2024",
             "description": "LightGBM short model trained on yearly 2024 sample.",
             "asset_id": "solusdt",
             "target_name": "short_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_q10_2024",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2024",
+            "oos_year": 2025,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2024",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2024",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         },
-        "lgbm_solusdt_s_fw60_q10_2025": {
-            "display_name": "SOL Short q10 LightGBM 2025",
+        "lgbm_solusdt_s_fw60_2025": {
+            "display_name": "SOL Short LightGBM 2025",
             "description": "LightGBM short model trained on yearly 2025 sample.",
             "asset_id": "solusdt",
             "target_name": "short_mfe_fw60",
             "family": "lightgbm",
-            "trainer": "lightgbm_binary",
-            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_q10_2025",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2025",
+            "oos_year": null,
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2025",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2025",
                 "row_stride": 60
             },
-            "predict": { "method": "predict_proba", "proba": true },
+            "predict": { "method": "predict" },
             "active": false
         }
     }

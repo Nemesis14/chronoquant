@@ -13,8 +13,8 @@ flowchart LR
   A[feat_ohlcv_quant\nopen_time + feat_*] -->|INNER JOIN\non open_time| C[quant_train\nopen_time + feat_* +\nlong_mfe_fw60 +\nshort_mfe_fw60]
   B[target\nopen_time + fw60 outcomes] -->|INNER JOIN\non open_time| C
   C --> D[00_create_sample.py\nyearly random-hour\nsegment assign]
-  D --> E[sample_sample_id\nDuckDB tábla\n+ sample.parquet]
-  E --> F[01_train_model.py\nLightGBM]
+  D --> E[database/.../samples/<sample_id>/\nmetadata.json + audit.json +\nsample_train_valid.parquet]
+  E --> F[03_fit_model.py\nLightGBM]
 ```
 
 **NULL target policy:** Az INNER JOIN automatikusan kizárja azokat a sorokat, ahol `long_mfe_fw60 IS NULL OR short_mfe_fw60 IS NULL`. Ezek a sorok sosem kerülnek be a `quant_train`-be.
@@ -23,31 +23,31 @@ flowchart LR
 
 ---
 
-## Sample tábla materialization
+## Yearly sample artifact handoff
 
-A `00_create_sample.py` (`create_yearly_sample`) az éves mintavétel után a `quant_train`-ből
-válogatott sorokat materializálja a DuckDB-be:
+A `00_create_sample.py` (`create_yearly_sample`) az éves mintavétel után statikus
+parquet/json artifactokat ír a `database/<asset>/samples/<sample_id>/` könyvtárba.
+Az aktív yearly sampling pipeline nem hoz létre `sample_<id>` DuckDB táblát.
 
-**Tábla neve:** `sample_<sample_id>` (pl. `sample_solusdt_fw60_yearly_2024`)
+**Könyvtár példa:** `database/solusdt/samples/solusdt_fw60_yearly_2024/`
 
-**Oszlopok:**
+**`sample_train_valid.parquet` oszlopok:**
 
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|
-| `open_time` | `TIMESTAMP` | Bar nyitási ideje (PK az adott szegmensen belül) |
-| `fold_id` | `BIGINT \| NULL` | 0-alapú index a validációs héthez; NULL ha train/test |
-| `segment` | `VARCHAR` | `train`, `valid`, `purge`, vagy `test` |
-| `feat_*` | `DOUBLE` | Kiválasztott feature-ök (sorted névsorban) |
-| `long_mfe_fw60` | `DOUBLE` | Long target — NULL megengedett purge/test soroknál |
-| `short_mfe_fw60` | `DOUBLE` | Short target — NULL megengedett purge/test soroknál |
+| `open_time` | `TIMESTAMP` | Bar nyitási ideje |
+| `segment` | `VARCHAR` | `train`, `valid`, vagy `purge` |
+| `fold_id` | `BIGINT \| NULL` | 0-alapú index a validációs héthez; NULL ha nem valid sor |
+| `long_mfe_fw60` | `DOUBLE` | Long target |
+| `short_mfe_fw60` | `DOUBLE` | Short target |
 
-**Rebuild:** `CREATE OR REPLACE TABLE` — idempotens, biztonságos újrafuttatásra.
+Feature oszlopok nem kerülnek a sample parquetba; a modeling lépések a szükséges
+feature-öket DuckDB-ből töltik vissza a sample `open_time` soraival joinolva.
 
 **Artefaktok szerepe:**
-- `sample_<id>` DuckDB tábla: **elsődleges modellezési handoff** — ebből olvas `01_train_model.py`
-- `sample.parquet`: másodlagos output — EDA, notebookok, archív célokra
-- `metadata.json`: konfigurációs és auditálási metaadatok; tartalmaz `sample_table_name` mezőt
-- `audit.json`: adatminőségi metrikák (hiányzó órák, sorszámok)
+- `sample_train_valid.parquet`: elsődleges yearly sample handoff — ebből jönnek az `open_time`, `segment`, `fold_id` és target sorok
+- `metadata.json`: konfigurációs és auditálási metaadatok; tartalmazza a `selected_valid_weeks` listát
+- `audit.json`: adatminőségi metrikák
 
 ---
 
@@ -114,4 +114,4 @@ uv run python src/data_handling/03_build_quant_train.py --start 2024-01-01 --end
 - [`_doc_/1110_duckdb_store.md`](_doc_/1110_duckdb_store.md) — store réteg
 - [`_doc_/3100_sync_targets.md`](_doc_/3100_sync_targets.md) — target tábla és fw60 outcome-ok
 - [`_doc_/3000_targets.md`](_doc_/3000_targets.md) — target layer módszertani háttér
-- [`_doc_/5400_sampling.md`](_doc_/5400_sampling.md) — sampling modul (downstream fogyasztó)
+- [`_doc_/5010_sampling_yearly.md`](_doc_/5010_sampling_yearly.md) — aktív yearly sampling metodológia

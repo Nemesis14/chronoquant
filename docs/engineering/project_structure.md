@@ -10,11 +10,10 @@
 
 ## Source
 
-- `src/data_pipeline/`: OHLCV, feature, and prediction sync.
-- `src/db/`: SQLite table operations, inspection helpers, and maintenance.
+- `src/data_handling/`: OHLCV, feature, target, prediction sync, DuckDB store helpers.
 - `src/modeling/`: dataset loading, sampling, trainers, metrics, artifacts, reports.
-- `src/evaluation/`: cutoff analysis and backtesting.
-- `src/streamlit_app/`: dashboard app, sync runner, data reads, chart components.
+- `src/modeling/evaluation/`: cutoff analysis and backtesting.
+- `src/ui/`: dashboard app, sync runner, data reads, chart components.
 - `src/trading/`: live/paper trading service, strategy decisions, state, exchange adapter, journal.
 - `src/elliott_waves/`: Elliott Wave detection system (M1-M7).
   - `elliott/config.py`, `elliott/data.py`: ElliottConfig, Pivot, PatternCandidate.
@@ -36,9 +35,9 @@ files directly.
 
 ## Artifacts And Data
 
-- `database/`: SQLite databases.
-- `models/`: trained model artifacts under `models/<model_id>/`.
-- `samples/`: persisted modeling sample and fold definitions.
+- `database/`: DuckDB databases and yearly sample snapshots.
+- `artifacts/`: trained model artifacts under `artifacts/<model_id>/`.
+- `database/<asset>/samples/`: persisted yearly sample definitions and parquet snapshots.
 - `backtests/`: backtest outputs.
 - `trading_reports/`: exported runtime trading reports.
 - `logs/`: runtime logs.

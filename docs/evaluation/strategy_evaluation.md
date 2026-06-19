@@ -58,17 +58,9 @@ Typical fixed values:
 - `cooldown_minutes`;
 - fees and slippage.
 
-Example command:
-
-```bash
-python scripts/sweep_strategy.py \
-    --model-id lgbm_solusdt_l_fw60_q90_local_v3 \
-    --asset-id solusdt_fw60 \
-    --start 2024-01-01 \
-    --end 2025-12-31 \
-    --side long \
-    --top-n 20
-```
+No maintained standalone sweep script is currently documented. Use
+`src/modeling/evaluation/backtest.py` from the modeling/evaluation flow or add a
+thin CLI wrapper when the sweep contract is finalized.
 
 Choose the sweep dates according to the window policy above, not by convenience.
 

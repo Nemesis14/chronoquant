@@ -1,7 +1,7 @@
 ﻿# 5000 — Modeling
 
-A modeling domain a ChronoQuant ML pipeline szíve: nyers OHLCV adatokból valószínűségi
-kereskedési jelzéseket állít elő LightGBM bináris osztályozókkal.
+A modeling domain a ChronoQuant ML pipeline szíve: nyers OHLCV adatokból
+folytonos előrejelzéseket állít elő LightGBM regresszorokkal (fw60 MFE target).
 
 ---
 
@@ -18,21 +18,25 @@ flowchart TD
   C --> D[database/solusdt/samples/]
   D --> E[01_train_model.py\nlightgbm_model]
   E --> F[models/ artifact]
-  F --> G[sync_predictions\npredict_proba]
+  F --> G[sync_predictions\npredict / predict_proba]
   G --> H[predictions táblázat]
   H --> I[trading/strategy.py\njelzések]
 ```
 
 ---
 
-## Aktív modellek (v4)
+## Aktív modellek konfiguráció
 
-| Model ID | Irány | Target |
-|----------|-------|--------|
-| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `long_mfe_fw60` |
-| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `short_mfe_fw60` |
+### Éves modellek (naming convention v4)
 
-- **Target szemantika:** `fw60` = 60-perces forward ablak (`t+1..t+60`); `long_mfe_fw60` = log(max future close / close[t]); `short_mfe_fw60` = log(min future close / close[t])
+Model ID minta: `lgbm_{asset}_{direction}_fw{horizon}_{year}`
+
+| Model ID minta | Irány | Target | Évek |
+|----------------|-------|--------|------|
+| `lgbm_solusdt_l_fw60_{year}` | Long | `long_mfe_fw60` | 2021-2025 |
+| `lgbm_solusdt_s_fw60_{year}` | Short | `short_mfe_fw60` | 2021-2025 |
+
+- **Target szemantika:** `fw60` = 60-perces forward ablak (`t+1..t+60`); `long_mfe_fw60` = log(max future close / close[t]); `short_mfe_fw60` = log(min future close / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
 - **Feature prefix:** `feat_` | **Target oszlopok:** `long_mfe_fw60`, `short_mfe_fw60`
 - **t-1 lag kötelező** minden feature-ön tanítás előtt
 
@@ -50,7 +54,7 @@ flowchart TD
 | 2010 | [2010_feature_engineering.md](2010_feature_engineering.md) | Feature selection — quality, target relation, redundancy, stability | X100 | kész |
 | 3000 | [3000_targets.md](3000_targets.md) | Target layer metodológia (fw60 logreturn outcome-ok) | X100 | kész |
 | 4000 | [4000_quant_train.md](4000_quant_train.md) | quant_train table — INNER JOIN handoff, rebuild szemantika | X100 | kész |
-| 5500 | [5500_hyper_param_search.md](5500_hyper_param_search.md) | LightGBM hyperparameter search — yearly sample, Optuna TPE, CV | X100 | kész |
+| — | — | LightGBM model (training, CV, hyperparameter search) | X100 | tervezett |
 | — | — | Evaluation / backtest | X100 | tervezett |
 | — | — | Elliott waves (kutatás, izolált) | X100 | tervezett |
 | 5400 | [5400_sampling.md](5400_sampling.md) | **ARCHÍV** — expanding window CV (nem aktív) | archív | archív |

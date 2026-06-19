@@ -33,6 +33,5 @@ system assumptions that affect interpretation of model and backtest results.
 - Backtest performance can be inflated by accidental holdout leakage.
 - Feature definitions with delayed confirmation can introduce lookahead if the
   confirmation time is not used.
-- Local SQLite is simple and inspectable, but operational robustness depends on
+- Local runtime storage is simple and inspectable, but operational robustness depends on
   careful locking, backups, and runtime checks.
-

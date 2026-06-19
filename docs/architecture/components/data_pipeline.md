@@ -7,11 +7,11 @@ and runtime prediction sync.
 
 | Module | Responsibility |
 |---|---|
-| `src/data_pipeline/sync_ohlcv.py` | Fetch and upsert raw OHLCV bars |
-| `src/data_pipeline/sync_features.py` | Compute configured targets and features |
-| `src/data_pipeline/sync_predictions.py` | Load runtime model artifacts and write predictions |
-| `src/db/maintenance.py` | Rebuild derived tables |
-| `src/db/table_ops.py` | DDL and upsert helpers |
+| `src/data_handling/sync_tables/sync_ohlcv.py` | Fetch and upsert raw OHLCV bars |
+| `src/data_handling/sync_tables/sync_features.py` | Compute configured features |
+| `src/data_handling/sync_tables/sync_targets.py` | Compute fw60 target outcomes |
+| `src/data_handling/sync_tables/sync_predictions.py` | Load runtime model artifacts and write predictions |
+| `src/data_handling/store/duckdb_store.py` | DDL and insert/rebuild helpers |
 
 ## Data Contracts
 
@@ -19,4 +19,3 @@ and runtime prediction sync.
 - Derived features and predictions join on `open_time`.
 - Config is loaded through `src/utils.py`.
 - Timestamps are stored as UTC strings.
-

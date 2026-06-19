@@ -14,7 +14,7 @@ azonositasa, amelyekbol szabalyalapu long/short strategia epitheto.
 | Model family | LightGBM binary classifiers |
 | Runtime UI | Streamlit dashboard |
 | Evaluation | Threshold sweep and bar-by-bar backtest |
-| Trading state | Local SQLite runtime database |
+| Trading state | Local runtime state and journal storage |
 
 ## Business Questions
 
@@ -31,4 +31,3 @@ azonositasa, amelyekbol szabalyalapu long/short strategia epitheto.
 - Terms: `glossary.md`
 - Model evidence: `../modeling/model_cards/`
 - Backtest evidence: `../evaluation/reports/`
-

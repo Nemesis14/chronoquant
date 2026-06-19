@@ -36,7 +36,7 @@ Ruff always CLI (`--fix` auto-applies; MCP cannot do this).
 - Use `src/utils.py` as the config-loading entry point — never read JSON config directly from business logic.
 - Keep scripts thin; reusable logic belongs under `src/`.
 - Store timestamps as UTC strings: `YYYY-MM-DD HH:MM:SS`.
-- Keep generated model artifacts under `models/<model_id>/`.
+- Keep generated model artifacts under `artifacts/<model_id>/`.
 - Keep candidate model evaluation output separate from the live predictions table.
 
 ---

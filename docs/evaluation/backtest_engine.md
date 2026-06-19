@@ -1,6 +1,6 @@
 # Backtest Engine
 
-Forrás: `src/evaluation/backtest.py`
+Forrás: `src/modeling/evaluation/backtest.py`
 
 A backtest motor modell- és eszközfüggetlen szimulációs keretrendszer.
 Bármely bináris valószínűségi modell és bármely OHLCV-alapú eszköz esetén
@@ -17,7 +17,7 @@ visszamérést. Minden artifact-ot automatikusan ment.
 
 ```python
 from evaluation.backtest import run_configured_strategy
-summary = run_configured_strategy("solusdt_long_fw60_q90_local_v3")
+summary = run_configured_strategy("solusdt_long_fw60_q90_2021")
 ```
 
 ### `run_strategy_backtest(strategy_id, strategy_cfg) -> dict`
@@ -46,7 +46,7 @@ config/models.json + config/assets.json
     ↓
 model.pkl + features.json betöltése
     ↓
-SQLite features tábla → chunked feature olvasás (50 000 sor/chunk)
+DuckDB features/predictions → bounded frame build
     ↓
 model.predict_proba(X) → prediction oszlop
     ↓

@@ -14,7 +14,7 @@ flowchart TD
   B --> C[target tábla\n10 fw60 outcome oszlop]
   C --> D[sampling modul\n00_create_sample.py]
   D --> E[LightGBM tanítás\ntarget col = long_mfe_fw60]
-  C --> F[evaluation\nbacktest, model card]
+  C --> F[evaluation\nbacktest → sample_oos.parquet]
 ```
 
 **Aktív target oszlopok:** `long_mfe_fw60`, `short_mfe_fw60` — 60-perces forward logreturn outcome-ok.

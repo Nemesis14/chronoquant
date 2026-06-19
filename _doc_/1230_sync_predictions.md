@@ -43,13 +43,13 @@ sequenceDiagram
     FEAT-->>CALLER: pl.DataFrame (sorok × feature_cols)
 
     CALLER->>TARGET: query_range_pl(target, start, end)
-    TARGET-->>CALLER: pl.DataFrame trg_* értékek (opcionális)
+    TARGET-->>CALLER: pl.DataFrame fw60 outcome értékek (opcionális)
     CALLER->>CALLER: feat_df.join(target_df, on=open_time, how=left)
 
     CALLER->>MODEL: _run_inference(df, feature_list, long_model, long_meta)
-    MODEL-->>CALLER: long_pred[:, 1] (predict_proba)
+    MODEL-->>CALLER: long_pred (1D array — predict vagy predict_proba[:, 1])
     CALLER->>MODEL: _run_inference(df, feature_list, short_model, short_meta)
-    MODEL-->>CALLER: short_pred[:, 1] (predict_proba)
+    MODEL-->>CALLER: short_pred (1D array — predict vagy predict_proba[:, 1])
 
     CALLER->>PRED: insert_predictions(conn, unified_df)
 ```
@@ -120,7 +120,5 @@ Az `insert_predictions` a következő egyesített DataFrame-et kapja:
 | `open_time` | `feat_ohlcv_quant.open_time` |
 | `close` | `feat_ohlcv_quant.close` |
 | `label_end_ts` | `open_time + fw_minutes` (config) |
-| `trg_l_fw60_q90` | `target` tábla join (NULL ha nem elérhető) |
-| `trg_s_fw60_q10` | `target` tábla join (NULL ha nem elérhető) |
 | `long_pred` | `_run_inference(long_model)` |
 | `short_pred` | `_run_inference(short_model)` |

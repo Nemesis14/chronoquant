@@ -61,7 +61,7 @@ Use MCP first, CLI as fallback:
 
 ```powershell
 # Single file
-uv run pyright src/store/duckdb_store.py
+uv run pyright src/data_handling/store/duckdb_store.py
 
 # Full project
 uv run pyright

@@ -4,7 +4,7 @@ Yearly API (new):
     from modeling.sampling import YearlySamplingConfig, create_yearly_sample
     from modeling.sampling import load_yearly_sample
 
-Legacy API (kept for lightgbm_model.py / lgbm_search.py):
+Legacy API (kept for lgbm_search.py):
     from modeling.sampling import load_sample_definition, validate_sample_definition
 """
 

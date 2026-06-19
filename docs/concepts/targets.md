@@ -1,31 +1,14 @@
 # Target Concepts
 
-ChronoQuant target columns define forward-looking events. They are labels for
-training and evaluation, not live features.
+Current target methodology lives in `_doc_/3000_targets.md` and the code
+reference lives in `_doc_/3100_sync_targets.md`.
 
-## Naming
-
-```text
-trg_<side>_fw<horizon_minutes>_q<percentile>
-```
-
-Examples:
+Active primary target columns:
 
 | Target | Meaning |
 |---|---|
-| `trg_l_fw60_q90` | Long-side forward 60-minute high-percentile event |
-| `trg_s_fw60_q10` | Short-side forward 60-minute low-percentile event |
+| `long_mfe_fw60` | Log maximum favorable excursion over `t+1..t+60` for long models |
+| `short_mfe_fw60` | Log minimum favorable excursion over `t+1..t+60` for short models |
 
-## Value Semantics
-
-| Value | Meaning |
-|---|---|
-| `1` | Forward event confirmed |
-| `0` | Forward event not confirmed |
-| `NULL` | Forward window is incomplete/unknown |
-
-## Modeling Rule
-
-Targets are removed from model inputs. They may be used only as labels or
-evaluation outcomes.
-
+Binary event labels are derived downstream per model quantile, not stored as
+legacy `trg_*` target columns.

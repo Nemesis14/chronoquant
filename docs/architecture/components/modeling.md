@@ -7,15 +7,12 @@ reports, and artifact persistence.
 
 | Module | Responsibility |
 |---|---|
-| `src/modeling/datasets.py` | Load modeling frames |
-| `src/modeling/sampling.py` | Build chronological splits |
-| `src/modeling/lgbm_search.py` | LightGBM search |
-| `src/modeling/lightgbm_model.py` | LightGBM model helpers |
-| `src/modeling/metrics.py` | Metrics |
-| `src/modeling/reports.py` | Model reports |
-| `src/modeling/artifacts.py` | Artifact read/write helpers |
+| `src/modeling/sampling/` | Yearly sample creation |
+| `src/modeling/search/lgbm_search.py` | LightGBM hyperparameter search |
+| `src/modeling/training/` | Fit, datasets, metrics, reports, artifacts |
+| `src/modeling/evaluation/` | Backtest and evaluation helpers |
+| `src/modeling/feature_engineering/` | Feature quality and selection helpers |
 
 ## Artifact Contract
 
-Generated model artifacts live under `models/<model_id>/`.
-
+Generated model artifacts live under `artifacts/<model_id>/`.

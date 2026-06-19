@@ -24,7 +24,7 @@ sequenceDiagram
     OHLCV->>TARGET: DuckDB window SQL → DELETE+INSERT
 
     Note over FEAT,PRED: sync_predictions.py
-    FEAT->>PRED: ASOF join → model.predict_proba → insert
+    FEAT->>PRED: ASOF join → model.predict / predict_proba → insert
     TARGET-.->PRED: label join (ha elérhető)
 ```
 

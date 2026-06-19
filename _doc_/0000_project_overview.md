@@ -12,8 +12,8 @@ futures on Binance**. The core loop:
 
 1. Sync 1-minute OHLCV candles from Binance into a local DuckDB store.
 2. Compute quantitative features (momentum, volume, volatility) over that data.
-3. Train LightGBM binary classifiers to predict whether the next 60-bar forward
-   return exceeds a directional threshold (long) or falls below one (short).
+3. Train LightGBM regressors to predict the next 60-bar forward MFE (Maximum
+   Favorable Excursion) — a continuous logreturn outcome — for long and short direction.
 4. The trading module calibrates entry/exit rules against out-of-sample model
    output, producing a strategy artifact.
 5. A Streamlit dashboard consumes live predictions and strategy rules, shows
@@ -37,7 +37,7 @@ Owns all live data: ingestion, storage, sync, and validation.
 ### `src/modeling/` — Offline ML development
 Produces model artifacts from historical data. Runs ad-hoc, not in production.
 - Creates yearly samples (parquet), searches hyperparameters, fits final models
-- Outputs: `model.pkl`, `features.json`, `sample_oos.parquet`, `model_card.md`
+- Outputs: `model.pkl`, `features.json`, `params.json`, `sample_oos.parquet`
 - Does not operate live; does not decide thresholds or rules
 
 ### `src/trading/` — Strategy + live operations
@@ -128,7 +128,6 @@ src/
     01_feature_engineering.ipynb
     02_hyper_param_search.py
     03_fit_model.py
-    04_generate_model_card.py
 
   trading/          Strategy calibration + live operations
     00_measure_strategy.py
@@ -151,7 +150,7 @@ config/             JSON config files (assets, features, models, strategies, tra
 artifacts/          Model development artifacts — one folder per model_id
   <model_id>/
     manifest.json                   Pipeline state + model summary
-    model.pkl / features.json / params.json / model_card.json
+    model.pkl / features.json / params.json
     search/                         Hyperparameter search results
     feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
 database/           DuckDB files + static sample snapshots (read-only source for training)
@@ -195,16 +194,15 @@ Config is always accessed via `src/utils.py` — never read JSON config files di
 ### Model naming convention
 
 ```
-lgbm_{asset}_{direction}_fw{horizon}_q{quantile}_{year}
+lgbm_{asset}_{direction}_fw{horizon}_{year}
 ```
-pl. `lgbm_solusdt_l_fw60_q90_2021`, `lgbm_solusdt_s_fw60_q10_2023`
+pl. `lgbm_solusdt_l_fw60_2021`, `lgbm_solusdt_s_fw60_2023`
 
 **Active models:** 10 éves modell (2021–2025 × long + short) — mind `active: false` amíg nem kerül kiválasztásra élő kereskedésre. Config: `config/models.json` (schema v4).
 
-- **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]).
+- **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
 - **Feature engineering target:** only the model's own direction target is used (`l` → `long_mfe_fw60`, `s` → `short_mfe_fw60`).
-- **Expert exclude:** time-of-day / session-anchored features (`prev_session_*`, `day_open_return`, `day_range_position`, `bars_into_session_norm`, `weekly_open_return`) are always dropped regardless of statistical results. Patterns in `FeatureEngineeringConfig.expert_exclude_patterns`.
 - **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
 - **Samples:** read-only forrás `database/solusdt/samples/solusdt_fw60_yearly_{year}/`; nem másolódik az artifact-ba, csak hivatkozik rá (`sampling.sample_dir`).
 
@@ -212,23 +210,21 @@ pl. `lgbm_solusdt_l_fw60_q90_2021`, `lgbm_solusdt_s_fw60_q10_2023`
 
 ```bash
 # Teljes pipeline egy modellre:
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021
 
 # Egyes lépések:
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step setup
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step feature_engineering
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage smoke
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step train
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step model_card
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step setup
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step feature_engineering
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage smoke
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
 ```
 
 | Lépés | Input | Output (artifact-ban) |
 |-------|-------|----------------------|
 | `setup` | `config/models.json` | `manifest.json` |
-| `feature_engineering` | sample date range → `quant_train` (live DuckDB, year-filtered, in-memory) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
-| `search` | `feature_set.json["selected"]` + sample parquet (DuckDB join) | `search/search_best.json`, `search/best_params.json`, `search_trials.jsonl` |
-| `train` | sample parquet + search results | `model.pkl`, `features.json`, `params.json` |
-| `model_card` | model artifact + OOS results | `model_card.json` |
+| `feature_engineering` | `samples/{sample_id}/sample_train_valid.parquet` (via DuckDB) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
+| `search` | sample parquet + feature_set.json | `search/search_best.json`, `search_trials.jsonl` |
+| `train` | sample parquet + search results | `model.pkl`, `features.json`, `params.json`, `sample_oos.parquet` |
 
 ### Yearly sample model
 
@@ -241,8 +237,9 @@ Test evaluation uses a separate future-year OOS (see OOS Evaluation section).
 sample_train_valid.parquet columns:
   open_time | long_mfe_fw60 | short_mfe_fw60 | segment
 
-sample_oos.parquet columns (written by 03_fit_model.py):
-  open_time | pred_long | pred_short | long_mfe_fw60 | short_mfe_fw60
+sample_oos.parquet columns (artifacts/<model_id>/sample_oos.parquet):
+  l-irányú model: open_time | pred_long  | long_mfe_fw60 | short_mfe_fw60
+  s-irányú model: open_time | pred_short | long_mfe_fw60 | short_mfe_fw60
 ```
 
 Features are NOT stored in the sample — loaded from `quant_train` at training time.
@@ -261,9 +258,9 @@ the training data, and the OOS is a genuinely unseen period.
 ...
 ```
 
-`3_fit_model.py --year 2021 --oos-year 2022` produces:
+`uv run python src/modeling/03_fit_model.py --model lgbm_solusdt_l_fw60_2021` produces:
 1. Final model refitted on all train+valid rows of the 2021 sample.
-2. `sample_oos.parquet` — predict_proba applied to the full 2022 dataset.
+2. `sample_oos.parquet` — `predict()` (continuous regression output) applied to the full `oos_year` (2022) dataset.
 
 The trading module uses `sample_oos.parquet` for strategy calibration.
 

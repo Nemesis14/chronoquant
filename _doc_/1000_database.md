@@ -47,8 +47,8 @@ erDiagram
         TIMESTAMP open_time PK
         DOUBLE close
         TIMESTAMP label_end_ts
-        DOUBLE long_pred "predict_proba long [0,1]"
-        DOUBLE short_pred "predict_proba short [0,1]"
+        DOUBLE long_pred "long model prediction score"
+        DOUBLE short_pred "short model prediction score"
     }
 
     quant_train {
@@ -188,8 +188,8 @@ Az ASOF join (`predictions` ↔ `feat_ohlcv_quant`) az `available_ts` oszlopon a
 | `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC |
 | `close` | `DOUBLE` | Bar záróára (az `ohlcv.close`-val egyezik) |
 | `label_end_ts` | `TIMESTAMP` | A forward window vége: `open_time + fw_minutes` |
-| `long_pred` | `DOUBLE` | Long modell predict_proba értéke [0, 1] |
-| `short_pred` | `DOUBLE` | Short modell predict_proba értéke [0, 1] |
+| `long_pred` | `DOUBLE` | Long modell predikciós értéke (`predict_proba` vagy `predict`, config szerint) |
+| `short_pred` | `DOUBLE` | Short modell predikciós értéke (`predict_proba` vagy `predict`, config szerint) |
 
 ```sql
 CREATE TABLE IF NOT EXISTS predictions (

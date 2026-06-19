@@ -85,11 +85,13 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 
 | Teszt | Mit ellenőriz |
 |-------|---------------|
-| `test_feat_table_exists` | `feat_ohlcv_quant` tábla létezik |
-| `test_feat_required_columns` | `open_time`, `close`, `available_ts`, `lookback_end_ts` jelen van |
-| `test_feat_no_lookahead` | `available_ts <= open_time` minden sorban |
-| `test_feat_label_distribution` | `trg_l_fw60_q90` pozitív arány 5-20% között |
-| `test_feat_row_count_matches_ohlcv` | feature sorok száma ≈ ohlcv sorok száma |
+| `test_feat_ohlcv_quant_table_exists` | `feat_ohlcv_quant` tábla létezik |
+| `test_feat_ohlcv_quant_required_metadata_columns` | `open_time`, `close`, `available_ts`, `lookback_end_ts` jelen van |
+| `test_feat_ohlcv_quant_available_ts_no_lookahead` | `available_ts <= open_time` minden sorban |
+| `test_feat_ohlcv_quant_row_count` | feature sorok száma a várható tartományban van |
+| `test_target_required_columns` | `long_mfe_fw60`, `short_mfe_fw60` és fw60 outcome oszlopok jelen vannak |
+| `test_target_long_mfe_range` | `long_mfe_fw60` értékek az elvárt tartományban (logreturn) |
+| `test_target_short_mfe_range` | `short_mfe_fw60` értékek az elvárt tartományban (logreturn) |
 
 ---
 

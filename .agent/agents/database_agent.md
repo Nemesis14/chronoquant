@@ -7,7 +7,7 @@ Owns the storage layer, data pipeline, and DuckDB/Parquet infrastructure.
 ## Role
 
 Everything between raw Binance data and the derived feature/prediction tables.
-Responsible for DuckDB schema, Parquet partition layout, sync scripts, and
+Responsible for DuckDB schema, static sample layout, sync entry points, and
 store-layer correctness. Does not touch ML logic or UI code.
 
 ---
@@ -25,8 +25,8 @@ Read these before starting work:
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/store/` — if touching `src/store/`
-- `_doc_/data_pipeline/` — if touching `src/data_pipeline/`
+- `_doc_/1000_database.md` — if touching database schema
+- `_doc_/1200_sync_tables.md` — if touching sync tables
 
 ---
 
@@ -34,9 +34,9 @@ Load relevant module docs (only for affected modules):
 
 | Path | Responsibility |
 |------|---------------|
-| `src/store/` | DuckDB store, queries, maintenance, validation, stats, toolkit |
-| `src/data_pipeline/` | OHLCV sync, feature sync, prediction sync, target sync, rebuild derived |
-| `scripts/sync_ohlcv.py`, `scripts/benchmark_duckdb.py` | Operational scripts |
+| `src/data_handling/store/` | DuckDB store, queries, maintenance, validation, stats, toolkit |
+| `src/data_handling/sync_tables/` | OHLCV sync, feature sync, prediction sync, target sync, rebuild derived |
+| `src/data_handling/01_validate_stats.py`, `src/data_handling/02_sync_pipeline.py`, `src/data_handling/03_build_quant_train.py` | Operational entry points |
 | `config/assets.json` | Asset configuration |
 | `src/utils.py` | Config-loading helpers (shared — coordinate with others) |
 | `_tests/store/`, `_tests/data_pipeline/` | Tests for this layer |
@@ -47,14 +47,14 @@ Load relevant module docs (only for affected modules):
 ## Out of Scope
 
 - ML model code: `src/modeling/`, `src/evaluation/` — Modeling Agent
-- Streamlit UI: `src/streamlit_app/` — UI Agent
+- Streamlit UI: `src/ui/` — UI Agent
 - `.agent/` rule files — Doc Agent
 
 ---
 
 ## Key Patterns
 
-- DuckDB connection via `src/store/duckdb_store.py`
+- DuckDB connection via `src/data_handling/store/duckdb_store.py`
 - Config always loaded through `src/utils.py` — never read JSON directly
 - Timestamps: UTC strings `YYYY-MM-DD HH:MM:SS`
 - Idempotent upserts by `open_time` — all sync ops safe to re-run

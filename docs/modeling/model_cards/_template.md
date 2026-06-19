@@ -69,8 +69,7 @@ Describe what decision this model supports and where it is consumed.
 
 | Artifact | Path |
 |---|---|
-| Model | `models/<model_id>/model.pkl` |
-| Features | `models/<model_id>/features.json` |
-| Params | `models/<model_id>/params.json` |
-| Search best | `models/<model_id>/search/search_best.json` |
-
+| Model | `artifacts/<model_id>/model.pkl` |
+| Features | `artifacts/<model_id>/features.json` |
+| Params | `artifacts/<model_id>/params.json` |
+| Search best | `artifacts/<model_id>/search/search_best.json` |

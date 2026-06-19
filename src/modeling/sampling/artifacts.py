@@ -4,7 +4,7 @@ Yearly format: metadata.json, audit.json, sample_train_valid.parquet (Polars).
   sample_train_valid.parquet : hourly-sampled rows, segments train/valid/purge
   sample_oos.parquet         : full-resolution OOS year predictions (written by 03_fit_model)
 Legacy format (load/validate only): metadata.json + folds.json — kept for
-backward compatibility with lightgbm_model.py and lgbm_search.py.
+backward compatibility with lgbm_search.py.
 """
 
 import json
@@ -92,7 +92,7 @@ def write_sample_artifacts(
     _write_json(sample_dir / "audit.json",    audit)
 
 
-# %% Legacy format — load / validate (referenced by lightgbm_model.py, lgbm_search.py)
+# %% Legacy format — load / validate (referenced by lgbm_search.py)
 
 
 def load_sample_definition(sample_dir: str | Path) -> dict:

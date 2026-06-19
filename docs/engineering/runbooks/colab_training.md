@@ -9,11 +9,10 @@ Use Google Colab for compute-heavy LightGBM search phases.
 3. Commit and push notebook/config/sample changes.
 4. Open the GitHub-backed notebook in Colab.
 5. Run all cells.
-6. Copy model/search artifacts back to `models/<model_id>/`.
+6. Copy model/search artifacts back to `artifacts/<model_id>/`.
 7. Verify artifacts before validation.
 
 See also:
 
 - `docs/modeling/lightgbm_development.md`
 - `docs/engineering/tooling.md`
-

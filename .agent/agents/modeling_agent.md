@@ -8,7 +8,7 @@ Owns model training, evaluation, feature engineering, and prediction pipeline.
 
 Feature generation logic, model training, cross-validation, prediction artifact
 management, and backtest evaluation. Reads from and writes to the store only
-via the defined interfaces in `src/store/`. Does not touch the store layer
+via the defined interfaces in `src/data_handling/store/`. Does not touch the store layer
 directly or UI code.
 
 ---
@@ -26,8 +26,8 @@ Read these before starting work:
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/modeling/` — if touching `src/modeling/`
-- `_doc_/evaluation/` — if touching `src/evaluation/`
+- `_doc_/5000_modelling.md` — if touching `src/modeling/`
+- `_doc_/5500_hyper_param_search.md` — if touching model search
 
 ---
 
@@ -36,13 +36,13 @@ Load relevant module docs (only for affected modules):
 | Path | Responsibility |
 |------|---------------|
 | `src/modeling/` | Training, CV, dataset preparation, model artifacts |
-| `src/evaluation/` | Backtest, metrics, reporting |
-| `src/data_pipeline/_features_polars.py` | Feature computation logic |
-| `src/data_pipeline/sync_features.py` | Feature sync into store |
-| `src/data_pipeline/sync_predictions.py` | Prediction sync into store |
-| `models/` | Generated model artifacts (`models/<model_id>/`) |
+| `src/modeling/evaluation/` | Backtest, metrics, reporting |
+| `src/data_handling/sync_tables/_features_polars.py` | Feature computation logic |
+| `src/data_handling/sync_tables/sync_features.py` | Feature sync into store |
+| `src/data_handling/sync_tables/sync_predictions.py` | Prediction sync into store |
+| `artifacts/` | Generated model artifacts (`artifacts/<model_id>/`) |
 | `_tests/data_pipeline/` | Feature-related tests |
-| `_doc_/modeling/`, `_doc_/evaluation/` | Module documentation |
+| `_doc_/5xxx*.md` | Modeling documentation |
 
 ---
 
@@ -57,9 +57,9 @@ Load relevant module docs (only for affected modules):
 
 ## Key Patterns
 
-- Feature columns: `feat_` prefix; target columns: `trg_` prefix
-- Target naming: `trg_l_fw60_q90`, `trg_s_fw60_q10`
-- Model artifacts: `models/<model_id>/`
+- Feature columns: `feat_` prefix; primary target columns: `long_mfe_fw60`, `short_mfe_fw60`
+- Model naming: `lgbm_{asset}_{direction}_fw{horizon}_q{quantile}_{year}`
+- Model artifacts: `artifacts/<model_id>/`
 - Candidate evaluation output stays separate from live predictions table
 - Use Polars for feature computation — do not mix with pandas in same step
 - Apply t-1 lag on all features before training to prevent data leakage

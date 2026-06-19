@@ -5,14 +5,12 @@ Usage:
     uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step feature_engineering
     uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage smoke
     uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step train
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step model_card
 
 Steps (in order):
     setup               Create artifact directory and write manifest.json
     feature_engineering Run 01_feature_engineering.ipynb via papermill → artifact/feature_engineering/
     search              Hyperparameter search → artifact/search/
     train               Fit final model → artifact/model.pkl, features.json, params.json
-    model_card          Generate model_card.json → artifact/
 
 When --step is omitted, all steps run in order.
 """
@@ -29,7 +27,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 import utils  # noqa: E402
 
 NOTEBOOK_TEMPLATE = _ROOT / "src" / "modeling" / "01_feature_engineering.ipynb"
-ALL_STEPS = ["setup", "feature_engineering", "search", "train", "model_card"]
+ALL_STEPS = ["setup", "feature_engineering", "search", "train"]
 
 
 # ---------------------------------------------------------------------------
@@ -169,28 +167,13 @@ def step_train(model_id: str) -> None:
     from modeling.training.train import train_model
     print(f"[train] Training model: {model_id}")
     result = train_model(model_id)
-    print(f"[train] Done — n_features={result.get('n_features_selected')}, "
-          f"output_dir={result.get('output_dir')}")
-    _update_manifest_status(_artifact_dir_for(model_id), "train_done")
-
-
-# ---------------------------------------------------------------------------
-# Step: model_card
-# ---------------------------------------------------------------------------
-
-def step_model_card(model_id: str) -> None:
-    import subprocess
-    print(f"[model_card] Generating model card for: {model_id}")
-    result = subprocess.run(
-        ["uv", "run", "python", str(_ROOT / "src" / "modeling" / "04_generate_model_card.py"),
-         "--model-id", model_id],
-        capture_output=True, text=True,
+    print(
+        f"[train] Done — n_features={result.get('n_features')}, "
+        f"n_estimators={result.get('n_estimators')}, "
+        f"oos_year={result.get('oos_year')}, "
+        f"output_dir={result.get('artifact_dir')}"
     )
-    print(result.stdout)
-    if result.returncode != 0:
-        print(f"[model_card] ERROR:\n{result.stderr}")
-        sys.exit(result.returncode)
-    _update_manifest_status(_artifact_dir_for(model_id), "model_card_done")
+    _update_manifest_status(_artifact_dir_for(model_id), "train_done")
 
 
 # ---------------------------------------------------------------------------
@@ -251,8 +234,6 @@ def main() -> None:
             )
         elif step == "train":
             step_train(model_id)
-        elif step == "model_card":
-            step_model_card(model_id)
 
     print(f"\n[pipeline] All steps complete for {model_id}")
 

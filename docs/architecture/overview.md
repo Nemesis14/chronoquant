@@ -21,45 +21,44 @@ Key config files live under `config/`:
 
 ## Database Layer
 
-SQLite databases are organized per asset and environment. Each asset has raw
+DuckDB databases are organized per asset. Each asset has raw
 OHLCV, derived features, and prediction tables keyed by `open_time`.
 
 Important modules:
 
-- `src/db/table_ops.py`: low-level DDL and upsert helpers.
-- `src/db/toolkit.py`: inspection helpers.
-- `src/db/maintenance.py`: derived table rebuild orchestration.
+- `src/data_handling/store/duckdb_store.py`: low-level DDL and insert helpers.
+- `src/data_handling/store/toolkit.py`: inspection helpers.
+- `src/data_handling/02_sync_pipeline.py`: sync orchestration.
 
 ## Data Pipeline
 
-`src/data_pipeline/` owns idempotent sync stages:
+`src/data_handling/sync_tables/` owns idempotent sync stages:
 
 - `sync_ohlcv.py`: fetch raw 1m OHLCV bars.
 - `sync_features.py`: compute configured indicators and targets.
 - `sync_predictions.py`: load model artifacts and write live predictions.
 
-Detailed data documentation lives under `docs/data/`.
+Detailed data documentation lives under `_doc_/1000_database.md`.
 
 ## Modeling
 
 `src/modeling/` owns dataset loading, sampling, training, metrics, reports, and
-artifacts. Supported trainers include statsmodels p-value logistic regression,
-L1 logistic regression, and LightGBM.
+artifacts. The active yearly modeling flow uses LightGBM.
 
-Model artifacts are saved under `models/<model_id>/`.
+Model artifacts are saved under `artifacts/<model_id>/`.
 
-Modeling workflow documentation lives under `docs/modeling/`.
+Modeling workflow documentation lives under `_doc_/5000_modelling.md`.
 
 ## Evaluation
 
-`src/evaluation/` owns model-independent strategy evaluation and backtesting.
+`src/modeling/evaluation/` owns model-independent strategy evaluation and backtesting.
 Backtest outputs include trades, equity curves, summaries, and reports.
 
 Evaluation workflow documentation lives under `docs/evaluation/`.
 
 ## Streamlit Dashboard
 
-`src/streamlit_app/` owns the live monitoring dashboard. It chains OHLCV,
+`src/ui/` owns the live monitoring dashboard. It chains OHLCV,
 feature, and prediction sync at runtime and renders status, logs, price, and
 prediction charts.
 

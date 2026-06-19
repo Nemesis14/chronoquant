@@ -47,9 +47,9 @@ Minden smoke teszt szintetikus adattal és mocked Binance API-val fut. Nem igén
 
 | Teszt | Mit ellenőriz |
 |-------|---------------|
-| `test_sync_targets_label_columns` | `trg_l_fw60_q90` és `trg_s_fw60_q10` jelen van |
-| `test_sync_targets_null_tail` | Az utolsó 60 sor `NULL` label (horizon=60) |
-| `test_sync_targets_label_distribution` | Pozitív label arány 5-20% között (egészséges osztályeloszlás) |
+| `test_sync_targets_writes_fw60_outcome_columns` | `long_mfe_fw60`, `short_mfe_fw60` és összes fw60 outcome oszlop jelen van; idempotens |
+| `test_sync_targets_last_rows_are_null` | Az utolsó 60 sor `NULL` `long_mfe_fw60` (horizon=60) |
+| `test_sync_targets_fw60_values_are_nonzero` | Valid sorokban `long_mfe_fw60` és `short_mfe_fw60` nem null és nem nulla |
 
 ---
 

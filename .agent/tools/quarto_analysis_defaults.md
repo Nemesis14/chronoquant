@@ -10,8 +10,8 @@ Numbering belongs in Quarto config — never write "Figure 1", "Table 2", etc. m
 Régi `_doc_/analysis/_quarto.yml` törölve. Minden notebook self-contained Raw-cell frontmattert
 használ — nincs `_quarto.yml`-függőség. Az alábbi beállítások referenciaként:
 
-CSS elérési út `_doc_/` notebookoknál: `../src/analyst/chronoquant_analysis.css`  
-CSS elérési út `src/modeling/` notebookoknál: `../analyst/chronoquant_analysis.css`
+CSS elérési út `_doc_/` notebookoknál: `../analyst/chronoquant_analysis.css`
+CSS elérési út `src/modeling/` notebookoknál: `../../analyst/chronoquant_analysis.css`
 
 ```yaml
 project:
@@ -113,7 +113,7 @@ Rendering must succeed before the task is complete. If it fails, fix the noteboo
 
 Each notebook is self-contained: the full Quarto config lives in the Raw-cell frontmatter
 (see `analyst_skill.md`). No `_quarto.yml` project discovery needed.
-The CSS is referenced as `analysis/chronoquant_analysis.css` relative to `_doc_/`.
+The CSS is referenced as `../analyst/chronoquant_analysis.css` relative to `_doc_/`.
 
 ---
 

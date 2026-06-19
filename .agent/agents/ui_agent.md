@@ -7,7 +7,7 @@ Owns the Streamlit dashboard and user-facing display logic.
 ## Role
 
 Streamlit application: data loading for the UI, sync triggers, chart and table
-rendering, and user-facing configuration. Reads from the store via `src/store/`
+rendering, and user-facing configuration. Reads from the store via `src/data_handling/store/`
 interfaces — does not write to DuckDB directly or modify ML logic.
 
 ---
@@ -26,7 +26,7 @@ Do NOT load:
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/streamlit_app/` — if touching `src/streamlit_app/`
+- `_doc_/ui/` — if touching `src/ui/`
 - `_doc_/trading/` — if touching `src/trading/`
 
 ---
@@ -35,9 +35,9 @@ Load relevant module docs (only for affected modules):
 
 | Path | Responsibility |
 |------|---------------|
-| `src/streamlit_app/` | Pages, components, data loading, sync wrappers |
+| `src/ui/` | Pages, components, data loading, sync wrappers |
 | `src/trading/service.py` | Trading service called from UI |
-| `_doc_/streamlit_app/`, `_doc_/trading/` | Module documentation |
+| `_doc_/ui/`, `_doc_/trading/` | Module documentation |
 
 ---
 
@@ -45,16 +45,16 @@ Load relevant module docs (only for affected modules):
 
 - DuckDB schema or Parquet changes — Database Agent
 - ML training, feature computation, prediction logic — Modeling Agent
-- Raw data sync scripts under `scripts/` — Database Agent
+- Raw data sync entry points under `src/data_handling/` — Database Agent
 - `.agent/` rule files — Doc Agent
 
 ---
 
 ## Key Patterns
 
-- UI data loading via `src/streamlit_app/data.py` — no raw DuckDB queries in page files
-- Sync operations via `src/streamlit_app/sync.py`
-- Store reads via `src/store/duckdb_query.py` interfaces
+- UI data loading via `src/ui/data.py` — no raw DuckDB queries in page files
+- Sync operations via `src/ui/sync.py`
+- Store reads via `src/data_handling/store/duckdb_query.py` interfaces
 - No `print()` in library code — use `logger.*` or `st.*`
 - Primary active asset: SOLUSDT — UI defaults must reflect this
 

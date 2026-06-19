@@ -6,9 +6,9 @@ Use after data, model, or strategy config changes.
 import sys
 sys.path.insert(0, "src")
 
-from streamlit_app.data import load_dashboard_config
+from ui.data import load_dashboard_config
 
-cfg = load_dashboard_config(asset_id="solusdt_fw60")
+cfg = load_dashboard_config(asset_id="solusdt")
 print(cfg["runtime_model_id"])
 print(cfg["strategy_id"])
 print(cfg["strategy"]["entry_threshold"])
@@ -17,7 +17,7 @@ print(cfg["strategy"]["entry_threshold"])
 Then run:
 
 ```bash
-streamlit run src/streamlit_app/main.py
+streamlit run src/ui/main.py
 ```
 
 Check:
@@ -27,4 +27,3 @@ Check:
 - latest prediction timestamp;
 - backtest/report summary;
 - logs and sync status.
-

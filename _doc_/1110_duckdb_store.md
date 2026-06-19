@@ -143,7 +143,7 @@ flowchart TD
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
 | `conn` | `duckdb.DuckDBPyConnection` | Nyitott írható kapcsolat |
-| `df` | `pl.DataFrame` (Polars) | Target sorok (`open_time`, `close`, `trg_l_fw60_q90`, `trg_s_fw60_q10`) |
+| `df` | `pl.DataFrame` (Polars) | Target sorok (`open_time`, `long_mfe_fw60`, `short_mfe_fw60` és auxiliary fw60 oszlopok) |
 
 **Fontos:** A target kvantilis küszöbök a teljes history alapján újraszámítódnak minden `sync_targets` híváskor — ezért szükséges a teljes tartomány DELETE+INSERT.
 

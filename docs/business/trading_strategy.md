@@ -10,8 +10,8 @@ ChronoQuant currently uses two independent binary classifiers:
 
 | Side | Target | Meaning |
 |---|---|---|
-| Long | `trg_l_fw60_q90` | Probability that the next 60 minutes contain an unusually strong upward move |
-| Short | `trg_s_fw60_q10` | Probability that the next 60 minutes contain an unusually strong downward move |
+| Long | `long_mfe_fw60` thresholded by model quantile | Probability that the next 60 minutes contain an unusually strong upward move |
+| Short | `short_mfe_fw60` thresholded by model quantile | Probability that the next 60 minutes contain an unusually strong downward move |
 
 The target is intentionally not "will price go up/down". It asks whether the
 future window reaches a stronger percentile-defined event. This filters small
@@ -38,7 +38,7 @@ The active strategy parameters live in `config/strategies.json`.
 | Model registry | `config/models.json` |
 | Runtime model config | `config/env.json` |
 | Strategy config | `config/strategies.json` |
-| Long/short model artifacts | `models/<model_id>/` |
+| Long/short model artifacts | `artifacts/<model_id>/` |
 | Backtest outputs | `backtests/<strategy_id>/` |
 | Live/paper runtime reports | `trading_reports/<run_id>/` |
 
@@ -48,4 +48,3 @@ Use model cards for model evidence and evaluation reports for strategy evidence.
 
 - Model cards: `docs/modeling/model_cards/`
 - Strategy reports: `docs/evaluation/reports/`
-

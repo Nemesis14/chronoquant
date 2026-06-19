@@ -4,22 +4,20 @@
 
 | Script | Purpose |
 |---|---|
-| `scripts/sync_ohlcv.py` | Sync raw OHLCV |
+| `src/data_handling/02_sync_pipeline.py` | Run OHLCV/features/targets/predictions sync pipeline |
 
 ## Modeling
 
 | Script | Purpose |
 |---|---|
-| `scripts/create_sample_splits.py` | Create chronological sample/fold definitions |
-| `scripts/search_lgbm.py` | Run LightGBM search |
-| `scripts/generate_model_card.py` | Generate model card artifact |
+| `src/modeling/00_create_sample.py` | Create yearly random-hour sample artifacts |
+| `src/modeling/02_hyper_param_search.py` | Run LightGBM hyperparameter search |
+| `src/modeling/03_fit_model.py` | Train final model, write model.pkl + sample_oos.parquet |
 
 ## Evaluation
 
-| Script | Purpose |
-|---|---|
-| `scripts/sweep_strategy.py` | Strategy threshold sweep |
-| `scripts/backtest_strategy.py` | Run configured strategy backtest |
+No maintained standalone evaluation script is currently documented here.
+Use `src/modeling/evaluation/backtest.py` APIs from the modeling/evaluation flow.
 
 ## Elliott
 

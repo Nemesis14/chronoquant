@@ -34,7 +34,7 @@ date: "<YYYY-MM-DD>"
 format:
   html:
     theme: cosmo
-    css: ../src/analyst/chronoquant_analysis.css
+    css: ../analyst/chronoquant_analysis.css
     toc: true
     toc-title: "Tartalom"
     toc-location: left
@@ -169,7 +169,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from IPython.display import display, Markdown
 
-sys.path.insert(0, str(_root / "src"))
+sys.path.insert(0, str(_root))
 from analyst.table_formatting import format_analysis_table, display_analysis_table
 import analyst.plot_utils as pu
 import analyst.db_utils as dbu
@@ -249,15 +249,15 @@ Minden tábla cell **kötelezően** `display_analysis_table(df)`-fel zárul.
 | rate, ratio, share, pct, percent | Százalék string, 2 tizedes, pl. `23.24%`; ×100 auto ha érték ≤ 1 |
 | többi float | 3 tizedes string, pl. `1.234` |
 
-`_doc_/analyst/src/table_formatting.py` — kanonikus implementáció. Ha még nem létezik,
+`analyst/table_formatting.py` — kanonikus implementáció. Ha még nem létezik,
 hozd létre a `analysis_presentation_skill.md`-ben dokumentált kóddal, és tedd be
-a `_doc_/analyst/src/` könyvtárba.
+az `analyst/` könyvtárba.
 
 ---
 
 ## Segédmodulok
 
-Újrafelhasználható logika: `src/analyst/XXXX_<name>.py`  
+Újrafelhasználható logika: `analyst/XXXX_<name>.py`
 ahol `XXXX` = a notebook sorszáma.
 
 - Hozz létre helper-t ha ugyanaz a logika 2+ szekciót is érintene.
@@ -267,7 +267,7 @@ ahol `XXXX` = a notebook sorszáma.
 Import a Setup cell-ben:
 
 ```python
-sys.path.insert(0, str(_root / "src"))
+sys.path.insert(0, str(_root))
 from analyst.XXXX_helpers import compute_target_distribution
 ```
 

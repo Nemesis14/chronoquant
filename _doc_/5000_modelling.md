@@ -50,7 +50,7 @@ flowchart TD
 | 2010 | [2010_feature_engineering.md](2010_feature_engineering.md) | Feature selection — quality, target relation, redundancy, stability | X100 | kész |
 | 3000 | [3000_targets.md](3000_targets.md) | Target layer metodológia (fw60 logreturn outcome-ok) | X100 | kész |
 | 4000 | [4000_quant_train.md](4000_quant_train.md) | quant_train table — INNER JOIN handoff, rebuild szemantika | X100 | kész |
-| — | — | LightGBM model (training, CV, hyperparameter search) | X100 | tervezett |
+| 5500 | [5500_hyper_param_search.md](5500_hyper_param_search.md) | LightGBM hyperparameter search — yearly sample, Optuna TPE, CV | X100 | kész |
 | — | — | Evaluation / backtest | X100 | tervezett |
 | — | — | Elliott waves (kutatás, izolált) | X100 | tervezett |
 | 5400 | [5400_sampling.md](5400_sampling.md) | **ARCHÍV** — expanding window CV (nem aktív) | archív | archív |

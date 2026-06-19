@@ -26,7 +26,7 @@ from pathlib import Path
 _ROOT = next(p for p in [Path(__file__).resolve().parent, *Path(__file__).resolve().parents] if (p / "pyproject.toml").exists())
 sys.path.insert(0, str(_ROOT / "src"))
 
-import utils
+import utils  # noqa: E402
 
 NOTEBOOK_TEMPLATE = _ROOT / "src" / "modeling" / "01_feature_engineering.ipynb"
 ALL_STEPS = ["setup", "feature_engineering", "search", "train", "model_card"]
@@ -54,6 +54,14 @@ def _parse_args() -> argparse.Namespace:
         "--n-trials", type=int, default=60,
         help="Max search trials (only for 'search' step). Default: 60",
     )
+    parser.add_argument(
+        "--timeout-hours", type=float, default=None,
+        help="Hard time limit in hours for the search step. Default: no limit",
+    )
+    parser.add_argument(
+        "--fold-limit", type=int, default=None,
+        help="Limit to first N validation folds in search step. Default: stage default",
+    )
     return parser.parse_args()
 
 
@@ -79,7 +87,7 @@ def step_setup(model_id: str, meta: dict, artifact_dir: Path) -> None:
     }
     manifest_path = artifact_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=4), encoding="utf-8")
-    print(f"[setup] manifest.json written → {manifest_path}")
+    print(f"[setup] manifest.json written -> {manifest_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +109,7 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
 
     sample_dir = str(_ROOT / meta["sampling"]["sample_dir"])
 
-    print(f"[feature_engineering] Running notebook via papermill...")
+    print("[feature_engineering] Running notebook via papermill...")
     print(f"  template  : {NOTEBOOK_TEMPLATE}")
     print(f"  output    : {output_nb}")
     print(f"  sample_dir: {sample_dir}")
@@ -123,7 +131,7 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
         capture_output=True, text=True,
     )
     if result.returncode == 0:
-        print(f"[feature_engineering] HTML rendered → {output_html}")
+        print(f"[feature_engineering] HTML rendered -> {output_html}")
     else:
         print(f"[feature_engineering] WARNING: quarto render failed:\n{result.stderr}")
 
@@ -134,10 +142,22 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
 # Step: search
 # ---------------------------------------------------------------------------
 
-def step_search(model_id: str, stage: str, n_trials: int) -> None:
+def step_search(
+    model_id:      str,
+    stage:         str,
+    n_trials:      int,
+    timeout_hours: float | None = None,
+    fold_limit:    int | None   = None,
+) -> None:
     from modeling.search.lgbm_search import run_search
     print(f"[search] Starting hyperparameter search — stage={stage}, n_trials={n_trials}")
-    run_search(model_id=model_id, stage=stage, n_trials=n_trials)
+    run_search(
+        model_id      = model_id,
+        stage         = stage,
+        n_trials      = n_trials,
+        timeout_hours = timeout_hours,
+        fold_limit    = fold_limit,
+    )
     _update_manifest_status(_artifact_dir_for(model_id), "search_done")
 
 
@@ -222,7 +242,13 @@ def main() -> None:
         elif step == "feature_engineering":
             step_feature_engineering(model_id, meta, artifact_dir)
         elif step == "search":
-            step_search(model_id, args.stage, args.n_trials)
+            step_search(
+                model_id,
+                args.stage,
+                args.n_trials,
+                timeout_hours = args.timeout_hours,
+                fold_limit    = args.fold_limit,
+            )
         elif step == "train":
             step_train(model_id)
         elif step == "model_card":

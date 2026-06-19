@@ -1,8 +1,8 @@
 """Redundancy and correlation analysis.
 
-Groups feat_* columns in quant_train into high-correlation clusters using
-Pearson thresholds computed inside DuckDB.  Recommends one representative
-per cluster and marks the rest for removal.
+Groups feat_* columns in the 'quant_train' table (loaded from the model's sample
+parquet into an in-memory DuckDB) into high-correlation clusters using Pearson
+thresholds.  Recommends one representative per cluster and marks the rest for removal.
 """
 
 import logging

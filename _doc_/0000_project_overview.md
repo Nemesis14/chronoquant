@@ -203,6 +203,8 @@ pl. `lgbm_solusdt_l_fw60_q90_2021`, `lgbm_solusdt_s_fw60_q10_2023`
 
 - **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]).
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
+- **Feature engineering target:** only the model's own direction target is used (`l` → `long_mfe_fw60`, `s` → `short_mfe_fw60`).
+- **Expert exclude:** time-of-day / session-anchored features (`prev_session_*`, `day_open_return`, `day_range_position`, `bars_into_session_norm`, `weekly_open_return`) are always dropped regardless of statistical results. Patterns in `FeatureEngineeringConfig.expert_exclude_patterns`.
 - **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
 - **Samples:** read-only forrás `database/solusdt/samples/solusdt_fw60_yearly_{year}/`; nem másolódik az artifact-ba, csak hivatkozik rá (`sampling.sample_dir`).
 
@@ -223,8 +225,8 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --st
 | Lépés | Input | Output (artifact-ban) |
 |-------|-------|----------------------|
 | `setup` | `config/models.json` | `manifest.json` |
-| `feature_engineering` | `samples/{sample_id}/sample_train_valid.parquet` (via DuckDB) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
-| `search` | sample parquet + feature_set.json | `search/search_best.json`, `search_trials.jsonl` |
+| `feature_engineering` | sample date range → `quant_train` (live DuckDB, year-filtered, in-memory) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
+| `search` | `feature_set.json["selected"]` + sample parquet (DuckDB join) | `search/search_best.json`, `search/best_params.json`, `search_trials.jsonl` |
 | `train` | sample parquet + search results | `model.pkl`, `features.json`, `params.json` |
 | `model_card` | model artifact + OOS results | `model_card.json` |
 
@@ -237,7 +239,7 @@ Test evaluation uses a separate future-year OOS (see OOS Evaluation section).
 
 ```
 sample_train_valid.parquet columns:
-  open_time | feat_* | long_mfe_fw60 | short_mfe_fw60 | segment | fold_id
+  open_time | long_mfe_fw60 | short_mfe_fw60 | segment
 
 sample_oos.parquet columns (written by 03_fit_model.py):
   open_time | pred_long | pred_short | long_mfe_fw60 | short_mfe_fw60

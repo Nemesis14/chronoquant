@@ -1,8 +1,9 @@
 """Time stability analysis.
 
-Checks whether each feat_* column in quant_train behaves consistently across
-rolling time buckets.  Flags features whose null rate, variance, or target
-correlation drifts significantly in recent data versus the historical baseline.
+Checks whether each feat_* column in the 'quant_train' table (loaded from the
+model's sample parquet into an in-memory DuckDB) behaves consistently across
+rolling time buckets.  Flags features whose target correlation drifts
+significantly in recent data versus the historical baseline.
 """
 
 import logging

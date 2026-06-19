@@ -1,7 +1,8 @@
 """Univariate feature quality analysis.
 
-Reads feat_* columns from the quant_train DuckDB table and produces per-feature
-metrics: null rate, infinite-value rate, variance, outlier ratio, and a
+Reads feat_* columns from a DuckDB connection that exposes a 'quant_train' table
+(typically an in-memory DB loaded from the model's sample parquet) and produces
+per-feature metrics: null rate, infinite-value rate, variance, outlier ratio, and a
 keep / drop / review decision for each variable.
 """
 

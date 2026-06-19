@@ -1,6 +1,7 @@
 """Feature–target relationship analysis.
 
-Evaluates how each feat_* column in quant_train correlates with
+Evaluates how each feat_* column in the 'quant_train' table (loaded from the
+model's sample parquet into an in-memory DuckDB) correlates with
 long_mfe_fw60 and short_mfe_fw60.  Flags weak signals and leakage suspects.
 """
 

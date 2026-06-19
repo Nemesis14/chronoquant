@@ -25,9 +25,9 @@ class FeatureEngineeringConfig:
         max_spearman_leakage  : Flag leakage suspicion if |Spearman ρ| with a target
                                 exceeds this value.
         pearson_cluster_thr   : Pearson |r| threshold for grouping redundant features.
-        redundancy_max_rows   : Row cap for loading feat_* into numpy for correlation
-                                matrix computation.  Sampling keeps RAM under control
-                                without affecting accuracy at the 0.95 threshold.
+        redundancy_max_rows   : Row cap for correlation matrix computation.
+                                Sampling keeps RAM under control without affecting
+                                accuracy at the 0.95 threshold.
         stability_bucket_days : Number of days per rolling time bucket for stability checks.
         max_drift_threshold   : Flag as unstable if mean-normalised drift across buckets
                                 exceeds this value for either target correlation.
@@ -54,3 +54,16 @@ class FeatureEngineeringConfig:
     # --- stability ---
     stability_bucket_days : int   = 90
     max_drift_threshold   : float = 0.30
+
+    # --- expert exclude ---
+    # Features whose names contain any of these substrings are always dropped,
+    # regardless of statistical analysis results.  Covers time-of-day and
+    # session-anchored features that are valid on the full dataset but leak
+    # intra-day timing information irrelevant to a 60-bar forward model.
+    expert_exclude_patterns: tuple[str, ...] = (
+        "prev_session",
+        "day_open_return",
+        "day_range_position",
+        "bars_into_session",
+        "weekly_open_return",
+    )

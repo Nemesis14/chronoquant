@@ -393,9 +393,9 @@ def _load_sol_model_stats() -> dict[str, dict]:
     for model_id, meta in model_cfg.get("models", {}).items():
         if not meta.get("active"):
             continue
-        if meta.get("asset_id") != "solusdt_fw60":
+        if meta.get("asset_id") != "solusdt":
             continue
-        model_dir = Path(_utils._resolve_path(meta["paths"]["model_dir"]))
+        model_dir = Path(_utils._resolve_path(meta["artifact_dir"]))
         card_path = model_dir / "model_card.json"
         if not card_path.exists():
             continue

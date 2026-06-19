@@ -1,14 +1,13 @@
 """Redundancy and correlation analysis.
 
 Groups feat_* columns in quant_train into high-correlation clusters using
-Pearson thresholds via numpy.  Recommends one representative per cluster
-and marks the rest for removal.
+Pearson thresholds computed inside DuckDB.  Recommends one representative
+per cluster and marks the rest for removal.
 """
 
 import logging
 
 import duckdb
-import numpy as np
 import polars as pl
 
 from .config import FeatureEngineeringConfig
@@ -30,13 +29,12 @@ def analyze_redundancy(
     conn : duckdb.DuckDBPyConnection,
     cfg  : FeatureEngineeringConfig,
 ) -> pl.DataFrame:
-    """Detect redundant feature groups in quant_train and recommend per-cluster representatives.
+    """Detect redundant feature groups in quant_train.
 
-    Clusters are built from the Pearson correlation matrix computed in numpy.
-    Connected components (union-find) identify groups where any pair exceeds
-    cfg.pearson_cluster_thr.  The lowest-index feature in each cluster is
-    designated representative; downstream steps (t110) can refine the choice
-    using quality and target-relation metrics.
+    Computes Pearson correlation pairs inside DuckDB (no Python-side matrix) to
+    keep memory bounded.  For each feature, one aggregation query computes CORR
+    against all other features over a fixed sample; only pairs above threshold
+    are returned to Python.  Union-find clusters the resulting edge list.
 
     Args:
         conn : Open DuckDB connection to the asset database.
@@ -66,39 +64,62 @@ def analyze_redundancy(
 
     n_rows: int = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()[0]  # type: ignore[index]
     sample_n = min(n_rows, cfg.redundancy_max_rows)
+    n_feats  = len(feat_cols)
     logger.info(
-        "analyze_redundancy: loading %d feature columns, sample=%d / %d rows",
-        len(feat_cols), sample_n, n_rows,
+        "analyze_redundancy: %d features, sample=%d / %d rows",
+        n_feats, sample_n, n_rows,
     )
 
-    # --- load feat_* into Polars; fill NaN/NULL with column mean ---
-    cols_sql = ", ".join(f'"{c}"' for c in feat_cols)
+    # materialise a small sample table once — avoids re-scanning on every CORR query
     sample_clause = f"USING SAMPLE {sample_n} ROWS" if sample_n < n_rows else ""
-    df = conn.execute(f"SELECT {cols_sql} FROM quant_train {sample_clause}").pl()
+    cols_sql = ", ".join(f'"{c}"' for c in feat_cols)
+    conn.execute(f"""
+        CREATE OR REPLACE TEMP TABLE _redundancy_sample AS
+        SELECT {cols_sql} FROM quant_train {sample_clause}
+    """)
 
-    filled = df.with_columns([
-        pl.col(c).fill_nan(None).fill_null(strategy="mean")
-        for c in feat_cols
-    ])
+    # --- compute Pearson correlation for each feature pair inside DuckDB ---
+    # For each feat_i, one query computes CORR(feat_i, feat_j) for all j != i.
+    # We only pull high-correlation pairs back to Python — memory stays tiny.
+    thr = cfg.pearson_cluster_thr
+    edges: list[tuple[int, int, float]] = []   # (i, j, |r|) where j > i
+    max_pearson_per_feat: list[float] = [0.0] * n_feats
 
-    # --- Pearson correlation matrix via numpy ---
-    mat: np.ndarray = filled.to_numpy()               # (n_rows, n_feats)
-    corr: np.ndarray = np.corrcoef(mat.T)             # (n_feats, n_feats)
-    np.nan_to_num(corr, nan=0.0, copy=False)
+    for i, col_i in enumerate(feat_cols):
+        corr_selects = ", ".join(
+            f'ABS(CORR("{col_i}", "{col_j}")) AS c{j}'
+            for j, col_j in enumerate(feat_cols)
+            if j != i
+        )
+        try:
+            row = conn.execute(
+                f"SELECT {corr_selects} FROM _redundancy_sample"
+            ).fetchone()
+        except Exception:
+            continue
+        if row is None:
+            continue
 
-    n_feats = len(feat_cols)
+        # map results back to feature indices (skip index i)
+        result_idx = 0
+        for j in range(n_feats):
+            if j == i:
+                continue
+            r = row[result_idx] or 0.0
+            result_idx += 1
+            max_pearson_per_feat[i] = max(max_pearson_per_feat[i], r)
+            if j > i and r >= thr:
+                edges.append((i, j, r))
 
-    # --- union-find clustering: merge pairs above threshold ---
+    conn.execute("DROP TABLE IF EXISTS _redundancy_sample")
+
+    # --- union-find clustering over edge list ---
     parent = list(range(n_feats))
+    for i, j, _ in edges:
+        pi, pj = _find(parent, i), _find(parent, j)
+        if pi != pj:
+            parent[pi] = pj
 
-    for i in range(n_feats):
-        for j in range(i + 1, n_feats):
-            if abs(corr[i, j]) >= cfg.pearson_cluster_thr:
-                pi, pj = _find(parent, i), _find(parent, j)
-                if pi != pj:
-                    parent[pi] = pj
-
-    # --- normalise cluster IDs to sequential integers ---
     raw_roots    = [_find(parent, i) for i in range(n_feats)]
     unique_roots = sorted(set(raw_roots))
     root_map     = {r: idx for idx, r in enumerate(unique_roots)}
@@ -116,9 +137,6 @@ def analyze_redundancy(
         cid    = cluster_ids[i]
         is_rep = reps[cid] == i
 
-        members     = [j for j, c in enumerate(cluster_ids) if c == cid and j != i]
-        max_pearson = float(max((abs(corr[i, j]) for j in members), default=0.0))
-
         if is_rep:
             decision    = "keep"
             drop_reason: str | None = None
@@ -133,7 +151,7 @@ def analyze_redundancy(
             "feature"          : feat,
             "cluster_id"       : cid,
             "is_representative": is_rep,
-            "max_pearson"      : max_pearson,
+            "max_pearson"      : max_pearson_per_feat[i],
             "decision"         : decision,
             "drop_reason"      : drop_reason,
         })

@@ -102,8 +102,8 @@ def run_search(
     meta       = models_cfg["models"][model_id]
     target_col = meta["target_name"]
     asset_id   = asset_id or meta.get("asset_id")
-    sample_dir = Path(meta["training"]["sample_dir"])
-    model_dir  = Path(utils._resolve_path(meta["paths"]["model_dir"]))
+    sample_dir = Path(utils._resolve_path(meta["sampling"]["sample_dir"]))
+    model_dir  = Path(utils._resolve_path(meta["artifact_dir"]))
     search_dir = model_dir / "search"
     search_dir.mkdir(parents=True, exist_ok=True)
 

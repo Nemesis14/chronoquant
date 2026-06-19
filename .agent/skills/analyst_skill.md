@@ -34,7 +34,7 @@ date: "<YYYY-MM-DD>"
 format:
   html:
     theme: cosmo
-    css: analysis/chronoquant_analysis.css
+    css: ../src/analyst/chronoquant_analysis.css
     toc: true
     toc-title: "Tartalom"
     toc-location: left
@@ -169,14 +169,17 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from IPython.display import display, Markdown
 
-sys.path.insert(0, "analyst/src")
-from table_formatting import format_analysis_table, display_analysis_table
+sys.path.insert(0, str(_root / "src"))
+from analyst.table_formatting import format_analysis_table, display_analysis_table
+import analyst.plot_utils as pu
+import analyst.db_utils as dbu
 
 # Ha van notebook-specifikus helper:
-# from XXXX_helpers import ...
+# from analyst.XXXX_helpers import ...
 
-# Adatbázis path
-db_path = "../data/chronoquant.duckdb"   # igazítsd a projekt tényleges path-jához
+# Adatbázis path — utils-on keresztül, ne hardcode
+import utils
+db_path = utils.load_asset_config()["database"]["db_path"]
 
 # Design standard (részletek: analysis_presentation_skill.md)
 CQ_COLORS = {
@@ -254,7 +257,7 @@ a `_doc_/analyst/src/` könyvtárba.
 
 ## Segédmodulok
 
-Újrafelhasználható logika: `_doc_/analyst/src/XXXX_<name>.py`  
+Újrafelhasználható logika: `src/analyst/XXXX_<name>.py`  
 ahol `XXXX` = a notebook sorszáma.
 
 - Hozz létre helper-t ha ugyanaz a logika 2+ szekciót is érintene.
@@ -264,8 +267,8 @@ ahol `XXXX` = a notebook sorszáma.
 Import a Setup cell-ben:
 
 ```python
-sys.path.insert(0, "analyst/src")
-from 3200_target_helpers import compute_target_distribution
+sys.path.insert(0, str(_root / "src"))
+from analyst.XXXX_helpers import compute_target_distribution
 ```
 
 ---

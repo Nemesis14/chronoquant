@@ -32,9 +32,9 @@ def train_model(model_id: str) -> dict:
     meta       = models_cfg["models"][model_id]
     trainer    = meta["trainer"]
     target_col = meta["target_name"]
-    sample_dir = Path(meta["training"]["sample_dir"])
-    output_dir = Path(utils._resolve_path(meta["paths"]["model_dir"]))
-    row_stride = meta["training"].get("row_stride", 1)
+    sample_dir = Path(utils._resolve_path(meta["sampling"]["sample_dir"]))
+    output_dir = Path(utils._resolve_path(meta["artifact_dir"]))
+    row_stride = meta["sampling"].get("row_stride", 1)
     asset_id   = meta.get("asset_id")
 
     if trainer == "lightgbm_binary":

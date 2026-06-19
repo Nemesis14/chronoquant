@@ -58,23 +58,30 @@ def analyze_quality(
 
     for col in feat_cols:
         # --- aggregate stats in DuckDB (one query per feature) ---
-        row = conn.execute(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE "{col}" IS NULL)::DOUBLE / {n_rows}       AS null_rate,
-                COUNT(*) FILTER (WHERE isinf("{col}"))::DOUBLE / {n_rows}        AS inf_rate,
-                VAR_SAMP("{col}") FILTER (WHERE "{col}" IS NOT NULL
-                                              AND NOT isinf("{col}"))             AS variance,
-                AVG("{col}")      FILTER (WHERE "{col}" IS NOT NULL
-                                              AND NOT isinf("{col}"))             AS col_mean,
-                STDDEV_SAMP("{col}") FILTER (WHERE "{col}" IS NOT NULL
-                                                 AND NOT isinf("{col}"))          AS col_std
-            FROM quant_train
-        """).fetchone()
+        null_rate: float = conn.execute(
+            f'SELECT COUNT(*) FILTER (WHERE "{col}" IS NULL)::DOUBLE / {n_rows} FROM quant_train'
+        ).fetchone()[0] or 0.0  # type: ignore[index]
 
-        null_rate, inf_rate, variance, col_mean, col_std = row  # type: ignore[misc]
-        null_rate = null_rate or 0.0
-        inf_rate  = inf_rate  or 0.0
-        variance  = variance  or 0.0
+        inf_rate: float = conn.execute(
+            f'SELECT COUNT(*) FILTER (WHERE isinf("{col}"))::DOUBLE / {n_rows} FROM quant_train'
+        ).fetchone()[0] or 0.0  # type: ignore[index]
+
+        try:
+            stats_row = conn.execute(f"""
+                SELECT
+                    VAR_SAMP("{col}") FILTER (WHERE "{col}" IS NOT NULL
+                                                  AND NOT isinf("{col}"))            AS variance,
+                    AVG("{col}")      FILTER (WHERE "{col}" IS NOT NULL
+                                                  AND NOT isinf("{col}"))            AS col_mean,
+                    STDDEV_SAMP("{col}") FILTER (WHERE "{col}" IS NOT NULL
+                                                     AND NOT isinf("{col}"))         AS col_std
+                FROM quant_train
+            """).fetchone()
+            variance, col_mean, col_std = stats_row  # type: ignore[misc]
+            variance = variance or 0.0
+        except Exception:
+            # VAR_SAMP overflow: feature has extreme numeric range — treat as review
+            variance, col_mean, col_std = float("inf"), None, None
 
         # --- outlier ratio: |z-score| > 3 over valid values ---
         if col_std is not None and col_std > 0 and col_mean is not None:

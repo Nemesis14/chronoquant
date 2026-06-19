@@ -154,7 +154,7 @@ def main() -> None:
         print(f"ERROR: model_id '{args.model_id}' not found in config/models.json")
         sys.exit(1)
 
-    model_dir = Path(utils._resolve_path(model_meta["paths"]["model_dir"]))
+    model_dir = Path(utils._resolve_path(model_meta["artifact_dir"]))
 
     print(f"Reading CV metrics from {model_dir / 'search' / 'search_best.json'}...")
     cv = _cv_metrics(model_dir)

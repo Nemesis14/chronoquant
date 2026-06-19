@@ -221,10 +221,6 @@ def load_model_params_config() -> dict:
     return _load_json("model_params.json")
 
 
-def load_model_registry_config() -> dict:
-    """Load the model registry from config/model_registry.json."""
-    return _load_json("model_registry.json")
-
 
 def load_predictions_config() -> dict:
     """Load predictions config from config/predictions.json."""

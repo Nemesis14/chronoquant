@@ -49,7 +49,7 @@ class FeatureEngineeringConfig:
 
     # --- redundancy ---
     pearson_cluster_thr   : float = 0.95
-    redundancy_max_rows   : int   = 500_000
+    redundancy_max_rows   : int   = 50_000
 
     # --- stability ---
     stability_bucket_days : int   = 90

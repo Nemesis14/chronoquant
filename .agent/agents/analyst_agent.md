@@ -40,19 +40,26 @@ _doc_/
   analysis/
     _quarto.yml            ← Quarto config (régi notebookok; új notebookok self-contained frontmatterrel)
     chronoquant_analysis.css   ← CSS (erre hivatkoznak az új notebookok is)
-  analyst/
-    src/
-      XXXX_<name>.py       ← újrafelhasználható elemzési segédmodulok
-                              XXXX = a notebook sorszáma (prefix)
 
+src/
+  analyst/
+    __init__.py
+    table_formatting.py    ← display_analysis_table, format_analysis_table
+    plot_utils.py          ← apply_theme(), plot templates (timeseries, bar_monthly, …)
+    db_utils.py            ← connect(), load_table(), table_stats_df(), …
+    XXXX_<name>.py         ← notebook-specifikus segédmodulok (XXXX = notebook sorszáma)
 ```
 
 Python segédmodulok importja a notebookban:
 
 ```python
 import sys
-sys.path.insert(0, "analyst/src")
-from XXXX_helpers import something
+sys.path.insert(0, str(_root / "src"))
+from analyst.table_formatting import display_analysis_table
+import analyst.plot_utils as pu
+import analyst.db_utils as dbu
+# notebook-specifikus helper (ha van):
+from analyst.XXXX_helpers import something
 ```
 
 ---
@@ -104,7 +111,7 @@ Notebook felépítése (részletes szabályok: `analyst_skill.md`):
 ### 5. Kód és segédmodulok
 
 - Az elemzési Python kód a notebook code cell-jeibe kerül.
-- Ha ugyanaz a logika több szekciót is érintene: emeld ki `_doc_/analyst/src/XXXX_<name>.py`-ba.
+- Ha ugyanaz a logika több szekciót is érintene: emeld ki `src/analyst/XXXX_<name>.py`-ba.
 - A helper fájlnév prefixe = a notebook sorszáma (pl. `3200_target_helpers.py`).
 - Minden publikus helper függvény típusannotált, Google-style docstring-gel (ld. `coding_skill.md`).
 

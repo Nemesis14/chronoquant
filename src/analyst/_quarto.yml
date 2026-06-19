@@ -1,0 +1,50 @@
+project:
+  type: default
+
+execute:
+  enabled: true
+  echo: true
+  warning: false
+  message: false
+  freeze: false
+
+format:
+  html:
+    theme: cosmo
+    css: chronoquant_analysis.css
+
+    toc: true
+    toc-title: "Tartalom"
+    toc-location: left
+    toc-depth: 3
+    toc-expand: 2
+
+    number-sections: true
+
+    page-layout: article
+    smooth-scroll: true
+
+    code-fold: true
+    code-tools: true
+    code-summary: "code"
+    code-copy: true
+    code-overflow: wrap
+
+    df-print: paged
+
+    fig-align: center
+    fig-width: 10
+    fig-height: 5
+    fig-format: retina
+
+    embed-resources: true
+    self-contained: true
+
+    date-format: "YYYY-MM-DD"
+    link-external-newwindow: true
+
+    grid:
+      sidebar-width: 320px
+      body-width: 900px
+      margin-width: 200px
+      gutter-width: 2rem

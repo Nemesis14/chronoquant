@@ -97,9 +97,9 @@ ui/  ◀──  predictions table + strategy artifact + trade journal
 | `quant_train` | DuckDB | Ad-hoc join table, rebuilt before training |
 | Yearly samples | Parquet (`database/<asset>/samples/<id>/`) | Static snapshots, not synced |
 | OOS predictions | Parquet (`database/<asset>/samples/<sample_id>/sample_oos.parquet`) | Static, per-model OOS output |
-| Feature engineering analysis | Parquet + `.md` (`database/<asset>/feature_engineering/<run_id>/`) | Ad-hoc, analyst output |
-| Model artifacts | `models/<model_id>/` | Runtime use by prediction sync |
-| Strategy artifacts | `models/<model_id>/strategy/` | Runtime use by trading loop |
+| Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output |
+| Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
+| Strategy artifacts | `artifacts/<model_id>/strategy/` | Runtime use by trading loop |
 
 **Rule:** if a table needs to be synced incrementally → DuckDB. If it is a static
 snapshot produced by a modeling or analysis run → Parquet.
@@ -141,20 +141,23 @@ src/
 research/           Sandbox — explorations not yet production-ready
   elliott/            Elliott wave parser, validators, scanners, backtest
 
+src/analyst/        Analyst Python segédmodulok (table_formatting, plot_utils, db_utils, CSS, _quarto.yml)
 _doc_/              Module documentation + analyst notebooks
-  XXXX_*.ipynb        Analyst notebookok (közvetlenül itt, nem analysis/ alatt)
+  XXXX_*.ipynb        Analyst notebookok (közvetlenül itt)
   XXXX_*.html         Quarto-rendered HTML output
-  analysis/           Quarto config (_quarto.yml) + CSS (régi notebookok)
-  analyst/src/        Analyst Python segédmodulok (XXXX_ prefix = notebook sorszáma)
 _jira_/             Local task tracking (epics → tasks → stories); jira.json = epic counter
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
-models/             Generated model and strategy artifacts
-database/           DuckDB files, samples, OOF outputs, feature engineering runs
+artifacts/          Model development artifacts — one folder per model_id
+  <model_id>/
+    manifest.json                   Pipeline state + model summary
+    model.pkl / features.json / params.json / model_card.json
+    search/                         Hyperparameter search results
+    feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
+database/           DuckDB files + static sample snapshots (read-only source for training)
   solusdt/
     solusdt.duckdb
-    samples/<sample_id>/          metadata.json, audit.json, sample_train_valid.parquet, sample_oos.parquet
-    feature_engineering/<run_id>/ feature_set.json, analyst_report.md
+    samples/<sample_id>/            metadata.json, audit.json, sample_train_valid.parquet
 ```
 
 ---
@@ -189,26 +192,41 @@ Config is always accessed via `src/utils.py` — never read JSON config files di
 
 ## Modeling Pipeline
 
-### Active models (v4)
+### Model naming convention
 
-| Model ID | Direction | Target |
-|----------|-----------|--------|
-| `lgbm_solusdt_l_fw60_q90_local_v4` | Long | `long_mfe_fw60` |
-| `lgbm_solusdt_s_fw60_q10_local_v4` | Short | `short_mfe_fw60` |
+```
+lgbm_{asset}_{direction}_fw{horizon}_q{quantile}_{year}
+```
+pl. `lgbm_solusdt_l_fw60_q90_2021`, `lgbm_solusdt_s_fw60_q10_2023`
+
+**Active models:** 10 éves modell (2021–2025 × long + short) — mind `active: false` amíg nem kerül kiválasztásra élő kereskedésre. Config: `config/models.json` (schema v4).
 
 - **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]).
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
-- Artifacts stored under `models/<model_id>/`.
+- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
+- **Samples:** read-only forrás `database/solusdt/samples/solusdt_fw60_yearly_{year}/`; nem másolódik az artifact-ba, csak hivatkozik rá (`sampling.sample_dir`).
 
-### Script pipeline (runs offline, in order)
+### Pipeline (runs offline, in order)
 
-| Script | Input | Output |
-|--------|-------|--------|
-| `00_create_sample.py` | `quant_train` table | `sample_train_valid.parquet`, `metadata.json`, `audit.json` |
-| `01_feature_engineering.ipynb` | `quant_train` table | `feature_set.json` |
-| `02_hyper_param_search.py` | `sample_train_valid.parquet` + `feature_set.json` | `best_params.json` |
-| `03_fit_model.py` | `sample_train_valid.parquet` + `best_params.json` + OOS year | `model.pkl`, `features.json`, `sample_oos.parquet` |
-| `04_generate_model_card.py` | model artifact + OOS results | `model_card.md` |
+```bash
+# Teljes pipeline egy modellre:
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021
+
+# Egyes lépések:
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step setup
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step feature_engineering
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage smoke
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step train
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step model_card
+```
+
+| Lépés | Input | Output (artifact-ban) |
+|-------|-------|----------------------|
+| `setup` | `config/models.json` | `manifest.json` |
+| `feature_engineering` | `samples/{sample_id}/sample_train_valid.parquet` (via DuckDB) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
+| `search` | sample parquet + feature_set.json | `search/search_best.json`, `search_trials.jsonl` |
+| `train` | sample parquet + search results | `model.pkl`, `features.json`, `params.json` |
+| `model_card` | model artifact + OOS results | `model_card.json` |
 
 ### Yearly sample model
 
@@ -301,6 +319,6 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts |
 | UI Agent | `src/ui/`, `src/trading/` |
 | Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ code reference files |
-| Analyst Agent | `_doc_/XXXX_*.ipynb` (elemzési notebookok), `_doc_/analyst/src/` (Python segédmodulok); user-célból indul, nem spec-ből; interaktív session |
+| Analyst Agent | `_doc_/XXXX_*.ipynb` (elemzési notebookok), `src/analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`); user-célból indul, nem spec-ből; interaktív session |
 | Methodology Agent | `_doc_/` X000, X100 levels — business rationale, methodological decisions, parameter justification |
 | Validator Agent | `pr_` ticket validation: ruff + pyright + pytest, then `done_` promotion |

@@ -214,11 +214,11 @@ Shared helper module — import in every analysis notebook Setup cell:
 
 ```python
 import sys
-sys.path.insert(0, "analyst/src")
-from table_formatting import format_analysis_table, display_analysis_table
+sys.path.insert(0, str(_root / "src"))
+from analyst.table_formatting import format_analysis_table, display_analysis_table
 ```
 
-`_doc_/analyst/src/table_formatting.py` is the canonical implementation.
+`src/analyst/table_formatting.py` is the canonical implementation.
 Functions are also reproduced here for reference:
 
 ```python

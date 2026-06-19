@@ -155,10 +155,9 @@ def _load_model_artifacts(
     Returns:
         (model, feature_list) on success, (None, None) if artifacts are missing.
     """
-    paths     = model_meta["paths"]
-    model_dir = utils._resolve_path(paths["model_dir"])
-    feat_path = os.path.join(model_dir, paths["features_file"])
-    mdl_path  = os.path.join(model_dir, paths["model_file"])
+    model_dir = utils._resolve_path(model_meta["artifact_dir"])
+    feat_path = os.path.join(model_dir, "features.json")
+    mdl_path  = os.path.join(model_dir, "model.pkl")
 
     if not os.path.exists(feat_path) or not os.path.exists(mdl_path):
         logger.warning("Model artifact nem talalhato: model_id=%s, kihagyva", model_id)

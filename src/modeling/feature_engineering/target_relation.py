@@ -61,24 +61,30 @@ def analyze_target_relation(
     for target in cfg.target_cols:
         for col in feat_cols:
             # --- Pearson via DuckDB CORR() ---
-            pearson_r: float | None = conn.execute(f"""
-                SELECT CORR("{col}", "{target}")
-                FROM quant_train
-                WHERE "{col}" IS NOT NULL AND NOT isinf("{col}")
-            """).fetchone()[0]  # type: ignore[index]
-
-            # --- Spearman via RANK() within DuckDB ---
-            spearman_rho: float | None = conn.execute(f"""
-                WITH ranked AS (
-                    SELECT
-                        RANK() OVER (ORDER BY "{col}")    AS feat_rank,
-                        RANK() OVER (ORDER BY "{target}") AS tgt_rank
+            try:
+                pearson_r: float | None = conn.execute(f"""
+                    SELECT CORR("{col}", "{target}")
                     FROM quant_train
                     WHERE "{col}" IS NOT NULL AND NOT isinf("{col}")
-                )
-                SELECT CORR(feat_rank, tgt_rank)
-                FROM ranked
-            """).fetchone()[0]  # type: ignore[index]
+                """).fetchone()[0]  # type: ignore[index]
+            except Exception:
+                pearson_r = None
+
+            # --- Spearman via RANK() within DuckDB ---
+            try:
+                spearman_rho: float | None = conn.execute(f"""
+                    WITH ranked AS (
+                        SELECT
+                            RANK() OVER (ORDER BY "{col}")    AS feat_rank,
+                            RANK() OVER (ORDER BY "{target}") AS tgt_rank
+                        FROM quant_train
+                        WHERE "{col}" IS NOT NULL AND NOT isinf("{col}")
+                    )
+                    SELECT CORR(feat_rank, tgt_rank)
+                    FROM ranked
+                """).fetchone()[0]  # type: ignore[index]
+            except Exception:
+                spearman_rho = None
 
             spearman_abs = abs(spearman_rho) if spearman_rho is not None else 0.0
             signal_proxy = spearman_abs

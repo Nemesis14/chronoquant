@@ -14,8 +14,8 @@ futures on Binance**. The core loop:
 2. Compute quantitative features (momentum, volume, volatility) over that data.
 3. Train LightGBM regressors to predict the next 60-bar forward MFE (Maximum
    Favorable Excursion) — a continuous logreturn outcome — for long and short direction.
-4. The trading module calibrates entry/exit rules against out-of-sample model
-   output, producing a strategy artifact.
+4. The strategy module calibrates entry/exit rules against model output,
+   producing a strategy artifact with isotonic-calibrated scores and Optuna-optimised thresholds.
 5. A Streamlit dashboard consumes live predictions and strategy rules, shows
    signals, and exposes live trading controls.
 
@@ -26,7 +26,7 @@ it does not feed the live trading pipeline.
 
 ## Module Architecture
 
-Four production modules with clear, non-overlapping responsibilities:
+Five production modules with clear, non-overlapping responsibilities:
 
 ### `src/data_handling/` — Operational data layer
 Owns all live data: ingestion, storage, sync, and validation.
@@ -37,14 +37,20 @@ Owns all live data: ingestion, storage, sync, and validation.
 ### `src/modeling/` — Offline ML development
 Produces model artifacts from historical data. Runs ad-hoc, not in production.
 - Creates yearly samples (parquet), searches hyperparameters, fits final models
-- Outputs: `model.pkl`, `features.json`, `params.json`, `sample_oos.parquet`
-- Does not operate live; does not decide thresholds or rules
+- Outputs: `model.pkl`, `features.json`, `params.json`, updated `sample_train_valid.parquet`
+- Does not operate live; does not decide thresholds or rules; does not produce OOS scores
 
-### `src/trading/` — Strategy + live operations
-Consumes model artifacts to calibrate strategy rules, then runs them live.
-- Measures strategy performance on OOF predictions → produces strategy artifact
-- Runs the live trading loop: reads `predictions` table, applies rules, journals trades
-- Owns: thresholds, cut-offs, position sizing, cooldowns, hold times
+### `src/strategy/` — Offline strategy calibration
+Consumes model artifacts to calibrate trading rules. Runs ad-hoc, not in production.
+- Builds strategy table: both model predictions + targets from `quant_train` (DuckDB)
+- Calibrates raw regression scores via isotonic regression → E[mfe | score]
+- Optimises entry/exit/cooldown with Optuna (continuous MFE objective)
+- Outputs: `strategy_artifact.json`, `isotonic_long/short.pkl`, `strategy_table.parquet`, `sweep_results.csv`
+
+### `src/trading/` — Live operations only
+Runs the calibrated strategy live. Does not calibrate or optimise — only executes.
+- Reads `predictions` table + `strategy_artifact.json`, applies rules, journals trades
+- Owns: live state machine (FLAT → LONG/SHORT → COOLDOWN), position sizing, trade journal
 
 ### `src/ui/` — Display layer
 Reads from the database and from artifacts; does not write business data.
@@ -72,14 +78,20 @@ modeling/                                           quant_train (ad-hoc build)
   0_create_sample   ◀──────────────────────────────────────┘
   1_feature_engineering
   2_hyper_param_search
-  3_fit_model  ──────────▶  model artifact (model.pkl + features.json)
-               ──────────▶  sample_oos.parquet
+  3_fit_model  ──────────▶  model artifact (model.pkl + features.json + params.json)
+                            sample_train_valid.parquet (pred_{dir} added)
+
+strategy/             ◀──  model artifacts (model.pkl + features.json) × 2 models
+  0_build_strategy_table   ◀──  quant_train (DuckDB) + target (DuckDB)
+                           ──▶  strategy_table.parquet
+  1_calibrate_scores       ◀──  strategy_table.parquet
+                           ──▶  isotonic_long/short.pkl + updated strategy_table.parquet
+  2_optimize_strategy      ◀──  strategy_table.parquet (calibrated)
+                           ──▶  strategy_artifact.json + sweep_results.csv
 
 trading/
-  0_measure_strategy  ◀──  sample_oos.parquet
-                      ──▶  strategy artifact (thresholds, rules)
   live loop           ◀──  predictions table (database sync)
-                      ◀──  strategy artifact
+                      ◀──  strategy_artifact.json + isotonic_long/short.pkl
                       ──▶  trade journal
 
 database/  ◀──  prediction sync uses model artifact  ──▶  predictions table
@@ -96,10 +108,9 @@ ui/  ◀──  predictions table + strategy artifact + trade journal
 | Live OHLCV, features, targets, predictions | DuckDB | Synced, queryable, updatable |
 | `quant_train` | DuckDB | Ad-hoc join table, rebuilt before training |
 | Yearly samples | Parquet (`artifacts/<model_id>/sample_train_valid.parquet`) | Model-specific; contains all feat_* + own target + pred_{dir} (after train step) |
-| OOS predictions | Parquet (`artifacts/<model_id>/sample_oos.parquet`) | Model-specific; own target + pred_{dir} + selected feat_* + segment='test' |
 | Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
-| Strategy artifacts | `artifacts/<model_id>/strategy/` | Runtime use by trading loop |
+| Strategy artifacts | `artifacts/{session_id}/` — naming: `strategy_{asset}_fw{horizon}_{start}_{end}` (e.g. `strategy_lgbm_solusdt_fw60_2101_2605`); contains `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `strategy_table.parquet`, `sweep_results.csv`, `trades.parquet`, `equity_curve.parquet`, `summary.json`, `strategy_report.ipynb/.html` | Produced by `src/strategy/`; runtime use by live trading loop |
 
 **Rule:** if a table needs to be synced incrementally → DuckDB. If it is a static
 snapshot produced by a modeling or analysis run → Parquet.
@@ -129,12 +140,16 @@ src/
     02_hyper_param_search.py
     03_fit_model.py
 
-  trading/          Strategy calibration + live operations
-    calibration/        Backtest engine, calibration orchestrator, strategy artifacts
+  strategy/         Offline strategy calibration (ad-hoc, not in production)
+    strategy/           build_table, calibrate, optimize, artifacts library
+    tests/              Smoke tests
+    00_build_strategy_table.py
+    01_calibrate_scores.py
+    02_optimize_strategy.py
+
+  trading/          Live trading operations only
     live/               TradingService, exchange client, journal, state machine, strategy evaluator
-    00_calibrate_strategy.py
-    01_sweep_strategy.py
-    02_run_service.py
+    01_run_service.py
 
   ui/               Streamlit dashboard (pages, components, data loading)
   utils.py          All config loading — single entry point, never read JSON directly
@@ -149,16 +164,27 @@ _doc_/              Module documentation + analyst notebooks
 _jira_/             Local task tracking (epics → tasks → stories); jira.json = epic counter
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
-artifacts/          Model development artifacts — one folder per model_id
+artifacts/          Model and strategy artifacts
   <model_id>/
     manifest.json                   Pipeline state + model summary
     metadata.json / audit.json      Sample metadata (written by sample step)
-    sample_train_valid.parquet      Hourly sample: own target + pred_{dir} + all feat_* + segment
-    sample_oos.parquet              OOS predictions: own target + pred_{dir} + selected feat_* + segment='test'
+    sample_train_valid.parquet      Hourly sample: own target + pred_{dir} + all feat_* + fold_id
     model.pkl / features.json / params.json
     search/                         Hyperparameter search results
     feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
-    strategy/                       strategy_artifact.json + sweep_results.csv + report.html
+  <session_id>/                     Strategy session — naming: strategy_{asset}_fw{horizon}_{start}_{end}
+                                    e.g. strategy_lgbm_solusdt_fw60_2101_2605
+                                    (asset=solusdt, horizon=60, start=2021-01, end=2026-05; no date suffix)
+    strategy_table.parquet          open_time | pred_long_raw | pred_short_raw | pred_long_cal | pred_short_cal | long_mfe_fw60 | short_mfe_fw60
+    isotonic_long.pkl               Fitted sklearn IsotonicRegression (long direction)
+    isotonic_short.pkl              Fitted sklearn IsotonicRegression (short direction)
+    strategy_artifact.json          Entry/exit/cooldown thresholds + metrics + artifact path refs
+    sweep_results.csv               Optuna trial log
+    trades.parquet                  Trade ledger (entry_time, exit_time, direction, hold_minutes, exit_reason, …)
+    equity_curve.parquet            Cumulative MFE per trade (proxy equity curve)
+    summary.json                    Session summary: n_trades, win_rate, gross_return, equity_basis
+    strategy_report.ipynb           Analyst report notebook
+    strategy_report.html            Quarto-rendered HTML report
 database/           DuckDB files only (samples no longer stored here)
   solusdt/
     solusdt.duckdb
@@ -199,16 +225,18 @@ Config is always accessed via `src/utils.py` — never read JSON config files di
 ### Model naming convention
 
 ```
-lgbm_{asset}_{direction}_fw{horizon}_{year}
+lgbm_{asset}_{direction}_fw{horizon}_{year}               ← éves modell
+lgbm_{asset}_{direction}_fw{horizon}_{start}_{end}        ← multi-year champion
 ```
 pl. `lgbm_solusdt_l_fw60_2021`, `lgbm_solusdt_s_fw60_2023`
+pl. `lgbm_solusdt_l_fw60_2101_2605` (anchor 2023-01, valid through 2026-05)
 
-**Active models:** 10 éves modell (2021–2025 × long + short) — mind `active: false` amíg nem kerül kiválasztásra élő kereskedésre. Config: `config/models.json` (schema v4).
+**Active models:** 10 éves modell (2021–2025 × long + short) + 2 champion modell (`lgbm_solusdt_l/s_fw60_2101_2605`) — mind `active: false` amíg nem kerül kiválasztásra élő kereskedésre. Config: `config/models.json` (schema v4).
 
 - **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
 - **Feature engineering target:** only the model's own direction target is used (`l` → `long_mfe_fw60`, `s` → `short_mfe_fw60`).
-- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `sample_train_valid.parquet`, `sample_oos.parquet`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
+- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `sample_train_valid.parquet`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`. Note: `sample_oos.parquet` is **not** produced by the fit step — strategy calibration reads from `quant_train` (DuckDB) directly.
 - **Samples:** model-specifikusak, az artifact mappában élnek. A `sample_train_valid.parquet` a `sample` lépés outputja; a `pred_{dir}` oszlop a `train` lépés után kerül bele.
 
 ### Pipeline (runs offline, in order)
@@ -231,7 +259,7 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step t
 | `sample` | `quant_train` (DuckDB) | `sample_train_valid.parquet`, `metadata.json`, `audit.json` |
 | `feature_engineering` | `sample_train_valid.parquet` (artifact) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
 | `search` | `sample_train_valid.parquet` + `feature_set.json` (artifact) | `search/search_best.json`, `search_trials.jsonl` |
-| `train` | `sample_train_valid.parquet` + search results | `model.pkl`, `features.json`, `params.json`, `sample_train_valid.parquet` (pred hozzáadva), `sample_oos.parquet` |
+| `train` | `sample_train_valid.parquet` + search results | `model.pkl`, `features.json`, `params.json`, `sample_train_valid.parquet` (pred hozzáadva) |
 
 ### Yearly sample model
 
@@ -244,7 +272,14 @@ One sample = one calendar year. Sample ID: `{asset_id}_fw60_yearly_{year}`.
 | Legacy weekly | `yearly_random_hour` (default) | 4-fold random-week, monthly stratified | `fold_id` 1–4 per week | Legacy |
 | **Walk-forward** | `walk_forward` | 9m train + 3m valid, 3m shift | `fold_id` 1–4 (valid ablak) / `0` (train-only) | **ACTIVE** |
 
-**Walk-forward CV (ACTIVE):** `train_months=9`, `valid_months=3`, `shift_months=3` → 4 fold/év, non-overlapping validation ablakok. Validation átnyúlhat a következő évre. Purge: 240 perc. `metadata.json`-ban: `fold_time_windows` lista (foldonkénti `train_start/end`, `valid_start/end`). `fold_id = 0` a train-only sorokat jelöli.
+**Walk-forward CV (ACTIVE):** paraméterek a `config/models.json` → `sampling` szekcióból jönnek (`train_months`, `valid_months`, `shift_months`, `n_folds`). Purge: 240 perc. `metadata.json`-ban: `fold_time_windows` lista (foldonkénti `train_start/end`, `valid_start/end`). `fold_id = 0` a train-only sorokat jelöli.
+
+| Modell típus | train | valid | shift | n_folds |
+|---|---|---|---|---|
+| Éves (2021–2025) | 9m | 3m | 3m | 4 |
+| Champion (`_2101_2605`) | 9m | 8m | 8m | 4 |
+
+Éves modellek anchor éve = `sampling.year`; champion modelleknél `sampling.year` adja az anchor-t (2023), a tényleges adattartomány a fold windows-ból számítódik (2023-01 → 2026-05).
 
 **Search objective (ACTIVE):** Top10 Lift fold-stability penaltyvel:
 ```
@@ -259,52 +294,56 @@ sample_train_valid.parquet columns (artifacts/<model_id>/):
   s-irányú model: open_time | short_mfe_fw60 | pred_short | fold_id | feat_* (all)
   — pred_{dir} csak a train step után kerül bele
   — walk-forward módban fold_id: Int8, 0–4 (0 = train-only); legacy módban: 1–4
-
-sample_oos.parquet columns (artifacts/<model_id>/):
-  l-irányú model: open_time | long_mfe_fw60  | pred_long  | segment (='test') | feat_* (selected)
-  s-irányú model: open_time | short_mfe_fw60 | pred_short | segment (='test') | feat_* (selected)
 ```
 
-Features a sample parquetban tárolódnak (mind a kettőben: all feat_* a train_valid-ban,
-selected feat_* az OOS-ban). Nincs DB join training közben.
+Features a sample parquetban tárolódnak (all feat_* a train_valid-ban). Nincs DB join training közben.
 Samples are parquet only — no DuckDB materialization.
 Methodology details: `_doc_/5010_sampling_yearly.md`.
 
 ### OOS evaluation
 
-OOS (out-of-sample) is always a **separate, future calendar year** — not a holdout
+For **yearly models**, the intended OOS is always a **separate, future calendar year** — not a holdout
 month from the training year. This ensures all seasonal effects are represented in
 the training data, and the OOS is a genuinely unseen period.
 
 ```
-2021 model  →  trained on 2021 sample  →  OOS scored on 2022
-2022 model  →  trained on 2022 sample  →  OOS scored on 2023
+2021 model  →  trained on 2021 sample  →  strategy calibration uses 2022 data from quant_train
+2022 model  →  trained on 2022 sample  →  strategy calibration uses 2023 data from quant_train
 ...
 ```
 
 `uv run python src/modeling/03_fit_model.py --model lgbm_solusdt_l_fw60_2021` produces:
 1. Final model refitted on **all rows** of the 2021 sample (fold_id is CV metadata only).
-2. `sample_oos.parquet` — `predict()` (continuous regression output) applied to the full `oos_year` (2022) dataset.
+2. Updated `sample_train_valid.parquet` with `pred_{dir}` column added.
 
-The trading module uses `sample_oos.parquet` for strategy calibration.
+The `src/strategy/` module scores any date range directly from `quant_train` (DuckDB) using
+the trained `model.pkl` — no pre-computed OOS parquet is needed or produced.
 
 ---
 
 ## Trading Strategy
 
-The trading module calibrates strategy rules offline, then runs them live.
+Strategy calibration is performed offline by `src/strategy/`, then the artifact drives the live service.
 
-**Offline calibration (`00_calibrate_strategy.py --model <model_id>`):**
-- Reads `artifacts/<model_id>/sample_oos.parquet` (OOS predictions + targets)
-- Runs backtest with default parameters, produces `strategy_artifact.json`
-- Sweep variant: `01_sweep_strategy.py` — grid search over entry/hold/TP combinations
+**Offline calibration (`src/strategy/`):**
+- `00_build_strategy_table.py` — loads both model predictions from `quant_train` (DuckDB) for a date range
+- `01_calibrate_scores.py` — fits rank percentile lookup (primary) + isotonic regression (secondary) per direction; single `--start/--end` window
+- `02_optimize_strategy.py` — Optuna sweep; objective: mean(bucket_mean_mfe | entry fired); rank-first entry/exit logic; requires `--long-model`, `--short-model`, `--start`, `--end`
+- Produces: `strategy_artifact.json` + `rank_lookup_long/short.parquet` + `isotonic_long/short.pkl` + `strategy_table.parquet` + `sweep_results.csv` in `artifacts/{session_id}/`
+- **Signal mode:** `rank_first` — entry based on score percentile in calibration distribution, not raw score threshold
+- **Evaluation mode:** `same_window` — calibration, optimization, and reported metrics use the same session window
 
-**Live state machine (`src/trading/live/strategy.py`):**
+**`strategy_artifact.json` contract:**
+- `signal_mode: "rank_first"`, `evaluation_mode: "same_window"`, `fit_period`
+- `decision_params`: `long/short_entry_pct`, `min_edge_gap`, `min/max_hold_minutes`, `cooldown_minutes`, `rearm_pct`, `conflict_rule: "highest_edge"`
+
+**Live state machine (`src/trading/live/`):**
 - **States:** FLAT → LONG / SHORT → COOLDOWN → FLAT
-- **Entry:** `pred_long >= entry_threshold` → ENTER_LONG (long has priority if both fire)
-- **Exit:** max hold time elapsed OR stop-loss triggered → EXIT, enter COOLDOWN
-- **Rearm:** both model probs must cool below `rearm_threshold` before next entry
-- All thresholds and cooldowns come from `strategy_artifact.json`
+- **Entry:** `score_pct_long >= long_entry_pct` → ENTER_LONG; conflict → `highest_edge` rule
+- **Exit:** `max_hold_minutes` elapsed, or `opposite_edge`, or `signal_decay` (score_pct < rearm_pct)
+- **Rearm:** after `cooldown_minutes` AND both `score_pct <= rearm_pct` → FLAT
+- Service loads `strategy_artifact.json` + rank lookup parquets; converts raw predictions to percentiles via `np.interp` at each bar
+- `config/trading.json`: `strategy_session_id` (replaces legacy `long/short_strategy_id`)
 
 ---
 
@@ -316,7 +355,8 @@ The trading module calibrates strategy rules offline, then runs them live.
 | `ruff check src/<module>/ --fix` | Before committing any Python file |
 | `uv run pytest src/data_handling/tests/ -v` | Store or pipeline changes |
 | `uv run pytest src/modeling/ -v` | Modeling changes |
-| `uv run pytest src/trading/tests/ -v` | Trading calibration or live service changes |
+| `uv run pytest src/strategy/tests/ -v` | Strategy calibration changes |
+| `uv run pytest src/trading/tests/ -v` | Live trading service changes |
 | `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
 
 Always run pyright and ruff for the affected module. Never skip for non-trivial changes.
@@ -340,7 +380,7 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 | Agent | Owns |
 |-------|------|
 | Database Agent | `src/data_handling/`, `config/assets.json`, DuckDB schema |
-| Modeling Agent | `src/modeling/`, feature computation, model artifacts |
+| Modeling Agent | `src/modeling/`, feature computation, model artifacts; `src/strategy/` |
 | UI Agent | `src/ui/`, `src/trading/` |
 | Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ code reference files |
 | Analyst Agent | `_doc_/XXXX_*.ipynb` (elemzési notebookok), `src/analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`); user-célból indul, nem spec-ből; interaktív session |

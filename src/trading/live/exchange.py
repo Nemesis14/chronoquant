@@ -19,15 +19,6 @@ _SOL_QTY_STEP = 0.1
 
 
 def _round_qty(qty: float, step: float = _SOL_QTY_STEP) -> float:
-    """Round quantity down to the nearest lot-size step.
-
-    Args:
-        qty  : Raw quantity in base asset units.
-        step : Lot size increment (default 0.1 for SOLUSDT).
-
-    Returns:
-        Rounded quantity.
-    """
     return round(int(qty / step) * step, 8)
 
 
@@ -48,14 +39,6 @@ class BinanceFuturesClient:
         quote_order_qty : float,
         mode            : str,
     ) -> None:
-        """Initialise the client.
-
-        Args:
-            symbol          : Binance symbol, e.g. ``"SOLUSDT"``.
-            leverage        : Futures leverage multiplier.
-            quote_order_qty : Notional order size in USDT.
-            mode            : ``"dry_run"`` or ``"live"``.
-        """
         self.symbol          = symbol
         self.leverage        = leverage
         self.quote_order_qty = quote_order_qty
@@ -68,11 +51,6 @@ class BinanceFuturesClient:
     # --- setup ---
 
     def set_leverage(self) -> None:
-        """Set futures leverage on the exchange (no-op in dry_run mode).
-
-        Raises:
-            Nothing — warns on failure (exchange may reject duplicate set).
-        """
         if self.mode == "dry_run":
             logger.info("[dry_run] set_leverage %s x %d", self.symbol, self.leverage)
             return
@@ -88,14 +66,6 @@ class BinanceFuturesClient:
     # --- price ---
 
     def get_mark_price(self) -> float:
-        """Return the current mark price for the symbol.
-
-        Returns:
-            Mark price as float.
-
-        Raises:
-            RuntimeError: If the live price fetch fails.
-        """
         if self.mode == "dry_run":
             return self._dry_run_price()
         try:
@@ -115,14 +85,6 @@ class BinanceFuturesClient:
     # --- orders ---
 
     def open_long(self, mark_price: float) -> dict:
-        """Place a market BUY order to open a long position.
-
-        Args:
-            mark_price : Reference price used to compute quantity.
-
-        Returns:
-            Exchange order response dict.
-        """
         qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price)
         logger.info(
             "[%s] OPEN LONG %s qty=%s notional=%.2f USDT price=~%.4f",
@@ -133,15 +95,6 @@ class BinanceFuturesClient:
         return self._place_order("BUY", qty, reduce_only=False)
 
     def close_long(self, quantity: float, mark_price: float) -> dict:
-        """Place a reduce-only market SELL order to close a long position.
-
-        Args:
-            quantity   : Position quantity to close.
-            mark_price : Reference price for logging.
-
-        Returns:
-            Exchange order response dict.
-        """
         qty = _round_qty(quantity)
         logger.info("[%s] CLOSE LONG %s qty=%s price=~%.4f", self.mode, self.symbol, qty, mark_price)
         if self.mode == "dry_run":
@@ -149,14 +102,6 @@ class BinanceFuturesClient:
         return self._place_order("SELL", qty, reduce_only=True)
 
     def open_short(self, mark_price: float) -> dict:
-        """Place a market SELL order to open a short position.
-
-        Args:
-            mark_price : Reference price used to compute quantity.
-
-        Returns:
-            Exchange order response dict.
-        """
         qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price)
         logger.info(
             "[%s] OPEN SHORT %s qty=%s notional=%.2f USDT price=~%.4f",
@@ -167,15 +112,6 @@ class BinanceFuturesClient:
         return self._place_order("SELL", qty, reduce_only=False)
 
     def close_short(self, quantity: float, mark_price: float) -> dict:
-        """Place a reduce-only market BUY order to close a short position.
-
-        Args:
-            quantity   : Position quantity to close.
-            mark_price : Reference price for logging.
-
-        Returns:
-            Exchange order response dict.
-        """
         qty = _round_qty(quantity)
         logger.info("[%s] CLOSE SHORT %s qty=%s price=~%.4f", self.mode, self.symbol, qty, mark_price)
         if self.mode == "dry_run":

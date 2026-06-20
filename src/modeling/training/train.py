@@ -18,7 +18,7 @@ def train_model(model_id: str) -> dict:
 
     Returns:
         Artifact dict with at minimum: model_id, n_estimators, n_features,
-        selected_features, artifact_dir, oos_year.
+        selected_features, artifact_dir.
 
     Raises:
         ValueError: If model_id is not found or the trainer is unsupported.

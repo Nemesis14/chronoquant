@@ -203,7 +203,7 @@ def create_walk_forward_sample(
         valid_months  = config.valid_months,
         shift_months  = config.shift_months,
         purge_minutes = config.purge_minutes,
-        n_folds       = 4,
+        n_folds       = config.n_folds,
     )
 
     range_start = f"{config.year}-01-01"
@@ -338,22 +338,32 @@ def create_model_walk_forward_sample(model_id: str) -> None:
     if model_id not in models_cfg.get("models", {}):
         raise ValueError(f"Model not found in config/models.json: {model_id}")
 
-    meta         = models_cfg["models"][model_id]
-    asset_id     = meta["asset_id"]
-    target_name  = meta["target_name"]
-    sample_id    = meta["sampling"]["sample_id"]
-    artifact_dir = Path(utils._resolve_path(meta["artifact_dir"]))
+    meta          = models_cfg["models"][model_id]
+    asset_id      = meta["asset_id"]
+    target_name   = meta["target_name"]
+    sampling_meta = meta["sampling"]
+    sample_id     = sampling_meta["sample_id"]
+    artifact_dir  = Path(utils._resolve_path(meta["artifact_dir"]))
 
-    year = int(sample_id.split("_yearly_")[-1]) if "_yearly_" in sample_id else int(sample_id.split("_")[-1])
+    if "year" in sampling_meta:
+        year = int(sampling_meta["year"])
+    elif "_yearly_" in sample_id:
+        year = int(sample_id.split("_yearly_")[-1])
+    else:
+        year = int(sample_id.split("_")[-1])
     seed = 42 + year
 
     config = WalkForwardSamplingConfig(
-        sample_id   = sample_id,
-        asset_id    = asset_id,
-        year        = year,
-        seed        = seed,
-        target_cols = (target_name,),
-        feature_cols= (),
+        sample_id    = sample_id,
+        asset_id     = asset_id,
+        year         = year,
+        seed         = seed,
+        train_months = int(sampling_meta.get("train_months", 9)),
+        valid_months = int(sampling_meta.get("valid_months", 3)),
+        shift_months = int(sampling_meta.get("shift_months", 3)),
+        n_folds      = int(sampling_meta.get("n_folds", 4)),
+        target_cols  = (target_name,),
+        feature_cols = (),
     )
 
     artifact_dir.mkdir(parents=True, exist_ok=True)

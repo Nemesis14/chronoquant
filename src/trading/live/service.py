@@ -3,10 +3,11 @@
 Runs in a background thread, executing one cycle per 1-minute bar:
   1. Sync OHLCV + features + predictions via the pipeline.
   2. Read the latest closed-bar predictions from DuckDB.
-  3. Evaluate strategy -> decision.
-  4. Execute: open/close position via the exchange client.
-  5. Persist signal, position, and order to trading.db.
-  6. Sleep until the next 1-minute bar closes.
+  3. Convert raw scores to rank percentiles via lookup.
+  4. Evaluate strategy -> decision.
+  5. Execute: open/close position via the exchange client.
+  6. Persist signal, position, and order to trading.db.
+  7. Sleep until the next 1-minute bar closes.
 """
 
 from __future__ import annotations
@@ -18,10 +19,22 @@ import time
 import traceback
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 import utils
+from data_handling.store.duckdb_query import (
+    latest_open_time,
+    ohlcv_latest_open_time,
+    ohlcv_row_count,
+    query_range,
+)
+from data_handling.sync_tables.sync_features import sync_features
+from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
+from data_handling.sync_tables.sync_predictions import sync_predictions
+from strategy.strategy.artifacts import read_strategy_artifact
 from trading.live import journal, strategy
 from trading.live.exchange import BinanceFuturesClient
 from trading.live.state import COOLDOWN, FLAT, TradingState
@@ -30,56 +43,44 @@ logger = logging.getLogger("chronoquant.trading")
 
 
 def _dash_log(msg: str, level: str = "info") -> None:
-    """Forward a message to the dashboard logger (no-op when headless).
-
-    Args:
-        msg   : Message string to log.
-        level : Log level name (``"info"`` or ``"warning"``).
-    """
-    try:
-        from ui.dashboard_logging import get_dashboard_logger
-        getattr(get_dashboard_logger(), level)(msg)
-    except Exception:
-        pass
+    _ = (msg, level)
 
 
 # %% TradingService
 
 
 class TradingService:
-    """Main trading service loop.
-
-    Runs in a background thread. Each cycle (every ~60s):
-      1. Sync OHLCV + features + predictions via existing pipeline.
-      2. Read latest closed bar predictions for both models.
-      3. Evaluate strategy -> decision.
-      4. Execute: open/close position via exchange client.
-      5. Persist signal + position + order to trading.db.
-      6. Sleep until next 1-minute bar closes.
-
-    Mirrors the simulation logic in trading.calibration.backtest exactly.
-    """
+    """Main trading service loop."""
 
     def __init__(self, config: dict) -> None:
-        """Initialise the service from a trading config dict.
-
-        Args:
-            config : Full trading config dict (from config/trading.json).
-        """
         self.config   = config
         self.mode     = config["mode"]
         self.asset_id = config["asset_id"]
-        self.db_path  = utils._resolve_path(config["db_path"])
+        self.db_path       = utils._resolve_path(config["db_path"])
+        self.asset_db_path = utils._resolve_path(
+            utils.load_asset_config(self.asset_id)["database"]["db_path"]
+        )
         self.risk_cfg    = config.get("risk", {})
         self.journal_cfg = config.get("journal", {})
         self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
         self.state  : TradingState | None = None
         self.run_id : str | None          = None
 
-        # Load strategy configs once
-        strategies      = utils.load_strategies_config()["strategies"]
-        self.long_cfg   = strategies[config["long_strategy_id"]]
-        self.short_cfg  = strategies[config["short_strategy_id"]]
+        # Load strategy artifact
+        session_id   = config["strategy_session_id"]
+        artifact     = read_strategy_artifact(session_id)
+        self.session_id      : str  = session_id
+        self.decision_params : dict = artifact["decision_params"]
+
+        # Load rank lookup arrays for np.interp
+        artifact_dir = Path(utils._resolve_path("artifacts")) / session_id
+        lookup_long  = pd.read_parquet(artifact_dir / artifact["rank_lookup_long_path"])
+        lookup_short = pd.read_parquet(artifact_dir / artifact["rank_lookup_short_path"])
+        self._rank_scores_long  = lookup_long["score_raw"].to_numpy(dtype=float)
+        self._rank_pct_long     = lookup_long["score_pct"].to_numpy(dtype=float)
+        self._rank_scores_short = lookup_short["score_raw"].to_numpy(dtype=float)
+        self._rank_pct_short    = lookup_short["score_pct"].to_numpy(dtype=float)
 
         # Stable prediction column names (not model-ID-derived)
         self.long_pred_col  = "long_pred"
@@ -96,24 +97,25 @@ class TradingService:
     # --- public API ---
 
     def start(self) -> None:
-        """Start the trading loop in a daemon background thread."""
+        if self.is_running():
+            logger.warning("Trading service already running")
+            return
+
         self._stop_event.clear()
-        t = threading.Thread(target=self._run, name="chronoquant-trading", daemon=True)
-        t.start()
+        self._thread = threading.Thread(
+            target = self._run,
+            name   = "chronoquant-trading",
+            daemon = True,
+        )
+        self._thread.start()
         logger.info("Trading service started (mode=%s)", self.mode)
 
     def stop(self) -> None:
-        """Request a graceful stop of the trading loop."""
         logger.info("Trading service stop requested")
         self._stop_event.set()
 
     def is_running(self) -> bool:
-        """Return True if the service has not been stopped.
-
-        Returns:
-            Boolean running status.
-        """
-        return not self._stop_event.is_set()
+        return self._thread is not None and self._thread.is_alive()
 
     # --- main loop ---
 
@@ -144,7 +146,7 @@ class TradingService:
         )
         journal.insert_run(
             self.db_path, self.run_id, self.mode, self.asset_id,
-            self.config["long_strategy_id"], self.config["short_strategy_id"],
+            self.session_id, self.session_id,
             self.config,
         )
 
@@ -178,50 +180,57 @@ class TradingService:
 
         bar_open_time, pred_long, pred_short, bar_close = bar
 
-        # 3. Evaluate cooldown / rearm transitions before strategy decision
-        now = datetime.now(UTC)
-        self._apply_cooldown_rearm(pred_long, pred_short, now)
+        # 3. Convert raw scores to rank percentiles
+        score_pct_long, score_pct_short = self._to_percentiles(pred_long, pred_short)
 
-        # 4. Evaluate strategy
+        # 4. Evaluate cooldown / rearm transitions before strategy decision
+        now = datetime.now(UTC)
+        self._apply_cooldown_rearm(score_pct_long, score_pct_short, now)
+
+        # 5. Evaluate strategy
         decision, reason = strategy.evaluate(
-            self.state, pred_long, pred_short,
-            self.long_cfg, self.short_cfg, now,
+            self.state, score_pct_long, score_pct_short,
+            self.decision_params, now,
         )
         state_before = self.state.status
         logger.info(
-            "Bar %s | long=%.3f short=%.3f | state=%s -> %s (%s)",
-            bar_open_time, pred_long, pred_short, state_before, decision, reason,
+            "Bar %s | raw=%.4f/%.4f pct=%.3f/%.3f | state=%s -> %s (%s)",
+            bar_open_time, pred_long, pred_short, score_pct_long, score_pct_short,
+            state_before, decision, reason,
         )
         _dash_log(
-            f"[trading] {bar_open_time} L={pred_long:.3f} S={pred_short:.3f}"
+            f"[trading] {bar_open_time} raw={pred_long:.4f}/{pred_short:.4f}"
+            f" pct={score_pct_long:.3f}/{score_pct_short:.3f}"
             f" {state_before} -> {decision} ({reason})"
         )
 
-        # 5. Execute
+        # 6. Execute
         self._execute(decision, reason, bar_open_time, bar_close, now)
 
-        # 6. Persist signal
+        # 7. Persist signal
         journal.insert_signal(
             self.db_path, self.run_id, bar_open_time,
             pred_long, pred_short, state_before, decision, reason,
         )
 
-        # 7. Reset error counter on successful cycle
+        # 8. Reset error counter on successful cycle
         self.state.consecutive_errors = 0
+
+    def _to_percentiles(self, pred_long: float, pred_short: float) -> tuple[float, float]:
+        pct_long  = float(
+            np.interp(pred_long,  self._rank_scores_long,  self._rank_pct_long).clip(0.0, 1.0)
+        )
+        pct_short = float(
+            np.interp(pred_short, self._rank_scores_short, self._rank_pct_short).clip(0.0, 1.0)
+        )
+        return pct_long, pct_short
 
     def _apply_cooldown_rearm(
         self,
-        pred_long  : float,
-        pred_short : float,
-        now        : datetime,
+        score_pct_long  : float,
+        score_pct_short : float,
+        now             : datetime,
     ) -> None:
-        """Handle COOLDOWN -> FLAT transition and armed flag.
-
-        Args:
-            pred_long  : Latest long prediction probability.
-            pred_short : Latest short prediction probability.
-            now        : Current UTC datetime.
-        """
         assert self.state is not None
         if self.state.status != COOLDOWN:
             return
@@ -229,12 +238,15 @@ class TradingService:
         if self.state.cooldown_until and now < self.state.cooldown_until:
             return
 
-        # Cooldown elapsed — rearm when both predictions are below their thresholds
-        if (pred_long <= self.long_cfg["rearm_threshold"]
-                and pred_short <= self.short_cfg["rearm_threshold"]):
+        # Cooldown elapsed — rearm when both percentiles are below threshold
+        rearm_pct = float(self.decision_params["rearm_pct"])
+        if score_pct_long <= rearm_pct and score_pct_short <= rearm_pct:
             self.state.armed  = True
             self.state.status = FLAT
-            logger.info("Rearmed — entering FLAT long=%.3f short=%.3f", pred_long, pred_short)
+            logger.info(
+                "Rearmed — entering FLAT long_pct=%.3f short_pct=%.3f",
+                score_pct_long, score_pct_short,
+            )
 
     def _execute(
         self,
@@ -365,10 +377,7 @@ class TradingService:
         )
 
         self.state.record_trade_result(pnl_usdt)
-        cooldown_min = max(
-            self.long_cfg.get("cooldown_minutes", 60),
-            self.short_cfg.get("cooldown_minutes", 60),
-        )
+        cooldown_min = int(self.decision_params.get("cooldown_minutes", 60))
         self.state.cooldown_until = datetime.now(UTC).replace(microsecond=0) + timedelta(
             minutes=cooldown_min
         )
@@ -388,22 +397,33 @@ class TradingService:
 
     def _sync_data(self) -> None:
         try:
-            from ui.sync import run_database_sync
-            run_database_sync(asset_id=self.asset_id)
+            rows_before    = ohlcv_row_count(self.asset_db_path)
+            last_open_time = ohlcv_latest_open_time(self.asset_db_path)
+            start_time     = _next_open_time(last_open_time) if last_open_time else _INITIAL_SYNC_START
+            start_ms       = _utc_str_to_ms(start_time)
+
+            sync_ohlcv(open_time_ms_from=start_ms, asset_id=self.asset_id)
+
+            rows_after       = ohlcv_row_count(self.asset_db_path)
+            latest_open      = ohlcv_latest_open_time(self.asset_db_path)
+            inserted_rows    = rows_after - rows_before
+            logger.info(
+                "OHLCV sync rows before=%s after=%s inserted=%s",
+                rows_before, rows_after, inserted_rows,
+            )
+
+            if not latest_open or pd.to_datetime(latest_open) < pd.to_datetime(start_time):
+                logger.info("No new OHLCV interval found for feature and prediction sync")
+                return
+
+            sync_features(start_time, end_time=latest_open, asset_id=self.asset_id)
+            sync_predictions(start_time, end_time=latest_open, asset_id=self.asset_id)
         except Exception as exc:
             logger.warning("Data sync failed: %s", exc)
             raise
 
     def _read_latest_bar(self) -> tuple[str, float, float, float] | None:
-        """Read the latest safely closed 1-minute bar's predictions from DuckDB.
-
-        Returns:
-            Tuple of (bar_open_time, pred_long, pred_short, close_price) or None.
-        """
-        from data_handling.store.duckdb_query import latest_open_time, query_range
-
-        db_path = utils.load_asset_config(self.asset_id)["database"]["db_path"]
-        if latest_open_time(db_path, "predictions") is None:
+        if latest_open_time(self.asset_db_path, "predictions") is None:
             return None
 
         cutoff    = datetime.now(UTC).replace(tzinfo=None)
@@ -412,7 +432,7 @@ class TradingService:
 
         try:
             df = query_range(
-                db_path, "predictions",
+                self.asset_db_path, "predictions",
                 start   = start_str,
                 end     = end_str,
                 columns = ["open_time", "close", self.long_pred_col, self.short_pred_col],
@@ -467,7 +487,6 @@ class TradingService:
             )
 
     def _sleep_until_next_bar(self) -> None:
-        """Sleep until 5 seconds after the next 1-minute boundary."""
         now            = time.time()
         next_boundary  = (now // 60 + 1) * 60 + 5
         sleep_sec      = max(1.0, next_boundary - now)
@@ -475,6 +494,7 @@ class TradingService:
         self._stop_event.wait(timeout=sleep_sec)
 
     def _shutdown(self) -> None:
+        self._stop_event.set()
         logger.info("Trading service shutting down (run_id=%s)", self.run_id)
         if self.run_id:
             with contextlib.suppress(Exception):
@@ -491,3 +511,17 @@ class TradingService:
                 logger.warning("Export failed: %s", exc)
 
         logger.info("Trading service stopped")
+        self._thread = None
+
+
+_INITIAL_SYNC_START = "2017-01-01 00:00:00"
+
+
+def _next_open_time(open_time: str) -> str:
+    value = pd.to_datetime(open_time, errors="raise") + timedelta(minutes=1)
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _utc_str_to_ms(value: str) -> int:
+    timestamp = datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+    return int(timestamp.timestamp() * 1000)

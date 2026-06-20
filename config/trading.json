@@ -1,9 +1,8 @@
 {
     "schema_version": 1,
     "mode": "dry_run",
-    "asset_id": "solusdt_fw60",
-    "long_strategy_id": "solusdt_long_fw60_q90_local_v4",
-    "short_strategy_id": "solusdt_short_fw60_q10_local_v4",
+    "asset_id": "solusdt",
+    "strategy_session_id": "strategy_lgbm_solusdt_fw60_2101_2605",
     "leverage": 10,
     "quote_order_qty": 10.0,
     "poll_seconds": 60,

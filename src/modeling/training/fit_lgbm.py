@@ -5,8 +5,10 @@ Loads training data from the model's own sample_train_valid.parquet (artifact di
 which already contains all feat_* columns — no DuckDB join needed for training.
 
 Outputs:
+  model.pkl                   — serialised LGBMRegressor
+  features.json               — selected feature list
+  params.json                 — final training params + n_estimators
   sample_train_valid.parquet  — updated in-place with pred_{dir} column added
-  sample_oos.parquet          — OOS year predictions + target + features
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ import lightgbm as lgb
 import pandas as pd
 
 import utils
-from data_handling.store.duckdb_query import query_range
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +37,18 @@ _FIXED_PARAMS: dict = {
 
 
 def fit_lightgbm_from_search(model_id: str) -> dict:
-    """Fit a LightGBM model from search artifacts and run OOS scoring.
+    """Fit a LightGBM model from search artifacts.
 
     Training data is loaded entirely from the model's sample_train_valid.parquet
     (artifact directory), which must already contain all selected feat_* columns.
     After fitting, pred_{dir} is appended to sample_train_valid.parquet.
-    OOS predictions are written to sample_oos.parquet.
 
     Args:
         model_id: Key from config/models.json.
 
     Returns:
         Dict with model_id, n_estimators, n_features, selected_features,
-        artifact_dir, oos_year.
+        artifact_dir.
     """
     models_cfg = utils.load_models_config()
     if model_id not in models_cfg.get("models", {}):
@@ -56,9 +56,7 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
     meta         = models_cfg["models"][model_id]
     artifact_dir = Path(utils._resolve_path(meta["artifact_dir"]))
-    asset_id     = meta["asset_id"]
     target_name  = meta["target_name"]
-    oos_year     = meta.get("oos_year")
 
     best_params: dict = json.loads(
         (artifact_dir / "search" / "best_params.json").read_text(encoding="utf-8")
@@ -76,8 +74,6 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
     final_params: dict = {**_FIXED_PARAMS, **best_params, "n_estimators": n_estimators, "random_state": 42}
 
-    db_path = utils.load_asset_config(asset_id)["database"]["db_path"]
-
     sample_df, X_train, y_train = _load_train_data(artifact_dir, selected_features, target_name)
 
     logger.info(
@@ -92,17 +88,12 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
     _add_predictions_to_sample(artifact_dir, model, sample_df, selected_features, target_name)
 
-    if oos_year is not None:
-        _score_oos(model, db_path, selected_features, target_name, oos_year, artifact_dir)
-        logger.info("[fit_lgbm] OOS scoring done for year %d -> sample_oos.parquet", oos_year)
-
     return {
         "model_id":          model_id,
         "n_estimators":      n_estimators,
         "n_features":        len(selected_features),
         "selected_features": selected_features,
         "artifact_dir":      str(artifact_dir),
-        "oos_year":          oos_year,
     }
 
 
@@ -157,65 +148,6 @@ def _add_predictions_to_sample(
     out = out[col_order]
 
     out.to_parquet(artifact_dir / "sample_train_valid.parquet", compression="zstd", index=False)
-
-
-def _score_oos(
-    model            : lgb.LGBMRegressor,
-    db_path          : str,
-    selected_features: list[str],
-    target_name      : str,
-    oos_year         : int,
-    artifact_dir     : Path,
-) -> None:
-    """Score model on the OOS year and save sample_oos.parquet to artifact_dir.
-
-    Loads features from quant_train (all selected features must be present).
-    Column order: open_time, {target_name}, pred_{dir}, feat_*
-    """
-    oos_start = f"{oos_year}-01-01 00:00:00"
-    oos_end   = f"{oos_year}-12-31 23:59:59"
-
-    feat_oos = query_range(
-        db_path, "quant_train",
-        start   = oos_start,
-        end     = oos_end,
-        columns = ["open_time"] + selected_features,
-    )
-    target_oos = query_range(
-        db_path, "target",
-        start   = oos_start,
-        end     = oos_end,
-        columns = ["open_time", target_name],
-    )
-
-    feat_oos["open_time"]   = pd.to_datetime(feat_oos["open_time"])
-    target_oos["open_time"] = pd.to_datetime(target_oos["open_time"])
-
-    if feat_oos.empty:
-        raise RuntimeError(
-            f"No quant_train rows found for OOS year {oos_year}. "
-            "Ensure quant_train is built for the full date range."
-        )
-
-    oos_df = feat_oos.merge(target_oos, on="open_time", how="left")
-
-    X_oos = pd.DataFrame(oos_df[selected_features])
-    preds = model.predict(X_oos)
-
-    pred_col  = "pred_long" if "long" in target_name else "pred_short"
-    feat_cols = sorted(selected_features)
-
-    col_data: dict[str, object] = {
-        "open_time" : oos_df["open_time"].values,
-        target_name : oos_df[target_name].values,
-        pred_col    : preds,
-        "segment"   : "test",
-    }
-    for col in feat_cols:
-        col_data[col] = oos_df[col].values
-
-    out = pd.DataFrame(col_data)
-    out.to_parquet(artifact_dir / "sample_oos.parquet", index=False)
 
 
 def _save_artifacts(

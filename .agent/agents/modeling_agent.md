@@ -41,7 +41,8 @@ Load relevant module docs (only for affected modules):
 | `src/data_handling/sync_tables/sync_features.py` | Feature sync into store |
 | `src/data_handling/sync_tables/sync_predictions.py` | Prediction sync into store |
 | `artifacts/` | Generated model artifacts (`artifacts/<model_id>/`) |
-| `_tests/data_pipeline/` | Feature-related tests |
+| `src/modeling/tests/` | Modeling tests for training and sampling |
+| `src/modeling/feature_engineering/tests/` | Feature engineering tests |
 | `_doc_/5xxx*.md` | Modeling documentation |
 
 ---

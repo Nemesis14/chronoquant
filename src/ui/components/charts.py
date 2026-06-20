@@ -70,7 +70,7 @@ def prediction_price_figure(
     _focus     = focus_hours if focus_hours is not None else CHART_INITIAL_FOCUS_HOURS
     x_start    = latest_ts - pd.Timedelta(hours=_focus)
     focus_df   = plot_df[plot_df["open_time"] >= x_start]
-    if _has_ohlc(focus_df) and not focus_df.empty:
+    if _has_ohlc(focus_df) and not focus_df.empty:  # type: ignore[arg-type]
         _yl, _yh = focus_df["low"].min(), focus_df["high"].max()
     elif "close" in focus_df.columns and not focus_df.empty:
         _yl, _yh = focus_df["close"].min(), focus_df["close"].max()
@@ -266,10 +266,10 @@ def _threshold_legend(
     items: list[tuple[float | None, str, str]],
     y_domain_ref: str = "y domain",
 ) -> None:
-    valid = [(float(v), l, c) for v, l, c in items if v is not None]
+    valid = [(float(v), lbl, c) for v, lbl, c in items if v is not None]
     if not valid:
         return
-    for x_pos, (value, label, color) in zip([0.01, 0.22, 0.43], valid):
+    for x_pos, (value, label, color) in zip([0.01, 0.22, 0.43], valid, strict=False):
         fig.add_annotation(
             x=x_pos, y=0.97,
             xref="paper", yref=y_domain_ref,
@@ -292,7 +292,7 @@ def _long_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, pred in zip(sig["open_time"], sig["prediction"]):
+    for ts, _pred in zip(sig["open_time"], sig["prediction"], strict=False):
         fig.add_annotation(
             x=ts, y=0.99,
             xref="x", yref="y2 domain",
@@ -314,7 +314,7 @@ def _short_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, pred in zip(sig["open_time"], sig["short_prediction"]):
+    for ts, _pred in zip(sig["open_time"], sig["short_prediction"], strict=False):
         fig.add_annotation(
             x=ts, y=0.01,
             xref="x", yref="y2 domain",
@@ -424,7 +424,7 @@ def equity_figure(df: pd.DataFrame):
 
     time_col   = "open_time" if "open_time" in df.columns else df.columns[0]
     equity_col = "equity" if "equity" in df.columns else df.select_dtypes("number").columns[-1]
-    ax.plot(pd.to_datetime(df[time_col]), pd.to_numeric(df[equity_col], errors="coerce"), color="#0f766e")
+    ax.plot(pd.to_datetime(df[time_col]), pd.to_numeric(df[equity_col], errors="coerce"), color="#0f766e")  # type: ignore[arg-type]
     ax.set_title("Equity curve")
     ax.set_ylabel("Equity")
     ax.grid(alpha=0.25)

@@ -10,10 +10,10 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 
 import utils
+from data_handling.store.duckdb_query import ohlcv_latest_open_time, ohlcv_row_count
 from data_handling.sync_tables.sync_features import sync_features
 from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
 from data_handling.sync_tables.sync_predictions import sync_predictions
-from data_handling.store.duckdb_query import ohlcv_latest_open_time, ohlcv_row_count
 from ui.dashboard_logging import get_dashboard_logger
 
 INITIAL_SYNC_START = "2017-01-01 00:00:00"

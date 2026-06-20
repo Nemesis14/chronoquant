@@ -34,11 +34,6 @@ def _connect(db_path: str):
 
 
 def trading_db_path() -> str:
-    """Return the resolved path to trading.db from config/trading.json.
-
-    Returns:
-        Absolute path string to the trading DuckDB file.
-    """
     cfg = utils.load_trading_config()
     return utils._resolve_path(cfg["db_path"])
 
@@ -47,11 +42,6 @@ def trading_db_path() -> str:
 
 
 def ensure_tables(db_path: str) -> None:
-    """Create all trading journal tables if they do not already exist.
-
-    Args:
-        db_path : Path to the trading DuckDB file.
-    """
     with _connect(db_path) as conn:
         conn.execute("CREATE SEQUENCE IF NOT EXISTS seq_trading_signals START 1")
         conn.execute("CREATE SEQUENCE IF NOT EXISTS seq_trading_errors START 1")
@@ -140,17 +130,6 @@ def insert_run(
     short_strategy_id : str,
     config            : dict,
 ) -> None:
-    """Insert a new trading run record.
-
-    Args:
-        db_path           : Path to trading DuckDB.
-        run_id            : Unique run identifier.
-        mode              : ``"dry_run"`` or ``"live"``.
-        asset_id          : Asset being traded.
-        long_strategy_id  : Long strategy identifier.
-        short_strategy_id : Short strategy identifier.
-        config            : Full service config dict.
-    """
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_runs
@@ -162,12 +141,6 @@ def insert_run(
 
 
 def mark_run_stopped(db_path: str, run_id: str) -> None:
-    """Set stopped_at on a running run record.
-
-    Args:
-        db_path : Path to trading DuckDB.
-        run_id  : Run to close.
-    """
     with _connect(db_path) as conn:
         conn.execute(
             "UPDATE trading_runs SET stopped_at = ? WHERE run_id = ?",
@@ -188,18 +161,6 @@ def insert_signal(
     decision      : str,
     reason        : str,
 ) -> None:
-    """Insert one strategy evaluation signal record.
-
-    Args:
-        db_path       : Path to trading DuckDB.
-        run_id        : Current run identifier.
-        bar_open_time : Open time of the bar that triggered evaluation.
-        pred_long     : Long model prediction probability.
-        pred_short    : Short model prediction probability.
-        state_before  : State string before the decision.
-        decision      : Decision string (HOLD, ENTER_LONG, etc.).
-        reason        : Human-readable reason string.
-    """
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_signals
@@ -223,18 +184,6 @@ def insert_position(
     quantity       : float,
     entry_order_id : str | None = None,
 ) -> None:
-    """Insert a new open position record.
-
-    Args:
-        db_path        : Path to trading DuckDB.
-        position_id    : Unique position identifier.
-        run_id         : Current run identifier.
-        side           : ``"LONG"`` or ``"SHORT"``.
-        entry_time     : UTC timestamp string.
-        entry_price    : Execution price.
-        quantity       : Position size in base asset.
-        entry_order_id : Associated entry order identifier.
-    """
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_positions
@@ -253,17 +202,6 @@ def close_position(
     exit_reason    : str,
     exit_order_id  : str | None = None,
 ) -> None:
-    """Mark an open position as CLOSED with exit details.
-
-    Args:
-        db_path       : Path to trading DuckDB.
-        position_id   : Position to close.
-        exit_time     : UTC timestamp string.
-        exit_price    : Execution price at close.
-        pnl_usdt      : Realised PnL in USDT.
-        exit_reason   : Reason string for the close.
-        exit_order_id : Associated exit order identifier.
-    """
     with _connect(db_path) as conn:
         conn.execute(
             """UPDATE trading_positions
@@ -275,14 +213,6 @@ def close_position(
 
 
 def get_open_position(db_path: str) -> dict | None:
-    """Return the most recent open position, or None.
-
-    Args:
-        db_path : Path to trading DuckDB.
-
-    Returns:
-        Row dict or None if no open position exists.
-    """
     with _connect(db_path) as conn:
         cur = conn.execute(
             "SELECT * FROM trading_positions WHERE status = 'OPEN' ORDER BY entry_time DESC LIMIT 1"
@@ -295,14 +225,6 @@ def get_open_position(db_path: str) -> dict | None:
 
 
 def get_latest_run(db_path: str) -> dict | None:
-    """Return the most recent trading run record, or None.
-
-    Args:
-        db_path : Path to trading DuckDB.
-
-    Returns:
-        Row dict or None if no runs exist.
-    """
     with _connect(db_path) as conn:
         cur = conn.execute(
             "SELECT * FROM trading_runs ORDER BY started_at DESC LIMIT 1"
@@ -333,24 +255,6 @@ def insert_order(
     request_json     : dict | None,
     response_json    : dict | None,
 ) -> None:
-    """Insert one order record.
-
-    Args:
-        db_path          : Path to trading DuckDB.
-        order_id         : Unique local order identifier.
-        run_id           : Current run identifier.
-        position_id      : Associated position identifier.
-        side             : ``"BUY"`` or ``"SELL"``.
-        order_type       : E.g. ``"MARKET"``.
-        status           : E.g. ``"FILLED"``.
-        client_order_id  : Client-assigned order ID.
-        binance_order_id : Binance-assigned order ID.
-        requested_qty    : Requested quantity.
-        filled_qty       : Actually filled quantity.
-        avg_price        : Average fill price.
-        request_json     : Raw request parameters (for audit).
-        response_json    : Raw exchange response (for audit).
-    """
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_orders
@@ -377,16 +281,6 @@ def insert_error(
     message    : str,
     traceback  : str | None = None,
 ) -> None:
-    """Insert one error record. Never raises — errors must not crash the service.
-
-    Args:
-        db_path    : Path to trading DuckDB.
-        run_id     : Current run identifier (may be None).
-        component  : Component name that raised the error.
-        error_type : Exception class name.
-        message    : Exception message string.
-        traceback  : Full traceback string.
-    """
     try:
         with _connect(db_path) as conn:
             conn.execute(
@@ -403,15 +297,6 @@ def insert_error(
 
 
 def get_recent_signals(db_path: str, limit: int = 20) -> list[dict]:
-    """Return the most recent signal records for the dashboard.
-
-    Args:
-        db_path : Path to trading DuckDB.
-        limit   : Maximum number of rows to return.
-
-    Returns:
-        List of row dicts ordered newest-first.
-    """
     try:
         with _connect(db_path) as conn:
             cur = conn.execute(
@@ -424,15 +309,6 @@ def get_recent_signals(db_path: str, limit: int = 20) -> list[dict]:
 
 
 def get_recent_positions(db_path: str, limit: int = 50) -> list[dict]:
-    """Return the most recent position records for the dashboard.
-
-    Args:
-        db_path : Path to trading DuckDB.
-        limit   : Maximum number of rows to return.
-
-    Returns:
-        List of row dicts ordered newest-first.
-    """
     try:
         with _connect(db_path) as conn:
             cur = conn.execute(
@@ -445,15 +321,6 @@ def get_recent_positions(db_path: str, limit: int = 50) -> list[dict]:
 
 
 def get_current_run_status(db_path: str) -> dict | None:
-    """Return a combined status dict for the dashboard fragment.
-
-    Args:
-        db_path : Path to trading DuckDB.
-
-    Returns:
-        Dict with run_id, mode, started_at, stopped_at, open_position,
-        last_signal; or None if no run exists or the DB is missing.
-    """
     try:
         run = get_latest_run(db_path)
         if not run:
@@ -476,13 +343,6 @@ def get_current_run_status(db_path: str) -> dict | None:
 
 
 def export_run(db_path: str, run_id: str, report_dir: str) -> None:
-    """Export positions, signals, and orders to CSV files for a finished run.
-
-    Args:
-        db_path    : Path to trading DuckDB.
-        run_id     : Run to export.
-        report_dir : Output directory (relative or absolute).
-    """
     out = Path(utils._resolve_path(report_dir)) / run_id
     out.mkdir(parents=True, exist_ok=True)
 

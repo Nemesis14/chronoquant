@@ -26,14 +26,15 @@ Read these before starting work:
 ## Scope
 
 - Any `pr_t{n}_*.md` ticket across all epics
-- `_tests/` — creates and maintains test files
+- `src/*/tests/` — creates and maintains test files
 - Does NOT touch `.agent/` rule files (Doc Agent owns those)
 
 ---
 
 ## Test Structure
 
-All tests live under `_tests/<module>/<category>/`. The categories and what belongs in each:
+All tests live under the owning module, typically `src/<module>/tests/<submodule>/<category>/`.
+The categories and what belongs in each:
 
 | Category | Folder | What it tests | Real DB? |
 |----------|--------|---------------|----------|
@@ -50,7 +51,7 @@ if not Path(db_path).exists():
 
 Every test file starts with `pytestmark = pytest.mark.<category>`.
 
-Shared fixtures for real-DB tests go in the nearest `conftest.py` (e.g., `_tests/store/conftest.py`).
+Shared fixtures for real-DB tests go in the nearest `conftest.py` under that module's test tree.
 
 ---
 
@@ -100,7 +101,7 @@ Fix all ruff and pyright issues directly — do not leave them for the developer
 ### 3. Write tests
 
 Determine the implementation type (see **Test Writing Rules** above).
-Write tests in the correct `_tests/<module>/<category>/` subfolder.
+Write tests in the correct `src/<module>/tests/<submodule>/<category>/` subfolder.
 Use `pytestmark = pytest.mark.<category>` at module level.
 Inherit shared DB fixtures from `conftest.py` — do not redefine them.
 
@@ -109,7 +110,7 @@ Developer agents do not write tests — this is the Validator Agent's responsibi
 ### 4. Run tests
 
 ```powershell
-uv run pytest _tests/<affected_module>/ -v
+uv run pytest src/<affected_module>/tests/ -v
 ```
 
 Fix test failures that are small: off-by-one errors, wrong defaults, minor type
@@ -148,5 +149,5 @@ changing behavior beyond a small correction. When in doubt: fix small, return la
 ## Coding Standards
 
 Apply ruff and pyright fixes mechanically. When writing tests: use `pytest`,
-follow the existing test style in `_tests/`. Do not introduce new test
-dependencies without checking `pyproject.toml` first.
+follow the existing test style in the owning module's `src/*/tests/` tree.
+Do not introduce new test dependencies without checking `pyproject.toml` first.

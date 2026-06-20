@@ -1,11 +1,3 @@
-# =============================================================================
-# Streamlit dashboard data access
-# =============================================================================
-# Purpose:
-#  - Provide read-only, bounded data queries for the Streamlit dashboard
-#  - Keep UI code independent from pipeline and trading execution code
-# =============================================================================
-
 from __future__ import annotations
 
 import json
@@ -20,12 +12,6 @@ import utils
 from data_handling.store.duckdb_query import latest_open_time, query_range
 
 
-# =============================================================================
-# load_dashboard_config(asset_id: str | None = None) -> dict
-# =============================================================================
-# Purpose:
-#  - Return the main config values displayed by the dashboard
-# =============================================================================
 def load_dashboard_config(asset_id: str | None = None) -> dict:
     db_cfg         = utils.load_asset_config(asset_id)["database"]
     models_cfg     = utils.load_models_config()
@@ -50,12 +36,6 @@ def load_dashboard_config(asset_id: str | None = None) -> dict:
     }
 
 
-# =============================================================================
-# active_strategy(strategies_cfg: dict | None = None) -> tuple[str | None, dict]
-# =============================================================================
-# Purpose:
-#  - Resolve the first configured strategy until a trading runtime config exists
-# =============================================================================
 def active_strategy(
     strategies_cfg: dict | None = None,
     asset_id: str | None = None,
@@ -78,37 +58,29 @@ def active_strategy(
     return strategy_id, strategies[strategy_id]
 
 
-# =============================================================================
-# load_long_short_strategies(asset_id: str | None = None) -> tuple[dict, dict]
-# =============================================================================
-# Purpose:
-#  - Return (long_strategy_cfg, short_strategy_cfg) for the given asset
-#  - Reads thresholds from config/strategies.json (not predictions.json)
-# =============================================================================
 def load_long_short_strategies(
     asset_id: str | None = None,
 ) -> tuple[dict, dict]:
-    strategies_cfg = utils.load_strategies_config()
-    strategies     = strategies_cfg.get("strategies", {})
-    long_cfg  = {}
-    short_cfg = {}
-    for scfg in strategies.values():
-        if scfg.get("asset_id") != asset_id:
-            continue
-        side = scfg.get("side", "")
-        if side == "long" and not long_cfg:
-            long_cfg = scfg
-        elif side == "short" and not short_cfg:
-            short_cfg = scfg
+    try:
+        trading_cfg = utils.load_trading_config()
+        session_id  = trading_cfg.get("strategy_session_id", "")
+    except Exception:
+        return {}, {}
+    if not session_id:
+        return {}, {}
+    artifact_path = Path(utils._resolve_path(f"artifacts/{session_id}/strategy_artifact.json"))
+    if not artifact_path.exists():
+        return {}, {}
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}, {}
+    params    = artifact.get("decision_params", {})
+    long_cfg  = {"entry_pct": params.get("long_entry_pct"),  "rearm_pct": params.get("rearm_pct")}
+    short_cfg = {"entry_pct": params.get("short_entry_pct"), "rearm_pct": params.get("rearm_pct")}
     return long_cfg, short_cfg
 
 
-# =============================================================================
-# table_exists(...) -> bool
-# =============================================================================
-# Purpose:
-#  - Check optional tables without failing the UI
-# =============================================================================
 def table_exists(
     table_name: str,
     db_path: str | None = None,
@@ -128,12 +100,6 @@ def table_exists(
     return row is not None
 
 
-# =============================================================================
-# latest_table_timestamp(table_name: str, asset_id: str | None = None) -> str | None
-# =============================================================================
-# Purpose:
-#  - Return the newest timestamp-like known column using rowid order
-# =============================================================================
 def latest_table_timestamp(table_name: str, asset_id: str | None = None) -> str | None:
     if not table_exists(table_name, asset_id=asset_id):
         return None
@@ -158,12 +124,6 @@ def latest_table_timestamp(table_name: str, asset_id: str | None = None) -> str 
     return None
 
 
-# =============================================================================
-# prediction_history(...) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Load the latest prediction window joined with OHLCV from DuckDB
-# =============================================================================
 def prediction_history(
     lookback_hours: int = 24,
     asset_id: str | None = None,
@@ -215,12 +175,6 @@ def prediction_history(
     return df[df["open_time"] >= start_ts].reset_index(drop=True)  # type: ignore[return-value]
 
 
-# =============================================================================
-# latest_prediction(asset_id: str | None = None) -> dict | None
-# =============================================================================
-# Purpose:
-#  - Return the newest prediction row from DuckDB as a dict
-# =============================================================================
 def latest_prediction(asset_id: str | None = None) -> dict | None:
     db_cfg  = utils.load_asset_config(asset_id)["database"]
     db_path = db_cfg["db_path"]
@@ -250,110 +204,127 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     return {key: _json_safe(value) for key, value in row.items()}
 
 
-# =============================================================================
-# active_position(asset_id: str | None = None) -> dict | None
-# =============================================================================
-# Purpose:
-#  - Return the newest open live trading position when trading tables exist
-# =============================================================================
 def active_position(asset_id: str | None = None) -> dict | None:
-    table_name = "trading_positions"
-    if not table_exists(table_name, asset_id=asset_id):
+    try:
+        trading_cfg = utils.load_trading_config()
+        db_path     = utils._resolve_path(trading_cfg["db_path"])
+    except Exception:
+        return None
+    if not Path(db_path).exists():
         return None
 
-    columns = table_columns(table_name, asset_id=asset_id)
-    status_col = "status" if "status" in columns else None
-    where = "WHERE status IN ('OPEN', 'LONG', 'LONG_OPEN', 'SHORT', 'SHORT_OPEN')" if status_col else ""
-    order_col = "entry_time" if "entry_time" in columns else columns[0]
-    query = f"""
-        SELECT *
-        FROM {_quote_identifier(table_name)}
-        {where}
-        ORDER BY {_quote_identifier(order_col)} DESC
-        LIMIT 1
-    """
-    df = _read_sql(query, asset_id=asset_id)
+    table_name = "trading_positions"
+    conn = duckdb.connect(db_path, read_only=True)
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = ?",
+            [table_name],
+        ).fetchone()
+        if row is None:
+            return None
+        col_rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+            [table_name],
+        ).fetchall()
+        columns    = [r[0] for r in col_rows]
+        status_col = "status" if "status" in columns else None
+        where      = "WHERE status IN ('OPEN', 'LONG', 'LONG_OPEN', 'SHORT', 'SHORT_OPEN')" if status_col else ""
+        order_col  = "entry_time" if "entry_time" in columns else columns[0]
+        df = conn.execute(
+            f'SELECT * FROM {_quote_identifier(table_name)} {where}'
+            f' ORDER BY {_quote_identifier(order_col)} DESC LIMIT 1'
+        ).df()
+    finally:
+        conn.close()
+
     if df.empty:
         return None
     return {key: _json_safe(value) for key, value in df.iloc[0].to_dict().items()}
 
 
-# =============================================================================
-# closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Return live closed trades, or managed backtest trades before live tables exist
-# =============================================================================
 def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame:
-    table_name = "trading_positions"
-    if table_exists(table_name, asset_id=asset_id):
-        columns = table_columns(table_name, asset_id=asset_id)
-        order_col = "exit_time" if "exit_time" in columns else columns[0]
-        where = "WHERE status IN ('CLOSED', 'FLAT')" if "status" in columns else ""
-        query = f"""
-            SELECT *
-            FROM {_quote_identifier(table_name)}
-            {where}
-            ORDER BY {_quote_identifier(order_col)} DESC
-            LIMIT ?
-        """
-        return _read_sql(query, params=(int(limit),), asset_id=asset_id)
+    try:
+        trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
+    except Exception:
+        trading_db = None
 
-    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/trades.csv")
-    if not path.exists():
+    if trading_db and Path(trading_db).exists():
+        table_name = "trading_positions"
+        conn = duckdb.connect(trading_db, read_only=True)
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = ?", [table_name]
+            ).fetchone()
+            if row is not None:
+                col_rows  = conn.execute(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_name = ? ORDER BY ordinal_position",
+                    [table_name],
+                ).fetchall()
+                columns   = [r[0] for r in col_rows]
+                order_col = "exit_time" if "exit_time" in columns else columns[0]
+                where     = "WHERE status IN ('CLOSED', 'FLAT')" if "status" in columns else ""
+                return conn.execute(
+                    f'SELECT * FROM {_quote_identifier(table_name)} {where}'
+                    f' ORDER BY {_quote_identifier(order_col)} DESC LIMIT ?',
+                    [int(limit)],
+                ).df()
+        finally:
+            conn.close()
+
+    path = _session_artifact_path("trades.parquet")
+    if not path or not path.exists():
         return pd.DataFrame()
-    df = pd.read_csv(path)
+    df = pd.read_parquet(path)
     return df.tail(int(limit)).sort_values("entry_time", ascending=False).reset_index(drop=True)
 
 
-# =============================================================================
-# equity_curve(asset_id: str | None = None) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Return live equity snapshots, or managed backtest equity before live tables exist
-# =============================================================================
 def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
-    table_name = "trading_equity_snapshots"
-    if table_exists(table_name, asset_id=asset_id):
-        columns = table_columns(table_name, asset_id=asset_id)
-        time_col = "snapshot_time" if "snapshot_time" in columns else columns[0]
-        query = f"""
-            SELECT *
-            FROM {_quote_identifier(table_name)}
-            ORDER BY {_quote_identifier(time_col)} ASC
-        """
-        return _read_sql(query, asset_id=asset_id)
+    try:
+        trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
+    except Exception:
+        trading_db = None
 
-    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/equity_curve.csv")
-    if not path.exists():
+    if trading_db and Path(trading_db).exists():
+        table_name = "trading_equity_snapshots"
+        conn = duckdb.connect(trading_db, read_only=True)
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = ?", [table_name]
+            ).fetchone()
+            if row is not None:
+                col_rows = conn.execute(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_name = ? ORDER BY ordinal_position",
+                    [table_name],
+                ).fetchall()
+                columns  = [r[0] for r in col_rows]
+                time_col = "snapshot_time" if "snapshot_time" in columns else columns[0]
+                return conn.execute(
+                    f'SELECT * FROM {_quote_identifier(table_name)}'
+                    f' ORDER BY {_quote_identifier(time_col)} ASC'
+                ).df()
+        finally:
+            conn.close()
+
+    path = _session_artifact_path("equity_curve.parquet")
+    if not path or not path.exists():
         return pd.DataFrame()
-    return pd.read_csv(path)
+    return pd.read_parquet(path)
 
 
-# =============================================================================
-# backtest_summary(asset_id: str | None = None) -> dict
-# =============================================================================
-# Purpose:
-#  - Return the managed strategy summary before live trading tables exist
-# =============================================================================
 def backtest_summary(asset_id: str | None = None) -> dict:
-    path = _repo_path("backtests/solusdt_long_fw60_q90_local_v3/summary.json")
-    if not path.exists():
+    path = _session_artifact_path("summary.json")
+    if not path or not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-# =============================================================================
-# recent_orders(limit: int = 200, asset_id: str | None = None) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Return recent orders when trading order tables exist
-# =============================================================================
 def recent_orders(limit: int = 200, asset_id: str | None = None) -> pd.DataFrame:
     table_name = "trading_orders"
     if not table_exists(table_name, asset_id=asset_id):
         return pd.DataFrame()
-    columns = table_columns(table_name, asset_id=asset_id)
+    columns   = table_columns(table_name, asset_id=asset_id)
     order_col = "created_at" if "created_at" in columns else columns[0]
     query = f"""
         SELECT *
@@ -364,17 +335,11 @@ def recent_orders(limit: int = 200, asset_id: str | None = None) -> pd.DataFrame
     return _read_sql(query, params=(int(limit),), asset_id=asset_id)
 
 
-# =============================================================================
-# recent_errors(limit: int = 100, asset_id: str | None = None) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Return recent trading errors when the error table exists
-# =============================================================================
 def recent_errors(limit: int = 100, asset_id: str | None = None) -> pd.DataFrame:
     table_name = "trading_errors"
     if not table_exists(table_name, asset_id=asset_id):
         return pd.DataFrame()
-    columns = table_columns(table_name, asset_id=asset_id)
+    columns   = table_columns(table_name, asset_id=asset_id)
     order_col = "error_time" if "error_time" in columns else columns[0]
     query = f"""
         SELECT *
@@ -385,12 +350,6 @@ def recent_errors(limit: int = 100, asset_id: str | None = None) -> pd.DataFrame
     return _read_sql(query, params=(int(limit),), asset_id=asset_id)
 
 
-# =============================================================================
-# table_health(asset_id: str | None = None) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Return row counts and latest timestamps for core and optional trading tables
-# =============================================================================
 def table_health(asset_id: str | None = None) -> pd.DataFrame:
     cfg = load_dashboard_config(asset_id=asset_id)
     configured_tables = cfg["tables"]
@@ -410,22 +369,16 @@ def table_health(asset_id: str | None = None) -> pd.DataFrame:
         exists = table_exists(table_name, asset_id=asset_id)
         rows.append(
             {
-                "table": label,
-                "table_name": table_name,
-                "exists": exists,
-                "rows": table_row_count(table_name, asset_id=asset_id) if exists else 0,
+                "table":       label,
+                "table_name":  table_name,
+                "exists":      exists,
+                "rows":        table_row_count(table_name, asset_id=asset_id) if exists else 0,
                 "latest_time": latest_table_timestamp(table_name, asset_id=asset_id) if exists else None,
             }
         )
     return pd.DataFrame(rows)
 
 
-# =============================================================================
-# table_columns(table_name: str, asset_id: str | None = None) -> list[str]
-# =============================================================================
-# Purpose:
-#  - Return table columns for optional UI rendering
-# =============================================================================
 def table_columns(table_name: str, asset_id: str | None = None) -> list[str]:
     if not table_exists(table_name, asset_id=asset_id):
         return []
@@ -443,12 +396,6 @@ def table_columns(table_name: str, asset_id: str | None = None) -> list[str]:
     return [r[0] for r in rows]
 
 
-# =============================================================================
-# table_row_count(table_name: str, asset_id: str | None = None) -> int
-# =============================================================================
-# Purpose:
-#  - Return row count for a dashboard table
-# =============================================================================
 def table_row_count(table_name: str, asset_id: str | None = None) -> int:
     if not table_exists(table_name, asset_id=asset_id):
         return 0
@@ -459,12 +406,6 @@ def table_row_count(table_name: str, asset_id: str | None = None) -> int:
     return int(value or 0)
 
 
-# =============================================================================
-# _has_ohlcv_columns(table_name: str | None, asset_id: str | None = None) -> bool
-# =============================================================================
-# Purpose:
-#  - Check whether the configured OHLCV table can support candlestick rendering
-# =============================================================================
 def _has_ohlcv_columns(table_name: str | None, asset_id: str | None = None) -> bool:
     if not table_name or not table_exists(table_name, asset_id=asset_id):
         return False
@@ -472,12 +413,6 @@ def _has_ohlcv_columns(table_name: str | None, asset_id: str | None = None) -> b
     return {"open_time", "open", "high", "low", "close"}.issubset(columns)
 
 
-# =============================================================================
-# _coerce_prediction_frame(df: pd.DataFrame) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Normalize prediction table dtypes for chart rendering
-# =============================================================================
 def _coerce_prediction_frame(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
@@ -500,12 +435,6 @@ def _resolve_long_short_pred_cols(
     return long_col, short_col
 
 
-# =============================================================================
-# _read_sql(...) -> pd.DataFrame
-# =============================================================================
-# Purpose:
-#  - Execute a bounded read-only query
-# =============================================================================
 def _read_sql(
     query: str,
     params: tuple = (),
@@ -521,12 +450,6 @@ def _read_sql(
         conn.close()
 
 
-# =============================================================================
-# _scalar(...) -> Any
-# =============================================================================
-# Purpose:
-#  - Execute a scalar query
-# =============================================================================
 def _scalar(
     query: str,
     params: tuple = (),
@@ -543,12 +466,6 @@ def _scalar(
     return row[0] if row else None
 
 
-# =============================================================================
-# _db_path(asset_id: str | None = None) -> str
-# =============================================================================
-# Purpose:
-#  - Return configured SQLite path
-# =============================================================================
 def _db_path(asset_id: str | None = None) -> str | None:
     path = utils.load_asset_config(asset_id)["database"].get("db_path")
     if path:
@@ -560,32 +477,24 @@ def _db_path(asset_id: str | None = None) -> str | None:
         return None
 
 
-# =============================================================================
-# _repo_path(relative_path: str) -> Path
-# =============================================================================
-# Purpose:
-#  - Resolve repo-relative artifacts
-# =============================================================================
+def _session_artifact_path(filename: str) -> Path | None:
+    try:
+        session_id = utils.load_trading_config().get("strategy_session_id", "")
+    except Exception:
+        return None
+    if not session_id:
+        return None
+    return _repo_path(f"artifacts/{session_id}/{filename}")
+
+
 def _repo_path(relative_path: str) -> Path:
     return Path(utils._repo_root()) / relative_path
 
 
-# =============================================================================
-# _quote_identifier(value: str) -> str
-# =============================================================================
-# Purpose:
-#  - Quote SQLite identifiers safely
-# =============================================================================
 def _quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
 
 
-# =============================================================================
-# _json_safe(value: Any) -> Any
-# =============================================================================
-# Purpose:
-#  - Convert pandas timestamps/NA values for Streamlit display dictionaries
-# =============================================================================
 def _json_safe(value: Any) -> Any:
     if pd.isna(value):
         return None

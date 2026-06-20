@@ -15,7 +15,7 @@ Before committing — full gate from repo root:
 ```powershell
 ruff check . --fix
 uv run pyright
-uv run pytest _tests/
+uv run pytest src/<module>/tests/
 ```
 
 Ruff always CLI (`--fix` auto-applies; MCP cannot do this).
@@ -191,7 +191,8 @@ src/<domain>/               ← module root
 - Scripts are thin CLI wrappers; all reusable logic belongs in a submodule folder.
 - Scripts are numbered (`00_`, `01_`, …) when execution order is defined.
 - Submodule folders group files **by topic** (e.g., `sampling/`, `training/`, `search/`, `evaluation/`).
-- Tests mirror the submodule structure: `tests/<submodule>/<type>/test_*.py`.
+- Tests live next to the owning module under `src/<module>/tests/`.
+- Tests mirror the submodule structure: `src/<module>/tests/<submodule>/<type>/test_*.py`.
 
 **Reference implementation:** `src/database/` and `src/modeling/quantitative/`.
 

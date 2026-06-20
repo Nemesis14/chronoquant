@@ -1,0 +1,23 @@
+{
+    "model_id": "lgbm_solusdt_l_fw60_2101_2605",
+    "display_name": "SOL Long LightGBM Champion 2101-2605",
+    "description": "Champion long model \u2014 walk-forward CV, anchor 2023-01, 4-fold \u00d7 8m valid, through 2026-05.",
+    "asset_id": "solusdt",
+    "target_name": "long_mfe_fw60",
+    "family": "lightgbm",
+    "trainer": "lightgbm_regression",
+    "sampling": {
+        "sample_id": "solusdt_fw60_2101_2605",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2605",
+        "row_stride": 60,
+        "sampling_mode": "walk_forward",
+        "year": 2023,
+        "train_months": 9,
+        "valid_months": 8,
+        "shift_months": 8,
+        "n_folds": 4
+    },
+    "created_at": "2026-06-20T11:53:27.769620+00:00",
+    "pipeline_status": "search_done",
+    "updated_at": "2026-06-20T12:36:42.299500+00:00"
+}

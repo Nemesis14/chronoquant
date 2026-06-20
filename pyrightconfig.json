@@ -4,7 +4,6 @@
   "venv": ".venv",
   "include": [
     "src",
-    "_tests",
     "scripts"
   ],
   "exclude": [

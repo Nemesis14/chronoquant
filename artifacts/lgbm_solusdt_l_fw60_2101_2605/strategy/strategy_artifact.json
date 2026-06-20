@@ -1,0 +1,38 @@
+{
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
+  "side": "long",
+  "calibrated_at": "2026-06-20T14:01:34.187409+00:00",
+  "oos_period": {
+    "start": "2026-05-01",
+    "end": "2026-05-31"
+  },
+  "strategy": {
+    "entry_threshold": 0.45,
+    "rearm_threshold": 0.18,
+    "exit_threshold": 0.1,
+    "min_hold_minutes": 5,
+    "max_hold_minutes": 120,
+    "take_profit_pct": 0.0,
+    "stop_loss_pct": 0.0,
+    "trailing_activation_pct": 0.0,
+    "trailing_stop_pct": 0.0,
+    "cooldown_minutes": 60,
+    "fee_bps_per_side": 10.0,
+    "slippage_bps_per_side": 2.0,
+    "initial_equity": 10000.0,
+    "side": "long"
+  },
+  "metrics": {
+    "trade_count": 0,
+    "win_rate": null,
+    "total_return": 0.0,
+    "profit": null,
+    "profit_factor": null,
+    "max_drawdown": 0.0,
+    "avg_hold_minutes": null,
+    "exposure_pct": 0.0,
+    "initial_equity": 10000.0,
+    "final_equity": 10000.0,
+    "exit_reasons": {}
+  }
+}

@@ -1,1 +1,1 @@
-"""Trading module: calibration (backtest, artifacts) and live service."""
+"""Trading module: live trading service, exchange client, journal, state machine."""

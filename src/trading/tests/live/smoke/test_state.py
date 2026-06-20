@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 
-pytestmark = pytest.mark.smoke
-
 from trading.live.state import FLAT, LONG, TradingState
 
+pytestmark = pytest.mark.smoke
 
 # ---------------------------------------------------------------------------
 # Tests

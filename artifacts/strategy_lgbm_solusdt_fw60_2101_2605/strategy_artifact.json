@@ -1,0 +1,41 @@
+{
+  "session_id": "strategy_lgbm_solusdt_fw60_2101_2605",
+  "long_model": "lgbm_solusdt_l_fw60_2101_2605",
+  "short_model": "lgbm_solusdt_s_fw60_2101_2605",
+  "signal_mode": "rank_first",
+  "evaluation_mode": "same_window",
+  "fit_period": {
+    "start": "2025-05-01",
+    "end": "2026-05-31"
+  },
+  "rank_lookup_long_path": "rank_lookup_long.parquet",
+  "rank_lookup_short_path": "rank_lookup_short.parquet",
+  "isotonic_long_path": "isotonic_long.pkl",
+  "isotonic_short_path": "isotonic_short.pkl",
+  "decision_params": {
+    "long_entry_pct": 0.8086166344657351,
+    "short_entry_pct": 0.9757071488588757,
+    "min_edge_gap": 0.21959818254342153,
+    "max_hold_minutes": 156,
+    "cooldown_minutes": 31,
+    "min_hold_minutes": 7,
+    "rearm_pct": 0.42032926425886985,
+    "conflict_rule": "highest_edge"
+  },
+  "optuna_best_trial": {
+    "value": 0.005753190429900971,
+    "n_trials": 20
+  },
+  "metrics": {
+    "n_trades": 83,
+    "total_return": 0.477515,
+    "win_rate": 0.9157,
+    "sharpe": 36.019,
+    "max_drawdown": -0.00245,
+    "sufficient_sample": true
+  },
+  "trades_path": "trades.parquet",
+  "equity_curve_path": "equity_curve.parquet",
+  "summary_path": "summary.json",
+  "calibrated_at": "2026-06-20T18:50:06Z"
+}

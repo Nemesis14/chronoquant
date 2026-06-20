@@ -171,6 +171,52 @@
             },
             "predict": { "method": "predict" },
             "active": false
+        },
+        "lgbm_solusdt_l_fw60_2101_2605": {
+            "display_name": "SOL Long LightGBM Champion 2101-2605",
+            "description": "Champion long model — walk-forward CV, anchor 2023-01, 4-fold × 8m valid, through 2026-05.",
+            "asset_id": "solusdt",
+            "target_name": "long_mfe_fw60",
+            "family": "lightgbm",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2605",
+            "oos_year": null,
+            "sampling": {
+                "sample_id": "solusdt_fw60_2101_2605",
+                "sample_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2605",
+                "row_stride": 60,
+                "sampling_mode": "walk_forward",
+                "year": 2023,
+                "train_months": 9,
+                "valid_months": 8,
+                "shift_months": 8,
+                "n_folds": 4
+            },
+            "predict": { "method": "predict" },
+            "active": false
+        },
+        "lgbm_solusdt_s_fw60_2101_2605": {
+            "display_name": "SOL Short LightGBM Champion 2101-2605",
+            "description": "Champion short model — walk-forward CV, anchor 2023-01, 4-fold × 8m valid, through 2026-05.",
+            "asset_id": "solusdt",
+            "target_name": "short_mfe_fw60",
+            "family": "lightgbm",
+            "trainer": "lightgbm_regression",
+            "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2605",
+            "oos_year": null,
+            "sampling": {
+                "sample_id": "solusdt_fw60_2101_2605",
+                "sample_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2605",
+                "row_stride": 60,
+                "sampling_mode": "walk_forward",
+                "year": 2023,
+                "train_months": 9,
+                "valid_months": 8,
+                "shift_months": 8,
+                "n_folds": 4
+            },
+            "predict": { "method": "predict" },
+            "active": false
         }
     }
 }

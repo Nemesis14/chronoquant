@@ -35,6 +35,7 @@ class WalkForwardSamplingConfig:
     train_months : int = 9
     valid_months : int = 3
     shift_months : int = 3
+    n_folds      : int = 4
     purge_minutes: int = 240
     target_cols  : tuple[str, ...] = ("long_mfe_fw60", "short_mfe_fw60")
     feature_cols : tuple[str, ...] = ()

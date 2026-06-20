@@ -18,7 +18,7 @@ uv run python script.py
 
 # Run a tool (pyright, ruff, pytest)
 uv run pyright
-uv run pytest _tests/
+uv run pytest src/<module>/tests/
 ```
 
 ---

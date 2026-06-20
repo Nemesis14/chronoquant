@@ -1,4 +1,4 @@
-"""Helpers for the combined 5600 train-valid analysis notebook."""
+"""Helpers for parameterized train-valid analysis notebooks."""
 
 from __future__ import annotations
 
@@ -12,20 +12,26 @@ import numpy as np
 import pandas as pd
 
 
-MODEL_ID = "lgbm_solusdt_l_fw60_2021"
-TARGET_COL = "long_mfe_fw60"
-PRED_COL = "pred_long"
 CACHE_SUBDIR = Path("analysis_cache") / "5600_train_valid_analysis"
 
 
-def artifact_dir(root: Path) -> Path:
+def infer_pred_col(target_col: str) -> str:
+    """Infer prediction column name from the target column."""
+    if target_col.startswith("long_"):
+        return "pred_long"
+    if target_col.startswith("short_"):
+        return "pred_short"
+    return "pred"
+
+
+def artifact_dir(root: Path, model_id: str) -> Path:
     """Return artifact directory path."""
-    return root / "artifacts" / MODEL_ID
+    return root / "artifacts" / model_id
 
 
-def cache_dir(root: Path) -> Path:
+def cache_dir(root: Path, model_id: str) -> Path:
     """Return cache directory path under the model artifact tree."""
-    return artifact_dir(root) / CACHE_SUBDIR
+    return artifact_dir(root, model_id) / CACHE_SUBDIR
 
 
 def legacy_cache_dir(root: Path) -> Path:
@@ -33,9 +39,15 @@ def legacy_cache_dir(root: Path) -> Path:
     return root / "_doc_" / "5600_model_2021_train_valid_analysis_cache"
 
 
-def ensure_cache(root: Path) -> Path:
+def model_target_col(root: Path, model_id: str) -> str:
+    """Return target column name from the model manifest."""
+    manifest = load_manifest(root, model_id)
+    return str(manifest["target_name"])
+
+
+def ensure_cache(root: Path, model_id: str) -> Path:
     """Ensure cached CV predictions and metrics exist."""
-    out_dir = cache_dir(root)
+    out_dir = cache_dir(root, model_id)
     required = [
         out_dir / "cv_predictions.parquet",
         out_dir / "fold_metrics.json",
@@ -58,19 +70,30 @@ def ensure_cache(root: Path) -> Path:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run(
-        ["uv", "run", "python", str(Path(__file__).resolve()), "--build-cache", str(root)],
+        [
+            "uv",
+            "run",
+            "python",
+            str(Path(__file__).resolve()),
+            "--build-cache",
+            str(root),
+            "--model-id",
+            model_id,
+        ],
         check=True,
         cwd=root,
     )
     return out_dir
 
 
-def _build_cache(root: Path) -> None:
+def _build_cache(root: Path, model_id: str) -> None:
     """Build CV prediction cache in the uv environment."""
     import lightgbm as lgb
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-    art_dir = artifact_dir(root)
+    art_dir = artifact_dir(root, model_id)
+    target_col = model_target_col(root, model_id)
+    pred_col = infer_pred_col(target_col)
     sample = pd.read_parquet(art_dir / "sample_train_valid.parquet")
     sample["open_time"] = pd.to_datetime(sample["open_time"])
     sample["date"] = sample["open_time"].dt.floor("D")
@@ -81,6 +104,7 @@ def _build_cache(root: Path) -> None:
     best_params = json.loads((art_dir / "search" / "best_params.json").read_text(encoding="utf-8"))
     metadata = json.loads((art_dir / "metadata.json").read_text(encoding="utf-8"))
     features = list(feature_set["selected"])
+    fold_time_windows = metadata.get("fold_time_windows") or []
 
     fixed = {
         "objective": "regression",
@@ -93,16 +117,35 @@ def _build_cache(root: Path) -> None:
         "n_jobs": 4,
     }
 
+    if fold_time_windows:
+        fold_ids = [int(fw["fold_id"]) for fw in fold_time_windows]
+    else:
+        fold_ids = [int(fold) for fold in sorted(sample["fold_id"].unique().tolist()) if int(fold) > 0]
+
     metric_rows: list[dict[str, float | int]] = []
     pred_frames: list[pd.DataFrame] = []
-    for fold in sorted(sample["fold_id"].unique().tolist()):
-        train_mask = sample["fold_id"] != fold
-        valid_mask = sample["fold_id"] == fold
+    for fold in fold_ids:
+        if fold_time_windows:
+            fw = next(fw for fw in fold_time_windows if int(fw["fold_id"]) == fold)
+            valid_start = pd.Timestamp(fw["valid_start"])
+            valid_end = pd.Timestamp(fw["valid_end"]) + pd.Timedelta(hours=23, minutes=59)
+            train_end = pd.Timestamp(fw["train_end"]) + pd.Timedelta(hours=23, minutes=59)
+            delta = pd.Timedelta(minutes=int(metadata.get("purge_minutes", 0)))
+
+            valid_mask = (sample["open_time"] >= valid_start) & (sample["open_time"] <= valid_end)
+            purge_mask = (
+                ((sample["open_time"] > train_end) & (sample["open_time"] < valid_start))
+                | ((sample["open_time"] > valid_end) & (sample["open_time"] <= valid_end + delta))
+            )
+            train_mask = ~valid_mask & ~purge_mask
+        else:
+            train_mask = sample["fold_id"] != fold
+            valid_mask = sample["fold_id"] == fold
 
         x_train = sample.loc[train_mask, features]
-        y_train = sample.loc[train_mask, TARGET_COL].astype(float)
+        y_train = sample.loc[train_mask, target_col].astype(float)
         x_valid = sample.loc[valid_mask, features]
-        y_valid = sample.loc[valid_mask, TARGET_COL].astype(float)
+        y_valid = sample.loc[valid_mask, target_col].astype(float)
 
         model = lgb.LGBMRegressor(**fixed, **best_params, random_state=42)
         model.fit(
@@ -136,19 +179,21 @@ def _build_cache(root: Path) -> None:
             }
         )
 
-        train_df = sample.loc[train_mask, ["open_time", "date", "fold_id", TARGET_COL]].copy()
+        train_df = sample.loc[train_mask, ["open_time", "date", "fold_id", target_col]].copy()
+        train_df = train_df.rename(columns={target_col: "target"})
         train_df["cv_fold"] = int(fold)
         train_df["segment"] = "train"
         train_df["pred"] = pred_train
         pred_frames.append(train_df)
 
-        valid_df = sample.loc[valid_mask, ["open_time", "date", "fold_id", TARGET_COL]].copy()
+        valid_df = sample.loc[valid_mask, ["open_time", "date", "fold_id", target_col]].copy()
+        valid_df = valid_df.rename(columns={target_col: "target"})
         valid_df["cv_fold"] = int(fold)
         valid_df["segment"] = "valid"
         valid_df["pred"] = pred_valid
         pred_frames.append(valid_df)
 
-    out_dir = cache_dir(root)
+    out_dir = cache_dir(root, model_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pred_df = pd.concat(pred_frames, ignore_index=True).sort_values(["cv_fold", "open_time", "segment"])
@@ -157,9 +202,9 @@ def _build_cache(root: Path) -> None:
     (out_dir / "metadata_snapshot.json").write_text(
         json.dumps(
             {
-                "model_id": MODEL_ID,
-                "target_col": TARGET_COL,
-                "pred_col": PRED_COL,
+                "model_id": model_id,
+                "target_col": target_col,
+                "pred_col": pred_col,
                 "fold_time_windows": metadata.get("fold_time_windows", []),
                 "fold_row_counts": metadata.get("fold_row_counts", {}),
             },
@@ -169,46 +214,51 @@ def _build_cache(root: Path) -> None:
     )
 
 
-def load_cv_predictions(root: Path) -> pd.DataFrame:
+def load_cv_predictions(root: Path, model_id: str) -> pd.DataFrame:
     """Load cached CV prediction frame."""
-    ensure_cache(root)
-    df = pd.read_parquet(cache_dir(root) / "cv_predictions.parquet")
+    ensure_cache(root, model_id)
+    df = pd.read_parquet(cache_dir(root, model_id) / "cv_predictions.parquet")
+    if "target" not in df.columns:
+        snapshot = load_metadata_snapshot(root, model_id)
+        legacy_target_col = snapshot.get("target_col")
+        if legacy_target_col in df.columns:
+            df = df.rename(columns={legacy_target_col: "target"})
     df["open_time"] = pd.to_datetime(df["open_time"])
     df["date"] = pd.to_datetime(df["date"])
     return df
 
 
-def load_fold_metrics(root: Path) -> pd.DataFrame:
+def load_fold_metrics(root: Path, model_id: str) -> pd.DataFrame:
     """Load cached fold metrics."""
-    ensure_cache(root)
-    rows = json.loads((cache_dir(root) / "fold_metrics.json").read_text(encoding="utf-8"))
+    ensure_cache(root, model_id)
+    rows = json.loads((cache_dir(root, model_id) / "fold_metrics.json").read_text(encoding="utf-8"))
     return pd.DataFrame(rows).sort_values("fold").reset_index(drop=True)
 
 
-def load_metadata_snapshot(root: Path) -> dict:
+def load_metadata_snapshot(root: Path, model_id: str) -> dict:
     """Load cached metadata snapshot."""
-    ensure_cache(root)
-    return json.loads((cache_dir(root) / "metadata_snapshot.json").read_text(encoding="utf-8"))
+    ensure_cache(root, model_id)
+    return json.loads((cache_dir(root, model_id) / "metadata_snapshot.json").read_text(encoding="utf-8"))
 
 
-def load_manifest(root: Path) -> dict:
+def load_manifest(root: Path, model_id: str) -> dict:
     """Load model manifest."""
-    return json.loads((artifact_dir(root) / "manifest.json").read_text(encoding="utf-8"))
+    return json.loads((artifact_dir(root, model_id) / "manifest.json").read_text(encoding="utf-8"))
 
 
-def load_sampling_metadata(root: Path) -> dict:
+def load_sampling_metadata(root: Path, model_id: str) -> dict:
     """Load raw sampling metadata."""
-    return json.loads((artifact_dir(root) / "metadata.json").read_text(encoding="utf-8"))
+    return json.loads((artifact_dir(root, model_id) / "metadata.json").read_text(encoding="utf-8"))
 
 
-def load_search_best(root: Path) -> dict:
+def load_search_best(root: Path, model_id: str) -> dict:
     """Load search best summary."""
-    return json.loads((artifact_dir(root) / "search" / "search_best.json").read_text(encoding="utf-8"))
+    return json.loads((artifact_dir(root, model_id) / "search" / "search_best.json").read_text(encoding="utf-8"))
 
 
-def load_oos_predictions(root: Path) -> pd.DataFrame:
+def load_oos_predictions(root: Path, model_id: str) -> pd.DataFrame:
     """Load OOS prediction frame."""
-    df = pd.read_parquet(artifact_dir(root) / "sample_oos.parquet")
+    df = pd.read_parquet(artifact_dir(root, model_id) / "sample_oos.parquet")
     df["open_time"] = pd.to_datetime(df["open_time"])
     return df
 
@@ -217,7 +267,7 @@ def split_summary_metrics(pred_df: pd.DataFrame) -> pd.DataFrame:
     """Return overall metrics by train/valid split across all folds."""
     rows: list[dict[str, float | str | int]] = []
     for segment, sub in pred_df.groupby("segment"):
-        y = sub[TARGET_COL].astype(float).to_numpy()
+        y = sub["target"].astype(float).to_numpy()
         p = sub["pred"].astype(float).to_numpy()
         rmse = float(np.sqrt(np.mean((y - p) ** 2)))
         mae = float(np.mean(np.abs(y - p)))
@@ -259,7 +309,7 @@ def residual_summary(pred_df: pd.DataFrame) -> pd.DataFrame:
     """Return residual distribution summary by split."""
     rows: list[dict[str, float | str]] = []
     for segment, sub in pred_df.groupby("segment"):
-        resid = sub["pred"] - sub[TARGET_COL]
+        resid = sub["pred"] - sub["target"]
         rows.append(
             {
                 "segment": segment,
@@ -302,7 +352,7 @@ def fold_rank_metrics(pred_df: pd.DataFrame, segment: str = "valid") -> pd.DataF
     """Compute fold-level ranking metrics for one segment."""
     rows: list[dict[str, float | int | str]] = []
     for fold, sub in pred_df.loc[pred_df["segment"] == segment].groupby("cv_fold"):
-        y = sub[TARGET_COL].to_numpy(dtype=float)
+        y = sub["target"].to_numpy(dtype=float)
         s = sub["pred"].to_numpy(dtype=float)
         rows.append(
             {
@@ -323,15 +373,15 @@ def decile_summary(pred_df: pd.DataFrame, n_bins: int = 10) -> pd.DataFrame:
     for segment, sub in pred_df.groupby("segment"):
         tmp = sub.copy()
         tmp["decile"] = pd.qcut(tmp["pred"], q=n_bins, labels=False, duplicates="drop") + 1
-        overall_target_mean = float(tmp[TARGET_COL].mean())
+        overall_target_mean = float(tmp["target"].mean())
         agg = (
             tmp.groupby("decile", observed=True)
             .agg(
                 rows=("pred", "size"),
                 pred_mean=("pred", "mean"),
-                target_mean=(TARGET_COL, "mean"),
-                target_median=(TARGET_COL, "median"),
-                target_std=(TARGET_COL, "std"),
+                target_mean=("target", "mean"),
+                target_median=("target", "median"),
+                target_std=("target", "std"),
             )
             .reset_index()
         )
@@ -389,7 +439,7 @@ def fold_decile_summary(pred_df: pd.DataFrame, segment: str = "valid", n_bins: i
             .agg(
                 rows=("pred", "size"),
                 pred_mean=("pred", "mean"),
-                target_mean=(TARGET_COL, "mean"),
+                target_mean=("target", "mean"),
             )
             .reset_index()
         )
@@ -401,8 +451,12 @@ def fold_decile_summary(pred_df: pd.DataFrame, segment: str = "valid", n_bins: i
 
 def oos_rank_summary(oos_df: pd.DataFrame) -> pd.DataFrame:
     """Return a compact OOS ranking summary."""
-    y = oos_df[TARGET_COL].to_numpy(dtype=float)
-    s = oos_df[PRED_COL].to_numpy(dtype=float)
+    target_candidates = [c for c in oos_df.columns if c.endswith("_mfe_fw60")]
+    pred_candidates = [c for c in oos_df.columns if c.startswith("pred_")]
+    if not target_candidates or not pred_candidates:
+        raise ValueError("Could not infer target/pred columns from OOS frame.")
+    y = oos_df[target_candidates[0]].to_numpy(dtype=float)
+    s = oos_df[pred_candidates[0]].to_numpy(dtype=float)
     dec = pd.qcut(s, q=10, labels=False, duplicates="drop") + 1
     top_mean = float(np.mean(y[dec == dec.max()]))
     bottom_mean = float(np.mean(y[dec == dec.min()]))
@@ -421,9 +475,9 @@ def oos_rank_summary(oos_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def fold_window_table(root: Path) -> pd.DataFrame:
+def fold_window_table(root: Path, model_id: str) -> pd.DataFrame:
     """Return readable fold window table from sampling metadata."""
-    metadata = load_sampling_metadata(root)
+    metadata = load_sampling_metadata(root, model_id)
     rows = []
     for fw in metadata.get("fold_time_windows", []):
         t_start = pd.Timestamp(fw["train_start"])
@@ -444,9 +498,9 @@ def fold_window_table(root: Path) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("fold_id").reset_index(drop=True)
 
 
-def search_summary_table(root: Path) -> pd.DataFrame:
+def search_summary_table(root: Path, model_id: str) -> pd.DataFrame:
     """Return concise search summary table."""
-    best = load_search_best(root)
+    best = load_search_best(root, model_id)
     fold_summary = best.get("fold_summary", [])
     return pd.DataFrame(
         [
@@ -493,11 +547,14 @@ def commentary_lines(split_metrics: pd.DataFrame, fold_metrics: pd.DataFrame) ->
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for cache building."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    if len(argv) == 2 and argv[0] == "--build-cache":
+    if len(argv) == 4 and argv[0] == "--build-cache" and argv[2] == "--model-id":
         root = Path(argv[1]).resolve()
-        _build_cache(root)
+        _build_cache(root, argv[3])
         return 0
-    print("Usage: python analyst/model_5600_train_valid_analysis.py --build-cache <root>")
+    print(
+        "Usage: python analyst/model_5600_train_valid_analysis.py "
+        "--build-cache <root> --model-id <model_id>"
+    )
     return 1
 
 

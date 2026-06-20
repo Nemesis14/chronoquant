@@ -200,7 +200,6 @@ def step_train(model_id: str) -> None:
     print(
         f"[train] Done — n_features={result.get('n_features')}, "
         f"n_estimators={result.get('n_estimators')}, "
-        f"oos_year={result.get('oos_year')}, "
         f"output_dir={result.get('artifact_dir')}"
     )
     _update_manifest_status(_artifact_dir_for(model_id), "train_done")

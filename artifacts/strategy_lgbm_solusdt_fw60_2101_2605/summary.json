@@ -1,0 +1,10 @@
+{
+  "initial_capital": 1.0,
+  "final_equity": 1.477515,
+  "n_trades": 83,
+  "win_rate": 0.915663,
+  "gross_return": 0.477515,
+  "net_return": 0.477515,
+  "equity_basis": "mfe_proxy",
+  "note": "entry_price and exit_price reflect close at entry/exit timestamps; equity still uses bucket_mean_mfe as proxy return per trade"
+}

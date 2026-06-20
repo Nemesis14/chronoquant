@@ -9,13 +9,11 @@ from __future__ import annotations
 #  - Provide read functions for the UI to display trading status from trading.db.
 # =============================================================================
 import logging
-import threading
 import traceback
 
 _logger = logging.getLogger("chronoquant.trading")
 
 # Module-level singleton — survives Streamlit session rerenders
-_service_thread: threading.Thread | None = None
 _service_instance = None  # TradingService instance
 _last_error: str | None = None  # last startup error, shown in UI
 
@@ -26,7 +24,7 @@ _last_error: str | None = None  # last startup error, shown in UI
 
 def start_trading(mode: str = "dry_run") -> bool:
     """Start the trading service in a background thread. Returns True if started."""
-    global _service_thread, _service_instance, _last_error
+    global _service_instance, _last_error
     _last_error = None
 
     if is_trading_running():
@@ -41,15 +39,7 @@ def start_trading(mode: str = "dry_run") -> bool:
         config["mode"] = mode
 
         _service_instance = TradingService(config)
-
-        # Thread calls _run() which internally calls _startup() on first iteration.
-        # We do NOT call _startup() here to avoid double initialisation.
-        _service_thread = threading.Thread(
-            target=_service_instance._run,
-            name="chronoquant-trading",
-            daemon=True,
-        )
-        _service_thread.start()
+        _service_instance.start()
 
         _logger.info("Trading service thread started (mode=%s)", mode)
         return True
@@ -59,7 +49,6 @@ def start_trading(mode: str = "dry_run") -> bool:
         _last_error = f"{type(exc).__name__}: {exc}\n{tb}"
         _logger.error("Failed to start trading service:\n%s", tb)
         _service_instance = None
-        _service_thread = None
         return False
 
 
@@ -72,8 +61,7 @@ def stop_trading() -> None:
 
 
 def is_trading_running() -> bool:
-    """True if the background trading thread is alive."""
-    return _service_thread is not None and _service_thread.is_alive()
+    return _service_instance is not None and _service_instance.is_running()
 
 
 def get_trading_mode() -> str | None:

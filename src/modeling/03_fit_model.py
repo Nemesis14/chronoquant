@@ -26,7 +26,6 @@ def main() -> None:
     print(f"Model trained : {result['model_id']}")
     print(f"n_estimators  : {result['n_estimators']}")
     print(f"n_features    : {result['n_features']}")
-    print(f"oos_year      : {result.get('oos_year')}")
     print(f"Output        : {result['artifact_dir']}")
 
 

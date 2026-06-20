@@ -87,7 +87,7 @@ cross-reference linkkel hivatkozzon rá.
 ```powershell
 ruff check . --fix
 uv run pyright
-uv run pytest _tests/
+uv run pytest src/<module>/tests/
 ```
 
 ---

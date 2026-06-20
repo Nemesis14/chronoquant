@@ -39,7 +39,7 @@ Load relevant module docs (only for affected modules):
 | `src/data_handling/01_validate_stats.py`, `src/data_handling/02_sync_pipeline.py`, `src/data_handling/03_build_quant_train.py` | Operational entry points |
 | `config/assets.json` | Asset configuration |
 | `src/utils.py` | Config-loading helpers (shared — coordinate with others) |
-| `_tests/store/`, `_tests/data_pipeline/` | Tests for this layer |
+| `src/data_handling/tests/store/`, `src/data_handling/tests/sync_tables/`, `src/data_handling/tests/sync_pipeline/` | Tests for this layer |
 | `_doc_/store/`, `_doc_/data_pipeline/` | Module documentation |
 
 ---

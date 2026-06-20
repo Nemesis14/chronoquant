@@ -76,7 +76,7 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
     try:
         rows = client.futures_account_trades(symbol=symbol, limit=limit)
         if rows:
-            return _normalize_futures(rows)
+            return _normalize_futures(rows)  # type: ignore[arg-type]
     except Exception as exc:
         _logger.debug("Futures trade fetch failed (%s), trying spot", exc)
 
@@ -84,7 +84,7 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
     try:
         rows = client.get_my_trades(symbol=symbol, limit=limit)
         if rows:
-            return _normalize_spot(rows)
+            return _normalize_spot(rows)  # type: ignore[arg-type]
     except Exception as exc:
         _logger.warning("Spot trade fetch also failed: %s", exc)
 
@@ -98,8 +98,8 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
 def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     out = _empty_frame()
-    out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)
-    out["side"]       = df.get("side", pd.Series(dtype=str)).str.upper()
+    out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)  # type: ignore[arg-type]
+    out["side"]       = df.get("side", pd.Series(dtype=str)).str.upper()  # type: ignore[union-attr]
     out["price"]      = pd.to_numeric(df.get("price"),      errors="coerce")
     out["qty"]        = pd.to_numeric(df.get("qty"),        errors="coerce")
     out["quote_qty"]  = pd.to_numeric(df.get("quoteQty"),   errors="coerce")
@@ -112,9 +112,9 @@ def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
 def _normalize_spot(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     out = _empty_frame()
-    out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)
+    out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)  # type: ignore[arg-type]
     if "isBuyer" in df.columns:
-        out["side"]   = df["isBuyer"].map({True: "BUY", False: "SELL"})
+        out["side"]   = df["isBuyer"].map({True: "BUY", False: "SELL"})  # type: ignore[arg-type]
     elif "side" in df.columns:
         out["side"]   = df["side"].str.upper()
     out["price"]      = pd.to_numeric(df.get("price"),     errors="coerce")

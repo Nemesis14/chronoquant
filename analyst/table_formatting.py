@@ -17,7 +17,7 @@ _PCT_TOKENS = ("rate", "ratio", "share", "pct", "percent")
 _TABLE_STYLES = [
     {"selector": "",         "props": [("border-collapse", "collapse"), ("border", "1px solid black")]},
     {"selector": "th",       "props": [("border", "1px solid black"), ("padding", "4px 8px"), ("text-align", "center")]},
-    {"selector": "td",       "props": [("border", "1px solid black"), ("padding", "4px 8px"), ("text-align", "right")]},
+    {"selector": "td",       "props": [("border", "1px solid black"), ("padding", "4px 8px")]},
     {"selector": "thead th", "props": [("border-bottom", "2px solid black")]},
 ]
 
@@ -62,9 +62,19 @@ def format_analysis_table(df: pd.DataFrame) -> pd.DataFrame:
 
 def display_analysis_table(df: pd.DataFrame) -> None:
     """Format and display df with the pandas index hidden and consistent border/alignment styling."""
-    display(
-        format_analysis_table(df)
-        .style
+    formatted = format_analysis_table(df)
+    numeric_cols = [
+        col
+        for col in df.columns
+        if pd.api.types.is_numeric_dtype(df[col]) and not pd.api.types.is_bool_dtype(df[col])
+    ]
+    text_cols = [col for col in formatted.columns if col not in numeric_cols]
+
+    styler = (
+        formatted.style
         .hide(axis="index")
         .set_table_styles(_TABLE_STYLES)
+        .set_properties(subset=text_cols, **{"text-align": "left"})
+        .set_properties(subset=numeric_cols, **{"text-align": "right"})
     )
+    display(styler)

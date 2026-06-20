@@ -64,7 +64,7 @@ sequenceDiagram
 
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
-| `model_id` | `str` | Model azonosító (`lgbm_solusdt_l_fw60_q90_local_v4`) |
+| `model_id` | `str` | Model azonosító (`<model_id>`) |
 | `model_meta` | `dict` | Model konfiguráció (paths, trainer, stb.) |
 
 **Visszatérési érték:** `tuple[Any, list[str]]` — `(model_object, feature_list)`

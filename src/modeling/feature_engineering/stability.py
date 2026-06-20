@@ -6,6 +6,7 @@ rolling time buckets.  Flags features whose target correlation drifts
 significantly in recent data versus the historical baseline.
 """
 
+import contextlib
 import logging
 
 import duckdb
@@ -84,10 +85,8 @@ def analyze_stability(
     records: list[dict] = []
 
     for col in feat_cols:
-        try:
+        with contextlib.suppress(Exception):  # extreme-valued feature: skipped here, caught by quality step
             _process_col(col, conn, min_ts, bucket_days, cfg, records)
-        except Exception:
-            pass  # extreme-valued feature: skipped here, caught by quality step
 
     logger.info(
         "analyze_stability: done — %d (feature, bucket) rows",

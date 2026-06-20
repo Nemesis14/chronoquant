@@ -7,6 +7,12 @@
 > A kódban a legacy funkciók (`write_sample_artifacts`, `load_sample_definition`,
 > `validate_sample_definition`, `audit_feature_table`, `build_expanding_window_splits`)
 > visszafele kompatibilitás miatt megmaradnak, de új munkában ne használd őket.
+>
+> **Megjegyzés a segment struktúráról:** Az ebben a dokumentumban leírt `segment`
+> oszlop (`fold_1_train`, `fold_N_valid`, `test`) kizárólag az expanding window CV
+> pipeline artifaktjaihoz tartozik. Az aktív yearly sampling pipeline parquetje
+> **nem tartalmaz `segment` oszlopot** — helyette `fold_id` (Int8, 1–4) azonosítja
+> a CV foldokat, a purge kizárás dinamikusan történik a search során.
 
 ---
 
@@ -88,7 +94,7 @@ Az expanding window azért preferált, mert:
 ### Embargo: miért kell és hogyan működik?
 
 A `feat_ohlcv_quant` feature-ök egy részét rolling ablakokkal számítjuk. A
-`trg_l_fw60_q90` target egy 60 perces előre néző ablakot vesz figyelembe — ez azt
+`long_mfe_fw60` target egy 60 perces előre néző ablakot vesz figyelembe — ez azt
 jelenti, hogy az ablak határán lévő feature sorok **implicit módon tartalmazzák
 jövőbeli információt** (pl. az átlag kiszámításához a target ablak áraihoz is nyúlik
 a rolling window).
@@ -205,22 +211,21 @@ generálásának alapja.
 
 ## Target NULL szemantika
 
-A feature tábla target oszlopai (`trg_l_fw60_q90`, `trg_s_fw60_q10`) három értéket vehetnek fel:
+A feature tábla target oszlopai (`long_mfe_fw60`, `short_mfe_fw60`) folytonos fw60 outcome-okat tartalmaznak:
 
 | Érték | Jelentés |
 |-------|---------|
-| `1` | Feltétel teljesült — a forward ablak megerősítette az eseményt |
-| `0` | Feltétel nem teljesült — a forward ablak lezárult esemény nélkül |
+| `DOUBLE` | Számszerű fw60 outcome a `target` táblából |
 | `NULL` | Forward adat még nem elérhető — az utolsó `rolling_window` bar-ban vagyunk |
 
 ### Miért fontos a NULL?
 
-A target egy fordított rolling ablakkal számított. Az utolsó `rolling_window` bar-nál
-(pl. 60 bar a fw60-nál) az ablak nem tartalmaz teljes forward adatot — ezért ezek
-a sorok ismeretlen állapotban vannak, nem megerősített negatívok.
+A target egy fordított rolling ablakkal számított folytonos outcome. Az utolsó
+`rolling_window` bar-nál (pl. 60 bar a fw60-nál) az ablak nem tartalmaz teljes
+forward adatot — ezért ezek a sorok ismeretlen állapotban vannak.
 
-**Alapelv:** Ne impputáld a NULL targeteket 0-val. A NULL valóban ismeretlen, nem
-megerősített negatív. A modell-pipeline `dropna(subset=[target_col])` szűréssel
+**Alapelv:** Ne imputáld a NULL targeteket 0-val. A NULL valóban ismeretlen, nem
+egy semleges outcome. A modell-pipeline `dropna(subset=[target_col])` szűréssel
 kezeli őket.
 
 Az utolsó `rolling_window` bar-ban lévő, nem-nulla NULL arány normális és helyes.
@@ -272,8 +277,8 @@ Minden `create_sample` futtatás négy fájlt ír a `database/<asset_id>/samples
 |--------|--------|--------|
 | `open_time` | `feat_ohlcv_quant` | Timestamp (YYYY-MM-DD HH:MM:SS) |
 | `feat_*` (208 db) | `feat_ohlcv_quant` | Kvantitatív feature-ök |
-| `trg_l_fw60_q90` | `target` | Long target label |
-| `trg_s_fw60_q10` | `target` | Short target label |
+| `long_mfe_fw60` | `target` | Long fw60 outcome |
+| `short_mfe_fw60` | `target` | Short fw60 outcome |
 | `segment` | generált | Szegmens azonosító (ld. lent) |
 
 **`segment` oszlop értékkészlete:**

@@ -44,7 +44,7 @@ format:
     link-external-newwindow: true
 
     grid:
-      sidebar-width: 320px
+      sidebar-width: 380px
       body-width: 900px
-      margin-width: 200px
+      margin-width: 140px
       gutter-width: 2rem

@@ -62,7 +62,7 @@ feature-öket DuckDB-ből töltik vissza a sample `open_time` soraival joinolva.
 
 **Kizárt oszlopok:** `close`, `available_ts`, `lookback_end_ts` (feat táblából), `fw60_close`, `fw60_max`, `fw60_min` és egyéb fw60 oszlopok (target táblából), `long_pred`, `short_pred` (predictions tábla).
 
-**Legacy naming:** A `trg_l_fw60_q90` / `trg_s_fw60_q10` boolean elnevezés NEM szerepel ebben a rétegben. A target oszlopok kizárólag `long_mfe_fw60` és `short_mfe_fw60`.
+**Legacy naming:** A régi `trg_*` boolean elnevezés NEM szerepel ebben a rétegben. A target oszlopok kizárólag `long_mfe_fw60` és `short_mfe_fw60`.
 
 ---
 

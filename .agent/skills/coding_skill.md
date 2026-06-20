@@ -142,7 +142,7 @@ Align `:` to longest parameter name:
 - **snake_case** for all variables and functions
 - Config dicts: `db_cfg`, `feat_cfg`, `model_cfg`, `env_cfg`
 - Features: `feat_rsi_14`, `feat_roc_140`
-- Targets: `trg_l_fw60_q90`, `trg_s_fw60_q10`
+- Targets: `long_mfe_fw60`, `short_mfe_fw60`
 - Verb-first functions: `sync_features()`, `load_db_config()`
 - Private helpers: leading underscore `_resolve_path()`
 

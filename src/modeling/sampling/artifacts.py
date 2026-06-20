@@ -1,10 +1,10 @@
 """Sample artifact IO — write, load, and validate sample definition files.
 
 Yearly format: metadata.json, audit.json, sample_train_valid.parquet (Polars).
-  sample_train_valid.parquet : hourly-sampled rows, segments train/valid/purge
+  sample_train_valid.parquet : hourly-sampled rows, fold_id 1-4
   sample_oos.parquet         : full-resolution OOS year predictions (written by 03_fit_model)
 Legacy format (load/validate only): metadata.json + folds.json — kept for
-backward compatibility with lgbm_search.py.
+backward compatibility.
 """
 
 import json

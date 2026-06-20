@@ -4,7 +4,7 @@ Visual, table, caption, and rendering rules for ChronoQuant analysis notebooks.
 Applies Urban Institute-style data communication principles to Quarto-rendered notebooks.
 
 Quarto config and label syntax → see `quarto_analysis_defaults.md`.
-Notebook structure and cell patterns → see `analyst_skill.md`.
+Notebook structure and workflow → see `analyst_skill.md`.
 
 ---
 
@@ -15,10 +15,13 @@ A reader must understand every table and figure without opening the code.
 
 Each result-producing code cell must have:
 
-1. A preceding markdown explanation (purpose, method, interpretation, action rule).
+1. A preceding markdown explanation: purpose, source, method, interpretation.
 2. A Quarto label and caption.
 3. Consistent numeric formatting.
 4. A nearby finding that interprets the result.
+
+The notebook as a whole must also end with a short decision-oriented interpretation
+that answers the user's actual analytical question.
 
 ---
 
@@ -48,13 +51,16 @@ CQ_SEQUENCE = [
 ]
 ```
 
-Color meaning (apply consistently):
+Color meaning:
 
 - main measured series: blue
-- expected/acceptable reference: gray or gray_light
-- warning threshold: yellow or orange
-- failure/violation: red
-- neutral context: gray
+- comparison or benchmark series: gray or black
+- secondary comparison series: yellow or orange
+- warnings, failures, problematic segments: red
+- contextual shading, bands, neutral overlays: gray_light
+
+Use color consistently across the notebook. Do not assign different semantics to the
+same color in neighboring charts.
 
 ---
 
@@ -77,7 +83,13 @@ CQ_COLORS = {
     "orange": "#f15a24",
     "red": "#ec008b",
 }
-CQ_SEQUENCE = [CQ_COLORS["blue"], CQ_COLORS["yellow"], CQ_COLORS["orange"], CQ_COLORS["gray"], CQ_COLORS["red"]]
+CQ_SEQUENCE = [
+    CQ_COLORS["blue"],
+    CQ_COLORS["yellow"],
+    CQ_COLORS["orange"],
+    CQ_COLORS["gray"],
+    CQ_COLORS["red"],
+]
 
 sns.set_theme(
     style="whitegrid",
@@ -103,23 +115,66 @@ sns.set_palette(CQ_SEQUENCE)
 
 ## Chart Rules
 
-- seaborn is the primary charting library; matplotlib is the fallback and customization layer (axis formatters, reference lines, multi-panel layout).
-- Plotly is forbidden by default — use only if the spec explicitly requests interactive HTML output.
-- Every plot must have a corresponding source dataframe or summary table computed in the same or adjacent code cell. Findings must derive from that data, not from visual inspection of the chart.
-- Do not use `ax.set_title()` — let Quarto captions title and number figures.
-- Use clear axis labels with units.
-- Remove top and right spines (handled by `sns.set_theme` rc above).
+- seaborn is the primary charting library; matplotlib is the fallback and customization layer.
+- Plotly is forbidden by default.
+- Every plot must have a corresponding source dataframe or summary table.
+- Findings must derive from computed data, not only from visual inspection.
+- Do not use `ax.set_title()`.
+- Use clear axis labels with units or scale context.
+- Remove top and right spines.
 - Use light gridlines on the value axis.
-- Start bar charts at zero unless documented otherwise.
-- Prefer horizontal bars for long category names.
-- Sort bars by measured value unless chronological or logical order matters.
 - Use direct labels or compact legends.
-- Show thresholds as reference lines and explain them in the preceding markdown.
-- Use red/orange only for actual warnings or failures.
-- **Temporal subplot layout:** when a multi-panel cell contains two or more time-ordered
-  subplots (period box plots by year/half-year, rolling time-series), always use
-  `layout-ncol: 1` (vertical stacking). Side-by-side (`layout-ncol: 2`) compresses
-  the time axis and makes period comparisons unreadable.
+- Explain thresholds and reference lines in the preceding markdown.
+- Use red and orange only for genuine warnings, failures, or clearly highlighted segments.
+
+---
+
+## Analysis-Driven Chart Selection
+
+Choose chart forms according to the analytical question, not convenience.
+
+- **Időbeli alakulás:** line chart, rolling chart, éves overlay vagy faceted time series.
+- **Éves összehasonlítás:** separate panels or aligned overlays with consistent scales.
+- **Eloszlás:** histogram, KDE, box, violin, ECDF, quantile range, or density comparison.
+- **Model performance:** train-valid metrics table plus calibration or prediction-vs-target views.
+- **Seasonality:** monthly or quarterly aggregation with aligned panels or heatmap.
+- **Split periods:** visually mark train, valid, OOS or regime periods with shading, bands, or explicit legends when relevant.
+
+If the user asks whether years or periods are comparable, the presentation must make
+those comparisons visually and numerically obvious.
+
+---
+
+## Temporal And Split Presentation Rules
+
+- When a chart mixes multiple time segments, explicitly distinguish them with shading,
+  facet panels, or stable color semantics.
+- When train and valid periods matter, mark them on the time axis or separate them into panels.
+- If yearly comparison is central, keep axes aligned across years.
+- For time-ordered multi-panel layouts, prefer `layout-ncol: 1` unless side-by-side
+  genuinely remains readable.
+- If a csonka year is being compared to full years, say so explicitly in nearby text.
+
+---
+
+## Regression And Target Diagnostics
+
+For continuous target analysis or regression model evaluation, prefer the following
+best-practice views when the data supports them:
+
+- train vs valid metric table: `RMSE`, `MAE`, `R²`, and sample counts;
+- prediction vs fact scatter with ideal reference line;
+- binned calibration style chart: average prediction vs average fact;
+- residual summary table or residual distribution view;
+- daily or periodic aggregation chart when regime following is important.
+
+The purpose is not to maximize the number of charts, but to answer:
+
+- is there signal;
+- does it survive on valid;
+- is the model calibrated or only rank-useful;
+- are there unstable periods;
+- can the same target behavior be assumed across years.
 
 ---
 
@@ -161,41 +216,55 @@ display_analysis_table(yearly)
 #|   - "Leading null count by rolling feature"
 #|   - "Null-rate distribution by feature family"
 #| layout-ncol: 2
+```
 
-fig, ax = plt.subplots(figsize=(7, 4))
-sns.barplot(data=nulls_by_feature, y="feature", x="leading_nulls", ax=ax, color=CQ_COLORS["blue"], orient="h")
-ax.set_xlabel("Leading nulls")
-ax.set_ylabel("")
+### Quarto panel layout
+
+When a result naturally consists of multiple separate outputs, prefer Quarto panel
+layout over manually squeezing everything into one subplot grid.
+
+Use this for:
+
+- train vs valid paired charts;
+- before vs after comparisons;
+- same metric on multiple splits or horizons;
+- a compact pair such as scatter + density heatmap.
+
+Supported executable-cell layout options:
+
+- `layout-ncol: 2` for equal-width side-by-side panels;
+- `layout-nrow: 2` for stacked outputs;
+- `layout: "[[1,1],[1]]"` or similar for asymmetric custom panels;
+- `layout-align` and `layout-valign` when vertical or horizontal alignment matters;
+- `fig-subcap` to caption each panel separately under one shared figure caption.
+
+Pattern:
+
+```python
+#| label: fig-train-valid-panel
+#| fig-cap: "Train-valid comparison"
+#| fig-subcap:
+#|   - "Train sample"
+#|   - "Validation sample"
+#| layout-ncol: 2
+
+fig, ax = plt.subplots()
+...
 plt.show()
 
-fig, ax = plt.subplots(figsize=(7, 4))
-sns.histplot(data=nulls_by_family, x="null_rate", bins=20, ax=ax, color=CQ_COLORS["blue"])
-ax.set_xlabel("Null rate")
-ax.set_ylabel("Feature families")
-ax.xaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
+fig, ax = plt.subplots()
+...
 plt.show()
 ```
 
-### Subtable group (markdown)
+If the outputs share axes and are only readable together, one matplotlib subplot
+figure is still acceptable. If each panel needs its own legend, scale treatment,
+or dense annotation, Quarto panels are usually cleaner.
 
-```markdown
-::: {#tbl-feature-quality-panel layout-ncol=2}
-
-| feature | leading_nulls |
-|---|---:|
-| feat_rsi_14 | 14 |
-
-: Leading null counts {#tbl-leading-nulls}
-
-| feature_family | null_rate_pct |
-|---|---:|
-| momentum | 2.31% |
-
-: Null rates by family {#tbl-null-rates}
-
-Feature quality diagnostics
-:::
-```
+For more complex layouts, Quarto also supports custom `layout` arrays such as
+`[[70,30],[100]]` and negative spacer columns. Source: official Quarto Figures
+documentation (`authoring/figures`, subfigures, figure panels, custom layouts)
+and Jupyter cell layout reference (`reference/cells/cells-jupyter`).
 
 ---
 
@@ -205,12 +274,12 @@ Apply consistently in all displayed tables and plot axes.
 
 | Column type | Display format |
 |---|---|
-| `year` | Full integer, e.g. `2024` — never `2,024` or `2024.0` |
+| `year` | Full integer, e.g. `2024` |
 | `count`, `count(*)`, `n`, `row_count`, `rows`, `trades`, `volume`, `violations`, `*_count`, `*_n` | Integer, zero decimals |
-| `rate`, `ratio`, `share`, `pct`, `percent` (name contains any of these) | Percent string, exactly 2 decimals, e.g. `23.24%`; auto-scaled ×100 if values ≤ 1 |
-| all other float columns | 3 decimal string, e.g. `1.234` |
+| `rate`, `ratio`, `share`, `pct`, `percent` | Percent string, exactly 2 decimals; auto-scaled ×100 if values ≤ 1 |
+| all other float columns | 3 decimal string |
 
-Shared helper module — import in every analysis notebook Setup cell:
+Shared helper module:
 
 ```python
 import sys
@@ -218,48 +287,24 @@ sys.path.insert(0, str(_root))
 from analyst.table_formatting import format_analysis_table, display_analysis_table
 ```
 
-`analyst/table_formatting.py` is the canonical implementation.
-Functions are also reproduced here for reference:
+---
 
-```python
-from IPython.display import display
-import pandas as pd
+## Interpretation Rules
 
-_COUNT_NAMES = {"count", "count(*)", "n", "row_count", "rows", "trades", "volume", "violations"}
-_PCT_TOKENS  = ("rate", "ratio", "share", "pct", "percent")
+- Every major chart or table must have a nearby interpretation.
+- Interpretations must be concrete: mention direction, magnitude, stability, and implication.
+- Do not stop at "visible difference" or "there is correlation"; quantify it if the data allows.
+- The final interpretation must answer the user's decision question, not only summarize outputs.
+- If the results are mixed, say what is strong and what is weak.
+- If the valid view is weaker than train, say whether the degradation is acceptable.
 
-def format_analysis_table(df):
-    out = df.copy()
-    for col in out.columns:
-        lower = col.lower()
-        if lower == "year":
-            out[col] = pd.array(out[col], dtype="Int64").astype(str)
-        elif lower in _COUNT_NAMES or lower.endswith("_count") or lower.endswith("_n"):
-            out[col] = pd.array(out[col], dtype="Int64")
-        elif any(t in lower for t in _PCT_TOKENS):
-            values = out[col]
-            if pd.api.types.is_numeric_dtype(values):
-                if pd.notna(values.max(skipna=True)) and values.max(skipna=True) <= 1.0:
-                    values = values * 100
-                out[col] = values.map(lambda x: f"{x:.2f}%" if pd.notna(x) else "—")
-        elif pd.api.types.is_float_dtype(out[col]):
-            out[col] = out[col].map(lambda x: f"{x:.3f}" if pd.notna(x) else "—")
-    return out
+Good interpretation answers questions like:
 
-def display_analysis_table(df):
-    display(format_analysis_table(df).style.hide(axis="index"))
-```
-
-Axis formatters (matplotlib ticker on seaborn axes):
-
-```python
-# Percent axis
-ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
-
-# Year axis
-ax.xaxis.set_major_locator(mtick.MaxNLocator(integer=True))
-ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%d"))
-```
+- mennyire más évente a target;
+- elég egységesek-e az évek a modellhez;
+- a csonka aktuális év mely korábbi évekre hasonlít;
+- van-e olyan év vagy rezsim, amit érdemes kizárni;
+- a modell inkább rangsorolásra vagy abszolút becslésre alkalmas.
 
 ---
 
@@ -269,12 +314,12 @@ Before handing off an analysis notebook, verify:
 
 - [ ] Notebook executed from a clean kernel.
 - [ ] Quarto render succeeded and HTML is at `_doc_/<slug>.html`.
-- [ ] No forbidden placeholder text remains (`futtatás után kitöltendő`, etc.).
+- [ ] No forbidden placeholder text remains.
 - [ ] Every table cell has `#| label: tbl-...` and `#| tbl-cap: ...`.
 - [ ] Every plot cell has `#| label: fig-...` and `#| fig-cap: ...`.
-- [ ] Multi-plot cells use `fig-subcap` or are split into separate labelled cells.
-- [ ] Markdown before each output explains purpose, method, and interpretation.
-- [ ] Every report table cell ends with `display_analysis_table(df)` — never a bare variable, `display(df)`, `df.head()`, or raw `df.style`.
-- [ ] No pandas index column visible in rendered HTML tables.
-- [ ] Numeric formatting follows project conventions (ratio/rate → `22.33%`, floats → `1.234`, counts → `0` decimals).
-- [ ] Headings and captions are not manually numbered.
+- [ ] Markdown before each output explains purpose, source, method, and interpretation.
+- [ ] Every report table cell ends with `display_analysis_table(df)`.
+- [ ] No pandas index column is visible in rendered HTML tables.
+- [ ] Numeric formatting follows project conventions.
+- [ ] Train-valid, in-sample/OOS, or yearly comparison is visually explicit when relevant.
+- [ ] The final notebook includes a decision-oriented interpretation based on the executed results.

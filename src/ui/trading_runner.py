@@ -35,7 +35,7 @@ def start_trading(mode: str = "dry_run") -> bool:
 
     try:
         import utils
-        from trading.service import TradingService
+        from trading.live.service import TradingService
 
         config = utils.load_trading_config()
         config["mode"] = mode
@@ -95,7 +95,7 @@ def get_trading_status() -> dict | None:
     try:
         import os
 
-        from trading.journal import get_current_run_status, trading_db_path
+        from trading.live.journal import get_current_run_status, trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
             return None
@@ -111,8 +111,8 @@ def get_recent_signals(limit: int = 10) -> list[dict]:
     try:
         import os
 
-        from trading.journal import get_recent_signals as _get
-        from trading.journal import trading_db_path
+        from trading.live.journal import get_recent_signals as _get
+        from trading.live.journal import trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
             return []
@@ -125,8 +125,8 @@ def get_recent_positions(limit: int = 20) -> list[dict]:
     try:
         import os
 
-        from trading.journal import get_recent_positions as _get
-        from trading.journal import trading_db_path
+        from trading.live.journal import get_recent_positions as _get
+        from trading.live.journal import trading_db_path
         db_path = trading_db_path()
         if not os.path.exists(db_path):
             return []

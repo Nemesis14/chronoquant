@@ -179,7 +179,7 @@ Az ASOF join (`predictions` ↔ `feat_ohlcv_quant`) az `available_ts` oszlopon a
 
 ### predictions
 
-**Cél:** Champion modellek (`lgbm_solusdt_l_fw60_q90_local_v4`, `lgbm_solusdt_s_fw60_q10_local_v4`) által generált valószínűségi pontszámok. Egy sor per `open_time`, unified long+short output.
+**Cél:** Champion modellek által generált predikciós pontszámok. Egy sor per `open_time`, unified long+short output.
 
 **Beírási mód:** append-only (`_insert_append_only`). A séma rögzített — `ensure_tables` hozza létre.
 
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS predictions (
 )
 ```
 
-**Legacy oszlopok:** `dataset_split`, `fold_id`, `trg_l_fw60_q90`, `trg_s_fw60_q10` — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
+**Legacy oszlopok:** `dataset_split`, `fold_id`, valamint a régi `trg_*` bináris target oszlopok — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
 
 ---
 

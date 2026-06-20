@@ -77,10 +77,10 @@ format:
     embed-resources: true
     self-contained: true
     grid:
-      sidebar-width: 250px
-      body-width: 950px
-      margin-width: 200px
-      gutter-width: 1.5rem
+      sidebar-width: 380px
+      body-width: 900px
+      margin-width: 140px
+      gutter-width: 2rem
 execute:
   enabled: false
 ---

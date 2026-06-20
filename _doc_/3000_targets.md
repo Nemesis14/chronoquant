@@ -55,17 +55,17 @@ A target layer ezért alapvetően meghatározza a modell megbízhatóságát és
 
 ```mermaid
 flowchart LR
-  Q[Target stratégia] --> A[Full-history q90/q10 bináris label\n❌ target-definition leakage\n❌ információvesztés\n❌ rezsimfüggő torzítás]
-  Q --> B[Folytonos fw60 logreturn outcome\n✅ objektív forward measurement\n✅ nincs percentilis küszöb\n✅ Választott]
-  Q --> C[Triple-barrier label\n⚠️ jobb MFE/MAE szétválasztás\nde komplex konfiguráció]
-  Q --> D[Fold-specifikus bináris label\n⚠️ leakage-mentes binarizálás\nde kompatibilitás elvész]
+  Q[Target stratégia] --> A[Full-history quantile bináris label\nNO: target-definition leakage\nNO: információvesztés\nNO: rezsimfüggő torzítás]
+  Q --> B[Folytonos fw60 logreturn outcome\nOK: objektív forward measurement\nOK: nincs percentilis küszöb\nOK: Választott]
+  Q --> C[Triple-barrier label\nWARN: jobb MFE/MAE szétválasztás\nde komplex konfiguráció]
+  Q --> D[Fold-specifikus bináris label\nWARN: leakage-mentes binarizálás\nde kompatibilitás elvész]
 ```
 
 | Megközelítés | Előny | Hátrány | Státusz |
 |---|---|---|---|
 | Folytonos fw60 logreturn (jelenlegi) | Nincs percentilis-torzítás, magnitude megmarad, flexibilis | Regresszor szükséges, binary baseline elvész | ✅ Választott (epic-011) |
-| Full-history q90/q10 bináris | Egyszerű classifier, stabil threshold | Target-definition leakage, rezsimfüggő torzítás, információvesztés | ❌ Eltávolítva — legacy |
-| Fold-specifikus q90 bináris | Leakage-mentes binarizálás | Minden foldban különböző label → összehasonlíthatatlan metrikák | ⚠️ Fontolóra vehető derived label-ként |
+| Full-history quantile bináris | Egyszerű classifier, stabil threshold | Target-definition leakage, rezsimfüggő torzítás, információvesztés | ❌ Eltávolítva — legacy |
+| Fold-specifikus quantile bináris | Leakage-mentes binarizálás | Minden foldban különböző label → összehasonlíthatatlan metrikák | ⚠️ Fontolóra vehető derived label-ként |
 | Triple-barrier | MFE + MAE egyszerre kezel, stop-loss implicit | Konfiguráció érzékeny, training instabilabb | ⚠️ Jövőbeli kísérlethez |
 | Quantile regression target | Tail opportunity fókusz | Nem standard loss, nehezebben interpretálható | ⚠️ Objektív altarget |
 
@@ -74,21 +74,21 @@ flowchart LR
 A korábbi rendszerben (`epic-011` előtt) két bináris label létezett:
 
 ```
-trg_l_fw60_q90 = (future_max_return >= teljes history q90 küszöb)
-trg_s_fw60_q10 = (future_min_return <= teljes history q10 küszöb)
+trg_long = (future_max_return >= teljes history quantile küszöb)
+trg_short = (future_min_return <= teljes history quantile küszöb)
 ```
 
 Ez három strukturális problémát okozott:
 
 ```mermaid
 graph TD
-  P1[Target-definition leakage\nA q90 küszöb a teljes historyból\nszámolódik beleértve a validációs\nidőszak utáni adatokat is]
-  P2[Rezsimfüggő torzítás\nKésőbbi volatilis időszak\nmagasabb q90-t okoz\nvisszamenőleg kevesebb pozitív labelt]
-  P3[Információvesztés\nfuture_max = 0.91% és 4.50%\nmindkettő trg=1 ha q90 = 0.90%]
+  P1[Target-definition leakage\nA quantile küszöb a teljes historyból\nszámolódik beleértve a validációs\nidőszak utáni adatokat is]
+  P2[Rezsimfüggő torzítás\nKésőbbi volatilis időszak\nmagasabb quantile küszöböt okoz\nvisszamenőleg kevesebb pozitív labelt]
+  P3[Információvesztés\nfuture_max = 0.91% és 4.50%\nmindkettő trg=1 ha a küszöb = 0.90%]
   P1 & P2 & P3 --> EFFECT[Torzult CV score\nTorzult feature importance\nNem production-like threshold]
 ```
 
-**Target-definition leakage:** Ha a q90 küszöb a teljes 2025–2026-os historyból számolódik, akkor a 2025 Q2 validációs fold targetjei már 2026-os eloszlásinformációt tartalmaznak a label definíciójában. Ez nem klasszikus feature leakage, hanem *target-definition leakage*.
+**Target-definition leakage:** Ha a quantile küszöb a teljes 2025–2026-os historyból számolódik, akkor a 2025 Q2 validációs fold targetjei már 2026-os eloszlásinformációt tartalmaznak a label definíciójában. Ez nem klasszikus feature leakage, hanem *target-definition leakage*.
 
 **Megoldás:** Objektív, küszöb-mentes forward outcome — `log(future_max / close[t])`. Az outcome a tényleges piacmozgást méri, percentilis policy és binarizálás nélkül.
 
@@ -156,7 +156,7 @@ A logreturn additív természete lehetővé teszi, hogy multi-period outlookokat
 | Rezsimváltás eltérő target eloszlást okoz | Alacsony volatilitású periódusban a `long_mfe_fw60` p90 kisebb mint magas volatilitású periódusban | Expanding window CV kezeli; az expanding train hatókör követi a rezsimeket |
 | `fw60_max` és `fw60_min` szimmetriája | A két outcome ugyanazon a skálán van, de long és short értelmezésük ellentétes | Dokumentált szimmetria: `long_mae_fw60` numerikusan = `short_mfe_fw60` |
 | Kis log value értelmezése | `long_mfe_fw60 = 0.003` → `exp(0.003) − 1 ≈ 0.30%` — konfúzió a magnitude körül | Model card-on és reporting-ban mindig % formában is feltüntetni |
-| Legacy target referencia örökség | Régi docs (`docs/data/dictionary/features.md`, `docs/concepts/targets.md`) még `trg_l_fw60_q90`-re hivatkoznak | Elavultként kezelni; ground truth: `_doc_/3100_sync_targets.md` és a forráskód |
+| Legacy target referencia örökség | Régi docs a bináris `trg_*` targetekre hivatkoznak | Elavultként kezelni; ground truth: `_doc_/3100_sync_targets.md` és a forráskód |
 
 ### Validációs checklist
 
@@ -165,6 +165,6 @@ A logreturn additív természete lehetővé teszi, hogy multi-period outlookokat
 - [ ] `long_mfe_fw60` = `log(fw60_max / close)` — numerikusan ellenőrzött determinisztikus teszttel
 - [ ] `short_mfe_fw60` = `log(fw60_min / close)` — numerikusan ellenőrzött determinisztikus teszttel
 - [ ] `long_mfe_fw60` és `short_mfe_fw60` csak DOUBLE `NULL`, soha `0.0` — nem impute-olt
-- [ ] A `target` tábla nem tartalmaz `trg_l_fw60_q90` vagy `trg_s_fw60_q10` oszlopot
+- [ ] A `target` tábla nem tartalmaz legacy `trg_*` bináris oszlopot
 - [ ] `sync_targets()` teljes futás után: `computed_from`, `computed_to`, `computed_at` frissítve a `solusdt.json` metaadatban
 - [ ] Dataset loader: null target sorok droppolva (`dropna` a target col alapján) — nincs `0` imputation

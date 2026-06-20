@@ -7,7 +7,7 @@ Notebook struktúra, cell-minták, kód-konvenciók és workflow.
 
 ## Notebook Struktúra
 
-```
+```text
 Raw cell       → Quarto frontmatter
 Markdown cell  → ## Cél
 Markdown cell  → ## <1. Szekció>
@@ -15,14 +15,17 @@ Code cell      → lekérdezés + display / plot
 ...
 Markdown cell  → ## <N. Szekció>
 Code cell      → lekérdezés + display / plot
+Markdown cell  → ## <Értelmező záró szekció>
+Code cell      → programmatikusan generált interpretáció / decision table / metrika összefoglaló
 ```
 
 Nincs `Findings`, `Conclusion`, `Summary` szekció. Az eredmények közvetlenül a
-code cell-ek outputjában jelennek meg táblaként és/vagy ábrán.
+code cell-ek outputjában jelennek meg táblaként és/vagy ábrán, majd a notebook
+végén kötelező egy rövid, döntést támogató értelmező szekció.
 
 ---
 
-## Quarto Frontmatter (Raw cell)
+## Quarto Frontmatter (Raw Cell)
 
 Az **első cell** minden notebookban Raw cell, a teljes Quarto config-gal:
 
@@ -71,14 +74,14 @@ execute:
 ---
 ```
 
-Ne használj `# Heading`-et dokumentumcímként — a Quarto a frontmatter `title`-t
-rendereli fejlécként. Redundáns `#` fejléc duplikált látható címet okoz.
+Ne használj `# Heading`-et dokumentumcímként. A Quarto a frontmatter `title`-t
+rendereli fejlécként.
 
 ---
 
 ## Cél Fejezet
 
-Mindig az első markdown cell (Raw cell után). Kötelező mezők:
+Mindig az első markdown cell a Raw cell után. Kötelező mezők:
 
 ```markdown
 ## Cél
@@ -92,6 +95,9 @@ Vizsgált területek: <rövid felsorolás>.
 
 **Asset:** SOLUSDT | **Granularitás:** 1m | **Dátum:** YYYY-MM-DD
 ```
+
+Ha a user egy döntési kérdést tesz fel, például mely éveket érdemes használni,
+kötelező ezt már a célfejezetben expliciten megfogalmazni.
 
 ---
 
@@ -108,38 +114,29 @@ Minden elemzési szekció három részből áll:
 
 **Forrás.** `<tábla>` tábla, `<oszlopok>` oszlopok.
 
-**Értelmezés.** <Mit jelent az eredmény. Milyen érték az elfogadható.>
+**Módszer.** <Milyen aggregáció, split, szűrés, validáció vagy transzformáció történik.>
+
+**Értelmezés.** <Mit jelent az eredmény. Milyen eltérés, kapcsolat vagy kockázat számít fontosnak.>
 ```
 
-Minden mező külön bekezdés (üres sorral elválasztva), hogy Quarto külön sorokra
-rendereli őket.
+Minden mező külön bekezdés.
 
 ### 2. Code cell — lekérdezés és megjelenítés
 
 ```python
-#| label: tbl-<kebab-case-nev>        # tábla esetén
+#| label: tbl-<kebab-case-nev>
 #| tbl-cap: "Emberi felirat"
-
-import duckdb, pandas as pd
-
-con = duckdb.connect(db_path, read_only=True)
-df = con.execute("""
-    SELECT ...
-    FROM ...
-    WHERE ...
-""").df()
-con.close()
 
 display_analysis_table(df)
 ```
 
 ```python
-#| label: fig-<kebab-case-nev>        # ábra esetén
+#| label: fig-<kebab-case-nev>
 #| fig-cap: "Emberi felirat"
 #| fig-alt: "Leírás"
 
 fig, ax = plt.subplots()
-sns.barplot(data=df, x="col", y="val", ax=ax, color=CQ_COLORS["blue"])
+sns.lineplot(data=df, x="x", y="y", ax=ax, color=CQ_COLORS["blue"])
 ax.set_xlabel("...")
 ax.set_ylabel("...")
 plt.show()
@@ -147,17 +144,18 @@ plt.show()
 
 ### 3. Szabályok
 
-- Minden szekció **legalább táblát vagy ábrát** tartalmaz — mindkettő is lehet.
-- Tábla: mindig `display_analysis_table(df)` — soha ne a bare `df` vagy `display(df)`.
+- Minden szekció **legalább egy táblát vagy ábrát** tartalmaz.
+- Tábla: mindig `display_analysis_table(df)`.
 - Ábra: mindig `plt.show()` a cell végén.
-- `ax.set_title()` tilos — a caption-t Quarto generálja a `fig-cap`-ből.
-- Nincs `print()` — csak tábla, ábra, vagy `display(Markdown(...))`.
+- `ax.set_title()` tilos.
+- `print()` tilos. Használj táblát, ábrát vagy `display(Markdown(...))`-t.
+- Minden fontos output után legyen közeli, programmatikusan generált rövid olvasat.
 
 ---
 
 ## Setup Cell
 
-A Raw cell után azonnal következő code cell — minden notebook-ban kötelező:
+A Raw cell után azonnal következő code cell minden notebookban kötelező:
 
 ```python
 import sys
@@ -173,103 +171,73 @@ sys.path.insert(0, str(_root))
 from analyst.table_formatting import format_analysis_table, display_analysis_table
 import analyst.plot_utils as pu
 import analyst.db_utils as dbu
-
-# Ha van notebook-specifikus helper:
-# from analyst.XXXX_helpers import ...
-
-# Adatbázis path — utils-on keresztül, ne hardcode
-import utils
-db_path = utils.load_asset_config()["database"]["db_path"]
-
-# Design standard (részletek: analysis_presentation_skill.md)
-CQ_COLORS = {
-    "blue": "#1696d2",
-    "black": "#000000",
-    "gray_dark": "#353535",
-    "gray": "#696969",
-    "gray_light": "#d2d2d2",
-    "yellow": "#fdbf11",
-    "orange": "#f15a24",
-    "red": "#ec008b",
-}
-CQ_SEQUENCE = [
-    CQ_COLORS["blue"], CQ_COLORS["yellow"], CQ_COLORS["orange"],
-    CQ_COLORS["gray"], CQ_COLORS["red"],
-]
-
-sns.set_theme(
-    style="whitegrid",
-    rc={
-        "figure.figsize": (10, 5),
-        "figure.dpi": 120,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.edgecolor": CQ_COLORS["gray"],
-        "axes.labelcolor": CQ_COLORS["gray_dark"],
-        "xtick.color": CQ_COLORS["gray_dark"],
-        "ytick.color": CQ_COLORS["gray_dark"],
-        "grid.color": CQ_COLORS["gray_light"],
-        "grid.linewidth": 0.8,
-        "axes.axisbelow": True,
-        "legend.frameon": False,
-    },
-)
-sns.set_palette(CQ_SEQUENCE)
 ```
+
+Ha van notebook-specifikus helper, azt itt importáld.
 
 ---
 
 ## Kód Stílus
 
-- **Adat-hozzáférés:** DuckDB-first — SQL szűrésre, join-ra, aggregációra, window függvényekre.
-- **Nagy in-memory transform:** Polars.
+- **Adat-hozzáférés:** DuckDB-first SQL lekérdezésekre, ahol ez természetes.
+- **Nagy in-memory transform:** Polars vagy pandas, a feladathoz illően.
 - **Display inputok:** pandas, kis végső dataframe-ekre.
-- **Charting:** seaborn (elsődleges); matplotlib fallback/customization (axis formatters, referencia-vonalak).
-- `duckdb.connect(db_path, read_only=True)` — soha ne írj az adatbázisba.
+- **Charting:** seaborn elsődleges, matplotlib fallback és finomhangolás.
+- Soha ne írj az adatbázisba.
 - Plotly tilos, kivéve ha a user explicit interaktív HTML-t kér.
 
----
+Az agentnek a helyes elemzési reprezentációt kell választania, nem a megszokottat:
 
-## Tábla-megjelenítési Szabályok
-
-Minden tábla cell **kötelezően** `display_analysis_table(df)`-fel zárul.
-
-**Tilos:**
-- `df` bare variable a cell végén
-- `display(df)` vagy `display(df.head())`
-- `df.style` `format_analysis_table` nélkül
-- `df.head()` mint utolsó kifejezés
-
-**Numerikus formázás:**
-
-| Oszlop típus | Megjelenítés |
-|---|---|
-| `year` | Egész, pl. `2024` — soha nem `2,024` vagy `2024.0` |
-| count, n, rows, violations, *_count, *_n | Egész, nulla tizedes |
-| rate, ratio, share, pct, percent | Százalék string, 2 tizedes, pl. `23.24%`; ×100 auto ha érték ≤ 1 |
-| többi float | 3 tizedes string, pl. `1.234` |
-
-`analyst/table_formatting.py` — kanonikus implementáció. Ha még nem létezik,
-hozd létre a `analysis_presentation_skill.md`-ben dokumentált kóddal, és tedd be
-az `analyst/` könyvtárba.
+- idősor esetén időtengelyes chart;
+- éves összehasonlításnál faceted vagy overlay nézet;
+- modellértékelésnél train-valid bontás;
+- eloszlásoknál histogram, KDE, box, violin vagy kvantilis alapú összefoglaló;
+- kalibrációnál binning, reference line, residual vagy pred-vs-fact nézet.
 
 ---
 
-## Segédmodulok
+## Model And Target Evaluation Rules
 
-Újrafelhasználható logika: `analyst/XXXX_<name>.py`
-ahol `XXXX` = a notebook sorszáma.
+Ha a notebook targetet, modellt vagy predikciót elemez, az alábbi szabályok kötelezők,
+ha az adat elérhető:
 
-- Hozz létre helper-t ha ugyanaz a logika 2+ szekciót is érintene.
-- Minden publikus függvény típusannotált, Google-style docstring-gel (`coding_skill.md`).
-- Soha ne írjon DuckDB-be, ne módosítson produkciós táblát.
+- különítsd el a train és valid vagy in-sample és out-of-sample halmazt;
+- mutasd meg az időbeli alakulást és a regime-váltásokat;
+- mutasd meg az eloszlási különbségeket;
+- mutasd meg a predikció és a fact target kapcsolatát;
+- használj referencia-vonalat vagy ideális vonalat, ha ennek van értelme;
+- írj metrikatáblát, ne csak ábrát;
+- a notebook végén fogalmazd meg, hogy a modell mire használható és mire nem.
 
-Import a Setup cell-ben:
+Ha a forrásban nincs kész `segment` mező:
 
-```python
-sys.path.insert(0, str(_root))
-from analyst.XXXX_helpers import compute_target_distribution
-```
+- keresd meg, rekonstruálható-e foldból, metadata-ból, manifestből vagy sample-logikából;
+- ha igen, rekonstruáld;
+- ha nem, írd le explicit módon, hogy a kiértékelés milyen korlátozással olvasandó.
+
+Ne használj leakage-gyanús vagy full-fit predikciót validációs következtetésekre,
+ha fair splitből újra előállítható a train-valid nézet.
+
+---
+
+## Értelmező Zárás
+
+Minden notebook végén kötelező egy külön szekció, például `## Értelmezés`,
+`## Modellolvasat`, `## Döntési szempontok` vagy hasonló címmel.
+
+Ebben a szekcióban:
+
+- ne ismételd meg szó szerint a táblákat;
+- állást kell foglalni a fontos kérdésekben;
+- a következtetés a futott számokra és ábrákra támaszkodjon;
+- ha a user döntést akar hozni, adj döntést támogató választ.
+
+Példák:
+
+- használható-e a teljes időszak a modellfejlesztéshez;
+- vannak-e kizárandó évek vagy rezsimek;
+- a valid teljesítmény elég stabil-e;
+- a modell inkább rangsorolásra vagy pontbecslésre jó-e.
 
 ---
 
@@ -280,36 +248,32 @@ Soha ne írj:
 - `futtatás után kitöltendő`
 - `to be filled after running`
 - `TODO after execution`
-- üres finding vagy értelmezés szekciót
+- üres értelmezést vagy üres záró szekciót
 
-Ha az eredmény a futtatástól függ, generáld programmatikusan:
-
-```python
-display(Markdown(f"**Eredmény:** {violations:,} sor sérti a feltételt."))
-```
+Ha az eredmény a futtatástól függ, generáld programmatikusan.
 
 ---
 
-## Futtatás és Renderelés
+## Futtatás És Renderelés
 
 ```bash
 quarto render _doc_\XXXX_<slug>.ipynb --execute
 ```
 
 1. Írd meg az összes markdown és code cell-t.
-2. Minden eredmény programmatikusan generált — nincs placeholder.
-3. Futtasd le a notebookot tiszta kernel-ből.
-4. `quarto render _doc_\XXXX_<slug>.ipynb --execute`
-5. Ellenőrizd: a HTML létezik `_doc_/XXXX_<slug>.html`-ként.
-6. Ellenőrizd: nincs tiltott placeholder a rendered outputban.
-7. Ellenőrizd: minden tábla és ábra cell rendelkezik `#| label:` és caption tag-gel.
+2. Minden eredmény programmatikusan generált legyen.
+3. Futtasd le a notebookot tiszta kernelből.
+4. Rendereld Quarto-val.
+5. Ellenőrizd, hogy a HTML létrejött.
+6. Olvasd vissza a fő outputokat.
+7. Ha kell, javítsd a notebookot, futtasd újra, és csak utána add át.
 
 ---
 
 ## Rendering QA Checklist
 
-- [ ] Raw cell: teljes Quarto frontmatter (cím, CSS, format config)
-- [ ] Setup cell: CQ_COLORS, sns.set_theme, import-ok, db_path
+- [ ] Raw cell: teljes Quarto frontmatter
+- [ ] Setup cell: importok, theme, table helper
 - [ ] Minden szekció: markdown leírás → code → tábla/ábra
 - [ ] `display_analysis_table(df)` minden tábla cell végén
 - [ ] Nincs bare `df`, `display(df)`, `df.head()` a cell végén
@@ -318,5 +282,6 @@ quarto render _doc_\XXXX_<slug>.ipynb --execute
 - [ ] `plt.show()` minden plot cell végén
 - [ ] Nincs `ax.set_title()`
 - [ ] Nincs placeholder szöveg
-- [ ] Numerikus formázás konvenciónak megfelelő
-- [ ] HTML létezik és letölthető
+- [ ] A train-valid vagy más kritikus split explicit jelölve van, ha releváns
+- [ ] A notebook végén van decision-oriented értelmezés
+- [ ] A HTML létezik és a fő eredmények visszaellenőrzöttek

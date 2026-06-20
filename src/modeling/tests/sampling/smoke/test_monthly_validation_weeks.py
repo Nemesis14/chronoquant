@@ -1,15 +1,17 @@
-"""Smoke tests for select_monthly_validation_weeks."""
+"""Smoke tests for assign_fold_ids — monthly stratification coverage."""
 
 from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
 
-from modeling.sampling.yearly_sampler import select_monthly_validation_weeks
+from modeling.sampling.yearly_sampler import assign_fold_ids
 
 pytestmark = pytest.mark.smoke
 
 YEAR = 2021
+SEED = 42
+N_FOLDS = 4
 
 
 def _make_hourly_df(year: int) -> pl.DataFrame:
@@ -22,54 +24,73 @@ def _make_hourly_df(year: int) -> pl.DataFrame:
     )
 
 
-def test_returns_exactly_12_weeks() -> None:
+def test_all_months_represented_in_assignments() -> None:
+    """Every calendar month should contribute weeks to the fold assignments."""
     hourly_df = _make_hourly_df(YEAR)
-    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    assert len(weeks) == 12, f"Expected 12 weeks, got {len(weeks)}"
+    _, assignments = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    all_weeks = [w for weeks in assignments.values() for w in weeks]
+    months_covered = {datetime.strptime(w["start"], "%Y-%m-%d").month for w in all_weeks}
+    assert len(months_covered) == 12, (
+        f"Expected 12 months covered, got {len(months_covered)}: {sorted(months_covered)}"
+    )
 
 
-def test_each_week_from_different_month() -> None:
+def test_each_fold_has_weeks_from_multiple_months() -> None:
+    """With n_folds=4 and 12 months, each fold should have ~3 weeks."""
     hourly_df = _make_hourly_df(YEAR)
-    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    # week_start (Monday) should be in a different month for each week
-    months = [ws.month for ws, _ in weeks]
-    assert len(set(months)) == 12, f"Duplicate months in validation weeks: {months}"
+    _, assignments = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    for fold_id, weeks in assignments.items():
+        assert len(weeks) >= 2, (
+            f"Fold {fold_id} has only {len(weeks)} weeks — expected at least 2"
+        )
 
 
-def test_each_week_is_seven_days() -> None:
+def test_week_entries_are_seven_days_apart() -> None:
+    """Each week entry should span exactly 6 days (Mon–Sun)."""
     hourly_df = _make_hourly_df(YEAR)
-    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    for ws, we in weeks:
-        delta = we - ws
-        assert delta.days == 6, f"Week {ws}–{we} is {delta.days + 1} days, expected 7"
+    _, assignments = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    for fold_id, weeks in assignments.items():
+        for week in weeks:
+            start = datetime.strptime(week["start"], "%Y-%m-%d").date()
+            end   = datetime.strptime(week["end"],   "%Y-%m-%d").date()
+            delta = (end - start).days
+            assert delta == 6, (
+                f"Fold {fold_id} week {week['start']}–{week['end']} spans {delta+1} days, expected 7"
+            )
 
 
 def test_week_starts_on_monday() -> None:
+    """All week start dates should be Mondays (weekday == 0)."""
     hourly_df = _make_hourly_df(YEAR)
-    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    for ws, we in weeks:
-        assert ws.weekday() == 0, f"Week start {ws} is not a Monday"
-        assert we.weekday() == 6, f"Week end {we} is not a Sunday"
+    _, assignments = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    for fold_id, weeks in assignments.items():
+        for week in weeks:
+            start = datetime.strptime(week["start"], "%Y-%m-%d").date()
+            assert start.weekday() == 0, (
+                f"Fold {fold_id} week start {week['start']} is not a Monday"
+            )
 
 
 def test_same_seed_reproducible() -> None:
     hourly_df = _make_hourly_df(YEAR)
-    w1 = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    w2 = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    assert w1 == w2, "Same seed produced different validation weeks"
+    _, a1 = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    _, a2 = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    assert a1 == a2, "Same seed produced different fold_week_assignments"
 
 
 def test_different_seed_different_output() -> None:
     hourly_df = _make_hourly_df(YEAR)
-    w1 = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    w2 = select_monthly_validation_weeks(hourly_df, YEAR, seed=99)
-    assert w1 != w2, "Different seeds produced identical validation weeks"
+    _, a1 = assign_fold_ids(hourly_df, YEAR, seed=SEED,      n_folds=N_FOLDS)
+    _, a2 = assign_fold_ids(hourly_df, YEAR, seed=SEED + 10, n_folds=N_FOLDS)
+    assert a1 != a2, "Different seeds produced identical fold_week_assignments"
 
 
 def test_all_starts_within_year() -> None:
     hourly_df = _make_hourly_df(YEAR)
-    weeks = select_monthly_validation_weeks(hourly_df, YEAR, seed=42)
-    for ws, _ in weeks:
-        assert ws.year == YEAR, f"Week start {ws} is not in year {YEAR}"
-
-
+    _, assignments = assign_fold_ids(hourly_df, YEAR, seed=SEED, n_folds=N_FOLDS)
+    for fold_id, weeks in assignments.items():
+        for week in weeks:
+            start = datetime.strptime(week["start"], "%Y-%m-%d")
+            assert start.year == YEAR, (
+                f"Fold {fold_id} week start {week['start']} is not in year {YEAR}"
+            )

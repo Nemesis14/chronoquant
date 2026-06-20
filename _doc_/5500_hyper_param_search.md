@@ -2,7 +2,7 @@
 
 A hyperparameter search az éves sample és a feature_engineering kimenete alapján
 keresi az optimális LightGBM modell paraméterkészletet. Optuna TPE (vagy seeded
-random fallback) alapú keresés, stability-penalized RMSE célértékkel.
+random fallback) alapú keresés, Top10 Lift fold-stability penalty célértékkel.
 
 ---
 
@@ -31,8 +31,8 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step s
 | Forrás | Tartalom | Hogyan töltődik be |
 |--------|----------|-------------------|
 | `artifact_dir/feature_engineering/feature_set.json` | `selected` lista — a feature engineering által kiválasztott feature-ök | `_load_feature_cols(artifact_dir)` |
-| `sample_dir/sample_train_valid.parquet` | `open_time`, `segment`, `target_col` — az éves hourly sample | `load_yearly_sample` + polars |
-| `sample_dir/metadata.json` | `selected_valid_weeks` (12 hét), `year` | `load_yearly_sample` |
+| `sample_dir/sample_train_valid.parquet` | `open_time`, `fold_id`, `target_col` — a walk-forward hourly sample | `load_yearly_sample` + polars |
+| `sample_dir/metadata.json` | `fold_time_windows` (lista, foldonkénti időhatárokkal), `year` | `load_yearly_sample` |
 | DuckDB `feat_ohlcv_quant` | Feature értékek az adott évre | `query_range_pl` |
 
 **Fontos:** a search **kizárólag** a `feature_set.json["selected"]` listán szereplő
@@ -58,22 +58,20 @@ A `long_mfe_fw60` értéke pozitív ha az ár felfelé ment (long kedvező); a
 
 ## CV struktúra
 
-A CV a `metadata.json["selected_valid_weeks"]` alapján épül — 12 fold, hónaponként egy.
+A CV a `metadata.json["fold_time_windows"]` alapján épül — 4 walk-forward fold, explicit időablakokkal.
 
 ```
-Fold 1: train=összes "train" szegmens sor  |  valid="2021-01-11"–"2021-01-17"
-Fold 2: train=összes "train" szegmens sor  |  valid="2021-02-08"–"2021-02-14"
-...
-Fold 12: train=összes "train" szegmens sor |  valid="2021-12-13"–"2021-12-19"
+Fold 1: train=2021-01-01–2021-09-30  |  valid=2021-10-01–2021-12-31
+Fold 2: train=2021-04-01–2021-12-31  |  valid=2022-01-01–2022-03-31
+Fold 3: train=2021-07-01–2022-03-31  |  valid=2022-04-01–2022-06-30
+Fold 4: train=2021-10-01–2022-06-30  |  valid=2022-07-01–2022-09-30
 ```
 
-**Kulcspont:** A training set minden foldban UGYANAZ — az összes `train` szegmens sor.
-Ez szándékos: a random-hour yearly sampling már elvégezte a strukturális szeparációt
-(purge zóna + segment assignment). A search feladata a generalizáció mérése 12
-különböző validációs héten keresztül, nem a CV folds train-valid időbeli szeparációja.
+**Kulcspont:** Minden fold saját train ablakot kap (expanding window jelleggel). A split logika a `fold_time_windows` listából indul ki — nem `segment` oszlopból. Ez production-like időrendi szeparációt biztosít: a train ablak mindig a valid ablak előtt zárul.
 
-**Purge sorok** (`segment == "purge"`) semmilyen foldba nem kerülnek be — sem train,
-sem valid oldalra.
+**`fold_id = 0`** sorok train-only sorok — egyik validációs ablakba sem esnek, de az adott fold train halmazába kerülhetnek (ha az open_time a fold train ablakán belül van).
+
+**Purge:** 240 perc purge-t a search dinamikusan alkalmaz a train-valid határon — sem train, sem valid halmazba nem kerülnek be a határhoz közeli sorok.
 
 ---
 
@@ -82,32 +80,41 @@ sem valid oldalra.
 | Stage | Trials | Folds | Célja |
 |-------|--------|-------|-------|
 | `smoke` | 5 | 2 | Pipeline sanity check — nem keresési eredmény |
-| `explore` | 60 | mind (12) | Széles régió feltérképezés |
-| `refine` | 30 | mind (12) | Legjobb régiók pontosítása |
+| `explore` | 60 | mind (4) | Széles régió feltérképezés |
+| `refine` | 30 | mind (4) | Legjobb régiók pontosítása |
 
 A `row_stride` paraméter alapértéke **1** minden stage-nél (a sample már hourly
 → ~8 760 sor/év, nem szükséges tovább ritkulni). Manuálisan felülírható.
 
 ---
 
-## Search Objective
+## Elsődleges Objective
 
-A search az alábbi penalizált célfüggvényt minimalizálja (lower = better):
+A search **Top10 Lift fold-stability penalty** célfüggvényt optimalizál (higher = better a lift, de Optuna `direction='minimize'` → `objective_score = −objective`):
 
 ```
-score = mean(valid_rmse)
-      + 0.25 × std(valid_rmse)         # stabilitás penalizálás
-      + 0.10 × max(0, gap - 0.03)      # overfitting penalizálás
+top10_lift = mean(y_true | score ∈ top 10%) − mean(y_true | all)
+objective  = mean(top10_lift_folds) − 0.5 × std(top10_lift_folds)   [higher is better]
+
+Optuna: direction='minimize', objective_score = −objective
 ```
 
-ahol `gap = mean(valid_rmse) - mean(train_rmse)`.
+**Miért Top10 Lift?** A rendszer előminősítőként működik: nem pontos becslés kell, hanem az, hogy a legmagasabb score-ú predikciók valóban a legjobb realzált hozamú bárokat azonosítsák. A lift mérőszám ezt közvetlenül méri.
 
-**Miért stabilitást bünteti?** Egy magas variance-ű modell (jó néhány foldon, rossz
-másokon) az éles kereskedésben megbízhatatlan. A std(valid_rmse) büntetés preferálja
-a konzisztensen közepes modelleket az ingadozó jókkal szemben.
+**Miért fold-stability penalty?** Az `std(top10_lift_folds)` büntetés kiszűri azokat a modelleket, amelyek csak egyes validációs ablakokban teljesítenek jól — az éles rendszerben az időbeli stabilitás kritikus.
 
-**Miért gap-et bünteti?** Egy 0.03-nál nagyobb train-valid rés overfittingre utal.
-A gap penalizálás a regularizált, általánosítható megoldásokat kedvezi.
+## Rank Audit Metrikák
+
+Minden fold kiértékelésekor az alábbi kötelező rank metrikák számítódnak:
+
+| Metrika | Leírás |
+|---------|--------|
+| **Spearman rank correlation** | A validációs halmazon a modell score és az y_true rangsorának Spearman korrelációja. Értéke: −1 (teljesen inverz) .. +1 (tökéletes rank egyezés). |
+| **Decile monotonicity** | A 10 decile-be rendezett predikciók mean(y_true) értékei hány %-ban monoton növekvők szomszédos decile-ek között. Ideális: 1.0 (teljesen monoton). |
+
+Mindkét metrika megjelenik:
+- `search_summary.csv`: `mean_spearman_rho`, `mean_decile_monotonicity` oszlopokban (összes trial)
+- `search_best.json`: foldonkénti bontásban a best trial rekordban
 
 ---
 
@@ -148,10 +155,13 @@ Rögzített (nem keresett): `objective=regression`, `metric=rmse`,
 
 ## Fold metrikák
 
-| Metrika | Leírás |
-|---------|--------|
-| `rmse` | Root mean squared error — elsődleges optimalizálási metrika |
-| `mae` | Mean absolute error — referencia metrika |
+| Metrika | Leírás | Szerep |
+|---------|--------|--------|
+| `top10_lift` | Top decile mean(y_true) − overall mean(y_true) | **Elsődleges** — objective komponens |
+| `spearman_rho` | Score vs. y_true Spearman korrelációja | Kötelező audit |
+| `decile_monotonicity` | Szomszédos decile-ek %-ban monoton növekvők | Kötelező audit |
+| `rmse` | Root mean squared error | Referencia metrika |
+| `mae` | Mean absolute error | Referencia metrika |
 
 ---
 

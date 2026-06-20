@@ -69,9 +69,9 @@ Ezért a feature layer helyes implementációja kötelező kapu minden modellez�
 
 ```mermaid
 flowchart LR
-  Q[Feature stratégia] --> A[Raw OHLCV árak\n❌ nem-stacionárius\n❌ skewed distribution]
-  Q --> B[Normalizált árszintek\n❌ ablak-függő skálázás\n❌ cross-sample inkonzisztencia]
-  Q --> C[Derivált technikai indikátorok\n✅ stacionáriusabb\n✅ domain knowledge\n✅ Választott]
+  Q[Feature stratégia] --> A[Raw OHLCV árak\nNO: nem-stacionárius\nNO: skewed distribution]
+  Q --> B[Normalizált árszintek\nNO: ablak-függő skálázás\nNO: cross-sample inkonzisztencia]
+  Q --> C[Derivált technikai indikátorok\nOK: stacionáriusabb\nOK: domain knowledge\nOK: Választott]
 ```
 
 | Megközelítés | Előny | Hátrány | Státusz |
@@ -111,7 +111,7 @@ flowchart TD
 
   WU -->|w=140 SMA/EMA| W140[140 bar null\n= 2 óra 20 perc]
   WU -->|Ichimoku Senkou B| W52[52 bar null]
-  WU -->|prev_session H/L| W1441[1441 bar null\n= 24 óra 1 perc ⚠️]
+  WU -->|prev_session H/L| W1441[1441 bar null\n= 24 óra 1 perc WARN]
 ```
 
 | Feature(ek) | Warmup (bar) | Valós idő |

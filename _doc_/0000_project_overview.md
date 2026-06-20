@@ -95,8 +95,8 @@ ui/  ◀──  predictions table + strategy artifact + trade journal
 |-----------|-------|--------|
 | Live OHLCV, features, targets, predictions | DuckDB | Synced, queryable, updatable |
 | `quant_train` | DuckDB | Ad-hoc join table, rebuilt before training |
-| Yearly samples | Parquet (`database/<asset>/samples/<id>/`) | Static snapshots, not synced |
-| OOS predictions | Parquet (`database/<asset>/samples/<sample_id>/sample_oos.parquet`) | Static, per-model OOS output |
+| Yearly samples | Parquet (`artifacts/<model_id>/sample_train_valid.parquet`) | Model-specific; contains all feat_* + own target + pred_{dir} (after train step) |
+| OOS predictions | Parquet (`artifacts/<model_id>/sample_oos.parquet`) | Model-specific; own target + pred_{dir} + selected feat_* + segment='test' |
 | Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
 | Strategy artifacts | `artifacts/<model_id>/strategy/` | Runtime use by trading loop |
@@ -130,7 +130,9 @@ src/
     03_fit_model.py
 
   trading/          Strategy calibration + live operations
-    00_measure_strategy.py
+    calibration/        Backtest engine, calibration orchestrator, strategy artifacts
+    live/               TradingService, exchange client, journal, state machine, strategy evaluator
+    00_calibrate_strategy.py
     01_sweep_strategy.py
     02_run_service.py
 
@@ -150,13 +152,16 @@ config/             JSON config files (assets, features, models, strategies, tra
 artifacts/          Model development artifacts — one folder per model_id
   <model_id>/
     manifest.json                   Pipeline state + model summary
+    metadata.json / audit.json      Sample metadata (written by sample step)
+    sample_train_valid.parquet      Hourly sample: own target + pred_{dir} + all feat_* + segment
+    sample_oos.parquet              OOS predictions: own target + pred_{dir} + selected feat_* + segment='test'
     model.pkl / features.json / params.json
     search/                         Hyperparameter search results
     feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
-database/           DuckDB files + static sample snapshots (read-only source for training)
+    strategy/                       strategy_artifact.json + sweep_results.csv + report.html
+database/           DuckDB files only (samples no longer stored here)
   solusdt/
     solusdt.duckdb
-    samples/<sample_id>/            metadata.json, audit.json, sample_train_valid.parquet
 ```
 
 ---
@@ -203,8 +208,8 @@ pl. `lgbm_solusdt_l_fw60_2021`, `lgbm_solusdt_s_fw60_2023`
 - **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
 - **Feature engineering target:** only the model's own direction target is used (`l` → `long_mfe_fw60`, `s` → `short_mfe_fw60`).
-- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
-- **Samples:** read-only forrás `database/solusdt/samples/solusdt_fw60_yearly_{year}/`; nem másolódik az artifact-ba, csak hivatkozik rá (`sampling.sample_dir`).
+- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `sample_train_valid.parquet`, `sample_oos.parquet`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`.
+- **Samples:** model-specifikusak, az artifact mappában élnek. A `sample_train_valid.parquet` a `sample` lépés outputja; a `pred_{dir}` oszlop a `train` lépés után kerül bele.
 
 ### Pipeline (runs offline, in order)
 
@@ -214,6 +219,7 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021
 
 # Egyes lépések:
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step setup
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step sample
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step feature_engineering
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage smoke
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
@@ -222,27 +228,45 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step t
 | Lépés | Input | Output (artifact-ban) |
 |-------|-------|----------------------|
 | `setup` | `config/models.json` | `manifest.json` |
-| `feature_engineering` | `samples/{sample_id}/sample_train_valid.parquet` (via DuckDB) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
-| `search` | sample parquet + feature_set.json | `search/search_best.json`, `search_trials.jsonl` |
-| `train` | sample parquet + search results | `model.pkl`, `features.json`, `params.json`, `sample_oos.parquet` |
+| `sample` | `quant_train` (DuckDB) | `sample_train_valid.parquet`, `metadata.json`, `audit.json` |
+| `feature_engineering` | `sample_train_valid.parquet` (artifact) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
+| `search` | `sample_train_valid.parquet` + `feature_set.json` (artifact) | `search/search_best.json`, `search_trials.jsonl` |
+| `train` | `sample_train_valid.parquet` + search results | `model.pkl`, `features.json`, `params.json`, `sample_train_valid.parquet` (pred hozzáadva), `sample_oos.parquet` |
 
 ### Yearly sample model
 
 One sample = one calendar year. Sample ID: `{asset_id}_fw60_yearly_{year}`.
 
-**Segments:** `train` / `valid` / `purge` — no test holdout within the sample.
-Test evaluation uses a separate future-year OOS (see OOS Evaluation section).
+**Két sampling mód** van (`config/models.json` → `sampling.sampling_mode`):
+
+| Mód | `sampling_mode` | CV struktúra | Fold assignment | Státusz |
+|-----|----------------|--------------|-----------------|---------|
+| Legacy weekly | `yearly_random_hour` (default) | 4-fold random-week, monthly stratified | `fold_id` 1–4 per week | Legacy |
+| **Walk-forward** | `walk_forward` | 9m train + 3m valid, 3m shift | `fold_id` 1–4 (valid ablak) / `0` (train-only) | **ACTIVE** |
+
+**Walk-forward CV (ACTIVE):** `train_months=9`, `valid_months=3`, `shift_months=3` → 4 fold/év, non-overlapping validation ablakok. Validation átnyúlhat a következő évre. Purge: 240 perc. `metadata.json`-ban: `fold_time_windows` lista (foldonkénti `train_start/end`, `valid_start/end`). `fold_id = 0` a train-only sorokat jelöli.
+
+**Search objective (ACTIVE):** Top10 Lift fold-stability penaltyvel:
+```
+top10_lift = mean(y_true | score ∈ top 10%) − mean(y_true | all valid)
+objective  = mean(top10_lift_folds) − 0.5 × std(top10_lift_folds)   [higher is better]
+```
+Kötelező audit metrikák foldonként: `spearman_rho`, `decile_monotonicity`. Mentve: `search_best.json`, `search_summary.csv`.
 
 ```
-sample_train_valid.parquet columns:
-  open_time | long_mfe_fw60 | short_mfe_fw60 | segment
+sample_train_valid.parquet columns (artifacts/<model_id>/):
+  l-irányú model: open_time | long_mfe_fw60  | pred_long  | fold_id | feat_* (all)
+  s-irányú model: open_time | short_mfe_fw60 | pred_short | fold_id | feat_* (all)
+  — pred_{dir} csak a train step után kerül bele
+  — walk-forward módban fold_id: Int8, 0–4 (0 = train-only); legacy módban: 1–4
 
-sample_oos.parquet columns (artifacts/<model_id>/sample_oos.parquet):
-  l-irányú model: open_time | pred_long  | long_mfe_fw60 | short_mfe_fw60
-  s-irányú model: open_time | pred_short | long_mfe_fw60 | short_mfe_fw60
+sample_oos.parquet columns (artifacts/<model_id>/):
+  l-irányú model: open_time | long_mfe_fw60  | pred_long  | segment (='test') | feat_* (selected)
+  s-irányú model: open_time | short_mfe_fw60 | pred_short | segment (='test') | feat_* (selected)
 ```
 
-Features are NOT stored in the sample — loaded from `quant_train` at training time.
+Features a sample parquetban tárolódnak (mind a kettőben: all feat_* a train_valid-ban,
+selected feat_* az OOS-ban). Nincs DB join training közben.
 Samples are parquet only — no DuckDB materialization.
 Methodology details: `_doc_/5010_sampling_yearly.md`.
 
@@ -259,7 +283,7 @@ the training data, and the OOS is a genuinely unseen period.
 ```
 
 `uv run python src/modeling/03_fit_model.py --model lgbm_solusdt_l_fw60_2021` produces:
-1. Final model refitted on all train+valid rows of the 2021 sample.
+1. Final model refitted on **all rows** of the 2021 sample (fold_id is CV metadata only).
 2. `sample_oos.parquet` — `predict()` (continuous regression output) applied to the full `oos_year` (2022) dataset.
 
 The trading module uses `sample_oos.parquet` for strategy calibration.
@@ -270,12 +294,12 @@ The trading module uses `sample_oos.parquet` for strategy calibration.
 
 The trading module calibrates strategy rules offline, then runs them live.
 
-**Offline calibration (`0_measure_strategy.py`):**
-- Reads `sample_oos.parquet` (model probs + actual targets for OOS year)
-- Sweeps entry/exit thresholds, hold times, cooldowns
-- Produces `strategy_artifact.json` with the optimal rule set
+**Offline calibration (`00_calibrate_strategy.py --model <model_id>`):**
+- Reads `artifacts/<model_id>/sample_oos.parquet` (OOS predictions + targets)
+- Runs backtest with default parameters, produces `strategy_artifact.json`
+- Sweep variant: `01_sweep_strategy.py` — grid search over entry/hold/TP combinations
 
-**Live state machine (`src/trading/strategy.py`):**
+**Live state machine (`src/trading/live/strategy.py`):**
 - **States:** FLAT → LONG / SHORT → COOLDOWN → FLAT
 - **Entry:** `pred_long >= entry_threshold` → ENTER_LONG (long has priority if both fire)
 - **Exit:** max hold time elapsed OR stop-loss triggered → EXIT, enter COOLDOWN
@@ -292,6 +316,7 @@ The trading module calibrates strategy rules offline, then runs them live.
 | `ruff check src/<module>/ --fix` | Before committing any Python file |
 | `uv run pytest src/data_handling/tests/ -v` | Store or pipeline changes |
 | `uv run pytest src/modeling/ -v` | Modeling changes |
+| `uv run pytest src/trading/tests/ -v` | Trading calibration or live service changes |
 | `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
 
 Always run pyright and ruff for the affected module. Never skip for non-trivial changes.

@@ -3,7 +3,7 @@
 `src/database/sync_tables/sync_targets.py`
 
 Minden `sync_targets` hívás teljes rebuild — DELETE+INSERT az összes tárolt OHLCV bar alapján.
-A régi bináris target rendszer (`trg_l_fw60_q90`, `trg_s_fw60_q10`) eltávolítva (epic-011).
+A régi bináris `trg_*` target rendszer eltávolítva (epic-011).
 
 ---
 
@@ -161,7 +161,6 @@ OUTCOME OSZLOPOK:  │ értékek (DOUBLE) │ NULL (60 sor) │
 ## Régi bináris target rendszer (eltávolítva)
 
 Az epic-011 előtt a target tábla két bináris oszlopot tartalmazott:
-- `trg_l_fw60_q90 BOOLEAN` — forward max return >= teljes history q90 küszöb
-- `trg_s_fw60_q10 BOOLEAN` — forward min return <= teljes history q10 küszöb
+- `trg_* BOOLEAN` — legacy quantile-bináris target oszlopok (eltávolítva)
 
 Ezek eltávolítva. Az `ensure_tables` migráció automatikusan felváltja a régi sémát az újra.

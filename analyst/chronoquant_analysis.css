@@ -17,9 +17,10 @@ li,
   }
 
   nav#TOC {
-    width: min(100%, 14rem) !important;
+    width: 100% !important;
     margin-left: auto !important;
     margin-right: auto !important;
+    font-size: 0.92rem;
   }
 }
 
@@ -39,6 +40,36 @@ nav#TOC a.nav-link {
   line-height: 1.4;
   padding-top: 0.15rem;
   padding-bottom: 0.15rem;
+}
+
+/* Mermaid diagrams: fill the report body while preserving SVG aspect ratio. */
+.cell-output-display:has(svg.mermaid-js),
+.cell-output-display:has(pre.mermaid-js) {
+  align-items: stretch;
+  overflow-x: visible;
+  width: 100%;
+}
+
+.cell-output-display:has(svg.mermaid-js) > div,
+.cell-output-display:has(pre.mermaid-js) > div,
+.cell-output-display:has(svg.mermaid-js) figure,
+.cell-output-display:has(pre.mermaid-js) figure,
+.cell-output-display:has(svg.mermaid-js) figure > div,
+.cell-output-display:has(pre.mermaid-js) figure > div {
+  width: 100%;
+  max-width: 100%;
+}
+
+pre.mermaid-js,
+svg.mermaid-js {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+svg.mermaid-js {
+  height: auto !important;
+  display: block;
+  margin: 1rem auto 1.5rem;
 }
 
 /* Table container: centered, horizontally scrollable when needed */

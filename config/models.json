@@ -3,7 +3,7 @@
     "models": {
         "lgbm_solusdt_l_fw60_2021": {
             "display_name": "SOL Long LightGBM 2021",
-            "description": "LightGBM long model trained on yearly 2021 sample.",
+            "description": "LightGBM long model — walk-forward CV, 2021 anchor year.",
             "asset_id": "solusdt",
             "target_name": "long_mfe_fw60",
             "family": "lightgbm",
@@ -13,7 +13,8 @@
             "sampling": {
                 "sample_id": "solusdt_fw60_yearly_2021",
                 "sample_dir": "database/solusdt/samples/solusdt_fw60_yearly_2021",
-                "row_stride": 60
+                "row_stride": 60,
+                "sampling_mode": "walk_forward"
             },
             "predict": { "method": "predict" },
             "active": false

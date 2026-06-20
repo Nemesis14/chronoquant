@@ -14,5 +14,6 @@
             "attached": false
         }
     ],
-    "duckdb.defaultDatabase": "solusdt"
+    "duckdb.defaultDatabase": "solusdt",
+    "openInDefaultBrowser.run.openWithLocalHttpServer": false
 }

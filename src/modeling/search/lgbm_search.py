@@ -25,9 +25,9 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import polars as pl
+from scipy.stats import spearmanr
 
 import utils
-from data_handling.store.duckdb_query import query_range_pl
 from modeling.sampling import load_yearly_sample
 from modeling.training.datasets import ModelingDataset
 from modeling.training.training_windows import DatasetSplit
@@ -46,11 +46,10 @@ _FIXED_PARAMS: dict = {
     "n_jobs":         4,
 }
 
-# ─── Objective penalty weights ────────────────────────────────────────────────
-# score = mean(valid_rmse) + STAB_W * std(valid_rmse) + GAP_W * max(0, gap - ALLOWED_GAP)
-_ALLOWED_GAP  = 0.03
-_STAB_W       = 0.25
-_GAP_W        = 0.10
+# ─── Objective: Top10 Lift with fold-stability penalty ───────────────────────
+# objective = mean(top10_lift_folds) - LIFT_LAMBDA * std(top10_lift_folds)
+# Higher is better → negate for Optuna minimize (objective_score = -objective)
+_LIFT_LAMBDA = 0.5
 
 _ES_ROUNDS        = 100
 _CURVE_MAX_POINTS = 100
@@ -69,7 +68,7 @@ except ImportError:
 @dataclass(frozen=True)
 class _SearchDataset:
     dataset:  ModelingDataset
-    segments: pd.Series   # "train" | "valid" | "purge" — aligned with dataset rows
+    fold_ids: pd.Series   # Int8 1-4 — aligned with dataset rows
 
 
 # =============================================================================
@@ -88,7 +87,7 @@ def run_search(
     Hyperparameter search for a yearly-sample LightGBM model.
 
     Reads feature list from artifact_dir/feature_engineering/feature_set.json
-    and CV structure from sample_dir/metadata.json (selected_valid_weeks).
+    and CV structure from sample_dir/metadata.json (fold_week_assignments, n_folds).
 
     Stages
     ------
@@ -104,9 +103,7 @@ def run_search(
 
     meta         = models_cfg["models"][model_id]
     target_col   = meta["target_name"]
-    asset_id     = meta["asset_id"]
     artifact_dir = Path(utils._resolve_path(meta["artifact_dir"]))
-    sample_dir   = Path(utils._resolve_path(meta["sampling"]["sample_dir"]))
     search_dir   = artifact_dir / "search"
     search_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,23 +112,33 @@ def run_search(
     )
 
     feature_cols  = _load_feature_cols(artifact_dir)
-    sample_meta   = load_yearly_sample(sample_dir)
-    all_weeks     = sample_meta["selected_valid_weeks"]
-    folds         = all_weeks[:fold_limit] if fold_limit else all_weeks
+    # Sample is now model-specific and lives in the artifact directory.
+    sample_meta       = load_yearly_sample(artifact_dir)
+    purge_minutes     = sample_meta.get("purge_minutes", 240)
+
+    # Detect walk-forward vs legacy weekly CV
+    fold_time_windows     = sample_meta.get("fold_time_windows")
+    fold_week_assignments = sample_meta.get("fold_week_assignments")
+    use_walk_forward      = fold_time_windows is not None
+
+    n_folds = len(fold_time_windows) if use_walk_forward else sample_meta.get("n_folds", 4)
+
+    all_fold_ids    = list(range(1, n_folds + 1))
+    fold_ids_to_run = all_fold_ids[:fold_limit] if fold_limit else all_fold_ids
 
     logger.info("=" * 72)
     logger.info(f"LGBM SEARCH  model={model_id}")
     logger.info(f"  target={target_col}  stage={stage}")
-    logger.info(f"  n_trials={n_trials}  row_stride={row_stride}  folds={len(folds)}/{len(all_weeks)}")
+    logger.info(f"  cv_mode={'walk_forward' if use_walk_forward else 'weekly'}")
+    logger.info(f"  n_trials={n_trials}  row_stride={row_stride}  folds={len(fold_ids_to_run)}/{n_folds}")
     logger.info(f"  engine={'optuna-TPE' if _HAS_OPTUNA else 'seeded-random'}")
     logger.info(f"  search_dir={search_dir}")
     logger.info("=" * 72)
 
     sd = _load_search_dataset(
-        sample_dir   = sample_dir,
+        artifact_dir = artifact_dir,
         target_col   = target_col,
         feature_cols = feature_cols,
-        asset_id     = asset_id,
         row_stride   = row_stride,
     )
     logger.info(
@@ -149,13 +156,17 @@ def run_search(
 
     if _HAS_OPTUNA:
         best = _search_optuna(
-            model_id, sd, folds, search_dir, feature_cols, row_stride,
+            model_id, sd, fold_ids_to_run, fold_week_assignments, purge_minutes,
+            search_dir, feature_cols, row_stride,
             n_trials, timeout_hours, stage, done_hashes, fail_hashes,
+            fold_time_windows=fold_time_windows,
         )
     else:
         best = _search_random(
-            model_id, sd, folds, search_dir, feature_cols, row_stride,
+            model_id, sd, fold_ids_to_run, fold_week_assignments, purge_minutes,
+            search_dir, feature_cols, row_stride,
             n_trials, timeout_hours, stage, done_hashes, fail_hashes,
+            fold_time_windows=fold_time_windows,
         )
 
     if best:
@@ -202,35 +213,22 @@ def _load_feature_cols(artifact_dir: Path) -> list[str]:
 
 
 # =============================================================================
-# Dataset loading — sample parquet × DuckDB features
+# Dataset loading — features come directly from the artifact sample parquet
 # =============================================================================
 def _load_search_dataset(
-    sample_dir:   Path,
+    artifact_dir: Path,
     target_col:   str,
     feature_cols: list[str],
-    asset_id:     str,
     row_stride:   int,
 ) -> _SearchDataset:
-    parquet_path = sample_dir / "sample_train_valid.parquet"
-    sample_pl = pl.read_parquet(parquet_path, columns=["open_time", "segment", target_col])
+    parquet_path = artifact_dir / "sample_train_valid.parquet"
+    load_cols    = ["open_time", "fold_id", target_col] + feature_cols
+    sample_pl    = pl.read_parquet(parquet_path, columns=load_cols)
 
     if row_stride > 1:
         sample_pl = sample_pl[::row_stride]
 
-    meta_path = sample_dir / "metadata.json"
-    year      = json.loads(meta_path.read_text(encoding="utf-8"))["year"]
-
-    db_path     = utils.load_asset_config(asset_id)["database"]["db_path"]
-    feat_cols   = ["open_time"] + feature_cols
-    feat_pl     = query_range_pl(
-        db_path, "feat_ohlcv_quant",
-        start   = f"{year}-01-01 00:00:00",
-        end     = f"{year}-12-31 23:59:59",
-        columns = feat_cols,
-    )
-
-    merged_pl = sample_pl.join(feat_pl, on="open_time", how="inner")
-    merged    = merged_pl.to_pandas().reset_index(drop=True)
+    merged    = sample_pl.to_pandas().reset_index(drop=True)
     merged["open_time"] = pd.to_datetime(merged["open_time"])
 
     logger.info(
@@ -244,32 +242,97 @@ def _load_search_dataset(
         target_col   = target_col,
         feature_cols = feature_cols,
     )
-    return _SearchDataset(dataset=dataset, segments=pd.Series(merged["segment"]))
-
-
-# =============================================================================
-# Fold split — one validation week from selected_valid_weeks
-# =============================================================================
-def _fold_split_yearly(
-    sd:         _SearchDataset,
-    valid_week: dict,
-    fold_idx:   int,
-) -> DatasetSplit:
-    start = pd.Timestamp(valid_week["start"])
-    end   = pd.Timestamp(valid_week["end"]) + pd.Timedelta(hours=23, minutes=59, seconds=59)
-
-    train_mask = sd.segments == "train"
-    valid_mask = (
-        (sd.segments == "valid")
-        & (sd.dataset.open_time >= start)
-        & (sd.dataset.open_time <= end)
+    return _SearchDataset(
+        dataset  = dataset,
+        fold_ids = pd.Series(merged["fold_id"].astype("int8"), name="fold_id"),
     )
 
+
+# =============================================================================
+# Fold split — 4-fold stratified by calendar week
+# =============================================================================
+def _fold_split_4fold(
+    sd:                    _SearchDataset,
+    fold_k:                int,
+    fold_week_assignments: dict,
+    purge_minutes:         int,
+) -> DatasetSplit:
+    valid_mask = (sd.fold_ids == fold_k).values
+    valid_mask = pd.Series(valid_mask, index=sd.dataset.open_time.index)
+
+    delta      = pd.Timedelta(minutes=purge_minutes)
+    purge_mask = pd.Series(False, index=sd.dataset.open_time.index)
+
+    weeks = fold_week_assignments.get(fold_k, fold_week_assignments.get(str(fold_k), []))
+    for week in weeks:
+        vs   = pd.Timestamp(week["start"])
+        ve   = pd.Timestamp(week["end"]) + pd.Timedelta(hours=23, minutes=59)
+        pre  = (sd.dataset.open_time >= vs - delta) & (sd.dataset.open_time < vs)
+        post = (sd.dataset.open_time > ve)           & (sd.dataset.open_time <= ve + delta)
+        purge_mask = purge_mask | pre | post
+
+    train_mask = ~valid_mask & ~purge_mask
+
     if not valid_mask.any():
-        raise ValueError(
-            f"Empty validation set — fold {fold_idx + 1} "
-            f"({valid_week['start']} – {valid_week['end']})"
-        )
+        raise ValueError(f"Empty validation set for fold {fold_k}")
+
+    return DatasetSplit(
+        X_train = sd.dataset.X.loc[train_mask],
+        y_train = sd.dataset.y.loc[train_mask],
+        X_eval  = sd.dataset.X.loc[valid_mask],
+        y_eval  = sd.dataset.y.loc[valid_mask],
+    )
+
+
+def _fold_split_walk_forward(
+    sd               : _SearchDataset,
+    fold_k           : int,
+    fold_time_windows: list[dict],
+    purge_minutes    : int,
+) -> DatasetSplit:
+    """Split dataset into train/valid using explicit time windows for walk-forward CV.
+
+    Args:
+        sd                : Search dataset with open_time aligned to X/y.
+        fold_k            : Fold number (1-based) matching a fold_id in fold_time_windows.
+        fold_time_windows : List of fold dicts from generate_walk_forward_folds().
+        purge_minutes     : Minutes to exclude around fold boundaries.
+
+    Returns:
+        DatasetSplit with X_train, y_train, X_eval, y_eval.
+
+    Raises:
+        ValueError: If fold_k not found or validation set is empty.
+    """
+    fw = next((f for f in fold_time_windows if f["fold_id"] == fold_k), None)
+    if fw is None:
+        raise ValueError(f"fold_id {fold_k} not in fold_time_windows")
+
+    valid_start = pd.Timestamp(fw["valid_start"])
+    valid_end   = pd.Timestamp(fw["valid_end"]) + pd.Timedelta(hours=23, minutes=59)
+    train_end   = pd.Timestamp(fw["train_end"]) + pd.Timedelta(hours=23, minutes=59)
+
+    delta      = pd.Timedelta(minutes=purge_minutes)
+    valid_mask = (
+        (sd.dataset.open_time >= valid_start)
+        & (sd.dataset.open_time <= valid_end)
+    )
+    # Purge zone: between train_end and valid_start, and after valid_end
+    purge_mask = (
+        (sd.dataset.open_time > train_end)
+        & (sd.dataset.open_time < valid_start)
+    ) | (
+        (sd.dataset.open_time > valid_end)
+        & (sd.dataset.open_time <= valid_end + delta)
+    )
+
+    train_mask = ~valid_mask & ~purge_mask
+
+    valid_mask = pd.Series(valid_mask.values, index=sd.dataset.open_time.index)
+    train_mask = pd.Series(train_mask.values, index=sd.dataset.open_time.index)
+
+    if not valid_mask.any():
+        raise ValueError(f"Empty validation set for fold {fold_k}")
 
     return DatasetSplit(
         X_train = sd.dataset.X.loc[train_mask],
@@ -280,20 +343,70 @@ def _fold_split_yearly(
 
 
 # =============================================================================
+# Rank audit metrics
+# =============================================================================
+
+def _compute_top10_lift(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    """Top-decile lift: mean y_true among top 10% scores minus overall mean.
+
+    Args:
+        y_true  : Ground-truth target values.
+        y_score : Model predicted scores.
+
+    Returns:
+        Float lift value.  Returns 0.0 if the top-decile mask is empty.
+    """
+    threshold = np.percentile(y_score, 90)
+    mask      = y_score >= threshold
+    if mask.sum() == 0:
+        return 0.0
+    return float(np.mean(y_true[mask]) - np.mean(y_true))
+
+
+def _compute_decile_monotonicity(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    """Fraction of adjacent decile pairs where mean y_true increases with score decile.
+
+    Args:
+        y_true  : Ground-truth target values.
+        y_score : Model predicted scores.
+
+    Returns:
+        Float in [0.0, 1.0].  Returns 0.0 if fewer than 2 deciles exist.
+    """
+    n_deciles = 10
+    labels    = pd.qcut(pd.Series(y_score), q=n_deciles, labels=False, duplicates="drop")
+    means     = pd.Series(y_true).groupby(labels).mean().sort_index()  # type: ignore[arg-type]
+    if len(means) < 2:
+        return 0.0
+    diffs = np.diff(means.to_numpy(dtype=float))
+    return float((diffs > 0).mean())
+
+
+# =============================================================================
 # Single trial execution
 # =============================================================================
 def _run_one_trial(
-    trial_no:   int,
-    params:     dict,
-    sd:         _SearchDataset,
-    folds:      list[dict],
-    search_dir: Path,
+    trial_no             : int,
+    params               : dict,
+    sd                   : _SearchDataset,
+    fold_ids             : list[int],
+    fold_week_assignments: dict | None,
+    purge_minutes        : int,
+    search_dir           : Path,
+    fold_time_windows    : list[dict] | None = None,
 ) -> dict:
     full_params  = {**_FIXED_PARAMS, **params, "random_state": 42}
     fold_results = []
+    use_walk_forward = fold_time_windows is not None
 
-    for fold_idx, fold in enumerate(folds):
-        split = _fold_split_yearly(sd, fold, fold_idx)
+    for fold_k in fold_ids:
+        if use_walk_forward:
+            split = _fold_split_walk_forward(sd, fold_k, fold_time_windows, purge_minutes)
+            fold_label = _fold_label_walk_forward(fold_k, fold_time_windows)
+        else:
+            split      = _fold_split_4fold(sd, fold_k, fold_week_assignments or {}, purge_minutes)
+            weeks      = (fold_week_assignments or {}).get(fold_k, (fold_week_assignments or {}).get(str(fold_k), []))
+            fold_label = f"{weeks[0]['start']}_{weeks[-1]['end']}" if weeks else ""
 
         eval_result: dict = {}
         callbacks = [
@@ -324,32 +437,49 @@ def _run_one_trial(
         train_mae  = float(np.mean(np.abs(y_tr - p_tr)))
         valid_mae  = float(np.mean(np.abs(y_va - p_va)))
 
+        # Rank audit metrics
+        top10_lift          = _compute_top10_lift(y_va, p_va)
+        spearman_result      = spearmanr(y_va, p_va)
+        spearman_rho         = float(spearman_result[0])  # type: ignore[arg-type]
+        decile_monotonicity = _compute_decile_monotonicity(y_va, p_va)
+
         fi = _feature_importance(model, sd.dataset.feature_cols)
 
         curves_path = (
             search_dir / "trial_curves"
-            / f"trial_{trial_no:04d}_fold_{fold_idx + 1:02d}.json"
+            / f"trial_{trial_no:04d}_fold_{fold_k:02d}.json"
         )
         curves_path.parent.mkdir(parents=True, exist_ok=True)
-        _write_json(curves_path, _compact_curves(eval_result, trial_no, fold_idx + 1))
+        _write_json(curves_path, _compact_curves(eval_result, trial_no, fold_k))
 
         fold_results.append({
-            "fold":           fold_idx + 1,
-            "fold_week":      f"{fold['start']}_{fold['end']}",
-            "train_rmse":     train_rmse,
-            "valid_rmse":     valid_rmse,
-            "train_mae":      train_mae,
-            "valid_mae":      valid_mae,
-            "train_n":        int(len(split.y_train)),
-            "valid_n":        int(len(split.y_eval)),
-            "best_iteration": best_iter,
-            "top20_features": fi,
+            "fold":                fold_k,
+            "fold_week":           fold_label,
+            "train_rmse":          train_rmse,
+            "valid_rmse":          valid_rmse,
+            "train_mae":           train_mae,
+            "valid_mae":           valid_mae,
+            "top10_lift":          top10_lift,
+            "spearman_rho":        spearman_rho if np.isfinite(spearman_rho) else None,
+            "decile_monotonicity": decile_monotonicity,
+            "train_n":             int(len(split.y_train)),
+            "valid_n":             int(len(split.y_eval)),
+            "best_iteration":      best_iter,
+            "top20_features":      fi,
         })
 
         del model, train_pred, valid_pred
         gc.collect()
 
     return {"fold_metrics": fold_results}
+
+
+def _fold_label_walk_forward(fold_k: int, fold_time_windows: list[dict]) -> str:
+    """Return a human-readable label for a walk-forward fold."""
+    fw = next((f for f in fold_time_windows if f["fold_id"] == fold_k), None)
+    if fw is None:
+        return f"fold_{fold_k}"
+    return f"{fw['valid_start']}_{fw['valid_end']}"
 
 
 def _feature_importance(model: lgb.LGBMRegressor, feature_cols: list[str]) -> list[dict]:
@@ -378,36 +508,47 @@ def _compact_curves(eval_result: dict, trial_no: int, fold_no: int) -> dict:
 # Objective computation
 # =============================================================================
 def _compute_objective(fold_metrics: list[dict]) -> dict:
-    """
-    score = mean(valid_rmse) + STAB_W * std(valid_rmse)
-            + GAP_W * max(0, mean(valid_rmse - train_rmse) - ALLOWED_GAP)
+    """Compute Top10 Lift objective with fold-stability penalty.
 
-    Lower is better (matches Optuna direction='minimize').
-    """
-    valid_rmses = [f["valid_rmse"] for f in fold_metrics if f.get("valid_rmse") is not None]
-    train_rmses = [f["train_rmse"] for f in fold_metrics if f.get("train_rmse") is not None]
-    valid_maes  = [f["valid_mae"]  for f in fold_metrics if f.get("valid_mae")  is not None]
-    train_maes  = [f["train_mae"]  for f in fold_metrics if f.get("train_mae")  is not None]
+    objective = mean(top10_lift_folds) - LIFT_LAMBDA * std(top10_lift_folds)
+    Higher objective is better → objective_score = -objective (lower is better
+    for Optuna minimize direction).
 
-    if not valid_rmses:
+    Also aggregates RMSE/MAE and rank audit metrics for logging/persistence.
+
+    Args:
+        fold_metrics : List of per-fold metric dicts from _run_one_trial.
+
+    Returns:
+        Dict with ``objective_score`` (lower=better) and aggregated metrics.
+    """
+    lifts = [f["top10_lift"]   for f in fold_metrics if f.get("top10_lift")   is not None]
+    if not lifts:
         return {"objective_score": float("inf")}
 
-    mean_v   = float(np.mean(valid_rmses))
-    std_v    = float(np.std(valid_rmses))
-    mean_t   = float(np.mean(train_rmses)) if train_rmses else None
-    mean_gap = float(mean_v - mean_t) if mean_t is not None else 0.0
-    penalty  = max(0.0, mean_gap - _ALLOWED_GAP)
-    score    = mean_v + _STAB_W * std_v + _GAP_W * penalty
+    mean_lift = float(np.mean(lifts))
+    std_lift  = float(np.std(lifts))
+    objective = mean_lift - _LIFT_LAMBDA * std_lift
+    score     = -objective  # Lower is better for Optuna minimize
+
+    spearmans:   list[float] = [float(f["spearman_rho"])        for f in fold_metrics if f.get("spearman_rho")        is not None]
+    monots:      list[float] = [float(f["decile_monotonicity"]) for f in fold_metrics if f.get("decile_monotonicity") is not None]
+    valid_rmses: list[float] = [float(f["valid_rmse"])          for f in fold_metrics if f.get("valid_rmse")          is not None]
+    train_rmses: list[float] = [float(f["train_rmse"])          for f in fold_metrics if f.get("train_rmse")          is not None]
+    valid_maes:  list[float] = [float(f["valid_mae"])           for f in fold_metrics if f.get("valid_mae")           is not None]
+    train_maes:  list[float] = [float(f["train_mae"])           for f in fold_metrics if f.get("train_mae")           is not None]
 
     return {
-        "mean_valid_rmse":  mean_v,
-        "std_valid_rmse":   std_v,
-        "mean_train_rmse":  mean_t,
-        "mean_gap":         mean_gap,
-        "gap_penalty":      penalty,
-        "objective_score":  score,
-        "mean_valid_mae":   float(np.mean(valid_maes)) if valid_maes else None,
-        "mean_train_mae":   float(np.mean(train_maes)) if train_maes else None,
+        "objective_score":           score,
+        "mean_top10_lift":           mean_lift,
+        "std_top10_lift":            std_lift,
+        "mean_spearman_rho":         float(np.mean(spearmans)) if spearmans else None,
+        "mean_decile_monotonicity":  float(np.mean(monots))    if monots    else None,
+        "mean_valid_rmse":           float(np.mean(valid_rmses)) if valid_rmses else None,
+        "std_valid_rmse":            float(np.std(valid_rmses))  if valid_rmses else None,
+        "mean_train_rmse":           float(np.mean(train_rmses)) if train_rmses else None,
+        "mean_valid_mae":            float(np.mean(valid_maes))  if valid_maes  else None,
+        "mean_train_mae":            float(np.mean(train_maes))  if train_maes  else None,
     }
 
 
@@ -415,17 +556,20 @@ def _compute_objective(fold_metrics: list[dict]) -> dict:
 # Seeded random search
 # =============================================================================
 def _search_random(
-    model_id:      str,
-    sd:            _SearchDataset,
-    folds:         list[dict],
-    search_dir:    Path,
-    feature_cols:  list[str],
-    row_stride:    int,
-    n_trials:      int,
-    timeout_hours: float | None,
-    stage:         str,
-    done_hashes:   set,
-    fail_hashes:   set,
+    model_id:              str,
+    sd:                    _SearchDataset,
+    fold_ids:              list[int],
+    fold_week_assignments: dict | None,
+    purge_minutes:         int,
+    search_dir:            Path,
+    feature_cols:          list[str],
+    row_stride:            int,
+    n_trials:              int,
+    timeout_hours:         float | None,
+    stage:                 str,
+    done_hashes:           set,
+    fail_hashes:           set,
+    fold_time_windows:     list[dict] | None = None,
 ) -> dict:
     rng = np.random.default_rng(seed=42)
 
@@ -460,7 +604,7 @@ def _search_random(
 
         t_trial = time.time()
         try:
-            result  = _run_one_trial(trial_no, params, sd, folds, search_dir)
+            result  = _run_one_trial(trial_no, params, sd, fold_ids, fold_week_assignments, purge_minutes, search_dir, fold_time_windows=fold_time_windows)
             obj     = _compute_objective(result["fold_metrics"])
             elapsed = time.time() - t_trial
 
@@ -505,17 +649,20 @@ def _search_random(
 # Optuna TPE search
 # =============================================================================
 def _search_optuna(
-    model_id:      str,
-    sd:            _SearchDataset,
-    folds:         list[dict],
-    search_dir:    Path,
-    feature_cols:  list[str],
-    row_stride:    int,
-    n_trials:      int,
-    timeout_hours: float | None,
-    stage:         str,
-    done_hashes:   set,
-    fail_hashes:   set,
+    model_id:              str,
+    sd:                    _SearchDataset,
+    fold_ids:              list[int],
+    fold_week_assignments: dict | None,
+    purge_minutes:         int,
+    search_dir:            Path,
+    feature_cols:          list[str],
+    row_stride:            int,
+    n_trials:              int,
+    timeout_hours:         float | None,
+    stage:                 str,
+    done_hashes:           set,
+    fail_hashes:           set,
+    fold_time_windows:     list[dict] | None = None,
 ) -> dict:
     import optuna  # type: ignore[import-not-found]
 
@@ -544,7 +691,7 @@ def _search_optuna(
         logger.info(f"\n[Trial {trial_no:04d}]  Params: {_format_params(params)}")
 
         t_trial      = time.time()
-        result       = _run_one_trial(trial_no, params, sd, folds, search_dir)
+        result       = _run_one_trial(trial_no, params, sd, fold_ids, fold_week_assignments, purge_minutes, search_dir, fold_time_windows=fold_time_windows)
         obj          = _compute_objective(result["fold_metrics"])
         elapsed      = time.time() - t_trial
         trial_record = {
@@ -720,16 +867,19 @@ def _persist_completed(
     _write_json(logs_dir / f"trial_{trial_no:04d}.json", log_record)
 
     compact = {
-        "trial_no":          record["trial_no"],
-        "param_hash":        record["param_hash"],
-        "params":            record["params"],
-        "objective_score":   record.get("objective_score"),
-        "mean_valid_rmse":   record.get("mean_valid_rmse"),
-        "std_valid_rmse":    record.get("std_valid_rmse"),
-        "mean_train_rmse":   record.get("mean_train_rmse"),
-        "mean_gap":          record.get("mean_gap"),
-        "mean_valid_mae":    record.get("mean_valid_mae"),
-        "elapsed_s":         record.get("elapsed_s"),
+        "trial_no":                  record["trial_no"],
+        "param_hash":                record["param_hash"],
+        "params":                    record["params"],
+        "objective_score":           record.get("objective_score"),
+        "mean_top10_lift":           record.get("mean_top10_lift"),
+        "std_top10_lift":            record.get("std_top10_lift"),
+        "mean_spearman_rho":         record.get("mean_spearman_rho"),
+        "mean_decile_monotonicity":  record.get("mean_decile_monotonicity"),
+        "mean_valid_rmse":           record.get("mean_valid_rmse"),
+        "std_valid_rmse":            record.get("std_valid_rmse"),
+        "mean_train_rmse":           record.get("mean_train_rmse"),
+        "mean_valid_mae":            record.get("mean_valid_mae"),
+        "elapsed_s":                 record.get("elapsed_s"),
     }
     _append_jsonl(search_dir / "search_trials.jsonl", compact)
     _update_summary_csv(search_dir, compact, record["params"])
@@ -816,35 +966,39 @@ def _write_best_params(search_dir: Path, best: dict) -> None:
 def _log_trial_result(
     trial_no: int, params: dict, record: dict, best: dict | None
 ) -> None:
+    lift  = record.get("mean_top10_lift")
+    slift = record.get("std_top10_lift")
+    rho   = record.get("mean_spearman_rho")
+    mono  = record.get("mean_decile_monotonicity")
     vrmse = record.get("mean_valid_rmse")
-    trmse = record.get("mean_train_rmse")
-    gap   = record.get("mean_gap")
     vmae  = record.get("mean_valid_mae")
     obj   = record.get("objective_score")
-    std   = record.get("std_valid_rmse")
     best_obj = (best or {}).get("objective_score")
 
     logger.info(
-        f"  valid_rmse={_fmt(vrmse)}  train_rmse={_fmt(trmse)}  "
-        f"gap={_fmt(gap)}  std={_fmt(std)}"
+        f"  top10_lift={_fmt(lift)}  std_lift={_fmt(slift)}  objective={_fmt(obj)}"
     )
-    logger.info(f"  valid_mae={_fmt(vmae)}  objective={_fmt(obj)}")
+    logger.info(
+        f"  spearman_rho={_fmt(rho)}  decile_monotonicity={_fmt(mono)}"
+    )
+    logger.info(
+        f"  valid_rmse={_fmt(vrmse)}  valid_mae={_fmt(vmae)}"
+    )
 
     if best_obj is not None:
         delta  = (obj or float("inf")) - best_obj
-        marker = "  << NEW BEST" if delta < 0 else f"  (Δ+{delta:.5f} vs best)"
-        logger.info(
-            f"  elapsed={record.get('elapsed_s')}s{marker}"
-        )
+        marker = "  << NEW BEST" if delta < 0 else f"  (Δ{delta:+.5f} vs best)"
+        logger.info(f"  elapsed={record.get('elapsed_s')}s{marker}")
     else:
         logger.info(f"  elapsed={record.get('elapsed_s')}s")
 
     for f in record.get("fold_metrics", []):
         logger.info(
             f"    fold {f['fold']} ({f.get('fold_week', '')})  "
+            f"top10_lift={_fmt(f.get('top10_lift'))}  "
+            f"spearman={_fmt(f.get('spearman_rho'))}  "
+            f"mono={_fmt(f.get('decile_monotonicity'))}  "
             f"valid_rmse={_fmt(f.get('valid_rmse'))}  "
-            f"train_rmse={_fmt(f.get('train_rmse'))}  "
-            f"valid_mae={_fmt(f.get('valid_mae'))}  "
             f"best_iter={f.get('best_iteration')}  "
             f"n_valid={f.get('valid_n', 0):,}"
         )
@@ -874,11 +1028,13 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
         return
 
     logger.info(f"Best trial: #{best.get('trial_no')}  hash={best.get('param_hash')}")
-    logger.info(f"  objective_score  = {_fmt(best.get('objective_score'))}  (lower=better)")
-    logger.info(f"  mean_valid_rmse  = {_fmt(best.get('mean_valid_rmse'))}  std={_fmt(best.get('std_valid_rmse'))}")
-    logger.info(f"  mean_train_rmse  = {_fmt(best.get('mean_train_rmse'))}  gap={_fmt(best.get('mean_gap'))}")
-    logger.info(f"  mean_valid_mae   = {_fmt(best.get('mean_valid_mae'))}")
-    logger.info(f"  elapsed_s        = {best.get('elapsed_s')}")
+    logger.info(f"  objective_score          = {_fmt(best.get('objective_score'))}  (lower=better)")
+    logger.info(f"  mean_top10_lift          = {_fmt(best.get('mean_top10_lift'))}  std={_fmt(best.get('std_top10_lift'))}")
+    logger.info(f"  mean_spearman_rho        = {_fmt(best.get('mean_spearman_rho'))}")
+    logger.info(f"  mean_decile_monotonicity = {_fmt(best.get('mean_decile_monotonicity'))}")
+    logger.info(f"  mean_valid_rmse          = {_fmt(best.get('mean_valid_rmse'))}  std={_fmt(best.get('std_valid_rmse'))}")
+    logger.info(f"  mean_valid_mae           = {_fmt(best.get('mean_valid_mae'))}")
+    logger.info(f"  elapsed_s                = {best.get('elapsed_s')}")
     logger.info("\nBest parameters:")
     for k, v in sorted(best.get("params", {}).items()):
         logger.info(f"  {k:<25} = {v}")
@@ -886,9 +1042,10 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
     for f in best.get("fold_summary", []):
         logger.info(
             f"  fold {f['fold']}  "
-            f"valid_rmse={_fmt(f.get('valid_rmse'))}  "
-            f"train_rmse={_fmt(f.get('train_rmse'))}  "
-            f"valid_mae={_fmt(f.get('valid_mae'))}"
+            f"top10_lift={_fmt(f.get('top10_lift'))}  "
+            f"spearman={_fmt(f.get('spearman_rho'))}  "
+            f"mono={_fmt(f.get('decile_monotonicity'))}  "
+            f"valid_rmse={_fmt(f.get('valid_rmse'))}"
         )
 
     csv_path = search_dir / "search_summary.csv"
@@ -902,8 +1059,8 @@ def _print_final_summary(best: dict | None, search_dir: Path) -> None:
                     logger.info(
                         f"  #{int(row['trial_no']):04d}  "  # type: ignore[arg-type]
                         f"obj={_fmt(row.get('objective_score'))}  "
-                        f"valid_rmse={_fmt(row.get('mean_valid_rmse'))}  "
-                        f"valid_mae={_fmt(row.get('mean_valid_mae'))}"
+                        f"lift={_fmt(row.get('mean_top10_lift'))}  "
+                        f"rho={_fmt(row.get('mean_spearman_rho'))}"
                     )
 
     logger.info("\nArtifacts:")

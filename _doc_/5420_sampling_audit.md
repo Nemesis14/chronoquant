@@ -45,7 +45,7 @@ meghatározásához.
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
 | `db_path` | `str` | Abszolút útvonal az asset `.duckdb` fájlhoz |
-| `target_col` | `str` | Target oszlop neve (pl. `trg_l_fw60_q90`) |
+| `target_col` | `str` | Target oszlop neve (pl. `long_mfe_fw60`) |
 
 ### Return dict
 

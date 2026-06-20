@@ -1,10 +1,10 @@
 """Model development pipeline — runs all steps for a single model artifact.
 
 Usage:
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step feature_engineering
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage smoke
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step train
+    uv run python src/modeling/pipeline.py --model <model_id>
+    uv run python src/modeling/pipeline.py --model <model_id> --step feature_engineering
+    uv run python src/modeling/pipeline.py --model <model_id> --step search --stage smoke
+    uv run python src/modeling/pipeline.py --model <model_id> --step train
 
 Steps (in order):
     setup               Create artifact directory and write manifest.json
@@ -27,7 +27,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 import utils  # noqa: E402
 
 NOTEBOOK_TEMPLATE = _ROOT / "src" / "modeling" / "01_feature_engineering.ipynb"
-ALL_STEPS = ["setup", "feature_engineering", "search", "train"]
+ALL_STEPS = ["setup", "sample", "feature_engineering", "search", "train"]
 
 
 # ---------------------------------------------------------------------------
@@ -38,11 +38,12 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ChronoQuant model development pipeline.")
     parser.add_argument(
         "--model", required=True,
-        help="Model ID from config/models.json (e.g. lgbm_solusdt_l_fw60_q90_2021)",
+        help="Model ID from config/models.json (e.g. <model_id>)",
     )
     parser.add_argument(
         "--step", choices=ALL_STEPS, default=None,
-        help="Single pipeline step to run. Omit to run all steps in order.",
+        help="Single pipeline step to run. Omit to run all steps in order. "
+             "Steps: setup → sample → feature_engineering → search → train",
     )
     parser.add_argument(
         "--stage", choices=["smoke", "explore", "refine"], default="smoke",
@@ -89,6 +90,34 @@ def step_setup(model_id: str, meta: dict, artifact_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Step: sample
+# ---------------------------------------------------------------------------
+
+def step_sample(model_id: str, artifact_dir: Path) -> None:
+    """Create model-specific sample.
+
+    Dispatches to walk-forward or yearly sampling based on the 'sampling_mode'
+    key in config/models.json.  If absent or 'yearly', uses the legacy yearly
+    random-week sampler.  If 'walk_forward', uses the walk-forward CV sampler.
+    """
+    print(f"[sample] Creating model-specific sample in: {artifact_dir}")
+    models_cfg   = utils.load_models_config()
+    meta         = models_cfg["models"][model_id]
+    sampling_mode = meta.get("sampling", {}).get("sampling_mode", "yearly")
+
+    if sampling_mode == "walk_forward":
+        from modeling.sampling import create_model_walk_forward_sample
+        create_model_walk_forward_sample(model_id)
+        print(f"[sample] Walk-forward sample written -> {artifact_dir / 'sample_train_valid.parquet'}")
+    else:
+        from modeling.sampling import create_model_sample
+        create_model_sample(model_id)
+        print(f"[sample] Yearly sample written -> {artifact_dir / 'sample_train_valid.parquet'}")
+
+    _update_manifest_status(artifact_dir, "sample_done")
+
+
+# ---------------------------------------------------------------------------
 # Step: feature_engineering
 # ---------------------------------------------------------------------------
 
@@ -105,7 +134,8 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
     output_nb = fe_dir / "01_feature_engineering.ipynb"
     output_html = fe_dir / "01_feature_engineering.html"
 
-    sample_dir = str(_ROOT / meta["sampling"]["sample_dir"])
+    # Sample is now model-specific and lives in the artifact directory.
+    sample_dir = str(artifact_dir)
 
     print("[feature_engineering] Running notebook via papermill...")
     print(f"  template  : {NOTEBOOK_TEMPLATE}")
@@ -222,6 +252,8 @@ def main() -> None:
     for step in steps:
         if step == "setup":
             step_setup(model_id, meta, artifact_dir)
+        elif step == "sample":
+            step_sample(model_id, artifact_dir)
         elif step == "feature_engineering":
             step_feature_engineering(model_id, meta, artifact_dir)
         elif step == "search":

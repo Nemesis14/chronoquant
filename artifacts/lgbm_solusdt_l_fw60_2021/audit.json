@@ -1,0 +1,13 @@
+{
+    "total_quant_train_rows_in_range": 918720,
+    "source_rows_with_valid_targets": 918720,
+    "expected_hours": 17520,
+    "actual_hourly_rows": 15312,
+    "missing_hours": 2208,
+    "date_range_start": "2021-01-01",
+    "date_range_end": "2022-09-30",
+    "years_covered": [
+        2021,
+        2022
+    ]
+}

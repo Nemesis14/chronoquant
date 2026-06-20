@@ -117,6 +117,71 @@ The CSS is referenced as `../analyst/chronoquant_analysis.css` relative to `_doc
 
 ---
 
+## Consolidated Documentation Layout
+
+For `_chronoquant_docs.ipynb` / `_chronoquant_docs.html`, update both
+`analyst/_quarto.yml` and `analyst/doc_renderer/build_doc_notebook.py` when the
+global layout must persist after notebook rebuild.
+
+Working grid:
+
+```yaml
+grid:
+  sidebar-width: 380px
+  body-width: 900px
+  margin-width: 140px
+  gutter-width: 2rem
+```
+
+TOC CSS guidance:
+
+```css
+nav#TOC {
+  width: 100% !important;
+  font-size: 0.92rem;
+}
+```
+
+Mermaid HTML guidance:
+
+```css
+.cell-output-display:has(svg.mermaid-js),
+.cell-output-display:has(pre.mermaid-js) {
+  align-items: stretch;
+  overflow-x: visible;
+  width: 100%;
+}
+
+.cell-output-display:has(svg.mermaid-js) > div,
+.cell-output-display:has(pre.mermaid-js) > div,
+.cell-output-display:has(svg.mermaid-js) figure,
+.cell-output-display:has(pre.mermaid-js) figure,
+.cell-output-display:has(svg.mermaid-js) figure > div,
+.cell-output-display:has(pre.mermaid-js) figure > div {
+  width: 100%;
+  max-width: 100%;
+}
+
+pre.mermaid-js,
+svg.mermaid-js {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+svg.mermaid-js {
+  height: auto !important;
+  display: block;
+  margin: 1rem auto 1.5rem;
+}
+```
+
+Do not add a desktop width override that exceeds the body by default; it makes
+large sequence diagrams overflow. Avoid emoji/status glyphs in Mermaid labels
+because Quarto's bundled Mermaid parser can show `Syntax error in text`; use
+`OK:`, `NO:`, `WARN:` inside Mermaid nodes instead.
+
+---
+
 ## What NOT to Do
 
 - Never write "Figure 1", "Table 2", or manual section numbers anywhere in captions or narrative.

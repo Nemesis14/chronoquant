@@ -42,9 +42,9 @@ A NULL target sorok kizárása ezen a szinten kritikus: ha az utolsó 60 sor (ah
 
 ```mermaid
 flowchart LR
-  Q[quant_train felépítése] --> A[Live sync pipeline\n❌ folyamatosan frissülő join\n❌ tanítás alatt változhat\n❌ nem reprodukálható]
-  Q --> B[Ad-hoc rebuild DuckDB-ben\n✅ tanítás előtt lefuttatott\n✅ teljes újraépítés = determinisztikus\n✅ Választott]
-  Q --> C[Parquet snapshot\n⚠️ reprodukálható, de nehéz frissíteni\n⚠️ inkompatibilis a live query-vel]
+  Q[quant_train felépítése] --> A[Live sync pipeline\nNO: folyamatosan frissülő join\nNO: tanítás alatt változhat\nNO: nem reprodukálható]
+  Q --> B[Ad-hoc rebuild DuckDB-ben\nOK: tanítás előtt lefuttatott\nOK: teljes újraépítés = determinisztikus\nOK: Választott]
+  Q --> C[Parquet snapshot\nWARN: reprodukálható, de nehéz frissíteni\nWARN: inkompatibilis a live query-vel]
 ```
 
 | Megközelítés | Előny | Hátrány | Státusz |

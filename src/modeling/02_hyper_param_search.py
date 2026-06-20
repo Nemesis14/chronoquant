@@ -2,12 +2,12 @@
 """LightGBM hyperparameter search — standalone entry point.
 
 Usage:
-    uv run python src/modeling/02_hyper_param_search.py --model lgbm_solusdt_l_fw60_q90_2021
-    uv run python src/modeling/02_hyper_param_search.py --model lgbm_solusdt_l_fw60_q90_2021 --stage explore
-    uv run python src/modeling/02_hyper_param_search.py --model lgbm_solusdt_l_fw60_q90_2021 --stage explore --n-trials 60 --timeout-hours 6
+    uv run python src/modeling/02_hyper_param_search.py --model <model_id>
+    uv run python src/modeling/02_hyper_param_search.py --model <model_id> --stage explore
+    uv run python src/modeling/02_hyper_param_search.py --model <model_id> --stage explore --n-trials 60 --timeout-hours 6
 
 The same search step can be run via the full pipeline:
-    uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_q90_2021 --step search --stage smoke
+    uv run python src/modeling/pipeline.py --model <model_id> --step search --stage smoke
 """
 
 import argparse
@@ -30,7 +30,7 @@ def main() -> None:
     parser.add_argument(
         "--model",
         required=True,
-        help="Model ID from config/models.json (e.g. lgbm_solusdt_l_fw60_q90_2021)",
+        help="Model ID from config/models.json (e.g. <model_id>)",
     )
     parser.add_argument(
         "--stage",

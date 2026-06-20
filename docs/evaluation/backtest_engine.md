@@ -17,7 +17,7 @@ visszamérést. Minden artifact-ot automatikusan ment.
 
 ```python
 from evaluation.backtest import run_configured_strategy
-summary = run_configured_strategy("solusdt_long_fw60_q90_2021")
+summary = run_configured_strategy("<strategy_id>")
 ```
 
 ### `run_strategy_backtest(strategy_id, strategy_cfg) -> dict`

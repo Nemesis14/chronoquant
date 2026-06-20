@@ -12,5 +12,5 @@ Use the current `_doc_` documentation as the source of truth:
 - `_doc_/5000_modelling.md` — active yearly modeling pipeline
 - `_doc_/5500_hyper_param_search.md` — LightGBM hyperparameter search
 
-Current model development uses `artifacts/<model_id>/` and yearly model IDs such as
-`lgbm_solusdt_l_fw60_q90_2021`.
+Current model development uses `artifacts/<model_id>/` and yearly model IDs from
+`config/models.json`.

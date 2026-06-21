@@ -22,7 +22,12 @@ import polars as pl
 
 import utils
 from data_handling.store.duckdb_query import query_range_pl
-from data_handling.store.duckdb_store import ensure_tables, get_connection, insert_predictions
+from data_handling.store.duckdb_store import (
+    backfill_predictions,
+    ensure_tables,
+    get_connection,
+    insert_predictions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,7 @@ def sync_predictions(
     start_time : str,
     end_time   : str | None = None,
     asset_id   : str | None = None,
+    backfill   : bool = False,
 ) -> None:
     """Sync predictions for the champion long and short models.
 
@@ -130,7 +136,11 @@ def sync_predictions(
     conn = get_connection(db_path)
     ensure_tables(conn)
     try:
-        written = insert_predictions(conn, df_out)
+        written = (
+            backfill_predictions(conn, df_out)
+            if backfill
+            else insert_predictions(conn, df_out)
+        )
     finally:
         conn.close()
     logger.info(

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import duckdb
+import numpy as np
 import pandas as pd
 
 import utils
@@ -46,9 +47,19 @@ def active_strategy(
         return None, {}
 
     if asset_id:
+        # Exact match on strategy asset_id
         for sid, scfg in strategies.items():
             if scfg.get("asset_id") == asset_id:
                 return sid, scfg
+        # Match via asset features_profile (e.g. "solusdt" → "solusdt_fw60")
+        try:
+            features_profile = utils.load_asset_config(asset_id)["database"].get("features_profile")
+            if features_profile:
+                for sid, scfg in strategies.items():
+                    if scfg.get("asset_id") == features_profile:
+                        return sid, scfg
+        except Exception:
+            pass
 
     for sid, scfg in strategies.items():
         if not scfg.get("asset_id"):
@@ -136,7 +147,7 @@ def prediction_history(
         return pd.DataFrame()
 
     end_dt    = latest_pred_ts.to_pydatetime()
-    start_dt  = datetime.utcnow() - timedelta(hours=int(lookback_hours) + 1)
+    start_dt  = end_dt - timedelta(hours=int(lookback_hours) + 1)
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -170,6 +181,13 @@ def prediction_history(
     )
     if df.empty:
         return df
+
+    long_lookup, short_lookup = _load_rank_lookups()
+    if "long_prediction" in df.columns:
+        df["long_prediction"] = _apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
+    if "short_prediction" in df.columns:
+        df["short_prediction"] = _apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
+
     latest_ts = df["open_time"].max()
     start_ts  = latest_ts - pd.Timedelta(hours=int(lookback_hours))
     return df[df["open_time"] >= start_ts].reset_index(drop=True)  # type: ignore[return-value]
@@ -197,9 +215,16 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     if pred_df.empty:
         return None
 
-    df  = _coerce_prediction_frame(
+    df = _coerce_prediction_frame(
         pred_df.rename(columns={"long_pred": "long_prediction", "short_pred": "short_prediction"})
     )
+
+    long_lookup, short_lookup = _load_rank_lookups()
+    if "long_prediction" in df.columns:
+        df["long_prediction"] = _apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
+    if "short_prediction" in df.columns:
+        df["short_prediction"] = _apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
+
     row = df.sort_values("open_time").iloc[-1].to_dict()
     return {key: _json_safe(value) for key, value in row.items()}
 
@@ -493,6 +518,58 @@ def _repo_path(relative_path: str) -> Path:
 
 def _quote_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
+
+
+def _load_rank_lookups() -> tuple[
+    tuple[np.ndarray, np.ndarray] | None,
+    tuple[np.ndarray, np.ndarray] | None,
+]:
+    try:
+        trading_cfg = utils.load_trading_config()
+        session_id  = trading_cfg.get("strategy_session_id", "")
+    except Exception:
+        return None, None
+    if not session_id:
+        return None, None
+
+    artifact_path = Path(utils._resolve_path(f"artifacts/{session_id}/strategy_artifact.json"))
+    if not artifact_path.exists():
+        return None, None
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None, None
+
+    artifact_dir = artifact_path.parent
+
+    def _load_one(filename: str) -> tuple[np.ndarray, np.ndarray] | None:
+        if not filename:
+            return None
+        path = artifact_dir / filename
+        if not path.exists():
+            return None
+        try:
+            df = pd.read_parquet(path)
+            return df["score_raw"].to_numpy(dtype=float), df["score_pct"].to_numpy(dtype=float)
+        except Exception:
+            return None
+
+    return (
+        _load_one(artifact.get("rank_lookup_long_path", "")),
+        _load_one(artifact.get("rank_lookup_short_path", "")),
+    )
+
+
+def _apply_rank_percentile(
+    series: pd.Series,
+    lookup: tuple[np.ndarray, np.ndarray] | None,
+) -> pd.Series:
+    if lookup is None:
+        return series
+    scores_raw, scores_pct = lookup
+    raw = series.to_numpy(dtype=float)
+    pct = np.interp(raw, scores_raw, scores_pct).clip(0.0, 1.0)
+    return pd.Series(pct, index=series.index, name=series.name)
 
 
 def _json_safe(value: Any) -> Any:

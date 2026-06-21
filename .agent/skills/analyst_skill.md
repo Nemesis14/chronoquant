@@ -1,7 +1,9 @@
 # Analyst Skill
 
 Quarto-renderable elemzési notebookok elkészítésének végrehajtási útmutatója.
-Notebook struktúra, cell-minták, kód-konvenciók és workflow.
+Notebook struktúra, vizuális design, kód-konvenciók és workflow.
+
+Quarto config és label szintaxis: → `.agent/tools/quarto_analysis_defaults.md`
 
 ---
 
@@ -96,8 +98,84 @@ Vizsgált területek: <rövid felsorolás>.
 **Asset:** SOLUSDT | **Granularitás:** 1m | **Dátum:** YYYY-MM-DD
 ```
 
-Ha a user egy döntési kérdést tesz fel, például mely éveket érdemes használni,
+Ha a user döntési kérdést tesz fel (pl. mely éveket érdemes használni),
 kötelező ezt már a célfejezetben expliciten megfogalmazni.
+
+---
+
+## Setup Cell
+
+A Raw cell után azonnal következő code cell minden notebookban kötelező.
+Importok és teljes seaborn téma együtt, egyetlen cellában:
+
+```python
+import sys
+import duckdb
+import pandas as pd
+import polars as pl
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+from IPython.display import display, Markdown
+
+sys.path.insert(0, str(_root))
+from analyst.table_formatting import format_analysis_table, display_analysis_table
+import analyst.plot_utils as pu
+import analyst.db_utils as dbu
+
+CQ_COLORS = {
+    "blue":       "#1696d2",
+    "black":      "#000000",
+    "gray_dark":  "#353535",
+    "gray":       "#696969",
+    "gray_light": "#d2d2d2",
+    "yellow":     "#fdbf11",
+    "orange":     "#f15a24",
+    "red":        "#ec008b",
+}
+CQ_SEQUENCE = [
+    CQ_COLORS["blue"],
+    CQ_COLORS["yellow"],
+    CQ_COLORS["orange"],
+    CQ_COLORS["gray"],
+    CQ_COLORS["red"],
+]
+
+sns.set_theme(
+    style="whitegrid",
+    rc={
+        "figure.figsize": (9, 5.5),
+        "figure.dpi": 120,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.edgecolor": CQ_COLORS["gray"],
+        "axes.labelcolor": CQ_COLORS["gray_dark"],
+        "xtick.color": CQ_COLORS["gray_dark"],
+        "ytick.color": CQ_COLORS["gray_dark"],
+        "grid.color": CQ_COLORS["gray_light"],
+        "grid.linewidth": 0.8,
+        "axes.axisbelow": True,
+        "legend.frameon": False,
+    },
+)
+sns.set_palette(CQ_SEQUENCE)
+```
+
+Ha van notebook-specifikus helper, itt importáld.
+
+---
+
+## Palette — Szín Szemantika
+
+| Szín | Hex | Mikor |
+|------|-----|-------|
+| blue | `#1696d2` | fő mérési sorozat |
+| gray / black | `#696969` / `#000000` | összehasonlítás, benchmark |
+| yellow / orange | `#fdbf11` / `#f15a24` | másodlagos összehasonlítás |
+| red | `#ec008b` | figyelmeztetés, hiba, kizárt szegmens |
+| gray_light | `#d2d2d2` | semleges háttér, sávok |
+
+Egy notebookon belül következetes szín-szemantika kötelező — szomszédos chartokban ne rendelj ugyanahhoz a színhez különböző jelentést.
 
 ---
 
@@ -144,107 +222,160 @@ plt.show()
 
 ### 3. Szabályok
 
-- Minden szekció **legalább egy táblát vagy ábrát** tartalmaz.
-- Tábla: mindig `display_analysis_table(df)`.
-- Ábra: mindig `plt.show()` a cell végén.
-- `ax.set_title()` tilos.
-- `print()` tilos. Használj táblát, ábrát vagy `display(Markdown(...))`-t.
-- Minden fontos output után legyen közeli, programmatikusan generált rövid olvasat.
+- Minden szekció **legalább egy táblát vagy ábrát** tartalmaz
+- Tábla: mindig `display_analysis_table(df)` — nincs bare `df`, `display(df)`, `df.head()`
+- Ábra: mindig `plt.show()` a cell végén
+- `ax.set_title()` tilos
+- `print()` tilos — használj táblát, ábrát vagy `display(Markdown(...))`-t
+- Minden fontos output után legyen közeli, programmatikusan generált rövid olvasat
 
 ---
 
-## Setup Cell
+## Chart Rules
 
-A Raw cell után azonnal következő code cell minden notebookban kötelező:
+- seaborn az elsődleges könyvtár; matplotlib a fallback és finomhangolás
+- Plotly tilos, kivéve ha a user explicit interaktív HTML-t kér
+- Minden charthoz legyen forrás dataframe vagy summary table
+- Következtetések számított adatból folyjanak, ne csak vizuális benyomásból
+- Tengelyfeliratok egységgel vagy skála kontextussal
+- Top és right spine eltávolítva
+- Könnyű gridlines az értéktengelyen
+- Direct labels vagy kompakt legend
+
+---
+
+## Analysis-Driven Chart Selection
+
+A kérdés dönti el a chart típust, nem a megszokás:
+
+- **Időbeli alakulás:** line chart, rolling chart, éves overlay vagy faceted time series
+- **Éves összehasonlítás:** külön panelek vagy aligned overlays, azonos skálák
+- **Eloszlás:** histogram, KDE, box, violin, ECDF, quantile range, density comparison
+- **Model performance:** train-valid metrics table + calibration vagy prediction-vs-target view
+- **Seasonality:** monthly/quarterly aggregation, aligned panelek vagy heatmap
+- **Split periódusok:** shading, bands, vagy explicit legend train/valid/OOS/regime-hez
+
+Ha a user azt kérdezi, összehasonlíthatók-e évek vagy periódusok: tedd vizuálisan és numerikusan egyértelművé.
+
+---
+
+## Temporal And Split Presentation Rules
+
+- Ha a chart több időszegmenst kever: különböztess meg shading-gel, facet panellel vagy stabil szín-szemantikával
+- Ha train és valid periódusok fontosak: jelöld az időtengelyen vagy szeparáld panelekre
+- Éves összehasonlításnál tartsd az y-tengelyeket azonos skálán
+- Időrendezett multi-panel layouthoz `layout-ncol: 1` előnyben, hacsak egymás melletti nézet nem olvashatóbb
+- Ha csonka évet hasonlítasz teljes évekhez: jelezd explicit szövegben
+
+---
+
+## Caption Examples
 
 ```python
-import sys
-import duckdb
-import pandas as pd
-import polars as pl
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-from IPython.display import display, Markdown
+# Egyetlen tábla
+#| label: tbl-positive-rate-by-year
+#| tbl-cap: "Positive target rate by year"
 
-sys.path.insert(0, str(_root))
-from analyst.table_formatting import format_analysis_table, display_analysis_table
-import analyst.plot_utils as pu
-import analyst.db_utils as dbu
+display_analysis_table(yearly)
 ```
 
-Ha van notebook-specifikus helper, azt itt importáld.
+```python
+# Egyetlen ábra
+#| label: fig-positive-rate-by-year
+#| fig-cap: "Positive target rate by year"
+#| fig-alt: "Line chart showing yearly positive target rate."
+
+fig, ax = plt.subplots(figsize=(9, 5.5))
+sns.lineplot(data=yearly, x="year", y="positive_rate", ax=ax, color=CQ_COLORS["blue"])
+ax.axhline(0.08, linestyle="--", linewidth=1, color=CQ_COLORS["gray"])
+ax.set_xlabel("Year")
+ax.set_ylabel("Positive rate")
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0, decimals=2))
+plt.show()
+```
+
+```python
+# Multi-panel (Quarto layout)
+#| label: fig-train-valid-panel
+#| fig-cap: "Train-valid comparison"
+#| fig-subcap:
+#|   - "Train sample"
+#|   - "Validation sample"
+#| layout-ncol: 2
+
+fig, ax = plt.subplots()
+...
+plt.show()
+
+fig, ax = plt.subplots()
+...
+plt.show()
+```
+
+Quarto panel layout előnyben ha: train vs valid páros chartok, before vs after összehasonlítások,
+ugyanaz a metrika több spliten vagy horizonton.
 
 ---
 
-## Kód Stílus
+## Numeric Formatting
 
-- **Adat-hozzáférés:** DuckDB-first SQL lekérdezésekre, ahol ez természetes.
-- **Nagy in-memory transform:** Polars vagy pandas, a feladathoz illően.
-- **Display inputok:** pandas, kis végső dataframe-ekre.
-- **Charting:** seaborn elsődleges, matplotlib fallback és finomhangolás.
-- Soha ne írj az adatbázisba.
-- Plotly tilos, kivéve ha a user explicit interaktív HTML-t kér.
-
-Az agentnek a helyes elemzési reprezentációt kell választania, nem a megszokottat:
-
-- idősor esetén időtengelyes chart;
-- éves összehasonlításnál faceted vagy overlay nézet;
-- modellértékelésnél train-valid bontás;
-- eloszlásoknál histogram, KDE, box, violin vagy kvantilis alapú összefoglaló;
-- kalibrációnál binning, reference line, residual vagy pred-vs-fact nézet.
+| Column type | Display format |
+|---|---|
+| `year` | Egész szám, pl. `2024` |
+| `count`, `n`, `row_count`, `rows`, `trades`, `volume`, `*_count`, `*_n` | Egész, nulla tizedesjegy |
+| `rate`, `ratio`, `share`, `pct`, `percent` | Percent string, 2 tizedesjegy; auto ×100 ha érték ≤ 1 |
+| minden más float | 3 tizedesjegy string |
 
 ---
 
-## Model And Target Evaluation Rules
+## Model és Target Kiértékelési Szabályok
 
-Ha a notebook targetet, modellt vagy predikciót elemez, az alábbi szabályok kötelezők,
-ha az adat elérhető:
+Ha a notebook targetet, modellt vagy predikciót elemez:
 
-- különítsd el a train és valid vagy in-sample és out-of-sample halmazt;
-- mutasd meg az időbeli alakulást és a regime-váltásokat;
-- mutasd meg az eloszlási különbségeket;
-- mutasd meg a predikció és a fact target kapcsolatát;
-- használj referencia-vonalat vagy ideális vonalat, ha ennek van értelme;
-- írj metrikatáblát, ne csak ábrát;
-- a notebook végén fogalmazd meg, hogy a modell mire használható és mire nem.
+**Mit vizsgálj (ha az adat elérhető):**
+- Különítsd el a train és valid / in-sample és out-of-sample halmazt
+- Mutasd meg az időbeli alakulást és a regime-váltásokat
+- Mutasd meg az eloszlási különbségeket évente vagy szegmensenként
+- Mutasd meg a predikció és a fact target kapcsolatát
+- Záró állásfoglalás: a teljes időszak használható-e együtt, vagy vannak kizárandó évek
 
-Ha a forrásban nincs kész `segment` mező:
+**Ha nincs kész `segment` mező:** rekonstruáld foldból, manifestből vagy metadata-ból.
+**Ne használj leakage-gyanús vagy full-fit predikciót** validációs következtetésekre.
 
-- keresd meg, rekonstruálható-e foldból, metadata-ból, manifestből vagy sample-logikából;
-- ha igen, rekonstruáld;
-- ha nem, írd le explicit módon, hogy a kiértékelés milyen korlátozással olvasandó.
-
-Ne használj leakage-gyanús vagy full-fit predikciót validációs következtetésekre,
-ha fair splitből újra előállítható a train-valid nézet.
+**Preferált vizualizációk:**
+- Train vs valid metric table: `RMSE`, `MAE`, `R²` és sample counts
+- Prediction vs fact scatter ideális reference line-nal
+- Binned calibration chart: átlag predikció vs átlag fact
+- Residual summary table vagy residual distribution
+- Daily/periodic aggregation chart ha regime-követés fontos
 
 ---
 
 ## Értelmező Zárás
 
-Minden notebook végén kötelező egy külön szekció, például `## Értelmezés`,
-`## Modellolvasat`, `## Döntési szempontok` vagy hasonló címmel.
+Minden notebook végén kötelező egy külön szekció.
+Lehetséges cím: `## Értelmezés`, `## Modellolvasat`, `## Döntési szempontok`
 
-Ebben a szekcióban:
+**Minőségi elvárások:**
+- Ne ismételd meg szó szerint a táblákat
+- Állást kell foglalni — ne állj meg a "látható különbségnél"; számszerűsítsd ha az adat engedi
+- A következtetés a futott számokra és ábrákra támaszkodjon
+- Ha a user döntést akar hozni: adj döntést támogató választ, ne csak összefoglalót
+- Ha az eredmény vegyes: mondd meg mi erős és mi gyenge
+- Ha a valid gyengébb mint a train: mondd meg, a degradáció elfogadható-e
 
-- ne ismételd meg szó szerint a táblákat;
-- állást kell foglalni a fontos kérdésekben;
-- a következtetés a futott számokra és ábrákra támaszkodjon;
-- ha a user döntést akar hozni, adj döntést támogató választ.
-
-Példák:
-
-- használható-e a teljes időszak a modellfejlesztéshez;
-- vannak-e kizárandó évek vagy rezsimek;
-- a valid teljesítmény elég stabil-e;
-- a modell inkább rangsorolásra vagy pontbecslésre jó-e.
+**Tipikus kérdések amikre válaszolni kell:**
+- Mennyire különböznek az évek egymástól?
+- Elég egységesek-e az évek a modellhez?
+- Vannak-e kizárandó évek vagy rezsimek?
+- A modell rangsorolásra vagy abszolút becslésre alkalmas inkább?
+- A valid teljesítmény elég stabil-e?
 
 ---
 
 ## Tiltott Placeholder Szöveg
 
 Soha ne írj:
-
 - `futtatás után kitöltendő`
 - `to be filled after running`
 - `TODO after execution`
@@ -254,34 +385,37 @@ Ha az eredmény a futtatástól függ, generáld programmatikusan.
 
 ---
 
-## Futtatás És Renderelés
+## Futtatás és Renderelés
 
 ```bash
 quarto render _doc_\XXXX_<slug>.ipynb --execute
 ```
 
-1. Írd meg az összes markdown és code cell-t.
-2. Minden eredmény programmatikusan generált legyen.
-3. Futtasd le a notebookot tiszta kernelből.
-4. Rendereld Quarto-val.
-5. Ellenőrizd, hogy a HTML létrejött.
-6. Olvasd vissza a fő outputokat.
-7. Ha kell, javítsd a notebookot, futtasd újra, és csak utána add át.
+1. Írd meg az összes markdown és code cell-t
+2. Minden eredmény programmatikusan generált legyen
+3. Futtasd le a notebookot tiszta kernelből
+4. Rendereld Quarto-val
+5. Ellenőrizd, hogy a HTML létrejött
+6. Olvasd vissza a fő outputokat
+7. Ha kell, javítsd a notebookot, futtasd újra, és csak utána add át
 
 ---
 
-## Rendering QA Checklist
+## QA Checklist
 
 - [ ] Raw cell: teljes Quarto frontmatter
-- [ ] Setup cell: importok, theme, table helper
-- [ ] Minden szekció: markdown leírás → code → tábla/ábra
-- [ ] `display_analysis_table(df)` minden tábla cell végén
-- [ ] Nincs bare `df`, `display(df)`, `df.head()` a cell végén
+- [ ] Setup cell: importok + seaborn theme + CQ_COLORS + table helper — egyetlen cellában
+- [ ] Minden szekció: markdown (mi/forrás/módszer/értelmezés) → code → tábla/ábra
+- [ ] `display_analysis_table(df)` minden tábla cell végén — nincs bare `df`, `display(df)`, `df.head()`
 - [ ] Minden tábla: `#| label: tbl-...` és `#| tbl-cap: ...`
-- [ ] Minden ábra: `#| label: fig-...` és `#| fig-cap: ...`
+- [ ] Minden ábra: `#| label: fig-...`, `#| fig-cap: ...`, `#| fig-alt: ...`
 - [ ] `plt.show()` minden plot cell végén
 - [ ] Nincs `ax.set_title()`
+- [ ] Nincs pandas index oszlop a rendered HTML táblákban
+- [ ] Numeric formatting projekt konvenciókat követ
+- [ ] Train-valid / in-sample-OOS / éves összehasonlítás vizuálisan jelölve, ha releváns
 - [ ] Nincs placeholder szöveg
-- [ ] A train-valid vagy más kritikus split explicit jelölve van, ha releváns
-- [ ] A notebook végén van decision-oriented értelmezés
-- [ ] A HTML létezik és a fő eredmények visszaellenőrzöttek
+- [ ] Notebook tiszta kernelből lefuttatva
+- [ ] Quarto render sikeres, HTML létezik `_doc_/<slug>.html` helyen
+- [ ] Fő outputok visszaolvasva és ellenőrizve
+- [ ] Notebook végén decision-oriented értelmezés a futott eredmények alapján

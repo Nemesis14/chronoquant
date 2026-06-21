@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 
 import utils
-from data_handling.store.duckdb_query import ohlcv_latest_open_time, ohlcv_row_count
+from data_handling.store.duckdb_query import latest_open_time, ohlcv_latest_open_time, ohlcv_row_count
 from data_handling.sync_tables.sync_features import sync_features
 from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
 from data_handling.sync_tables.sync_predictions import sync_predictions
@@ -109,38 +109,44 @@ def _run_database_sync_locked(
     logger.info("OHLCV sync from Binance started at %s", start_time)
     _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
 
-    rows_after       = ohlcv_row_count(db_path)
-    latest_open_time = ohlcv_latest_open_time(db_path)
+    rows_after      = ohlcv_row_count(db_path)
+    ohlcv_latest_ts = ohlcv_latest_open_time(db_path)
     logger.info(
         "OHLCV rows before=%s after=%s inserted=%s",
         rows_before, rows_after, rows_after - rows_before,
     )
 
-    if not latest_open_time or pd.to_datetime(latest_open_time) < pd.to_datetime(start_time):
+    if not ohlcv_latest_ts or pd.to_datetime(ohlcv_latest_ts) < pd.to_datetime(start_time):
         logger.info("No new OHLCV interval found for feature and prediction sync")
         logger.info("Database sync complete")
-        return SyncResult(start_time, latest_open_time, rows_before, rows_after)
+        return SyncResult(start_time, ohlcv_latest_ts, rows_before, rows_after)
 
-    logger.info("Feature sync started: %s -> %s", start_time, latest_open_time)
+    logger.info("Feature sync started: %s -> %s", start_time, ohlcv_latest_ts)
     _run_with_logged_stdout(
         sync_features,
         start_time,
-        end_time = latest_open_time,
+        end_time = ohlcv_latest_ts,
         asset_id = asset_id,
         logger   = logger,
     )
 
-    logger.info("Prediction sync started: %s -> %s", start_time, latest_open_time)
+    pred_latest_ts  = latest_open_time(db_path, "predictions")
+    pred_start_time = (
+        _next_open_time(str(pred_latest_ts))
+        if pred_latest_ts is not None
+        else start_time
+    )
+    logger.info("Prediction sync started: %s -> %s", pred_start_time, ohlcv_latest_ts)
     _run_with_logged_stdout(
         sync_predictions,
-        start_time,
-        end_time = latest_open_time,
+        pred_start_time,
+        end_time = ohlcv_latest_ts,
         asset_id = asset_id,
         logger   = logger,
     )
 
     logger.info("Database sync complete")
-    return SyncResult(start_time, latest_open_time, rows_before, rows_after)
+    return SyncResult(start_time, ohlcv_latest_ts, rows_before, rows_after)
 
 
 def _run_with_logged_stdout(func, *args, logger: logging.Logger, **kwargs) -> None:

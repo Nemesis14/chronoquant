@@ -146,7 +146,7 @@ class TradingService:
         )
         journal.insert_run(
             self.db_path, self.run_id, self.mode, self.asset_id,
-            self.session_id, self.session_id,
+            self.session_id,
             self.config,
         )
 

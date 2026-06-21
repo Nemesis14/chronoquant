@@ -46,9 +46,7 @@ Load relevant module docs (only for affected modules):
 
 ## Out of Scope
 
-- ML model code: `src/modeling/`, `src/evaluation/` — Modeling Agent
-- Streamlit UI: `src/ui/` — UI Agent
-- `.agent/` rule files — Doc Agent
+Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 
 ---
 
@@ -59,17 +57,6 @@ Load relevant module docs (only for affected modules):
 - Timestamps: UTC strings `YYYY-MM-DD HH:MM:SS`
 - Idempotent upserts by `open_time` — all sync ops safe to re-run
 - Primary active asset: SOLUSDT — do not spend time on bchusdt paths
-
----
-
-## Coding Standards
-
-Write code according to Pydantic, ruff, and pyright conventions by knowledge —
-do not run these tools yourself. Self-validation is the Validator Agent's job.
-
-Use LSP tools **only for navigation**: finding where a symbol is defined,
-what references exist, or what a type resolves to. Do not use LSP to check
-for errors — that belongs to the Validator Agent.
 
 ---
 

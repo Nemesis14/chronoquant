@@ -19,7 +19,8 @@
       "mcp__language-server__definition",
       "mcp__language-server__references",
       "mcp__language-server__rename_symbol",
-      "mcp__language-server__edit_file"
+      "mcp__language-server__edit_file",
+      "NotebookEdit(*)"
     ]
   },
   "hooks": {

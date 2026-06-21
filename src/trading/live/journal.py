@@ -47,16 +47,27 @@ def ensure_tables(db_path: str) -> None:
         conn.execute("CREATE SEQUENCE IF NOT EXISTS seq_trading_errors START 1")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trading_runs (
-                run_id            TEXT PRIMARY KEY,
-                started_at        TEXT NOT NULL,
-                stopped_at        TEXT,
-                mode              TEXT NOT NULL,
-                asset_id          TEXT NOT NULL,
-                long_strategy_id  TEXT NOT NULL,
-                short_strategy_id TEXT NOT NULL,
-                config_json       TEXT NOT NULL
+                run_id               TEXT PRIMARY KEY,
+                started_at           TEXT NOT NULL,
+                stopped_at           TEXT,
+                mode                 TEXT NOT NULL,
+                asset_id             TEXT NOT NULL,
+                strategy_session_id  TEXT NOT NULL,
+                config_json          TEXT NOT NULL
             )
         """)
+        # Migrate old schema: long_strategy_id / short_strategy_id → strategy_session_id
+        existing_cols = {
+            r[0] for r in conn.execute(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_name = 'trading_runs'"
+            ).fetchall()
+        }
+        if "long_strategy_id" in existing_cols and "strategy_session_id" not in existing_cols:
+            conn.execute("ALTER TABLE trading_runs ADD COLUMN strategy_session_id TEXT")
+            conn.execute("UPDATE trading_runs SET strategy_session_id = long_strategy_id")
+            conn.execute("ALTER TABLE trading_runs DROP COLUMN long_strategy_id")
+            conn.execute("ALTER TABLE trading_runs DROP COLUMN short_strategy_id")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trading_signals (
                 id            BIGINT PRIMARY KEY DEFAULT nextval('seq_trading_signals'),
@@ -122,21 +133,20 @@ def ensure_tables(db_path: str) -> None:
 
 
 def insert_run(
-    db_path           : str,
-    run_id            : str,
-    mode              : str,
-    asset_id          : str,
-    long_strategy_id  : str,
-    short_strategy_id : str,
-    config            : dict,
+    db_path             : str,
+    run_id              : str,
+    mode                : str,
+    asset_id            : str,
+    strategy_session_id : str,
+    config              : dict,
 ) -> None:
     with _connect(db_path) as conn:
         conn.execute(
             """INSERT INTO trading_runs
-               (run_id, started_at, mode, asset_id, long_strategy_id, short_strategy_id, config_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               (run_id, started_at, mode, asset_id, strategy_session_id, config_json)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             [run_id, utils.now_utc_str(), mode, asset_id,
-             long_strategy_id, short_strategy_id, json.dumps(config)],
+             strategy_session_id, json.dumps(config)],
         )
 
 
@@ -327,11 +337,28 @@ def get_current_run_status(db_path: str) -> dict | None:
             return None
         position = get_open_position(db_path)
         signal   = get_recent_signals(db_path, limit=1)
+
+        # Infer runtime state from open position and last signal decision
+        if position:
+            state = position["side"]  # "LONG" or "SHORT"
+        elif signal:
+            last_decision = signal[0].get("decision", "")
+            state_before  = signal[0].get("state_before", "FLAT")
+            if "EXIT" in last_decision:
+                state = "COOLDOWN"
+            elif state_before in ("FLAT", "COOLDOWN"):
+                state = state_before
+            else:
+                state = "FLAT"
+        else:
+            state = "FLAT"
+
         return {
             "run_id":        run["run_id"],
             "mode":          run["mode"],
             "started_at":    run["started_at"],
             "stopped_at":    run.get("stopped_at"),
+            "state":         state,
             "open_position": position,
             "last_signal":   signal[0] if signal else None,
         }

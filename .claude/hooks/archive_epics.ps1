@@ -11,7 +11,7 @@ foreach ($epic in $epics) {
     $files = Get-ChildItem -Path $epic.FullName -File
     if ($files.Count -eq 0) { continue }
 
-    $nonDone = $files | Where-Object { $_.Name -notmatch '^done_' }
+    $nonDone = $files | Where-Object { $_.Name -notmatch '^done_' -and $_.Name -ne 'epic.md' }
     if ($nonDone.Count -eq 0) {
         Move-Item -Path $epic.FullName -Destination "$archivePath\$($epic.Name)" -Force
         Write-Host "*** EPIC ARCHIVALVA: $($epic.Name) ***"

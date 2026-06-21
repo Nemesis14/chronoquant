@@ -374,7 +374,7 @@ def render_trade_panel(asset_id: str | None) -> None:
         else:
             trades_df = st.session_state[cache_trades]
 
-    if asset_id == "solusdt_fw60":
+    if asset_id in ("solusdt", "solusdt_fw60"):
         _render_trading_status_card()
         _render_signal_trigger_card(asset_id)
         _render_trading_positions_card()

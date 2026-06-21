@@ -7,6 +7,7 @@
 1. Olvasd be: `_doc_/0000_project_overview.md`
 2. Olvasd be: `.agent/general_principles.md`
 3. Listázd a `_jira_/` tartalmát (csak fájlnevek, nem tartalom) — aktív taskokat azonosítani
+   ⚠️ **`_jira_/archive/` TILOS** — soha ne nyisd meg, ne listázd, ne olvass belőle
 4. Várd meg a user kérését
 
 **Ne töltsd be az agent manifesteket és a `_doc_/<module>/` oldalakat** session
@@ -35,7 +36,7 @@ User: "igen"
 → Agent végrehajtja, majd egyből pr_ ticketet hoz létre
 ```
 
-Nincs előzetes `todo_` ticket, nincs terv jóváhagyás. Az agent elvégzi, létrehozza a `pr_` ticketet, majd a validator_agent validál.
+Nincs előzetes `todo_` ticket, nincs terv jóváhagyás. Az agent elvégzi, létrehozza a `pr_` ticketet, majd a validator_agent validál **ugyanabban a sessionben** — nem igényel külön session indítást.
 
 ---
 
@@ -70,27 +71,47 @@ OK?
 ### 3. Jóváhagyás után: `_jira_/` létrehozás
 
 - Hozd létre az epic mappát: `_jira_/epic_{id}_{slug}/`
+- Hozd létre az `epic.md` fájlt a mappában (lásd sablon a jira_skill-ben)
 - Minden taskhoz: `todo_t{n}_{slug}.md` az `assignee` mezővel (sablon lent)
 - `blocks` / `blocked_by` mezők a sorrendhez
 
-### 4. Végrehajtás — session = egy agent típus
+### 4. Végrehajtás — két mód
 
-**Egy session = egy agent típus összes taskja az epicen belül.**
+#### Mód A — Szegmentált (alacsony kontextus, az eredeti flow)
 
-Az agent manifestek nem halmozódnak — session határon a context ürül, a `_jira_/`
-ticketek viszik át a state-et a következő sessionbe.
-
-**Session indítása:**
 User megnevezi: epic ID + agent típus (pl. "futtasd az epic_3 database taskjait")
 
-Orchestrátor:
 1. Betölti **csak** a megnevezett agent manifestjét
-2. Beolvassa az epic összes `todo_` és `pr_` ticketjét — kontextus
-3. Az agent végrehajtja az összes hozzá rendelt `todo_` taskot sorban
+2. Beolvassa az epic összes `todo_` és `pr_` ticketjét
+3. Agent végrehajtja az összes hozzá rendelt taskot sorban
 4. Minden elvégzett task: `todo_` → `pr_` rename
 5. Ha a következő feloldott task más agenthez tartozik: **session zár**
 
-**Session zárása után** a user új sessiont indít a következő agent típussal.
+Session zárása után a user új sessiont indít a következő agent típussal.
+
+#### Mód B — Orchestrált (főszál koordinál, párhuzamos subagent spawn)
+
+User: "futtasd az epic_{n}-et orchestráltan"
+
+Az orchestrátor **aktív marad** és subagenteket hív. Lépések:
+
+1. Olvassa be az epic összes `todo_` ticketjét + `blocks`/`blocked_by` mezőket
+2. Csoportosítja a taskokat végrehajtási hullámokba:
+   - **1. hullám**: minden task, amelynek `blocked_by` listája üres
+   - **2. hullám**: azok, amelyek `blocked_by`-ja kizárólag 1. hullám taskjaiból áll
+   - stb.
+3. Indítja párhuzamosan az aktuális hullám összes taskját (**max 3 egyidejű Agent spawn**):
+   - Keresés / read-only lookup → `subagent_type: "Explore"`, `model: "haiku"`
+   - Rövid / izolált implementáció (1-2 fájl) → névvel ellátott agent, `model: "haiku"`
+   - Komplex / cross-file implementáció → névvel ellátott agent, `model: "sonnet"` (default)
+4. Minden visszatérő subagent után:
+   - `todo_` → `pr_` rename az elvégzett taskra
+   - Ellenőrzi: feloldódott-e valamely blokkolt task → ha igen, indítja a következő hullámot
+5. Minden task `pr_` állapotban → validator session következik (4a. pont)
+
+**Mikor ajánlott Mód A?**
+- Epic > 6 task esetén (orchestrátor kontextusa túlnő a subagent eredményektől)
+- Ha a user közte review-zni szeretne az agent-típusok között
 
 ### 4a. Validátor session — minden dev session után kötelező
 
@@ -124,32 +145,9 @@ Mindkét esetben a ticket validálása (→ `done_`) a **validator_agent** felad
 
 ---
 
-## Task Frontmatter Sablon (kibővített)
+## Task Sablon
 
-```markdown
----
-epic: epic_{id}
-id: t{n}
-title: Rövid imperatív cím
-assignee: database_agent | modeling_agent | ui_agent | code_doc_agent
-status: todo | pr | done
-blocks: [t{n}, t{n}]      # opcionális: ezeket blokkol
-blocked_by: [t{n}]        # opcionális: ezektől függ
----
-
-## Goal
-Mit kell csinálni és miért.
-
-## Scope
-Érintett fájlok és modulok.
-
-## Acceptance Criteria
-- [ ] criterion 1
-- [ ] criterion 2
-
-## Notes
-Progress notes, döntések, blockerek. Append, ne felülírd.
-```
+→ `.agent/skills/jira_skill.md` — "Task File Template" szekció
 
 ---
 
@@ -159,6 +157,8 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 - Agent manifesteket **csak végrehajtáskor** tölt be, delegáláshoz
 - `_doc_/<module>/` oldalakat az **agent** tölti be, nem az orchestrátor
 - Hosszú jira task tartalmakat csak akkor olvasd be, ha az adott taskra kérdeznek rá
+- Keresésnél / fájl-lookup-nál: `Explore` agent `model: "haiku"` — **soha nem `general-purpose`**
+- **`_jira_/archive/` olvasása szigorúan tilos** — archivált ticketek nem relevánsak aktív munkához
 
 ---
 
@@ -168,7 +168,8 @@ Progress notes, döntések, blockerek. Append, ne felülírd.
 |--------|-------|
 | `src/data_handling/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
 | `src/modeling/` (sampling, training, evaluation, feature_engineering), model artifacts | `modeling_agent` |
-| `src/trading/` (strategy calibration, live service, journal) | `ui_agent` |
+| `src/strategy/` (isotonic calibration, Optuna sweep, strategy artifacts) | `modeling_agent` |
+| `src/trading/` (live service, journal, exchange client) | `ui_agent` |
 | `src/ui/` (Streamlit dashboard, pages, components) | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies | `code_doc_agent` |
 | `_doc_/analysis/`, ML EDA, feature/model analysis notebooks | `analyst_agent` |

@@ -29,7 +29,6 @@ Read these before starting work:
 
 - `.agent/general_principles.md`
 - `.agent/skills/analyst_skill.md`
-- `.agent/skills/analysis_presentation_skill.md`
 - `.agent/tools/quarto_analysis_defaults.md`
 
 ---
@@ -159,26 +158,6 @@ A feladat akkor kész, ha:
 - nincs placeholder szöveg a rendered outputban;
 - az agent visszaellenőrizte a futott eredményeket;
 - a notebook tartalmaz végső, decision-oriented értelmezést.
-
----
-
-## Model And Target Analysis Rules
-
-Ha az elemzés modellről, predikcióról, targetről vagy éves stabilitásról szól,
-az agentnek az alábbiakat kell alapértelmezettként vizsgálnia, ha az adat elérhető:
-
-- időbeli alakulás és regime-váltások;
-- éves vagy segmentált összehasonlítás;
-- eloszlási különbségek;
-- szezonalitás vagy periódus-hatás;
-- train és valid vagy in-sample és out-of-sample elkülönítése;
-- leakage-gyanús vagy full-fit predikciók kerülése;
-- záró állásfoglalás arról, hogy a teljes történet használható-e együtt, vagy
-  vannak kizárandó időszakok.
-
-Ha a forrás nem tartalmaz kész `segment` mezőt, de a validációs struktúra
-rekonstruálható foldokból, manifestből vagy metadata-ból, akkor azt az agentnek
-meg kell tennie a fair értékelés érdekében.
 
 ---
 

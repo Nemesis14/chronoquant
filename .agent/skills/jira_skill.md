@@ -57,25 +57,25 @@ todo_s2_slug.md  →  (broken into tasks)  →  delete when all tasks done
 ---
 epic: epic_{id}
 id: t{n}
-title: Short imperative title
+title: Rövid imperatív cím
 assignee: database_agent | modeling_agent | ui_agent | code_doc_agent | methodology_agent | analyst_agent | validator_agent
-status: todo
-blocks: []        # optional: task IDs this blocks
-blocked_by: []    # optional: task IDs this depends on
+status: todo | pr | done
+blocks: []        # opcionális: ezeket blokkol
+blocked_by: []    # opcionális: ezektől függ
 ---
 
 ## Goal
-What needs to be done and why.
+Mit kell csinálni és miért.
 
 ## Scope
-Which files and modules are affected.
+Érintett fájlok és modulok.
 
 ## Acceptance Criteria
-- [ ] criterion 1
-- [ ] criterion 2
+- [ ] kritérium 1
+- [ ] kritérium 2
 
 ## Notes
-Progress notes, blockers, decisions. Append, do not overwrite.
+Progress notes, döntések, blockerek. Append, ne felülírd.
 ```
 
 ---
@@ -106,8 +106,38 @@ Design decisions, open questions.
 
 - Name: `epic_{id}_{slug}` where `{id}` is a **3-digit zero-padded number** (e.g. `epic_011_slug`) and `{slug}` is 2-5 words, lowercase, underscores
 - Create the epic folder before creating child tasks or stories
-- No separate epic definition file — the folder name and its contents define the epic
-- Completed epics (all tasks in `done_` state) are moved to `_jira_/archive/`
+- Completed epics are moved to `_jira_/archive/` automatically by the Stop hook
+
+### `epic.md` — High-level summary file
+
+Create an `epic.md` inside the epic folder when:
+- The request is complex (Flow B), OR
+- The user provides a `story_` file as input
+
+`epic.md` is **not a tracked task** — it has no `todo_/pr_/done_` prefix and no lifecycle.
+It documents: goal, scope, key decisions, and links to constituent tasks.
+
+```markdown
+# Epic {id}: {title}
+
+## Goal
+Why this epic exists.
+
+## Scope
+Modules and files affected.
+
+## Tasks
+- t{n}: title (assignee)
+- t{n}: title (assignee)
+
+## Key Decisions
+Architectural or design choices made during execution.
+```
+
+**Archive condition**: the Stop hook archives an epic when all task files are `done_`
+and the only remaining file is `epic.md`. The `epic.md` moves to archive together with the folder.
+
+⚠️ **NEVER read from `_jira_/archive/`** — archived epics are not relevant to active work.
 
 ## Epic Counter (`_jira_/jira.json`)
 

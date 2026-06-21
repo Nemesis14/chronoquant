@@ -514,3 +514,56 @@ def insert_predictions(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> int
     n = _insert_append_only(conn, "predictions", df.select(available))
     logger.info("insert_predictions: inserted=%d", n)
     return n
+
+
+def backfill_predictions(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> int:
+    """Insert prediction rows for historical gaps, skipping existing open_times.
+
+    Unlike insert_predictions, this does not restrict to rows newer than the
+    current maximum.  Use for backfilling gaps in historical prediction coverage.
+    Existing rows (matching open_time) are left unchanged.
+
+    Args:
+        conn : Open DuckDB connection.
+        df   : Polars DataFrame with prediction columns.
+
+    Returns:
+        Number of rows inserted.
+    """
+    if df.is_empty():
+        return 0
+
+    pred_cols = [
+        row[0]
+        for row in conn.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'predictions' ORDER BY ordinal_position"
+        ).fetchall()
+    ]
+    available = [c for c in pred_cols if c in df.columns]
+    df_out = df.select(available)
+
+    if "open_time" in df_out.columns and df_out.schema["open_time"] == pl.Utf8:
+        df_out = df_out.with_columns(
+            pl.col("open_time").str.strptime(pl.Datetime("us"), "%Y-%m-%d %H:%M:%S")
+        )
+
+    col_list = ", ".join(f'"{c}"' for c in df_out.columns)
+    conn.register("_backfill_batch", df_out)
+    try:
+        before = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()
+        n_before = int(before[0]) if before else 0
+        conn.execute(f"""
+            INSERT OR IGNORE INTO predictions ({col_list})
+            SELECT {col_list}
+            FROM _backfill_batch
+            ORDER BY open_time
+        """)
+        after = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()
+        n_after = int(after[0]) if after else 0
+    finally:
+        conn.unregister("_backfill_batch")
+
+    n = n_after - n_before
+    logger.info("backfill_predictions: inserted=%d", n)
+    return n

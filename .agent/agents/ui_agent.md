@@ -26,8 +26,8 @@ Do NOT load:
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/ui/` — if touching `src/ui/`
-- `_doc_/trading/` — if touching `src/trading/`
+- `_doc_/8000_ui.md` + `_doc_/81xx_*.md` — if touching `src/ui/`
+- `_doc_/7000_trading.md` + `_doc_/71xx_*.md` — if touching `src/trading/`
 
 ---
 
@@ -37,16 +37,13 @@ Load relevant module docs (only for affected modules):
 |------|---------------|
 | `src/ui/` | Pages, components, data loading, sync wrappers |
 | `src/trading/service.py` | Trading service called from UI |
-| `_doc_/ui/`, `_doc_/trading/` | Module documentation |
+| `_doc_/7xxx*.md`, `_doc_/8xxx*.md` | Trading and UI module documentation |
 
 ---
 
 ## Out of Scope
 
-- DuckDB schema or Parquet changes — Database Agent
-- ML training, feature computation, prediction logic — Modeling Agent
-- Raw data sync entry points under `src/data_handling/` — Database Agent
-- `.agent/` rule files — Doc Agent
+Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 
 ---
 
@@ -56,18 +53,6 @@ Load relevant module docs (only for affected modules):
 - Sync operations via `src/ui/sync.py`
 - Store reads via `src/data_handling/store/duckdb_query.py` interfaces
 - No `print()` in library code — use `logger.*` or `st.*`
-- Primary active asset: SOLUSDT — UI defaults must reflect this
-
----
-
-## Coding Standards
-
-Write code according to Pydantic, ruff, and pyright conventions by knowledge —
-do not run these tools yourself. Self-validation is the Validator Agent's job.
-
-Use LSP tools **only for navigation**: finding where a symbol is defined,
-what references exist, or what a type resolves to. Do not use LSP to check
-for errors — that belongs to the Validator Agent.
 
 ---
 

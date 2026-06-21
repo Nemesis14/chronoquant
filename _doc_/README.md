@@ -51,5 +51,23 @@ _doc_/
   # Strategy (6xxx)
   6000_strategy.md           <- strategy domain methodology, rank-first signal design
 
+  # Trading Runtime (7xxx)
+  7000_trading.md            <- live trading domain overview
+  7100_live_trading.md       <- trading runtime methodology + submodule map
+  7110_run_service.md        <- 01_run_service.py CLI entry point
+  7120_trading_service.md    <- live/service.py main loop
+  7130_trading_journal.md    <- live/journal.py trading.db contract
+  7140_trading_exchange.md   <- live/exchange.py Binance client
+  7150_trading_state_strategy.md <- live/state.py + live/strategy.py decision core
+
+  # UI Dashboard (8xxx)
+  8000_ui.md                 <- Streamlit dashboard domain overview
+  8100_dashboard.md          <- UI package methodology + submodule map
+  8110_ui_main.md            <- ui/main.py page assembly
+  8120_ui_data.md            <- ui/data.py read model
+  8130_ui_sync.md            <- ui/sync.py + sync_runner.py background sync
+  8140_ui_runners.md         <- ui/trading_runner.py + dashboard_logging.py
+  8150_ui_components.md      <- ui/components/* rendering helpers + binance_data.py
+
   analysis/                  <- analyst_agent: EDA, specs, sample quality notebooks
 ```

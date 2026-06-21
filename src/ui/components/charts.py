@@ -292,7 +292,7 @@ def _long_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, _pred in zip(sig["open_time"], sig["prediction"], strict=False):
+    for ts, _pred in zip(sig["open_time"], sig["long_prediction"], strict=False):
         fig.add_annotation(
             x=ts, y=0.99,
             xref="x", yref="y2 domain",

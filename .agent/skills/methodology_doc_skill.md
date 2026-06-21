@@ -14,19 +14,26 @@ identifies a gap. Never produce methodology docs speculatively.
 
 ## File Naming and Numbering
 
-Use the numbering scheme defined in `docs_skill.md`:
+Autoritatív számozási séma: → `.agent/skills/docs_skill.md`
 
 | Szint | Minta | Leírás |
 |-------|-------|--------|
-| X000 | `3000_modelling.md` | Fejezet — teljes domain áttekintője |
-| X100 | `3100_sampling.md` | Alfejezet — almodul áttekintője |
+| X000 | `5000_modelling.md` | Fejezet — teljes domain áttekintője |
+| X100 | `5100_sampling_config.md` | Alfejezet — almodul áttekintője |
 | X110+ | — | Részletes fájlok — **code_doc_agent territory, nem ide** |
 
 Chapter assignment:
+
 | Tartomány | Domain |
 |-----------|--------|
-| 1000 | database |
-| 3000 | modeling |
+| 1000–1999 | Database Infrastructure (store, sync, tests) |
+| 2000–2999 | Features (feature engineering, sync) |
+| 3000–3999 | Targets (target computation, sync) |
+| 4000–4999 | Quant Train (quant_train tábla) |
+| 5000–5999 | Sampling / Modelling (sampling, training, evaluation) |
+| 6000–6999 | Strategy (isotonic calibration, Optuna) |
+| 7000–7999 | Trading Runtime (live service, journal, exchange) |
+| 8000–8999 | UI Dashboard (Streamlit pages, components) |
 
 If no number exists for a new submodule: assign the next available X100 slot
 within the domain's range.

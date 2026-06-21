@@ -65,6 +65,27 @@ _doc_/
   5410_sampling_splits.md    ← ARCHÍV: expanding window splits
   5420_sampling_audit.md     ← ARCHÍV: feature table audit
 
+  # Strategy (6xxx)
+  6000_strategy.md           ← X000: strategy domain methodology
+
+  # Trading Runtime (7xxx)
+  7000_trading.md            ← X000: trading runtime domain overview
+  7100_live_trading.md       ← X100: runtime methodology + submodule map
+  7110_run_service.md        ← X110: 01_run_service.py CLI
+  7120_trading_service.md    ← X110: live/service.py main loop
+  7130_trading_journal.md    ← X110: live/journal.py trading.db access
+  7140_trading_exchange.md   ← X110: live/exchange.py Binance client
+  7150_trading_state_strategy.md ← X110: live/state.py + live/strategy.py
+
+  # UI Dashboard (8xxx)
+  8000_ui.md                 ← X000: UI domain overview
+  8100_dashboard.md          ← X100: dashboard methodology + submodule map
+  8110_ui_main.md            ← X110: ui/main.py Streamlit page
+  8120_ui_data.md            ← X110: ui/data.py read access layer
+  8130_ui_sync.md            ← X110: ui/sync.py + sync_runner.py background sync
+  8140_ui_runners.md         ← X110: ui/trading_runner.py + dashboard_logging.py
+  8150_ui_components.md      ← X110: ui/components/* + binance_data.py
+
   analysis/                  ← analyst_agent: EDA, specs, sample quality notebooks
 ```
 
@@ -92,6 +113,9 @@ Files in `_doc_/` use a **hierarchikus számozási séma**:
 | `3000–3999` | Targets | 3000–3099: metodológia → 3100+: kód |
 | `4000–4999` | Quant Train | 4000–4099: metodológia → 4100+: kód |
 | `5000–5999` | Sampling / Modelling | 5000–5099: overview/metod → 5100+: részletek |
+| `6000–6999` | Strategy | 6000–6099: methodology |
+| `7000–7999` | Trading Runtime | 7000–7099: overview/metod → 7100+: runtime details |
+| `8000–8999` | UI Dashboard | 8000–8099: overview/metod → 8100+: dashboard details |
 
 **Kötelező sorrend minden blokkon belül:** metodológia szám < kód szám.
 Ha egy témához új kód doc kerül, a száma nagyobb kell legyen a kapcsolódó metod docnál.

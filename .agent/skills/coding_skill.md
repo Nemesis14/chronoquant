@@ -6,12 +6,14 @@ ChronoQuant Python coding standards. Read this before writing or reviewing code.
 
 ## Quality Gate
 
-During coding — single file check (gyors, ~3s):
+**Developer agenteknek ez referencia — futtatás kizárólag a validator_agent feladata.**
+
+Single file check (gyors, ~3s):
 ```powershell
 uv run pyright src/foo.py
 ```
 
-Before committing — full gate from repo root:
+Full gate from repo root:
 ```powershell
 ruff check . --fix
 uv run pyright

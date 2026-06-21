@@ -43,22 +43,14 @@ Do NOT load:
 | `pyrightconfig.json` | Type-check configuration |
 | `CLAUDE.md` | Agent entry point |
 
-### Dokumentációs rendező elv (kötelező betartani)
+### Dokumentációs rendező elv
 
-Az egész `_doc_/` egy egységes dokumentáció ahol a sorrend:
-**Overview (X000) → Metodológia (X100) → Technikai referencia (X110+)**
-
-- **X000** fájl = domain flowchart + almodulok listája (rövid, átfogó)
-- **X100** fájl = alfejezet overview + 6 metodológiai szekció (methodology_agent írja!)
-- **X110+** fájl = teljes kód referencia: függvények, paraméterek, diagramok
+Részletesen: → `.agent/skills/docs_skill.md`
 
 A code_doc_agent **CSAK X110+ fájlokat ír**. Ha egy X100 hiányzik vagy hiányos,
 nyiss `todo_` ticketet a `methodology_agent`-nek — ne töltsd ki maga.
-
-Az X110 fájlban az `## Overview` szekcióban mindig szerepeljen egy flowchart vagy
-sequenceDiagram, amely megmutatja, hol kapcsolódik a .py fájl a pipeline-ba.
-Redundancia tilos: az X110 nem ismétli meg az X100 metodológiai tartalmát —
-cross-reference linkkel hivatkozzon rá.
+Az X110 `## Overview`-ban legyen flowchart/sequenceDiagram; ne ismételd az X100
+tartalmát — cross-reference linkkel hivatkozz rá.
 
 ---
 
@@ -79,16 +71,6 @@ cross-reference linkkel hivatkozzon rá.
 - `pip` does not exist in `.venv` — always use `uv run`
 - When updating `.agent/` rules: changes must remain backward-compatible for
   all agents that reference those files
-
----
-
-## Validation Commands
-
-```powershell
-ruff check . --fix
-uv run pyright
-uv run pytest src/<module>/tests/
-```
 
 ---
 

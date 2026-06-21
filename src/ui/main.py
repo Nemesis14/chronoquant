@@ -48,20 +48,17 @@ st.markdown(
 )
 
 if "active_asset_id" not in st.session_state:
-    st.session_state["active_asset_id"] = "solusdt_fw60"
+    st.session_state["active_asset_id"] = "solusdt"
 
 if "dashboard_started_logged" not in st.session_state:
     _logger = get_dashboard_logger()
     _logger.info("Dashboard started")
     st.session_state.dashboard_started_logged = True
 
-    _auto_state = ensure_sync_state(st.session_state, "solusdt_fw60")
+    _auto_state = ensure_sync_state(st.session_state, "solusdt")
     enable_auto_sync(_auto_state)
-    if start_sync(_auto_state, "solusdt_fw60"):
-        _logger.info("Auto-start sync (asset=solusdt_fw60)")
-
-    if not trading_runner.is_trading_running() and trading_runner.start_trading(mode="dry_run"):
-        _logger.info("Auto-start trading (mode=dry_run)")
+    if start_sync(_auto_state, "solusdt"):
+        _logger.info("Auto-start sync (asset=solusdt)")
 
 
 def _render_sync_controls(asset_id: str | None) -> None:
@@ -118,7 +115,7 @@ def _render_sync_controls(asset_id: str | None) -> None:
 
 @st.fragment(run_every="2s")
 def _sync_panel_sol() -> None:
-    _render_sync_controls(asset_id="solusdt_fw60")
+    _render_sync_controls(asset_id="solusdt")
 
 
 _WINDOW_OPTIONS = {"24h": 24, "8h": 8, "4h": 4}
@@ -228,7 +225,7 @@ with st.sidebar:
     _render_trading_controls()
 
 
-active_asset_id = "solusdt_fw60"
+active_asset_id = "solusdt"
 asset_label     = "SOL / 1m"
 
 st.markdown(

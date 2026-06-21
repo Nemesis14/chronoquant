@@ -1,7 +1,7 @@
 ﻿# ChronoQuant — Project Overview
 
-Single source of truth for the orchestrator. Agents load their own module docs
-from `_doc_/<module>/`; this file is for cross-domain context only.
+Single source of truth for the orchestrator. Detailed module documentation lives
+in flat numbered `_doc_/XXXX_*.md` files; this file is for cross-domain context only.
 
 ---
 

@@ -28,6 +28,7 @@ Load relevant module docs (only for affected modules):
 
 - `_doc_/5000_modelling.md` — if touching `src/modeling/`
 - `_doc_/5500_hyper_param_search.md` — if touching model search
+- `_doc_/6000_strategy.md` — if touching `src/strategy/`
 
 ---
 
@@ -37,22 +38,20 @@ Load relevant module docs (only for affected modules):
 |------|---------------|
 | `src/modeling/` | Training, CV, dataset preparation, model artifacts |
 | `src/modeling/evaluation/` | Backtest, metrics, reporting |
+| `src/strategy/` | Isotonic calibration, Optuna threshold sweep, strategy artifact |
 | `src/data_handling/sync_tables/_features_polars.py` | Feature computation logic |
 | `src/data_handling/sync_tables/sync_features.py` | Feature sync into store |
 | `src/data_handling/sync_tables/sync_predictions.py` | Prediction sync into store |
 | `artifacts/` | Generated model artifacts (`artifacts/<model_id>/`) |
 | `src/modeling/tests/` | Modeling tests for training and sampling |
 | `src/modeling/feature_engineering/tests/` | Feature engineering tests |
-| `_doc_/5xxx*.md` | Modeling documentation |
+| `_doc_/5xxx*.md`, `_doc_/6000_strategy.md` | Modeling and strategy documentation |
 
 ---
 
 ## Out of Scope
 
-- DuckDB schema or Parquet layout — Database Agent
-- Raw OHLCV sync — Database Agent
-- Streamlit UI — UI Agent
-- `.agent/` rule files — Doc Agent
+Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 
 ---
 
@@ -65,17 +64,6 @@ Load relevant module docs (only for affected modules):
 - Use Polars for feature computation — do not mix with pandas in same step
 - Apply t-1 lag on all features before training to prevent data leakage
 - Primary active asset: SOLUSDT
-
----
-
-## Coding Standards
-
-Write code according to Pydantic, ruff, and pyright conventions by knowledge —
-do not run these tools yourself. Self-validation is the Validator Agent's job.
-
-Use LSP tools **only for navigation**: finding where a symbol is defined,
-what references exist, or what a type resolves to. Do not use LSP to check
-for errors — that belongs to the Validator Agent.
 
 ---
 

@@ -1,0 +1,275 @@
+# 0004 — Modell Életciklus (Model Lifecycle)
+
+A teljes modellfejlesztési és élesítési folyamat: snapshot befagyasztástól a live
+predictions backfill+swap cutoverig. Minden lépés DuckDB-natív — a modellezési
+adat a `lab.duckdb`-ben él, a registry (`registry.duckdb`) köti össze a lánc
+elemeit, a live predikció az élesítés után a `live.duckdb` `predictions` táblájába kerül.
+
+---
+
+## Overview
+
+```mermaid
+flowchart TD
+  QT["main.quant_train (live, mutable)"]
+  SNAP["snap.&lt;snapshot_id&gt; (immutable CTAS + hash)"]
+  SAMP["model.&lt;id&gt;__sample (hourly+fold_id, kicsi)"]
+  FE["feature_set (logikai szures, reg.feature_sets)"]
+  SEARCH["hyperparameter search (reg.search_runs)"]
+  TRAIN["model.pkl (artifacts/)"]
+  PRED_OFF["model.&lt;id&gt;__pred (offline, teljes range)"]
+  STRAT["strat.&lt;session&gt;__trades/__equity/__cutoffs"]
+  DEPLOY["reg.deployments pending"]
+  LIVE_PRED["main.predictions (backfill+swap cutover)"]
+
+  QT -->|"create_snapshot CLI"| SNAP
+  SNAP -->|"create_sample"| SAMP
+  SAMP --> FE
+  FE --> SEARCH
+  SEARCH --> TRAIN
+  SNAP -->|"predict_offline"| PRED_OFF
+  PRED_OFF --> STRAT
+  STRAT -->|"06_trigger_deploy.py"| DEPLOY
+  DEPLOY -->|"sync_predictions cutover"| LIVE_PRED
+```
+
+A registry minden lépésnél kap provenance-bejegyzést. A státusz-lánc:
+`draft → sampled → trained → predicted → (strategy candidate) → deployed → archived`
+
+---
+
+## 1. Snapshot (adatállapot rögzítése)
+
+A fejlesztési folyamat forrása a `live.quant_train` egy befagyasztott
+range-másolata. Ez az egyetlen pont, ahol a változékony élő adat rögzül.
+
+```mermaid
+flowchart TD
+  CLI["05_create_snapshot.py --asset-id solusdt --start ... --end ..."]
+  HASH["content_sha256 + feature_set_hash szamitas"]
+  REUSE{"azonos asset + content_sha256?"}
+  CTAS["CREATE TABLE snap.&lt;snapshot_id&gt; AS SELECT ... range"]
+  REG_S["reg.snapshots INSERT (range, row_count, hash-ek, status=candidate)"]
+  SKIP["reuse: meglevo snapshot hasznalata"]
+
+  CLI --> HASH --> REUSE
+  REUSE -- nem --> CTAS --> REG_S
+  REUSE -- igen --> SKIP
+```
+
+A `snapshot_id` formátuma: `{asset}_fw{h}_{range}__{hash8}`
+(pl. `solusdt_fw60_2023__a37d2703`).
+
+Részletek: → [1400_snapshots.md](methodology_doc/1400_snapshots.md)
+
+---
+
+## 2. Sample (mintavétel a snapshotból)
+
+A sampling az immutable snapshot fölött dolgozik. Forrása a `snap."<snapshot_id>"`
+tábla (nem a `quant_train`), kimenete `model."<model_id>__sample"` DuckDB tábla.
+
+```mermaid
+flowchart TD
+  SNAP["snap.&lt;snapshot_id&gt; (immutable)"]
+  HOURLY["hourly select (QUALIFY ROW_NUMBER per hour, seed-del)"]
+  FOLD["fold_id hozzarendeles (walk-forward CASE)"]
+  SAMP_T["model.&lt;id&gt;__sample (open_time + target + fold_id)"]
+  FS["reg.feature_sets (selected_cols, n_input, n_selected)"]
+  REG_M["reg.models upsert (snapshot_id + feature_set_id, status=sampled)"]
+
+  SNAP --> HOURLY --> FOLD --> SAMP_T
+  SAMP_T --> FS --> REG_M
+```
+
+A sample kicsi (~tízezer sor hourly felbontásban). A feat_* oszlopok a snapshotban
+maradnak — a downstream a `model.__train_input` view-n projektál (nincs per-modell
+feature-másolat).
+
+Walk-forward CV paraméterek: `train_months=9`, `valid_months=3`, `shift_months=3`,
+`n_folds=4`, `purge_minutes=240`. A `fold_id=0` jelöli a train-only sorokat.
+
+---
+
+## 3. Feature Engineering
+
+A feature engineering nem hoz létre szűkebb DuckDB táblát — kimenete egy
+**logikai feature_set**: a kiválasztott oszlopok listája, amelyet a registry
+tárol.
+
+```mermaid
+flowchart LR
+  SAMP["model.&lt;id&gt;__sample (olvassa)"]
+  FE_NB["01_feature_engineering.ipynb (fut, EDA)"]
+  FS_JSON["feature_set.json (artifacts/)"]
+  FS_REG["reg.feature_sets (selected_cols JSON)"]
+  TRAIN_V["model.&lt;id&gt;__train_input VIEW\n(projekcio a feature_set-re a sample-bol)"]
+
+  SAMP --> FE_NB --> FS_JSON --> FS_REG
+  FS_REG -.->|"szures"| TRAIN_V
+  SAMP -.->|"alap"| TRAIN_V
+```
+
+A `__train_input` view-t a search és a train lépés olvassa — columnar projekció,
+fizikai tábla-másolat nélkül.
+
+---
+
+## 4. Hyperparameter Search
+
+```mermaid
+flowchart TD
+  TV["model.&lt;id&gt;__train_input VIEW (feature_set projakcio)"]
+  OPT["Optuna sweep (Top10 Lift + fold-stability penalty)"]
+  BEST["search_best.json + trials.jsonl (artifacts/search/)"]
+  SR["reg.search_runs INSERT (best_params, objective, stage=candidate)"]
+
+  TV --> OPT --> BEST --> SR
+```
+
+A search best-effort módon írja a registry-t: egy hiba a search futásában nem
+veszíti el a kész eredményt.
+
+---
+
+## 5. Train
+
+A tréning a `model.__train_input` view-ból dolgozik, kimenete a model bináris és
+az artifact fájlok.
+
+```mermaid
+flowchart TD
+  TV["model.&lt;id&gt;__train_input VIEW"]
+  LGB["LightGBM fit (fold-CV, walk-forward)"]
+  PKL["model.pkl + features.json + params.json + metrics.json (artifacts/)"]
+  REG_T["reg.models UPDATE (status=trained, oos_metric, search_run_id)"]
+  ARTS["reg.artifacts INSERT (model.pkl / features / params / metrics / cv_results)"]
+
+  TV --> LGB --> PKL --> REG_T
+  PKL --> ARTS
+```
+
+A final modell **az összes train során** refittelt (a fold CV csak metrika-mérés).
+
+---
+
+## 6. Offline Predict
+
+A predikció a snapshot teljes range-ét scorolja a frissen betanított modellel.
+A predikció **nem** íródik vissza a snapshotba — külön `model.__pred` tábla keletkezik.
+
+```mermaid
+flowchart TD
+  SNAP["snap.&lt;snapshot_id&gt; (teljes range, immutable)"]
+  PKL["model.pkl + features.json betoltes"]
+  SCORE["scoring (feat_* projekcio + predict)"]
+  PRED_T["model.&lt;id&gt;__pred (open_time, pred) - CREATE OR REPLACE"]
+  VER["snapshot hash verifikacio (elotte + utana)"]
+  REG_P["reg.models UPDATE (status=predicted)"]
+
+  SNAP --> PKL --> SCORE --> PRED_T --> VER --> REG_P
+```
+
+A `snap ⋈ model.__pred` join `open_time`-on 1:1. A snapshot immutability
+sértetlen: a hash a predict lépés előtt és után egyezik.
+
+---
+
+## 7. Strategy Kalibráció
+
+A strategy a `snap ⋈ model_long.__pred ⋈ model_short.__pred` joinból dolgozik —
+nincs parquet-mozgatás.
+
+```mermaid
+flowchart TD
+  JOIN["snap x model_long.__pred x model_short.__pred JOIN (scored_df)"]
+  CAL["kalibracio: rank percentil + isotonic regression (scored_df in-memory)"]
+  OPT_S["Optuna sweep (MFE objektiv, signal_mode=rank_first)"]
+  ARTS_S["strat.&lt;session&gt;__trades/__equity/__cutoffs (lab.duckdb)"]
+  FARTS["strategy_artifact.json + rank_lookup*.parquet + isotonic*.pkl (artifacts/)"]
+  RS["reg.strategies INSERT (model_id_long, model_id_short, session_id, status=candidate)"]
+  RA["reg.artifacts INSERT (strat tablak + fajlok utvonala)"]
+
+  JOIN --> CAL --> OPT_S --> ARTS_S --> RS
+  OPT_S --> FARTS --> RA
+```
+
+A live service csak a fájl-artefaktokat tölti be futáskor (`strategy_artifact.json`,
+`rank_lookup_*.parquet`, `isotonic_*.pkl`) — az `strat.*` DuckDB táblák az UI-nak
+és validációnak szólnak.
+
+---
+
+## 8. Deploy és Cutover
+
+A deploy a modell-életciklus utolsó fázisa: az élesítés atomikusan cseréli a
+`predictions` táblát és átállítja a registry-t.
+
+```mermaid
+flowchart TD
+  TRIGGER["06_trigger_deploy.py --strategy-session-id <session_id>"]
+  PEND["reg.deployments INSERT (status=pending)"]
+  DETECT["sync_predictions: _detect_pending_deployment"]
+  CUT["_execute_cutover: strategy -> model_id_long / short feloldas"]
+  LOAD["model.&lt;long&gt;__pred + model.&lt;short&gt;__pred betoltes lab-bol"]
+  TX["BEGIN; DELETE FROM predictions; INSERT INTO predictions (+ stamp); COMMIT"]
+  ACT["_activate_deployment: pending -> active, regi -> archived"]
+  LIVE_S["live trading az uj modellel (stamp: long/short_model_id)"]
+
+  TRIGGER --> PEND --> DETECT --> CUT --> LOAD --> TX --> ACT --> LIVE_S
+```
+
+Rollback: az előző `strategy_id` a `reg.deployments.previous_strategy_id`-ben
+tárolódik. Újra-élesítéssel (`06_trigger_deploy.py`) a következő sync ciklus
+visszacsinálja a backfill+swap-ot.
+
+Részletek: → [0003_runtime_flow.md](0003_runtime_flow.md)
+
+---
+
+## Reg.models státusz-lánc
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft : step_setup (register_model_draft)
+  draft --> sampled : create_model_sample (reg.models upsert)
+  sampled --> trained : fit_lightgbm -> mark_model_trained
+  trained --> predicted : predict_offline -> set_model_status
+  predicted --> champion : manualis promotalas (legjobb az osztalyaban)
+  champion --> active : deploy cutover (reg.deployments active=true)
+  active --> archived : uj deployment aktivalasakor
+  candidate --> archived : nem promotalt, kivezetve
+  champion --> archived : regi champion levaltas
+  archived --> [*]
+```
+
+A `champion` státusz manuális promóciót igényel — ez a gate, amely megelőzi, hogy
+egy validálatlan modell automatikusan élesedjen.
+
+---
+
+## Részleges retrain döntési tábla
+
+A registry hash-ek (`content_sha256`, `feature_set_hash`) automatikusan detektálják,
+mit lehet újrahasználni:
+
+| Mi változott | Snapshot | Sample | FE | Search | Train | Predict | Deploy |
+|--------------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Csak hyperparam | – | – | – | Igen | Igen | Igen | Igen |
+| Új feature_set (ua. range) | – | – | Igen | Igen | Igen | Igen | Igen |
+| Új range | Igen | Igen | Igen | Igen | Igen | Igen | Igen |
+| Csak újra-élesítés (kész modell) | – | – | – | – | – | – | Igen |
+
+---
+
+## Kapcsolódó dokumentumok
+
+| Téma | Hivatkozás |
+|------|-----------|
+| Tárolási topológia (3 fájl, sémák) | [0002_data_architecture.md](0002_data_architecture.md) |
+| Éles folyamat (sync → predict → trade → cutover) | [0003_runtime_flow.md](0003_runtime_flow.md) |
+| Snapshot réteg — miért és hogyan | [methodology_doc/1400_snapshots.md](methodology_doc/1400_snapshots.md) |
+| Registry séma + életciklus | [methodology_doc/1500_registry.md](methodology_doc/1500_registry.md) |
+| Sampling metodológia | [methodology_doc/5400_sampling.md](methodology_doc/5400_sampling.md) |
+| Hyperparameter search | [methodology_doc/5500_hyper_param_search.md](methodology_doc/5500_hyper_param_search.md) |
+| Strategy metodológia | [methodology_doc/6000_strategy.md](methodology_doc/6000_strategy.md) |

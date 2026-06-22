@@ -187,9 +187,9 @@ flowchart LR
   DB --> |owns| SRC1[src/data_handling/\nconfig/assets.json\nDuckDB schema]
   MOD --> |owns| SRC2[src/modeling/\nsrc/strategy/\nartifacts/]
   UI --> |owns| SRC3[src/ui/\nsrc/trading/]
-  DOC --> |owns| SRC4[.agent/\npyproject.toml\n_doc_/ X110+]
-  METH --> |owns| SRC5[_doc_/ X000, X100\nmódszertani tartalom]
-  ANA --> |owns| SRC6[_doc_/ *.ipynb\nsrc/analyst/]
+  DOC --> |owns| SRC4[.agent/\npyproject.toml\n_doc_/database_and_code_doc/]
+  METH --> |owns| SRC5[_doc_/methodology_doc/\nmodszertani tartalom]
+  ANA --> |owns| SRC6[_doc_/models_doc/\nanalyst/]
   VAL --> |owns| SRC7[pr_ ticket\nvalidálás]
 ```
 
@@ -209,9 +209,9 @@ Minden manifest tartalmaz:
 | `database_agent` | `.agent/agents/database_agent.md` | `src/data_handling/`, DuckDB | coding, jira | lsp, ast-grep, uv |
 | `modeling_agent` | `.agent/agents/modeling_agent.md` | `src/modeling/`, `src/strategy/`, artifacts | coding, jira | lsp, ast-grep, uv |
 | `ui_agent` | `.agent/agents/ui_agent.md` | `src/ui/`, `src/trading/` | coding, jira | lsp |
-| `code_doc_agent` | `.agent/agents/code_doc_agent.md` | `.agent/`, config, `_doc_/` X110+ | jira, docs | uv, permissions |
-| `methodology_agent` | `.agent/agents/methodology_agent.md` | `_doc_/` X000, X100 | jira, methodology_doc | — |
-| `analyst_agent` | `.agent/agents/analyst_agent.md` | `_doc_/*.ipynb`, `src/analyst/` | analyst, quarto | — |
+| `code_doc_agent` | `.agent/agents/code_doc_agent.md` | `.agent/`, config, `_doc_/database_and_code_doc/` | jira, docs | uv, permissions |
+| `methodology_agent` | `.agent/agents/methodology_agent.md` | `_doc_/methodology_doc/` | jira, methodology_doc | — |
+| `analyst_agent` | `.agent/agents/analyst_agent.md` | `_doc_/models_doc/`, `analyst/` | analyst, quarto | — |
 | `validator_agent` | `.agent/agents/validator_agent.md` | `pr_` ticketek, `src/*/tests/` | jira | lsp, uv |
 
 ### 5.3 Agent betöltési sorrend
@@ -257,6 +257,8 @@ flowchart LR
     DS[docs_skill]
     MS[methodology_doc_skill]
     AS[analyst_skill]
+    MLS[model_lifecycle_skill]
+    DEP[deploy_skill]
   end
 
   DB --> JS & CS
@@ -266,6 +268,8 @@ flowchart LR
   METH --> JS & MS
   ANA --> AS
   VAL --> JS
+  MOD -.->|on demand| MLS & DEP
+  DB -.->|on demand| DEP
 ```
 
 ### 6.1 Skill összefoglaló
@@ -274,9 +278,11 @@ flowchart LR
 |-------|---------|--------------|
 | `coding_skill.md` | Type annotations, docstring stílus, naming, alignment, logging, modul-szerkezet | database, modeling, ui, validator |
 | `jira_skill.md` | `_jira_/` könyvtár-struktúra, ID-szabályok, task lifecycle, template-ek | minden agent |
-| `docs_skill.md` | `_doc_/` számozási séma (X000–X110), Mermaid szabályok, doc típusok | code_doc, methodology |
+| `docs_skill.md` | `_doc_/` három-zónás séma (database_and_code_doc / methodology_doc / models_doc), számozás, Mermaid szabályok, doc típusok | code_doc, methodology |
 | `methodology_doc_skill.md` | X100 hat kötelező szekció template-jei, alternatíva-tábla formátum | methodology |
 | `analyst_skill.md` | Quarto frontmatter, notebook-struktúra, chart-szabályok, szekció-minta, `display_analysis_table()`, numeric formatting, paletta | analyst |
+| `model_lifecycle_skill.md` | Új modell build + részleges-retrain döntési tábla; pipeline lépések sorrendben (snapshot → sample → FE → search → train → predict) | modeling |
+| `deploy_skill.md` | Élesítési checklist: validáció → pending → cutover → registry active → rollback | modeling, database |
 
 ---
 
@@ -457,49 +463,58 @@ flowchart TD
 
 ## 9. _doc_/ — Dokumentációs Rendszer
 
-### 9.1 Hierarchikus számozási séma
+### 9.1 Három zóna + hierarchikus számozás
 
-**Domain blokkok (számozási tartományok):**
-
-```mermaid
-flowchart TD
-  G0["0000 — project_overview (globalis)"]
-  D1["1000-1999 — Database Infrastructure"]
-  D2["2000-2999 — Features"]
-  D3["3000-3999 — Targets"]
-  D4["4000-4999 — Quant Train"]
-  D5["5000-5999 — Sampling / Modelling"]
-  D6["6000-6999 — Strategy"]
-  D7["7000-7999 — Trading Runtime"]
-  D8["8000-8999 — UI Dashboard"]
-  ANA["analysis/ — analyst notebookok"]
-
-  G0 --- D1 --- D2 --- D3 --- D4 --- D5 --- D6 --- D7 --- D8 --- ANA
-```
-
-**Szintek egy blokkon belül (pl. 1xxx Database):**
+A `_doc_/` **három globális zónára** oszlik, mindegyiknek egy kizárólagos író agentje.
+A téma-számozás (1xxx db, 2xxx features … 8xxx ui) **zónán belül** megmarad, hogy a
+kereszthivatkozás kiszámítható maradjon.
 
 ```mermaid
 flowchart TD
-  A["X000: 1000_database.md\nDomain overview + flowchart + rationale\nmethodology_agent irja"]
-  B["X100: 1100_store.md\nAlmodul overview + 6 kotelezo metod szekció\nmethodology_agent irja"]
-  C["X110+: 1110_duckdb_store.md\nEgy .py fajl teljes kod-referenciaja\ncode_doc_agent irja"]
-  N["XXXX.ipynb: pl. 3200_targets_analysis.ipynb\nQuarto elemzesi notebook\nanalyst_agent irja"]
+  ROOT["_doc_/ (gyoker)\n0000_project_overview.md\n0001_agentic_system.md"]
+  Z1["database_and_code_doc/\nDB sema + kod-referencia (.md)\ncode_doc_agent"]
+  Z2["methodology_doc/\nrationale, dontesek (.md, kod-mentes)\nmethodology_agent"]
+  Z3["models_doc/\nmodellenkenti report (.ipynb -> Quarto)\nanalyst_agent"]
 
-  A -->|kotelezo elofeltétel| B
-  B -->|Entry Gate: X100 kell elobb| C
-  A -.->|parhuzamosan lehetseges| N
+  ROOT --- Z2
+  ROOT --- Z1
+  ROOT --- Z3
+  Z1 -->|kotelezo felfele link| Z2
+  Z3 -->|hivatkozas| Z2
 ```
 
-### 9.2 Fájl szintek
+**Domain blokkok (számozási tartományok, minden zónában):**
 
-| Szint | Minta | Felelős agent | Tartalom |
-|-------|-------|---------------|---------|
-| X000 | `5000_modelling.md` | `methodology_agent` | Domain overview, flowchart, rationale |
-| X010–X099 | `2010_feature_engineering.md` | `methodology_agent` | Módszertani háttér |
-| X100 | `5100_sampling_config.md` | `methodology_agent` | Almodul overview + 6 kötelező szekció |
-| X110+ | `1110_duckdb_store.md` | `code_doc_agent` | Egy .py fájl teljes kód-referenciája |
-| XXXX.ipynb | `3200_targets_analysis.ipynb` | `analyst_agent` | Quarto-renderable elemzési notebook |
+```mermaid
+flowchart LR
+  D1["1xxx Database"] --- D2["2xxx Features"] --- D3["3xxx Targets"] --- D4["4xxx Quant Train"]
+  D5["5xxx Modelling"] --- D6["6xxx Strategy"] --- D7["7xxx Trading"] --- D8["8xxx UI"]
+```
+
+**Zóna-besorolás tartalom szerint (pl. 2xxx Features):**
+
+```mermaid
+flowchart TD
+  A["2000_features.md\nfeature metodologia\nmethodology_doc / methodology_agent"]
+  C["2100_sync_features.md\nsync_features.py kod-ref\ndatabase_and_code_doc / code_doc_agent"]
+  N["XXXX.ipynb\nmodell-report\nmodels_doc / analyst_agent"]
+
+  A -->|Entry Gate: metodologia elobb| C
+  C -.->|kotelezo felfele link| A
+  N -.->|hivatkozas| A
+```
+
+### 9.2 Fájl szintek és zónák
+
+| Szint | Minta | Zóna | Felelős agent | Tartalom |
+|-------|-------|------|---------------|---------|
+| X000 | `5000_modelling.md` | `methodology_doc/` | `methodology_agent` | Domain overview, flowchart, rationale |
+| X010–X099 | `2010_feature_engineering.md` | `methodology_doc/` | `methodology_agent` | Módszertani háttér |
+| X100 (metod) | `7100_live_trading.md` | `methodology_doc/` | `methodology_agent` | Almodul overview + 6 kötelező szekció |
+| X100 (kód) / X110+ | `2100_sync_features.md`, `1110_duckdb_store.md` | `database_and_code_doc/` | `code_doc_agent` | Kód-referencia, DB séma, teljes .py leírás |
+| XXXX.ipynb | `XXXX_<model>_report.ipynb` | `models_doc/` | `analyst_agent` | Quarto-renderable modell-report |
+| Globális root | `0000`, `0001` | `_doc_/` **gyökér** | — | Project overview, agentic rendszer — **CSAK ez a kettő** |
+| Cross-domain arch ref | `0002+` | `database_and_code_doc/` | `code_doc_agent` | Rendszer-szintű arch referencia (pl. adat-topológia, runtime flow) |
 
 ### 9.3 X100 kötelező hat szekció (methodology_agent írja)
 
@@ -513,14 +528,16 @@ flowchart TD
   X100 --> S6[Validációs\nchecklist]
 ```
 
-**Entry Gate szabály:** a `code_doc_agent` nem írhat X110 fájlt, amíg a szülő X100 nem létezik
-és nem tartalmazza mind a hat szekciót.
+**Entry Gate szabály:** a `code_doc_agent` (`database_and_code_doc/`) nem írhat kód-referenciát,
+amíg a kapcsolódó methodology doc (`methodology_doc/`) nem létezik és nem tartalmazza mind a hat
+szekciót. A kód felfelé linkel a metodológiára; a metodológia kód-mentes és nem linkel lefelé.
 
 ### 9.4 Dokumentációs sorrendhatályossági elv
 
 ```
-Minden témában: X000 (overview) → X100 (metodológia) → X110+ (kód-referencia)
-Minden szinten belül: metodológia szám < kód szám
+Minden témában: methodology_doc (overview + metodológia) → database_and_code_doc (kód-referencia)
+Minden blokkon belül: metodológia szám < kód szám
+Kereszthivatkozás egy-irányú: kód → methodology kötelező; methodology nem linkel lefelé
 ```
 
 ---
@@ -677,9 +694,9 @@ flowchart TD
 | `src/data_handling/`, DuckDB, Parquet | `database_agent` | coding, jira, lsp, uv |
 | `src/modeling/`, `src/strategy/`, artifacts | `modeling_agent` | coding, jira, lsp, uv |
 | `src/trading/`, `src/ui/` | `ui_agent` | coding, jira, lsp |
-| `.agent/`, config, `_doc_/` X110+ | `code_doc_agent` | docs, jira, uv, permissions |
-| `_doc_/` X000, X100 — metodológia | `methodology_agent` | methodology_doc, jira |
-| `_doc_/XXXX*.ipynb`, `src/analyst/` | `analyst_agent` | analyst, quarto |
+| `.agent/`, config, `_doc_/database_and_code_doc/` | `code_doc_agent` | docs, jira, uv, permissions |
+| `_doc_/methodology_doc/` — metodológia | `methodology_agent` | methodology_doc, jira |
+| `_doc_/models_doc/`, `analyst/` | `analyst_agent` | analyst, quarto |
 | `pr_` ticketek validálása | `validator_agent` | jira, lsp, uv |
 
 ---

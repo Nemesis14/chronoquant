@@ -36,7 +36,7 @@ Do NOT load:
 | `.agent/agents/` | Agent manifests — update when agent roles evolve |
 | `.agent/skills/` | Skill files — update when workflows change |
 | `.agent/tools/` | Tool docs — update when tools change |
-| `_doc_/` X110+ | Részletes kód-referencia fájlok: függvény API, paraméterek, CLI, diagramok — teljes .py szintű leírás |
+| `_doc_/database_and_code_doc/` | **Kizárólagos író.** Implementation zóna: DB séma, kód-referencia (X110 + kód-jellegű X100, pl. `2100_sync_features`, `4100_quant_train`), függvény API, paraméterek, CLI, mermaid/UML — teljes .py szintű leírás |
 | `pyproject.toml`, `uv.lock` | Dependency management via `uv` |
 | `.mcp.json` | MCP server config (gitignored, machine-specific) |
 | `.claude/settings.json`, `.claude/settings.local.json` | Claude permissions |
@@ -47,10 +47,15 @@ Do NOT load:
 
 Részletesen: → `.agent/skills/docs_skill.md`
 
-A code_doc_agent **CSAK X110+ fájlokat ír**. Ha egy X100 hiányzik vagy hiányos,
-nyiss `todo_` ticketet a `methodology_agent`-nek — ne töltsd ki maga.
-Az X110 `## Overview`-ban legyen flowchart/sequenceDiagram; ne ismételd az X100
-tartalmát — cross-reference linkkel hivatkozz rá.
+A code_doc_agent a **`_doc_/database_and_code_doc/` zóna kizárólagos írója** (kód-referencia).
+Ha egy methodology doc (X000/X100) hiányzik vagy hiányos, nyiss `todo_` ticketet a
+`methodology_agent`-nek — ne töltsd ki maga, és tartsd vissza a kód-referenciát (Entry Gate).
+A kód-referencia `## Overview`-ban legyen flowchart/sequenceDiagram; ne ismételd a
+methodology zóna tartalmát.
+
+**Kereszthivatkozás (egy-irányú):** a `database_and_code_doc` fájlok KÖTELEZŐEN felfelé
+linkelnek a `methodology_doc/` „miért"-jére. A `methodology_doc` kód-mentes és nem linkel
+le ide.
 
 ---
 
@@ -59,8 +64,9 @@ tartalmát — cross-reference linkkel hivatkozz rá.
 - Application code under `src/` — specialist agents
 - Model artifacts under `models/`
 - `_jira_/` task content (Orchestrator creates tasks; Doc Agent only maintains the skill file)
-- `_doc_/` X000, X100 módszertani szekciók — ezek a `methodology_agent` feladata;
-  ha egy X100 fájlban hiányoznak, ne töltsd ki — nyiss `todo_` ticketet a `methodology_agent`-nek
+- `_doc_/methodology_doc/` — methodology zóna, a `methodology_agent` kizárólagos területe;
+  ha egy methodology doc hiányzik, ne töltsd ki — nyiss `todo_` ticketet a `methodology_agent`-nek
+- `_doc_/models_doc/` — modell-report zóna, az `analyst_agent` kizárólagos területe
 
 ---
 

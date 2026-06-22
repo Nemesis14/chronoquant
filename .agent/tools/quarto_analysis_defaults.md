@@ -105,15 +105,15 @@ Panel caption
 Always render after executing a notebook:
 
 ```bash
-quarto render _doc_\XXXX_<slug>.ipynb --execute
+quarto render _doc_\models_doc\XXXX_<slug>.ipynb --execute
 ```
 
-The rendered HTML is placed at `_doc_/XXXX_<slug>.html` (same directory as the notebook).
+The rendered HTML is placed at `_doc_/models_doc/XXXX_<slug>.html` (same directory as the notebook).
 Rendering must succeed before the task is complete. If it fails, fix the notebook.
 
 Each notebook is self-contained: the full Quarto config lives in the Raw-cell frontmatter
 (see `analyst_skill.md`). No `_quarto.yml` project discovery needed.
-The CSS is referenced as `../analyst/chronoquant_analysis.css` relative to `_doc_/`.
+The CSS is referenced as `../../analyst/chronoquant_analysis.css` relative to `_doc_/models_doc/`.
 
 ---
 

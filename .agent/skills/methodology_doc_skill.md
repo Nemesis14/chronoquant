@@ -51,7 +51,7 @@ Before writing any section:
 2. **Read `src/<module>/`** — implementation is ground truth for what was actually decided
 3. **Read `config/`** entries for parameter values
 4. **Check `docs/` legacy** for any narrative rationale worth migrating; if content contradicts current code, trust the code
-5. **Check `_doc_/analysis/`** for empirical findings relevant to this module
+5. **Check `_doc_/models_doc/`** for empirical findings relevant to this module
 
 ---
 
@@ -165,7 +165,7 @@ Minimum five items. Items must be actionable checks, not vague goals.
 
 ## Incorporating Analyst Findings
 
-If `_doc_/analysis/` contains a notebook with findings for this module:
+If `_doc_/models_doc/` contains a notebook with findings for this module:
 
 1. Read the Summary section of the notebook
 2. Translate relevant findings into methodology notes:
@@ -174,7 +174,7 @@ If `_doc_/analysis/` contains a notebook with findings for this module:
    - Calibration or distribution issues → named risk row with known mitigation status
 3. Cite the source:
    ```markdown
-   Forrás: `_doc_/analysis/<slug>.ipynb` — <dátum>, <finding title>
+   Forrás: `_doc_/models_doc/<slug>.ipynb` — <dátum>, <finding title>
    ```
 
 ---

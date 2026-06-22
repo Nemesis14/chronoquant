@@ -1,14 +1,15 @@
 """LightGBM fit from search artifacts — single fit, no CV sweep.
 
 Reads best_params.json + search_best.json (n_estimators), feature_set.json.
-Loads training data from the model's own sample_train_valid.parquet (artifact dir)
-which already contains all feat_* columns — no DuckDB join needed for training.
+Loads training data via snap ⋈ model.__sample JOIN (DuckDB-native, plan 5.1):
+  - source: snap."<snapshot_id>" (features) INNER JOIN model."<model_id>__sample"
+    (open_time + target + fold_id) on open_time
+  - uses ALL fold rows (fold_id 0 = train-only, fold_id 1..n = walk-forward folds)
+    for the final production fit
 
-Outputs:
-  model.pkl                   — serialised LGBMRegressor
-  features.json               — selected feature list
-  params.json                 — final training params + n_estimators
-  sample_train_valid.parquet  — updated in-place with pred_{dir} column added
+Offline prediction is a separate pipeline step (modeling.predict) that scores the
+full snapshot range into model."<id>__pred" — it is no longer fused into the
+sample here (t315).
 """
 
 from __future__ import annotations
@@ -39,9 +40,9 @@ _FIXED_PARAMS: dict = {
 def fit_lightgbm_from_search(model_id: str) -> dict:
     """Fit a LightGBM model from search artifacts.
 
-    Training data is loaded entirely from the model's sample_train_valid.parquet
-    (artifact directory), which must already contain all selected feat_* columns.
-    After fitting, pred_{dir} is appended to sample_train_valid.parquet.
+    Training data is loaded via the snap ⋈ model.__sample JOIN (DuckDB-native,
+    plan 5.1) — all fold rows are used for the final production fit.  Offline
+    scoring of the full snapshot range is the separate predict step.
 
     Args:
         model_id: Key from config/models.json.
@@ -74,7 +75,7 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
     final_params: dict = {**_FIXED_PARAMS, **best_params, "n_estimators": n_estimators, "random_state": 42}
 
-    sample_df, X_train, y_train = _load_train_data(artifact_dir, selected_features, target_name)
+    X_train, y_train = _load_train_data(model_id, selected_features, target_name)
 
     logger.info(
         "[fit_lgbm] Fitting %s: n_samples=%d, n_features=%d, n_estimators=%d",
@@ -86,7 +87,19 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
     _save_artifacts(artifact_dir, model, selected_features, final_params, n_estimators)
 
-    _add_predictions_to_sample(artifact_dir, model, sample_df, selected_features, target_name)
+    # Offline prediction is no longer fused into the sample (t315): the predict
+    # step scores the full snapshot range into a separate model."<id>__pred" table
+    # so the snapshot/sample stay clean. See modeling.predict.predict_offline.
+
+    # Provenance: mark reg.models 'trained' (oos_metric + search_run link) and
+    # register the produced artifact paths in reg.artifacts (plan 5 step 5).
+    from modeling.training.artifacts import register_training_artifacts
+    register_training_artifacts(
+        model_id      = model_id,
+        output_dir    = artifact_dir,
+        oos_metric    = search_best.get("objective_score"),
+        asset_id      = meta.get("asset_id"),
+    )
 
     return {
         "model_id":          model_id,
@@ -98,56 +111,67 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
 
 
 def _load_train_data(
-    artifact_dir     : Path,
+    model_id         : str,
     selected_features: list[str],
     target_name      : str,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
-    """Load training matrix from the model's sample parquet.
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Load training matrix from snap ⋈ model.__sample JOIN (plan 5.1).
+
+    Joins the immutable snapshot (feature columns) with the model's small
+    sample table (open_time + target + fold_id) on open_time.  All fold rows
+    are used for the final production fit (fold_id 0 = train-only rows,
+    fold_id 1..n = walk-forward validation folds — both included).
+
+    Args:
+        model_id          : Model key from config/models.json (used to resolve
+                            the snapshot_id and table names).
+        selected_features : Feature columns to load from the snapshot.
+        target_name       : Target column to load from the sample table.
 
     Returns:
-        (full sample_df, X_train, y_train) — full df kept for later prediction step.
+        (X_train, y_train).
     """
-    sample_path = artifact_dir / "sample_train_valid.parquet"
-    sample_df   = pd.read_parquet(sample_path)
-    sample_df["open_time"] = pd.to_datetime(sample_df["open_time"])
+    # --- resolve snapshot_id from registry or model config ---
+    models_cfg  = utils.load_models_config()
+    meta        = models_cfg["models"][model_id]
+    asset_id    = meta.get("asset_id")
+    snapshot_id = meta.get("sampling", {}).get("snapshot_id")
 
-    train_valid = sample_df.copy()
+    conn = utils.open_lab_connection(asset_id)
+    try:
+        if not snapshot_id:
+            # fall back to reg.models if config is missing snapshot_id
+            row = conn.execute(
+                "SELECT snapshot_id FROM reg.models WHERE model_id = ?", [model_id]
+            ).fetchone()
+            if row:
+                snapshot_id = row[0]
+        if not snapshot_id:
+            raise ValueError(
+                f"Cannot resolve snapshot_id for model {model_id} — set "
+                "sampling.snapshot_id in config/models.json or run the sample step first."
+            )
 
-    X_train = train_valid[selected_features]
-    y_train = train_valid[target_name].astype(float)
+        feat_cols_sql = ", ".join(f's."{c}"' for c in selected_features)
+        sql = f"""
+            SELECT
+                s.open_time,
+                m."{target_name}",
+                {feat_cols_sql}
+            FROM snap."{snapshot_id}" AS s
+            INNER JOIN model."{model_id}__sample" AS m ON s.open_time = m.open_time
+            ORDER BY s.open_time
+        """
+        df = conn.execute(sql).df()
+    finally:
+        conn.close()
 
-    return sample_df, pd.DataFrame(X_train), pd.Series(y_train)
+    df["open_time"] = pd.to_datetime(df["open_time"])
 
+    X_train = df[selected_features]
+    y_train = df[target_name].astype(float)
 
-def _add_predictions_to_sample(
-    artifact_dir     : Path,
-    model            : lgb.LGBMRegressor,
-    sample_df        : pd.DataFrame,
-    selected_features: list[str],
-    target_name      : str,
-) -> None:
-    """Predict on all rows and write updated sample_train_valid.parquet.
-
-    Column order: open_time, {target_name}, pred_{dir}, fold_id, feat_*
-    """
-    pred_col = "pred_long" if "long" in target_name else "pred_short"
-
-    rows         = sample_df
-    X_pred       = pd.DataFrame(rows[selected_features])
-    preds_values = model.predict(X_pred)
-
-    pred_series = pd.Series(index=sample_df.index, dtype="float64", name=pred_col)
-    pred_series.loc[rows.index] = preds_values
-
-    feat_cols = sorted(c for c in sample_df.columns if c.startswith("feat_"))
-    col_order = ["open_time", target_name, pred_col, "fold_id"] + feat_cols
-
-    out = sample_df.copy()
-    out[pred_col] = pred_series
-
-    out = out[col_order]
-
-    out.to_parquet(artifact_dir / "sample_train_valid.parquet", compression="zstd", index=False)
+    return pd.DataFrame(X_train), pd.Series(y_train)
 
 
 def _save_artifacts(

@@ -1,8 +1,15 @@
 """Rank-first score calibration for ChronoQuant strategy sessions.
 
-Fits percentile rank lookup tables and optional isotonic regression calibrators
-on a calibration period, applies them to the full strategy table, and persists
-all artifacts.
+Fits percentile rank lookup tables and isotonic regression calibrators on a
+calibration period of the scored table (the snap+pred join from
+``build_table.build_scored_table``), applies them to the full scored table, and
+persists the file artifacts.
+
+The calibration **method is unchanged** from the parquet era — only the source is
+now an in-memory DataFrame (the DuckDB join) instead of strategy_table.parquet,
+and the calibrated table is returned in-memory instead of being written back to
+parquet.  The rank_lookup_long/short.parquet and isotonic_long/short.pkl files
+remain (the live service loads them).
 """
 
 import logging
@@ -96,25 +103,24 @@ def _build_rank_lookup(
 
 def fit_calibration(
     session_id : str,
+    scored_df  : pd.DataFrame,
     start      : str,
     end        : str,
-) -> tuple[IsotonicRegression, IsotonicRegression]:
+) -> tuple[pd.DataFrame, IsotonicRegression, IsotonicRegression]:
     """Fit rank calibration and isotonic regression on the calibration period.
 
-    Reads strategy_table.parquet, filters to the [start, end] window, builds
-    percentile rank lookup tables (rank_lookup_long.parquet /
-    rank_lookup_short.parquet), fits one IsotonicRegression per direction, and
-    applies all calibrations to the entire strategy table before overwriting
-    strategy_table.parquet.
+    Takes the scored table (the snap+pred join), filters to the [start, end]
+    window, builds percentile rank lookup tables, fits one IsotonicRegression per
+    direction, and applies all calibrations to the entire scored table.
 
-    New columns added to strategy_table.parquet:
+    New columns added to the returned DataFrame:
         score_pct_long, score_pct_short      — interpolated percentile (0.0-1.0)
         bucket_long, bucket_short            — decile bucket int 1-10
         bucket_mean_mfe_long/short           — bucket mean realized MFE
         bucket_hit_rate_long/short           — bucket fraction(mfe > 0)
         pred_long_cal, pred_short_cal        — isotonic-predicted MFE
 
-    Artifacts written to artifacts/{session_id}/:
+    File artifacts written to artifacts/{session_id}/:
         rank_lookup_long.parquet
         rank_lookup_short.parquet
         isotonic_long.pkl
@@ -122,32 +128,29 @@ def fit_calibration(
 
     Args:
         session_id : Strategy session identifier.
+        scored_df  : The scored table from build_scored_table (open_time,
+                     pred_long_raw, pred_short_raw, long_mfe_fw60, short_mfe_fw60,
+                     and optional price columns).
         start      : Calibration start date YYYY-MM-DD (inclusive).
         end        : Calibration end date YYYY-MM-DD (inclusive).
 
     Returns:
-        Tuple of (isotonic_long, isotonic_short) fitted calibrators.
+        Tuple of (calibrated_df, isotonic_long, isotonic_short).
 
     Raises:
-        FileNotFoundError: If strategy_table.parquet does not exist.
-        ValueError: If calibration period produces no rows.
+        ValueError: If the calibration period produces no rows.
     """
     artifact_dir = _artifact_dir(session_id)
-    parquet_path = artifact_dir / "strategy_table.parquet"
 
-    if not parquet_path.exists():
-        raise FileNotFoundError(f"strategy_table.parquet not found: {parquet_path}")
-
-    # --- Load full strategy table ---
-    logger.info("Loading strategy_table.parquet from %s", parquet_path)
-    df = pd.read_parquet(parquet_path)
-    logger.info("Loaded %d rows", len(df))
+    df = scored_df.copy()
+    logger.info("fit_calibration: scored table has %d rows", len(df))
 
     # --- Filter calibration period ---
     start_ts = f"{start} 00:00:00"
     end_ts   = f"{end} 23:59:59"
 
-    mask     = (df["open_time"] >= start_ts) & (df["open_time"] <= end_ts)
+    open_time_str = df["open_time"].astype(str)
+    mask     = (open_time_str >= start_ts) & (open_time_str <= end_ts)
     calib_df = cast(pd.DataFrame, df[mask].copy())
 
     if calib_df.empty:
@@ -236,10 +239,5 @@ def fit_calibration(
     df["pred_long_cal"]  = iso_long.predict(full_long_raw)
     df["pred_short_cal"] = iso_short.predict(full_short_raw)
 
-    # --- Overwrite strategy_table.parquet ---
-    df.to_parquet(parquet_path, compression="zstd", index=False)
-    logger.info(
-        "strategy_table.parquet updated with rank + isotonic columns: %s", parquet_path
-    )
-
-    return iso_long, iso_short
+    logger.info("fit_calibration: calibrated table ready (%d rows)", len(df))
+    return df, iso_long, iso_short

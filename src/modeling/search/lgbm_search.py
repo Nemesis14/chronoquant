@@ -1,9 +1,10 @@
 # =============================================================================
-# LightGBM hyperparameter search — yearly sample edition
+# LightGBM hyperparameter search — DuckDB-native (snap ⋈ model.__sample)
 # =============================================================================
 # Inputs:
 #   artifact_dir/feature_engineering/feature_set.json  → selected feature list
-#   sample_dir/sample_train_valid.parquet + metadata.json  → CV folds + target
+#   snap."<snapshot_id>" ⋈ model."<model_id>__sample"  → CV data (fold_id, target, feat_*)
+#   config/models.json (sampling section)               → fold time windows + purge_minutes
 # Outputs:
 #   artifact_dir/search/search_best.json   — full best trial record
 #   artifact_dir/search/best_params.json   — best hyperparameter dict only
@@ -24,11 +25,10 @@ from pathlib import Path
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import polars as pl
 from scipy.stats import spearmanr
 
 import utils
-from modeling.sampling import load_yearly_sample
+from modeling.sampling import generate_walk_forward_folds
 from modeling.training.datasets import ModelingDataset
 from modeling.training.training_windows import DatasetSplit
 
@@ -112,11 +112,11 @@ def run_search(
     )
 
     feature_cols  = _load_feature_cols(artifact_dir)
-    # Sample is now model-specific and lives in the artifact directory.
-    sample_meta       = load_yearly_sample(artifact_dir)
+    # Load fold metadata from model config + DuckDB (DuckDB-native path, plan 5.1).
+    sample_meta = _load_model_sample_meta(model_id, meta)
     purge_minutes     = sample_meta.get("purge_minutes", 240)
 
-    # Detect walk-forward vs legacy weekly CV
+    # Champion models always use walk-forward CV (metadata always has fold_time_windows).
     fold_time_windows     = sample_meta.get("fold_time_windows")
     fold_week_assignments = sample_meta.get("fold_week_assignments")
     use_walk_forward      = fold_time_windows is not None
@@ -136,7 +136,8 @@ def run_search(
     logger.info("=" * 72)
 
     sd = _load_search_dataset(
-        artifact_dir = artifact_dir,
+        model_id     = model_id,
+        meta         = meta,
         target_col   = target_col,
         feature_cols = feature_cols,
         row_stride   = row_stride,
@@ -172,8 +173,38 @@ def run_search(
     if best:
         _write_best_params(search_dir, best)
 
+    _register_search_provenance(model_id, stage, best, search_dir)
+
     _print_final_summary(best, search_dir)
     return best
+
+
+def _register_search_provenance(
+    model_id:   str,
+    stage:      str,
+    best:       dict,
+    search_dir: Path,
+) -> None:
+    """Record the search run in reg.search_runs + its log files in reg.artifacts.
+
+    Best-effort: a registry failure must not lose a completed search, so the write
+    is wrapped — the search artifacts on disk remain the source of truth.
+    """
+    if not best:
+        return
+    try:
+        from modeling import provenance
+        provenance.register_search_run(model_id, stage, best)
+        provenance.register_artifacts(
+            model_id,
+            [
+                ("search_best",    search_dir / "search_best.json"),
+                ("search_trials",  search_dir / "search_trials.jsonl"),
+                ("search_summary", search_dir / "search_summary.csv"),
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001 — provenance must never abort the search
+        logger.warning("[search] registry provenance write failed: %s", exc)
 
 
 # =============================================================================
@@ -213,38 +244,142 @@ def _load_feature_cols(artifact_dir: Path) -> list[str]:
 
 
 # =============================================================================
-# Dataset loading — features come directly from the artifact sample parquet
+# Fold metadata — derived from model config (DuckDB-native path)
+# =============================================================================
+def _load_model_sample_meta(model_id: str, meta: dict) -> dict:
+    """Build sample metadata (fold_time_windows, purge_minutes, n_folds) from model config.
+
+    Replaces the old ``load_yearly_sample`` / metadata.json path.  The fold windows
+    are derived deterministically from the sampling section of the model config,
+    using the same ``generate_walk_forward_folds`` as ``create_model_sample``.
+
+    Args:
+        model_id : Model key (used for log messages).
+        meta     : Model config dict from config/models.json.
+
+    Returns:
+        Dict with ``fold_time_windows``, ``purge_minutes``, ``n_folds``.
+    """
+    sampling_meta = meta.get("sampling", {})
+    year          = _anchor_year_from_meta(sampling_meta)
+    train_months  = int(sampling_meta.get("train_months", 9))
+    valid_months  = int(sampling_meta.get("valid_months", 3))
+    shift_months  = int(sampling_meta.get("shift_months", 3))
+    n_folds       = int(sampling_meta.get("n_folds", 4))
+    purge_minutes = int(sampling_meta.get("purge_minutes", 240))
+
+    fold_time_windows = generate_walk_forward_folds(
+        year          = year,
+        train_months  = train_months,
+        valid_months  = valid_months,
+        shift_months  = shift_months,
+        purge_minutes = purge_minutes,
+        n_folds       = n_folds,
+    )
+    logger.info(
+        "[sample_meta] model=%s year=%d n_folds=%d purge_minutes=%d",
+        model_id, year, n_folds, purge_minutes,
+    )
+    return {
+        "fold_time_windows": fold_time_windows,
+        "purge_minutes":     purge_minutes,
+        "n_folds":           n_folds,
+    }
+
+
+def _anchor_year_from_meta(sampling_meta: dict) -> int:
+    """Resolve the anchor calendar year from sampling metadata."""
+    if "year" in sampling_meta:
+        return int(sampling_meta["year"])
+    sample_id = sampling_meta.get("sample_id", "")
+    if "_yearly_" in sample_id:
+        return int(sample_id.split("_yearly_")[-1])
+    if sample_id:
+        tail = sample_id.split("_")[-1]
+        if tail.isdigit():
+            return int(tail)
+    return 2023
+
+
+# =============================================================================
+# Dataset loading — snap ⋈ model.__sample JOIN (DuckDB-native, plan 5.1)
 # =============================================================================
 def _load_search_dataset(
-    artifact_dir: Path,
+    model_id:     str,
+    meta:         dict,
     target_col:   str,
     feature_cols: list[str],
     row_stride:   int,
 ) -> _SearchDataset:
-    parquet_path = artifact_dir / "sample_train_valid.parquet"
-    load_cols    = ["open_time", "fold_id", target_col] + feature_cols
-    sample_pl    = pl.read_parquet(parquet_path, columns=load_cols)
+    """Load the CV dataset from snap ⋈ model.__sample (DuckDB-native path, plan 5.1).
+
+    The sample table carries open_time + target + fold_id; the snapshot carries all
+    feat_* columns.  The join is on open_time and returns only training-set fold
+    rows (fold_id >= 0 — both train-only and walk-forward folds are included so
+    that all fold splits are available at search time).
+
+    Args:
+        model_id     : Model key (used to resolve snapshot_id and table names).
+        meta         : Model config dict.
+        target_col   : Target column name.
+        feature_cols : Selected feature columns.
+        row_stride   : Sub-sampling stride (1 = all rows).
+
+    Returns:
+        _SearchDataset ready for fold splitting.
+    """
+    asset_id    = meta.get("asset_id")
+    snapshot_id = meta.get("sampling", {}).get("snapshot_id")
+
+    conn = utils.open_lab_connection(asset_id)
+    try:
+        if not snapshot_id:
+            row = conn.execute(
+                "SELECT snapshot_id FROM reg.models WHERE model_id = ?", [model_id]
+            ).fetchone()
+            if row:
+                snapshot_id = row[0]
+        if not snapshot_id:
+            raise ValueError(
+                f"Cannot resolve snapshot_id for model {model_id} — set "
+                "sampling.snapshot_id in config/models.json or run the sample step first."
+            )
+
+        feat_cols_sql = ", ".join(f's."{c}"' for c in feature_cols)
+        sql = f"""
+            SELECT
+                s.open_time,
+                m."{target_col}",
+                m.fold_id,
+                {feat_cols_sql}
+            FROM snap."{snapshot_id}" AS s
+            INNER JOIN model."{model_id}__sample" AS m ON s.open_time = m.open_time
+            ORDER BY s.open_time
+        """
+        df = conn.execute(sql).df()
+    finally:
+        conn.close()
+
+    df["open_time"] = pd.to_datetime(df["open_time"])
 
     if row_stride > 1:
-        sample_pl = sample_pl[::row_stride]
-
-    merged    = sample_pl.to_pandas().reset_index(drop=True)
-    merged["open_time"] = pd.to_datetime(merged["open_time"])
+        df = df.iloc[::row_stride].copy().reset_index(drop=True)
 
     logger.info(
-        f"[Data] target={target_col}  total_rows={len(merged):,}"
+        "[Data] target=%s  total_rows=%d",
+        target_col, len(df),
     )
 
     dataset = ModelingDataset(
-        open_time    = pd.Series(merged["open_time"]),
-        X            = pd.DataFrame(merged[feature_cols]),
-        y            = pd.Series(merged[target_col].astype(float), name=target_col),
+        open_time    = pd.Series(df["open_time"]),
+        X            = pd.DataFrame(df[feature_cols]),
+        y            = pd.Series(df[target_col].astype(float), name=target_col),
         target_col   = target_col,
         feature_cols = feature_cols,
     )
     return _SearchDataset(
         dataset  = dataset,
-        fold_ids = pd.Series(merged["fold_id"].astype("int8"), name="fold_id"),
+        fold_ids = pd.Series(df["fold_id"].astype("int8"), name="fold_id"),
     )
 
 

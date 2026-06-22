@@ -1,0 +1,41 @@
+{
+  "session_id": "strat_solusdt_fw60_combo_2101_2605",
+  "long_model": "lgbm_solusdt_l_fw60_2101_2605",
+  "short_model": "lgbm_solusdt_s_fw60_2101_2605",
+  "signal_mode": "rank_first",
+  "evaluation_mode": "same_window",
+  "fit_period": {
+    "start": "2025-12-01",
+    "end": "2026-05-31"
+  },
+  "rank_lookup_long_path": "rank_lookup_long.parquet",
+  "rank_lookup_short_path": "rank_lookup_short.parquet",
+  "isotonic_long_path": "isotonic_long.pkl",
+  "isotonic_short_path": "isotonic_short.pkl",
+  "decision_params": {
+    "long_entry_pct": 0.8959098018514238,
+    "short_entry_pct": 0.9899563960183192,
+    "min_edge_gap": 0.22058925425251613,
+    "max_hold_minutes": 143,
+    "cooldown_minutes": 105,
+    "min_hold_minutes": 7,
+    "rearm_pct": 0.40050171487438413,
+    "conflict_rule": "highest_edge"
+  },
+  "optuna_best_trial": {
+    "value": 0.006318950826804731,
+    "n_trials": 200
+  },
+  "metrics": {
+    "n_trades": 134,
+    "total_return": 0.846739,
+    "win_rate": 0.8134,
+    "sharpe": 22.7929,
+    "max_drawdown": -0.013624,
+    "sufficient_sample": true
+  },
+  "trades_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__trades\"",
+  "equity_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__equity\"",
+  "cutoffs_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__cutoffs\"",
+  "calibrated_at": "2026-06-22T05:04:31Z"
+}

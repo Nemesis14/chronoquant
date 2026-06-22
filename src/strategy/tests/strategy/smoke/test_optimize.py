@@ -4,14 +4,40 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
+import duckdb
 import pandas as pd
 import pytest
 
+from data_handling.store import registry
+from strategy.strategy import artifacts as strat_artifacts
 from strategy.strategy.optimize import _simulate_strategy, optimize_strategy
 
 pytestmark = pytest.mark.smoke
+
+
+class _NoCloseConn:
+    """Delegating proxy whose ``close`` is a no-op (keeps the lab conn alive)."""
+
+    def __init__(self, conn: duckdb.DuckDBPyConnection) -> None:
+        self._conn = conn
+
+    def close(self) -> None:
+        pass
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn, name)
+
+
+def _lab_proxy(tmp_path: Path) -> _NoCloseConn:
+    """In-memory lab connection with strat schema + registry attached as ``reg``."""
+    reg_path = str(tmp_path / "registry.duckdb")
+    registry.ensure_registry(reg_path)
+    conn = duckdb.connect(":memory:")
+    registry.attach_registry(conn, reg_path, read_only=False)
+    return _NoCloseConn(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -166,28 +192,32 @@ def _make_strategy_table(n: int = 200) -> pd.DataFrame:
 
 
 def test_optimize_strategy_artifact_fields(tmp_path: Path) -> None:
-    """optimize_strategy() writes an artifact with expected rank-first fields."""
+    """optimize_strategy() writes strat.* tables + artifact with rank-first fields."""
     session_id = "test_session_smoke"
-    artifact_dir = tmp_path / "artifacts" / session_id
-    artifact_dir.mkdir(parents=True)
+    long_model  = "lgbm_solusdt_l_fw60_2021"
+    short_model = "lgbm_solusdt_s_fw60_2021"
 
-    strategy_table = _make_strategy_table(300)
-    strategy_table.to_parquet(artifact_dir / "strategy_table.parquet", index=False)
+    calibrated_df = _make_strategy_table(300)
 
     def _mock_resolve(path: str) -> str:
         return str(tmp_path / path) if path != "." else str(tmp_path)
 
+    proxy = _lab_proxy(tmp_path)
+
     with patch("strategy.strategy.optimize.utils._resolve_path", side_effect=_mock_resolve), \
-         patch("strategy.strategy.artifacts.utils._resolve_path", side_effect=_mock_resolve):
+         patch("strategy.strategy.artifacts.utils._resolve_path", side_effect=_mock_resolve), \
+         patch.object(strat_artifacts.utils, "open_lab_connection", lambda asset_id=None: proxy):
         result = optimize_strategy(
             session_id     = session_id,
-            long_model_id  = "lgbm_solusdt_l_fw60_2021",
-            short_model_id = "lgbm_solusdt_s_fw60_2021",
+            long_model_id  = long_model,
+            short_model_id = short_model,
+            calibrated_df  = calibrated_df,
             start          = "2026-01-01",
             end            = "2026-01-01",
             n_trials       = 5,
         )
 
+    artifact_dir  = tmp_path / "artifacts" / session_id
     artifact_path = artifact_dir / "strategy_artifact.json"
     assert artifact_path.exists(), "strategy_artifact.json must be written"
 
@@ -196,6 +226,9 @@ def test_optimize_strategy_artifact_fields(tmp_path: Path) -> None:
 
     assert artifact.get("signal_mode")      == "rank_first",    "signal_mode must be rank_first"
     assert artifact.get("evaluation_mode")  == "same_window",   "evaluation_mode must be same_window"
+    assert "trades_table"  in artifact, "artifact must reference the strat trades table"
+    assert "equity_table"  in artifact
+    assert "cutoffs_table" in artifact
 
     dp = artifact.get("decision_params", {})
     assert "long_entry_pct"  in dp, "decision_params must contain long_entry_pct"
@@ -206,3 +239,16 @@ def test_optimize_strategy_artifact_fields(tmp_path: Path) -> None:
     assert "best_params"  in result
     assert "metrics"      in result
     assert "optuna_best"  in result
+    assert "strat_tables" in result
+
+    # --- strat.* tables written into the lab connection ---
+    for kind in ("trades", "equity", "cutoffs"):
+        fqn = strat_artifacts.strat_table_fqn(session_id, kind)
+        n   = proxy.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()[0]
+        assert n is not None, f"{fqn} not created"
+
+    # --- reg.strategies row links both models ---
+    row = registry.get(cast(duckdb.DuckDBPyConnection, proxy), "strategies", session_id)
+    assert row is not None, "reg.strategies row missing"
+    assert row["model_id_long"]  == long_model
+    assert row["model_id_short"] == short_model

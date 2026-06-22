@@ -13,7 +13,11 @@ import optuna
 import pandas as pd
 
 import utils
-from strategy.strategy.artifacts import write_realized_outputs, write_strategy_artifact
+from strategy.strategy.artifacts import (
+    register_strategy,
+    write_realized_outputs,
+    write_strategy_artifact,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +351,49 @@ def _compute_metrics(trades: list[dict[str, Any]]) -> dict:
     }
 
 
+# %% Cutoffs
+
+
+def _build_cutoffs(calibrated_df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Derive per-direction decile cutoff rows from the calibrated scored table.
+
+    For each direction and decile bucket (1..10), records the raw-score lower/upper
+    bound, the bucket's upper percentile, and its realized stats (bucket_mean_mfe,
+    bucket_hit_rate).  Persisted to ``strat."<session>__cutoffs"``.
+
+    Args:
+        calibrated_df : Output of fit_calibration (carries score_pct_*, bucket_*,
+                        bucket_mean_mfe_*, bucket_hit_rate_* and pred_*_raw cols).
+
+    Returns:
+        List of cutoff dicts (one per direction+bucket present), or empty.
+    """
+    rows: list[dict[str, Any]] = []
+    for direction, raw_col, bucket_col, pct_col, mean_col, hr_col in (
+        ("long",  "pred_long_raw",  "bucket_long",  "score_pct_long",
+         "bucket_mean_mfe_long",  "bucket_hit_rate_long"),
+        ("short", "pred_short_raw", "bucket_short", "score_pct_short",
+         "bucket_mean_mfe_short", "bucket_hit_rate_short"),
+    ):
+        if bucket_col not in calibrated_df.columns:
+            continue
+        for bid, grp in calibrated_df.groupby(bucket_col):
+            raw      = grp[raw_col].to_numpy(dtype=float)
+            pct      = grp[pct_col].to_numpy(dtype=float)
+            mean_arr = grp[mean_col].to_numpy(dtype=float)
+            hr_arr   = grp[hr_col].to_numpy(dtype=float)
+            rows.append({
+                "direction"      : direction,
+                "bucket_id"      : int(bid),  # type: ignore[arg-type]
+                "score_raw_lower": float(raw.min()) if len(raw) else None,
+                "score_raw_upper": float(raw.max()) if len(raw) else None,
+                "score_pct_upper": float(pct.max()) if len(pct) else None,
+                "bucket_mean_mfe": float(mean_arr[0]) if len(mean_arr) else None,
+                "bucket_hit_rate": float(hr_arr[0]) if len(hr_arr) else None,
+            })
+    return rows
+
+
 # %% Public API
 
 
@@ -354,42 +401,44 @@ def optimize_strategy(
     session_id     : str,
     long_model_id  : str,
     short_model_id : str,
+    calibrated_df  : pd.DataFrame,
     start          : str,
     end            : str,
     n_trials       : int = 200,
+    asset_id       : str | None = None,
 ) -> dict:
     """Run Optuna strategy optimization on the evaluation period.
 
-    Reads strategy_table.parquet (must include score_pct_* and bucket_mean_mfe_*
-    columns added by fit_calibration). Filters to [start, end] window. Runs Optuna
-    TPE search with rank-first percentile-based entry/exit logic. Writes
-    strategy_artifact.json and sweep_results.csv to artifacts/{session_id}/.
+    Takes the calibrated scored table (output of fit_calibration; must include
+    score_pct_* and bucket_mean_mfe_* columns). Filters to [start, end] window.
+    Runs Optuna TPE search with rank-first percentile-based entry/exit logic.
+    Writes the realized backtest outputs as ``strat.*`` DuckDB tables, registers
+    the session in ``reg.strategies`` + ``reg.artifacts``, and writes
+    strategy_artifact.json + sweep_results.csv to artifacts/{session_id}/.
 
     Args:
         session_id    : Strategy session identifier.
         long_model_id : Model ID for the long direction.
         short_model_id: Model ID for the short direction.
+        calibrated_df : The calibrated scored table from fit_calibration.
         start         : Optimization window start date, YYYY-MM-DD (inclusive).
         end           : Optimization window end date, YYYY-MM-DD (inclusive).
         n_trials      : Number of Optuna trials (default 200).
+        asset_id      : Asset key for the lab connection; resolved if None.
 
     Returns:
-        Dict summary with session_id, best_params, metrics, and optuna_best.
+        Dict summary with session_id, best_params, metrics, optuna_best, and
+        strat_tables (the written table names).
 
     Raises:
-        FileNotFoundError: If strategy_table.parquet is missing.
         ValueError: If required rank columns are absent, or the period produces
                     no rows.
     """
-    # --- Load strategy table ---
     artifact_dir = Path(utils._resolve_path("artifacts")) / session_id
-    parquet_path = artifact_dir / "strategy_table.parquet"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    if not parquet_path.exists():
-        raise FileNotFoundError(f"strategy_table.parquet not found: {parquet_path}")
-
-    df = pd.read_parquet(parquet_path)
-    logger.info("Loaded strategy_table.parquet: %d rows", len(df))
+    df = calibrated_df
+    logger.info("optimize_strategy: calibrated table has %d rows", len(df))
 
     required_cols = (
         "score_pct_long",
@@ -400,14 +449,15 @@ def optimize_strategy(
     for col in required_cols:
         if col not in df.columns:
             raise ValueError(
-                f"Column '{col}' missing from strategy_table.parquet. "
-                "Run 01_calibrate_scores.py first."
+                f"Column '{col}' missing from calibrated table. "
+                "Run fit_calibration first."
             )
 
     # --- Filter to optimization window ---
     start_ts = f"{start} 00:00:00"
     end_ts   = f"{end} 23:59:59"
-    mask     = (df["open_time"] >= start_ts) & (df["open_time"] <= end_ts)
+    open_time_str = df["open_time"].astype(str)
+    mask     = (open_time_str >= start_ts) & (open_time_str <= end_ts)
     eval_df  : pd.DataFrame = df[mask].copy().reset_index(drop=True)  # type: ignore[assignment]
 
     if eval_df.empty:
@@ -446,7 +496,15 @@ def optimize_strategy(
         best_params["rearm_pct"],
     )
     metrics = _compute_metrics(best_trades)
-    write_realized_outputs(artifact_dir, best_trades)
+
+    # --- Write strat.* tables (trades / equity / cutoffs) ---
+    cutoffs      = _build_cutoffs(df)
+    strat_tables = write_realized_outputs(
+        session_id = session_id,
+        trades     = best_trades,
+        cutoffs    = cutoffs,
+        asset_id   = asset_id,
+    )
 
     # --- Write sweep_results.csv ---
     sweep_rows = []
@@ -468,7 +526,7 @@ def optimize_strategy(
         "conflict_rule": "highest_edge",
     }
 
-    write_strategy_artifact(
+    artifact_path = write_strategy_artifact(
         session_id      = session_id,
         long_model_id   = long_model_id,
         short_model_id  = short_model_id,
@@ -478,10 +536,26 @@ def optimize_strategy(
         optuna_best     = optuna_best,
     )
 
+    # --- Register the session in reg.strategies + reg.artifacts ---
+    register_strategy(
+        session_id     = session_id,
+        long_model_id  = long_model_id,
+        short_model_id = short_model_id,
+        artifact_files = [
+            ("strategy_artifact", artifact_path),
+            ("isotonic_long",     artifact_dir / "isotonic_long.pkl"),
+            ("isotonic_short",    artifact_dir / "isotonic_short.pkl"),
+            ("rank_lookup_long",  artifact_dir / "rank_lookup_long.parquet"),
+            ("rank_lookup_short", artifact_dir / "rank_lookup_short.parquet"),
+        ],
+        asset_id       = asset_id,
+    )
+
     result = {
         "session_id"   : session_id,
         "best_params"  : best_params,
         "metrics"      : metrics,
         "optuna_best"  : optuna_best,
+        "strat_tables" : strat_tables,
     }
     return result

@@ -1,8 +1,8 @@
 {
-  "run_id": "run_20260620_145721",
+  "run_id": "run_20260622_063351",
   "asset_id": "solusdt",
   "target_col": "short_mfe_fw60",
-  "created_at": "2026-06-20 15:14:19",
+  "created_at": "2026-06-22 06:51:49",
   "target_cols": [
     "short_mfe_fw60"
   ],
@@ -11,24 +11,19 @@
     "feat_adx_neg_14",
     "feat_adx_14",
     "feat_bb_width_14",
-    "feat_bb_width_140",
-    "feat_natr_14",
-    "feat_hist_vol_20",
-    "feat_volume_sma_14",
     "feat_volume_ratio_14",
     "feat_returns_skew_14",
-    "feat_returns_kurt_14",
     "feat_hml_range",
+    "feat_ohlc_range",
     "feat_higher_high_count_5",
     "feat_higher_low_count_5",
     "feat_lower_high_count_5",
     "feat_lower_low_count_5",
     "feat_swing_low_5",
+    "feat_quote_volume_ratio_10",
     "feat_quote_volume_ratio_30",
     "feat_quote_volume_ratio_60",
-    "feat_trade_count_ratio_30",
     "feat_trade_count_ratio_60",
-    "feat_avg_trade_quote_30",
     "feat_dist_rolling_high_10",
     "feat_dist_rolling_high_30",
     "feat_dist_rolling_high_60",
@@ -36,6 +31,8 @@
     "feat_dist_rolling_low_30",
     "feat_dist_rolling_low_60",
     "feat_rolling_drawdown_10",
+    "feat_rolling_drawdown_30",
+    "feat_rolling_drawdown_60",
     "feat_natr_rank_20",
     "feat_natr_rank_60",
     "feat_hist_vol_rank_20",
@@ -43,11 +40,11 @@
     "feat_bb_width_rank_60",
     "feat_range_expansion_10_30",
     "feat_volume_accel_10_30",
+    "feat_trade_count_accel_10_30",
     "feat_body_ratio",
     "feat_upper_wick_ratio",
     "feat_lower_wick_ratio",
     "feat_body_ratio_sma_10",
-    "feat_body_ratio_sma_30",
     "feat_hour_sin",
     "feat_hour_cos",
     "feat_dayofweek_sin",
@@ -56,31 +53,35 @@
     "feat_session_asia",
     "feat_session_europe",
     "feat_session_us",
-    "feat_parkinson_vol_10",
-    "feat_parkinson_vol_60",
+    "feat_gk_vol_10",
+    "feat_gk_vol_30",
+    "feat_gk_vol_60",
+    "feat_return_autocorr_lag1_30",
     "feat_return_autocorr_lag1_60",
     "feat_variance_ratio_10_60",
     "feat_max_drawdown_10",
     "feat_max_drawdown_30",
     "feat_max_drawdown_60",
+    "feat_inside_bar",
     "feat_engulf_bull",
+    "feat_engulf_bear",
     "feat_bull_bars_ratio_10",
     "feat_bull_bars_ratio_30",
     "feat_bull_bars_ratio_60",
+    "feat_gap_open",
+    "feat_efficiency_ratio_10",
     "feat_efficiency_ratio_30",
     "feat_efficiency_ratio_60",
     "feat_atr_dist_high_10",
-    "feat_atr_dist_high_30",
-    "feat_atr_dist_high_60",
+    "feat_atr_dist_low_60",
     "feat_pos_return_mean_10",
     "feat_neg_return_mean_10",
     "feat_pos_return_mean_30",
-    "feat_neg_return_mean_30",
-    "feat_pos_return_mean_60",
-    "feat_neg_return_mean_60",
-    "feat_tenkan_ratio",
+    "feat_donchian_width_10",
     "feat_donchian_breakout_10",
+    "feat_donchian_width_30",
     "feat_donchian_breakout_30",
+    "feat_donchian_width_60",
     "feat_donchian_breakout_60",
     "feat_lr_r2_30",
     "feat_lr_r2_60"
@@ -108,7 +109,7 @@
     },
     {
       "col": "feat_williams_r_14",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_3; representative=feat_stoch_k_14"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_cci_20",
@@ -120,7 +121,7 @@
     },
     {
       "col": "feat_macd_signal_12_26_9",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_8; representative=feat_macd_12_26"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_macd_diff",
@@ -136,15 +137,15 @@
     },
     {
       "col": "feat_ema_ratio_14",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_76; representative=feat_sma_ratio_14"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_ema_ratio_140",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_10; representative=feat_sma_ratio_140"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_wma_ratio_14",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_76; representative=feat_sma_ratio_14"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_kama_ratio_10_2_30",
@@ -156,10 +157,6 @@
     },
     {
       "col": "feat_bb_position_140",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_obv",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -180,15 +177,11 @@
     },
     {
       "col": "feat_returns_sma_14",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_23; representative=feat_roc_14"
+      "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_returns_std_14",
-      "reason": "redundancy: redundant in cluster_24; representative=feat_hist_vol_20"
-    },
-    {
-      "col": "feat_ohlc_range",
-      "reason": "redundancy: redundant in cluster_27; representative=feat_hml_range"
+      "col": "feat_returns_kurt_14",
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_close_position",
@@ -199,11 +192,15 @@
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_quote_volume_ratio_10",
-      "reason": "redundancy: redundant in cluster_35; representative=feat_volume_ratio_14"
+      "col": "feat_trade_count_ratio_10",
+      "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_trade_count_ratio_10",
+      "col": "feat_trade_count_ratio_30",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_avg_trade_quote_30",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -216,11 +213,11 @@
     },
     {
       "col": "feat_taker_buy_quote_ratio_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_42; representative=feat_taker_buy_base_ratio_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_taker_buy_quote_ratio_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_43; representative=feat_taker_buy_base_ratio_30"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_return_10",
@@ -240,19 +237,11 @@
     },
     {
       "col": "feat_return_z_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_81; representative=feat_return_z_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_return_z_60",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_81; representative=feat_return_z_10"
-    },
-    {
-      "col": "feat_rolling_drawdown_30",
-      "reason": "redundancy: redundant in cluster_52; representative=feat_dist_rolling_high_30"
-    },
-    {
-      "col": "feat_rolling_drawdown_60",
-      "reason": "redundancy: redundant in cluster_53; representative=feat_dist_rolling_high_60"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_bb_width_rank_20",
@@ -268,11 +257,11 @@
     },
     {
       "col": "feat_quote_volume_rank_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_61; representative=feat_volume_rank_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_quote_volume_rank_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_62; representative=feat_volume_rank_30"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_trade_count_rank_10",
@@ -281,10 +270,6 @@
     {
       "col": "feat_trade_count_rank_30",
       "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_trade_count_accel_10_30",
-      "reason": "redundancy: redundant in cluster_65; representative=feat_volume_accel_10_30"
     },
     {
       "col": "feat_signed_body_ratio",
@@ -308,7 +293,7 @@
     },
     {
       "col": "feat_ema_slope_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_76; representative=feat_sma_ratio_14"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_ema_slope_30",
@@ -328,11 +313,11 @@
     },
     {
       "col": "feat_vol_adj_return_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_81; representative=feat_return_z_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_vol_adj_return_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_81; representative=feat_return_z_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_volume_confirmed_return_10",
@@ -340,34 +325,14 @@
     },
     {
       "col": "feat_volume_confirmed_return_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_82; representative=feat_volume_confirmed_return_10"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_taker_flow_confirmed_return_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_83; representative=feat_returns_log"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_taker_flow_confirmed_return_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_83; representative=feat_returns_log"
-    },
-    {
-      "col": "feat_gk_vol_10",
-      "reason": "redundancy: redundant in cluster_92; representative=feat_parkinson_vol_10"
-    },
-    {
-      "col": "feat_parkinson_vol_30",
-      "reason": "redundancy: redundant in cluster_93; representative=feat_natr_14"
-    },
-    {
-      "col": "feat_gk_vol_30",
-      "reason": "redundancy: redundant in cluster_93; representative=feat_natr_14"
-    },
-    {
-      "col": "feat_gk_vol_60",
-      "reason": "redundancy: redundant in cluster_94; representative=feat_parkinson_vol_60"
-    },
-    {
-      "col": "feat_return_autocorr_lag1_30",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -427,35 +392,23 @@
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_inside_bar",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
       "col": "feat_outside_bar",
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_engulf_bear",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_gap_open",
-      "reason": "quality: variance=2.44e-09 < min=1e-08 | relation: weak signal across all targets"
-    },
-    {
       "col": "feat_gap_open_abs_sma_10",
-      "reason": "quality: variance=3.16e-10 < min=1e-08"
+      "reason": "quality: variance=5.19e-09 < min=1e-08"
     },
     {
       "col": "feat_gap_open_abs_sma_30",
-      "reason": "quality: variance=2.14e-10 < min=1e-08"
-    },
-    {
-      "col": "feat_efficiency_ratio_10",
-      "reason": "relation: weak signal across all targets"
+      "reason": "quality: variance=4.55e-09 < min=1e-08"
     },
     {
       "col": "feat_atr_dist_low_10",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_atr_dist_high_30",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -463,7 +416,7 @@
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_atr_dist_low_60",
+      "col": "feat_atr_dist_high_60",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -511,6 +464,10 @@
       "reason": "relation: weak signal across all targets"
     },
     {
+      "col": "feat_tenkan_ratio",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_kijun_ratio",
       "reason": "relation: weak signal across all targets"
     },
@@ -524,39 +481,27 @@
     },
     {
       "col": "feat_price_vs_tenkan",
-      "reason": "redundancy: redundant in cluster_147; representative=feat_tenkan_ratio"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_price_vs_kijun",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_148; representative=feat_kijun_ratio"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_ichimoku_cloud_thickness",
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_donchian_width_10",
-      "reason": "redundancy: redundant in cluster_150; representative=feat_max_drawdown_10"
-    },
-    {
       "col": "feat_donchian_position_10",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_151; representative=feat_recovery_ratio_10"
-    },
-    {
-      "col": "feat_donchian_width_30",
-      "reason": "redundancy: redundant in cluster_153; representative=feat_max_drawdown_30"
+      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_186; representative=feat_recovery_ratio_10"
     },
     {
       "col": "feat_donchian_position_30",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_154; representative=feat_recovery_ratio_30"
-    },
-    {
-      "col": "feat_donchian_width_60",
-      "reason": "redundancy: redundant in cluster_156; representative=feat_max_drawdown_60"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_donchian_position_60",
-      "reason": "relation: weak signal across all targets | redundancy: redundant in cluster_157; representative=feat_recovery_ratio_60"
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_lr_slope_10",
@@ -604,8 +549,21 @@
     }
   ],
   "review": [
+    "feat_bb_width_140",
     "feat_atr_14",
-    "feat_ad_line"
+    "feat_natr_14",
+    "feat_hist_vol_20",
+    "feat_volume_sma_14",
+    "feat_obv",
+    "feat_ad_line",
+    "feat_returns_std_14",
+    "feat_body_ratio_sma_30",
+    "feat_parkinson_vol_10",
+    "feat_parkinson_vol_30",
+    "feat_parkinson_vol_60",
+    "feat_neg_return_mean_30",
+    "feat_pos_return_mean_60",
+    "feat_neg_return_mean_60"
   ],
   "thresholds": {
     "max_null_rate": 0.01,

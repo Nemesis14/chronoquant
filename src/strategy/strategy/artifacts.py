@@ -1,6 +1,18 @@
 """Strategy artifact read/write for ChronoQuant strategy sessions.
 
-Handles persistence of strategy_artifact.json to artifacts/{session_id}/.
+Two persistence surfaces (plan 6):
+  * **DuckDB tables** ``strat."<session_id>__trades / __equity / __cutoffs"`` in
+    the lab database (``strat`` schema) — the realized backtest outputs the UI
+    queries directly.  Written via :func:`write_realized_outputs`.
+  * **Files** ``strategy_artifact.json`` (+ isotonic/rank_lookup, written by the
+    calibrate/optimize steps) under ``artifacts/{session_id}/`` — the live service
+    loads these.  Written via :func:`write_strategy_artifact`.
+
+The registry (``reg.strategies`` + ``reg.artifacts``) links the session to its
+two models and to both the strat tables and the file artifacts.
+
+Callers reach the lab/registry topology through ``utils.open_lab_connection``
+(config-gateway), never by opening DuckDB files directly.
 """
 
 import json
@@ -9,11 +21,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pandas as pd
 
 import utils
+from data_handling.store import registry
 
 logger = logging.getLogger(__name__)
+
+# strat schema (lab database) holds the per-session realized backtest tables.
+STRAT_SCHEMA = "strat"
 
 # %%  Path helper
 
@@ -31,31 +48,30 @@ def _artifact_dir(session_id: str) -> Path:
     return repo_root / "artifacts" / session_id
 
 
-# %% Realized backtest outputs
+# %% strat.* table names
 
 
-def write_realized_outputs(artifact_dir: Path, trades: list[dict[str, Any]]) -> None:
-    """Write realized backtest outputs to artifact_dir.
-
-    Writes three files:
-    - trades.parquet       : trade ledger with close-derived price columns
-    - equity_curve.parquet : cumulative MFE equity curve per trade
-    - summary.json         : headline metrics with equity_basis annotation
+def strat_table_fqn(session_id: str, kind: str) -> str:
+    """Return the fully-qualified, quoted strat table name (plan 6).
 
     Args:
-        artifact_dir: Resolved Path to the artifact directory (e.g. artifacts/{session_id}/).
-                      Must already exist. No path resolution is performed here.
-        trades      : List of trade dicts from _simulate_strategy(), each containing
-                      at minimum: entry_time, exit_time, direction, score_pct_at_entry,
-                      bucket_mean_mfe, hold_minutes, exit_reason. Optional:
-                      entry_price, exit_price.
-    """
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    n = len(trades)
+        session_id : Strategy session identifier.
+        kind       : One of ``trades`` / ``equity`` / ``cutoffs``.
 
-    # --- trades.parquet ---
+    Returns:
+        e.g. ``strat."<session_id>__trades"``.
+    """
+    return f'{STRAT_SCHEMA}."{session_id}__{kind}"'
+
+
+# %% Realized backtest outputs (strat.* DuckDB tables)
+
+
+def _trades_dataframe(trades: list[dict[str, Any]]) -> pd.DataFrame:
+    """Build the trades ledger DataFrame (typed, empty-safe)."""
+    n = len(trades)
     if n > 0:
-        trades_df = pd.DataFrame({
+        return pd.DataFrame({
             "entry_time"        : pd.to_datetime([t["entry_time"] for t in trades]),
             "exit_time"         : pd.to_datetime([t["exit_time"]  for t in trades]),
             "direction"         : [t["direction"]          for t in trades],
@@ -66,87 +82,219 @@ def write_realized_outputs(artifact_dir: Path, trades: list[dict[str, Any]]) -> 
             "score_pct_at_entry": [float(t["score_pct_at_entry"]) for t in trades],
             "bucket_mean_mfe"   : [float(t["bucket_mean_mfe"])    for t in trades],
         })
-    else:
-        trades_df = pd.DataFrame({
-            "entry_time"        : pd.Series([], dtype="datetime64[ns]"),
-            "exit_time"         : pd.Series([], dtype="datetime64[ns]"),
-            "direction"         : pd.Series([], dtype="object"),
-            "entry_price"       : pd.Series([], dtype="float64"),
-            "exit_price"        : pd.Series([], dtype="float64"),
-            "hold_minutes"      : pd.Series([], dtype="int64"),
-            "exit_reason"       : pd.Series([], dtype="object"),
-            "score_pct_at_entry": pd.Series([], dtype="float64"),
-            "bucket_mean_mfe"   : pd.Series([], dtype="float64"),
-        })
+    return pd.DataFrame({
+        "entry_time"        : pd.Series([], dtype="datetime64[ns]"),
+        "exit_time"         : pd.Series([], dtype="datetime64[ns]"),
+        "direction"         : pd.Series([], dtype="object"),
+        "entry_price"       : pd.Series([], dtype="float64"),
+        "exit_price"        : pd.Series([], dtype="float64"),
+        "hold_minutes"      : pd.Series([], dtype="int64"),
+        "exit_reason"       : pd.Series([], dtype="object"),
+        "score_pct_at_entry": pd.Series([], dtype="float64"),
+        "bucket_mean_mfe"   : pd.Series([], dtype="float64"),
+    })
 
-    trades_df.to_parquet(artifact_dir / "trades.parquet", index=False)
-    logger.info("trades.parquet written: %d rows → %s", n, artifact_dir / "trades.parquet")
 
-    # --- equity_curve.parquet ---
+def _equity_dataframe(trades: list[dict[str, Any]]) -> pd.DataFrame:
+    """Build the cumulative-MFE equity curve DataFrame (typed, empty-safe)."""
+    n = len(trades)
     if n > 0:
-        mfes         = [float(t["bucket_mean_mfe"]) for t in trades]
-        cum_mfe      = []
-        running      = 0.0
+        mfes    = [float(t["bucket_mean_mfe"]) for t in trades]
+        cum_mfe = []
+        running = 0.0
         for m in mfes:
             running += m
             cum_mfe.append(running)
-
-        equity_df = pd.DataFrame({
-            "trade_index"   : list(range(n)),
-            "entry_time"    : pd.to_datetime([t["entry_time"] for t in trades]),
+        return pd.DataFrame({
+            "trade_index"    : list(range(n)),
+            "entry_time"     : pd.to_datetime([t["entry_time"] for t in trades]),
             "bucket_mean_mfe": mfes,
-            "cumulative_mfe": cum_mfe,
+            "cumulative_mfe" : cum_mfe,
         })
-    else:
-        equity_df = pd.DataFrame({
-            "trade_index"    : pd.Series([], dtype="int64"),
-            "entry_time"     : pd.Series([], dtype="datetime64[ns]"),
-            "bucket_mean_mfe": pd.Series([], dtype="float64"),
-            "cumulative_mfe" : pd.Series([], dtype="float64"),
+    return pd.DataFrame({
+        "trade_index"    : pd.Series([], dtype="int64"),
+        "entry_time"     : pd.Series([], dtype="datetime64[ns]"),
+        "bucket_mean_mfe": pd.Series([], dtype="float64"),
+        "cumulative_mfe" : pd.Series([], dtype="float64"),
+    })
+
+
+def _cutoffs_dataframe(cutoffs: list[dict[str, Any]] | None) -> pd.DataFrame:
+    """Build the decile-cutoff DataFrame (per-direction bucket stats), empty-safe.
+
+    Each row is one (direction, bucket_id) decile boundary with its lower/upper
+    raw-score cut and the bucket's realized stats — the table the UI reads to
+    render the score-to-edge mapping.
+    """
+    if cutoffs:
+        return pd.DataFrame({
+            "direction"       : [c["direction"]              for c in cutoffs],
+            "bucket_id"       : [int(c["bucket_id"])         for c in cutoffs],
+            "score_raw_lower" : pd.Series([c.get("score_raw_lower") for c in cutoffs], dtype="float64"),
+            "score_raw_upper" : pd.Series([c.get("score_raw_upper") for c in cutoffs], dtype="float64"),
+            "score_pct_upper" : pd.Series([c.get("score_pct_upper") for c in cutoffs], dtype="float64"),
+            "bucket_mean_mfe" : pd.Series([c.get("bucket_mean_mfe") for c in cutoffs], dtype="float64"),
+            "bucket_hit_rate" : pd.Series([c.get("bucket_hit_rate") for c in cutoffs], dtype="float64"),
         })
+    return pd.DataFrame({
+        "direction"      : pd.Series([], dtype="object"),
+        "bucket_id"      : pd.Series([], dtype="int64"),
+        "score_raw_lower": pd.Series([], dtype="float64"),
+        "score_raw_upper": pd.Series([], dtype="float64"),
+        "score_pct_upper": pd.Series([], dtype="float64"),
+        "bucket_mean_mfe": pd.Series([], dtype="float64"),
+        "bucket_hit_rate": pd.Series([], dtype="float64"),
+    })
 
-    equity_df.to_parquet(artifact_dir / "equity_curve.parquet", index=False)
-    logger.info("equity_curve.parquet written: %s", artifact_dir / "equity_curve.parquet")
 
-    # --- summary.json ---
-    if n > 0:
-        mfes        = [float(t["bucket_mean_mfe"]) for t in trades]
-        gross_ret   = sum(mfes)
-        wins        = sum(1 for m in mfes if m > 0)
-        win_rate    = wins / n
-        final_eq    = 1.0 + gross_ret
-        summary = {
-            "initial_capital": 1.0,
-            "final_equity"   : round(final_eq,   6),
-            "n_trades"       : n,
-            "win_rate"       : round(win_rate,    6),
-            "gross_return"   : round(gross_ret,   6),
-            "net_return"     : round(gross_ret,   6),
-            "equity_basis"   : "mfe_proxy",
-            "note"           : (
-                "entry_price and exit_price reflect close at entry/exit timestamps; "
-                "equity still uses bucket_mean_mfe as proxy return per trade"
-            ),
-        }
-    else:
-        summary = {
-            "initial_capital": 1.0,
-            "final_equity"   : 1.0,
-            "n_trades"       : 0,
-            "win_rate"       : None,
-            "gross_return"   : 0.0,
-            "net_return"     : 0.0,
-            "equity_basis"   : "mfe_proxy",
-            "note"           : (
-                "entry_price and exit_price reflect close at entry/exit timestamps when trades exist; "
-                "equity still uses bucket_mean_mfe as proxy return per trade"
-            ),
-        }
+def _write_strat_table(
+    conn       : duckdb.DuckDBPyConnection,
+    session_id : str,
+    kind       : str,
+    frame      : pd.DataFrame,
+) -> int:
+    """CREATE OR REPLACE one ``strat."<session>__<kind>"`` table from a DataFrame.
 
-    with open(artifact_dir / "summary.json", "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    logger.info("summary.json written: %s", artifact_dir / "summary.json")
+    Idempotent: a re-run replaces the table in place. Returns the row count.
+    """
+    fqn = strat_table_fqn(session_id, kind)
+    conn.register("_strat_df", frame)
+    try:
+        conn.execute(f"CREATE OR REPLACE TABLE {fqn} AS SELECT * FROM _strat_df")
+    finally:
+        conn.unregister("_strat_df")
+    row = conn.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()
+    return int(row[0]) if row else 0
+
+
+def write_realized_outputs(
+    session_id : str,
+    trades     : list[dict[str, Any]],
+    cutoffs    : list[dict[str, Any]] | None = None,
+    asset_id   : str | None = None,
+) -> dict[str, str]:
+    """Write the realized backtest outputs as ``strat.*`` DuckDB tables (plan 6).
+
+    Creates three tables in the lab database's ``strat`` schema:
+      * ``strat."<session>__trades"``  — trade ledger with price columns,
+      * ``strat."<session>__equity"``  — cumulative-MFE equity curve per trade,
+      * ``strat."<session>__cutoffs"`` — per-direction decile cutoffs / bucket
+        stats (empty when not supplied).
+
+    Args:
+        session_id : Strategy session identifier (table-name token).
+        trades     : Trade dicts from _simulate_strategy() — each with at least
+                     entry_time, exit_time, direction, score_pct_at_entry,
+                     bucket_mean_mfe, hold_minutes, exit_reason; optional
+                     entry_price/exit_price.
+        cutoffs    : Optional decile-cutoff rows (see _cutoffs_dataframe).
+        asset_id   : Asset key for the lab connection; resolved if None.
+
+    Returns:
+        Mapping ``{"trades": fqn, "equity": fqn, "cutoffs": fqn}`` of the written
+        table names.
+    """
+    trades_df  = _trades_dataframe(trades)
+    equity_df  = _equity_dataframe(trades)
+    cutoffs_df = _cutoffs_dataframe(cutoffs)
+
+    conn = utils.open_lab_connection(asset_id)
+    try:
+        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {STRAT_SCHEMA}")
+        n_trades  = _write_strat_table(conn, session_id, "trades",  trades_df)
+        _write_strat_table(conn, session_id, "equity",  equity_df)
+        n_cutoffs = _write_strat_table(conn, session_id, "cutoffs", cutoffs_df)
+    finally:
+        conn.close()
+
+    tables = {
+        "trades":  strat_table_fqn(session_id, "trades"),
+        "equity":  strat_table_fqn(session_id, "equity"),
+        "cutoffs": strat_table_fqn(session_id, "cutoffs"),
+    }
+    logger.info(
+        "write_realized_outputs: %s trades=%d cutoffs=%d -> strat.*",
+        session_id, n_trades, n_cutoffs,
+    )
+    return tables
+
+
+def register_strategy(
+    session_id     : str,
+    long_model_id  : str,
+    short_model_id : str,
+    artifact_files : list[tuple[str, Path | str]] | None = None,
+    asset_id       : str | None = None,
+    status         : str = "candidate",
+) -> str:
+    """Register the strategy session in ``reg.strategies`` + ``reg.artifacts``.
+
+    Upserts a ``reg.strategies`` row linking the session to its long/short models,
+    and registers both the strat tables and the file artifacts in ``reg.artifacts``
+    (only existing files are recorded; strat tables are recorded by table name).
+
+    Args:
+        session_id     : Strategy session identifier (the ``strategy_id``).
+        long_model_id  : Long-direction model id.
+        short_model_id : Short-direction model id.
+        artifact_files : Optional (kind, path) file artifacts to register
+                         (strategy_artifact.json, isotonic_*, rank_lookup_*).
+        asset_id       : Asset key for the lab connection; resolved if None.
+        status         : Lifecycle status for the strategy row (default candidate).
+
+    Returns:
+        The strategy_id written.
+    """
+    conn = utils.open_lab_connection(asset_id)
+    try:
+        registry.upsert(
+            conn,
+            "strategies",
+            {
+                "strategy_id":    session_id,
+                "model_id_long":  long_model_id,
+                "model_id_short": short_model_id,
+                "session_id":     session_id,
+                "status":         status,
+            },
+        )
+
+        # strat.* tables as artifacts (table names, not files).
+        for kind in ("trades", "equity", "cutoffs"):
+            registry.upsert(
+                conn,
+                "artifacts",
+                {
+                    "artifact_id": f"{session_id}__strat_{kind}",
+                    "owner_id":    session_id,
+                    "kind":        f"strat_{kind}",
+                    "path":        strat_table_fqn(session_id, kind),
+                    "status":      "candidate",
+                },
+            )
+
+        # File artifacts (only existing files).
+        for kind, path in artifact_files or []:
+            if Path(path).exists():
+                registry.upsert(
+                    conn,
+                    "artifacts",
+                    {
+                        "artifact_id": f"{session_id}__{kind}",
+                        "owner_id":    session_id,
+                        "kind":        kind,
+                        "path":        str(path),
+                        "status":      "candidate",
+                    },
+                )
+    finally:
+        conn.close()
+
+    logger.info(
+        "register_strategy: %s long=%s short=%s status=%s",
+        session_id, long_model_id, short_model_id, status,
+    )
+    return session_id
 
 
 # %% Write / Read
@@ -192,9 +340,9 @@ def write_strategy_artifact(
         "decision_params"        : decision_params,
         "optuna_best_trial"      : optuna_best,
         "metrics"                : metrics,
-        "trades_path"            : "trades.parquet",
-        "equity_curve_path"      : "equity_curve.parquet",
-        "summary_path"           : "summary.json",
+        "trades_table"           : strat_table_fqn(session_id, "trades"),
+        "equity_table"           : strat_table_fqn(session_id, "equity"),
+        "cutoffs_table"          : strat_table_fqn(session_id, "cutoffs"),
         "calibrated_at"          : datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 

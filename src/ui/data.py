@@ -268,6 +268,19 @@ def active_position(asset_id: str | None = None) -> dict | None:
 
 
 def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame:
+    # Primary source: strat."<session_id>__trades" in the lab DB (t316 output).
+    session_id = _active_strategy_session_id()
+    if session_id:
+        df = _load_strat_table(session_id, "trades", asset_id=asset_id)
+        if not df.empty:
+            order_col: str = "entry_time" if "entry_time" in df.columns else str(df.columns[0])
+            return (
+                df.sort_values(order_col, ascending=False)
+                .head(int(limit))
+                .reset_index(drop=True)
+            )
+
+    # Fallback: live trading DB (positions already settled by the trading service).
     try:
         trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
     except Exception:
@@ -297,14 +310,19 @@ def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame
         finally:
             conn.close()
 
-    path = _session_artifact_path("trades.parquet")
-    if not path or not path.exists():
-        return pd.DataFrame()
-    df = pd.read_parquet(path)
-    return df.tail(int(limit)).sort_values("entry_time", ascending=False).reset_index(drop=True)
+    return pd.DataFrame()
 
 
 def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
+    # Primary source: strat."<session_id>__equity" in the lab DB (t316 output).
+    session_id = _active_strategy_session_id()
+    if session_id:
+        df = _load_strat_table(session_id, "equity", asset_id=asset_id)
+        if not df.empty:
+            order_col: str = "trade_index" if "trade_index" in df.columns else str(df.columns[0])
+            return df.sort_values(order_col, ascending=True).reset_index(drop=True)
+
+    # Fallback: live trading DB equity snapshots.
     try:
         trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
     except Exception:
@@ -332,10 +350,7 @@ def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
         finally:
             conn.close()
 
-    path = _session_artifact_path("equity_curve.parquet")
-    if not path or not path.exists():
-        return pd.DataFrame()
-    return pd.read_parquet(path)
+    return pd.DataFrame()
 
 
 def backtest_summary(asset_id: str | None = None) -> dict:
@@ -510,6 +525,49 @@ def _session_artifact_path(filename: str) -> Path | None:
     if not session_id:
         return None
     return _repo_path(f"artifacts/{session_id}/{filename}")
+
+
+def _active_strategy_session_id() -> str | None:
+    """Return the active strategy session_id from trading.json, or None if unavailable."""
+    try:
+        return utils.load_trading_config().get("strategy_session_id") or None
+    except Exception:
+        return None
+
+
+def _load_strat_table(
+    session_id: str,
+    kind: str,
+    asset_id: str | None = None,
+) -> pd.DataFrame:
+    """Read strat."<session_id>__<kind>" from the lab DB via open_lab_connection.
+
+    Returns an empty DataFrame when the table does not exist or any error occurs,
+    so callers can treat absence as a graceful no-data state.
+
+    Args:
+        session_id : Strategy session identifier.
+        kind       : One of ``trades`` / ``equity`` / ``cutoffs``.
+        asset_id   : Asset key; uses default_asset_id if None.
+    """
+    fqn = f'strat."{session_id}__{kind}"'
+    try:
+        conn = utils.open_lab_connection(asset_id)
+    except Exception:
+        return pd.DataFrame()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM information_schema.tables"
+            " WHERE table_schema = 'strat' AND table_name = ?",
+            [f"{session_id}__{kind}"],
+        ).fetchone()
+        if row is None:
+            return pd.DataFrame()
+        return conn.execute(f"SELECT * FROM {fqn}").df()
+    except Exception:
+        return pd.DataFrame()
+    finally:
+        conn.close()
 
 
 def _repo_path(relative_path: str) -> Path:

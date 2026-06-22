@@ -144,6 +144,87 @@ def save_database_metadata(metadata: dict, asset_id: str | None = None) -> None:
         f.write("\n")
 
 
+# %% Registry / ATTACH access (config-gateway)
+# Callers must reach the registry and the lab/live DuckDB topology through these
+# helpers — never by hardcoding paths or opening the registry file directly.
+
+REGISTRY_REL_PATH = "database/_registry/registry.duckdb"
+
+
+def registry_path() -> str:
+    """Return the absolute path to the global registry database.
+
+    The registry is asset-agnostic and lives at database/_registry/registry.duckdb
+    (plan 4.2). Resolved against the repo/runtime root.
+    """
+    return _resolve_path(REGISTRY_REL_PATH)
+
+
+def lab_db_path(asset_id: str | None = None) -> str:
+    """Return the absolute path to an asset's modeling lab database.
+
+    Derived from the asset's live db_path by inserting a ``_lab`` suffix
+    (e.g. database/solusdt/solusdt.duckdb -> database/solusdt/solusdt_lab.duckdb),
+    per the 3-file topology in plan 4.2.
+
+    Args:
+        asset_id : Asset key; uses default_asset_id if None.
+    """
+    live_path = load_asset_config(asset_id)["database"]["db_path"]
+    p = Path(live_path)
+    return str(p.with_name(f"{p.stem}_lab{p.suffix}"))
+
+
+def ensure_registry() -> list[int]:
+    """Create/upgrade the registry schema, returning newly applied migrations.
+
+    Thin gateway over data_handling.store.registry.ensure_registry so callers
+    do not import storage internals or resolve paths themselves.
+    """
+    from data_handling.store import registry as _registry
+
+    return _registry.ensure_registry(registry_path())
+
+
+def open_registry_connection():  # noqa: ANN201 — duckdb type kept out of utils import surface
+    """Open a CRUD connection where registry tables resolve as ``reg.<table>``.
+
+    The schema is ensured first. Use this for registry CRUD; the same ``reg``
+    alias is also exposed by open_lab_connection.
+
+    Returns:
+        An open DuckDB connection with the registry attached as ``reg``. Caller closes it.
+    """
+    from data_handling.store import registry as _registry
+
+    return _registry.open_crud_connection(registry_path())
+
+
+def open_lab_connection(asset_id: str | None = None):  # noqa: ANN201
+    """Open a modeling connection: lab default + live (READ_ONLY) + reg attached.
+
+    Mirrors plan 4.2: from one connection ``snap``/``model``/``strat`` (lab),
+    ``live.*`` (read-only) and ``reg.*`` are joinable, with the live sync target
+    write-isolated.
+
+    Args:
+        asset_id : Asset key; uses default_asset_id if None.
+
+    Returns:
+        An open DuckDB connection with live + reg attached. Caller must close it.
+    """
+    from data_handling.store import registry as _registry
+
+    live_path = load_asset_config(asset_id)["database"]["db_path"]
+    reg_path  = registry_path()
+    _registry.ensure_registry(reg_path)
+    return _registry.open_lab_connection(
+        lab_path      = lab_db_path(asset_id),
+        live_path     = live_path,
+        registry_path = reg_path,
+    )
+
+
 def load_features_config(asset_id: str | None = None) -> dict:
     """Load features.json and apply the feature profile for the given asset."""
     cfg        = _load_json("features.json")

@@ -12,10 +12,13 @@ from data_handling.store.duckdb_store import (
     get_connection,
     insert_feat_ohlcv_quant,
     insert_target,
-    materialize_sample_table,
     rebuild_quant_train,
 )
-from data_handling.store.validate import assert_zero, check_quant_train_no_duplicates, check_sample_table
+from data_handling.store.validate import (
+    assert_zero,
+    check_quant_train_no_duplicates,
+    check_sample_table,
+)
 
 pytestmark = pytest.mark.smoke
 
@@ -131,9 +134,17 @@ def _make_valid_segment_df() -> pl.DataFrame:
 
 
 def _seed_sample(db_path: str, sample_id: str, df: pl.DataFrame | None = None) -> None:
+    """Seed a sample_<sample_id> table directly via DuckDB register."""
+    src = df if df is not None else _make_valid_segment_df()
+    feat_cols = sorted(c for c in src.columns if c.startswith("feat_"))
+    target_cols = [c for c in ("long_mfe_fw60", "short_mfe_fw60") if c in src.columns]
+    df_out = src.select(["open_time", "fold_id", "segment"] + feat_cols + target_cols)
+    table_name = f"sample_{sample_id}"
     conn = get_connection(db_path)
     try:
-        materialize_sample_table(conn, sample_id, df if df is not None else _make_valid_segment_df())
+        conn.register("_sample_seed_tmp", df_out)
+        conn.execute(f'CREATE OR REPLACE TABLE "{table_name}" AS SELECT * FROM _sample_seed_tmp')
+        conn.unregister("_sample_seed_tmp")
     finally:
         conn.close()
 

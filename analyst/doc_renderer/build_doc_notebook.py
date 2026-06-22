@@ -11,6 +11,10 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 DOC_DIR = ROOT / "_doc_"
+# Three-zone layout (epic_032): docs live in these subdirs + the _doc_ root globals.
+# Walk order is by topic number across all zones, so methodology (X000/X100) still
+# precedes its code reference (X110) in the consolidated reading order.
+ZONE_DIRS = ("database_and_code_doc", "methodology_doc", "models_doc")
 DEFAULT_OUT = ROOT / "_chronoquant_docs.ipynb"
 MERMAID_FENCE_RE = re.compile(r"^(\s*)```mermaid\s*$", re.IGNORECASE | re.MULTILINE)
 
@@ -94,18 +98,31 @@ def is_frontmatter_cell(cell: dict[str, Any]) -> bool:
 
 
 def doc_sources() -> list[Path]:
+    """Collect docs from the _doc_ root globals + the three zone subdirs.
+
+    Numbered files are merged and sorted by their 4-digit topic prefix so the
+    reading order is preserved across zones (methodology X000/X100 before code
+    X110). Archive subdirs and the draft `_plans_/` are excluded.
+    """
     sources: list[Path] = []
     readme = DOC_DIR / "README.md"
     if readme.exists():
         sources.append(readme)
 
-    numbered = sorted(
-        path
-        for path in DOC_DIR.iterdir()
-        if path.is_file()
-        and path.suffix.lower() in {".md", ".ipynb"}
-        and path.name[:4].isdigit()
-    )
+    search_dirs = [DOC_DIR] + [DOC_DIR / zone for zone in ZONE_DIRS]
+    numbered: list[Path] = []
+    for base in search_dirs:
+        if not base.is_dir():
+            continue
+        for path in base.iterdir():
+            if (
+                path.is_file()
+                and path.suffix.lower() in {".md", ".ipynb"}
+                and path.name[:4].isdigit()
+            ):
+                numbered.append(path)
+
+    numbered.sort(key=lambda p: p.name)
     sources.extend(numbered)
     return sources
 

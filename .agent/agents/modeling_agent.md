@@ -24,6 +24,11 @@ Read these before starting work:
 - `.agent/tools/ast_grep_tool.md`
 - `.agent/tools/uv_tool.md`
 
+Load on demand (only when relevant):
+
+- `.agent/skills/model_lifecycle_skill.md` — új modell build, részleges retrain döntés
+- `.agent/skills/deploy_skill.md` — élesítés, cutover, rollback
+
 Load relevant module docs (only for affected modules):
 
 - `_doc_/5000_modelling.md` — if touching `src/modeling/`

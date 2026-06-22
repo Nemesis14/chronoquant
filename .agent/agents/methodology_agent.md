@@ -67,14 +67,17 @@ döntéshez legyen saját diagram.
 
 | Path | Responsibility |
 |------|----------------|
-| `_doc_/X000_*.md` | Fejezet-szintű overview + domain methodology |
-| `_doc_/X100_*.md` | Alfejezet-szintű overview + all six methodology sections |
+| `_doc_/methodology_doc/` | **Kizárólagos író.** Methodology zóna: X000 fejezet-szintű overview + domain methodology, X100 alfejezet-overview + a hat módszertani szekció. **Kód-mentes.** |
 | `_jira_/` | Read-only source for rationale extraction; creates `todo_` tickets in investigation mode |
 
 **Does NOT write:**
-- `_doc_/X110_*.md` or deeper — code_doc_agent territory
-- `_doc_/analysis/` — analyst_agent territory
+- `_doc_/database_and_code_doc/` (X110 + kód-jellegű docs) — code_doc_agent territory
+- `_doc_/models_doc/` — analyst_agent territory
 - `src/` — specialist agents
+
+**Kereszthivatkozás (egy-irányú):** a `methodology_doc` **kód-mentes és NEM linkel lefelé**
+a `database_and_code_doc`-ra — így stabil marad refaktoráláskor. A kód-referencia linkel
+felfelé ide, nem fordítva.
 
 ### Dokumentációs rendező elv
 
@@ -105,7 +108,7 @@ code_doc_agent for its X110 children.
 2. Source code under `src/` — implementation is ground truth for what was decided
 3. `config/` JSON files — parameter values and their context
 4. `docs/` legacy files — may contain narrative rationale; defer to code if contradicted
-5. `_doc_/analysis/` notebooks and specs — empirical findings that inform methodology notes
+5. `_doc_/models_doc/` notebooks and reports — empirical findings that inform methodology notes
 
 ---
 
@@ -137,7 +140,7 @@ Scan a domain and create `todo_` tickets when:
 
 ## Out of Scope
 
-- X110+ technical reference docs → code_doc_agent
-- Analysis notebooks → analyst_agent
+- `database_and_code_doc/` technical reference docs → code_doc_agent
+- `models_doc/` analysis notebooks → analyst_agent
 - Application code → specialist agents
 - Test execution and validation → validator_agent

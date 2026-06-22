@@ -1,7 +1,14 @@
 # Analyst Agent
 
 Interaktív elemzési session-öket vezet. Egy user-cél alapján feltárja a releváns
-dokumentációt, majd Quarto-renderable `.ipynb` notebookot készít a `_doc_/` könyvtárba.
+dokumentációt, majd Quarto-renderable `.ipynb` notebookot készít a **`_doc_/models_doc/`**
+zónába (results zóna). Ennek a zónának a **kizárólagos írója**.
+
+**Termelő–fogyasztó szétválasztás:** a `models_doc` *forrása* a `modeling_agent` outputja
+(model.pkl, metrikák, registry/artifact); az analyst_agent a *tulajdonos/renderelő*. A report
+modellenként egy `.ipynb` (+ rendered `.html`), amely a `methodology_doc/`-ra hivatkozik a
+„miért"-ért. Per-példány adat **nem** statikus markdownként nő a `_doc_`-ban — registry-/artifact-
+lekérdezésből származik.
 
 ---
 
@@ -37,13 +44,14 @@ Read these before starting work:
 
 ```text
 _doc_/
-  XXXX_<slug>.ipynb        ← notebooks (ide kerülnek, nem az analysis/ alá)
-  XXXX_<slug>.html         ← Quarto-rendered HTML (notebook mellé)
-  analysis/
-    _quarto.yml            ← Quarto config (régi notebookok; új notebookok self-contained frontmatterrel)
-    chronoquant_analysis.css   ← CSS (erre hivatkoznak az új notebookok is)
+  models_doc/              ← ZONE 3 — results (analyst_agent kizárólagos zónája)
+    XXXX_<slug>.ipynb      ← per-model report notebook
+    XXXX_<slug>.html       ← Quarto-rendered HTML (notebook mellé)
+    archive/               ← régi/archivált elemzés notebookok (.ipynb + .html)
 
 analyst/
+  _quarto.yml              ← Quarto config (a renderelő lánc ezt használja)
+  chronoquant_analysis.css ← CSS (erre hivatkoznak a notebookok)
   __init__.py
   table_formatting.py      ← display_analysis_table, format_analysis_table
   plot_utils.py            ← apply_theme(), plot templates
@@ -76,8 +84,8 @@ mintavétel, vagy modellértékelés vizsgálatát.
 
 Keresd meg a `_doc_/`-ban:
 
-- **Módszertani dokumentációt** (X000 szintű fájlok): a témára vonatkozó overview, üzleti rationale.
-- **Kód-dokumentációt** (X100, X200, ... szintű fájlok): a modul konkrét implementációja, táblák, oszlopok.
+- **Módszertani dokumentációt** (`_doc_/methodology_doc/`, X000/X100): a témára vonatkozó overview, üzleti rationale.
+- **Kód-dokumentációt** (`_doc_/database_and_code_doc/`, X110+): a modul konkrét implementációja, táblák, oszlopok.
 
 Ha egyik sem található:
 
@@ -91,7 +99,7 @@ Ha csak az egyik van meg, folytasd, de a notebookban jelezd, hogy a másik hián
 
 - Azonosítsd a témához tartozó doc-sorozat utolsó, legnagyobb számú fájlját.
 - Add hozzá a következő inkrementet, általában `100`, vagy `10`, ha a sorozat 10-es lépéseket használ.
-- Ellenőrizd, hogy a szám szabad-e, nincs-e ütköző `.ipynb` vagy `.md` a `_doc_/`-ban.
+- Ellenőrizd, hogy a szám szabad-e, nincs-e ütköző `.ipynb` a `_doc_/models_doc/`-ban.
 - Ha foglalt, lépj a következő szabad számra.
 
 | Téma példa | Code doc vége | Elemzés sorszáma |
@@ -102,7 +110,7 @@ Ha csak az egyik van meg, folytasd, de a notebookban jelezd, hogy a másik hián
 
 ### 4. Notebook elkészítése
 
-Fájlnév: `_doc_/XXXX_<slug>.ipynb`
+Fájlnév: `_doc_/models_doc/XXXX_<slug>.ipynb`
 
 A slug az elemzés rövid, kebab-case neve, például `targets_analysis`,
 `feature_null_patterns`, `model_2021_train_valid_analysis`.
@@ -140,11 +148,11 @@ Az Analyst Agent nem áll meg a notebook legyártásánál. Az elemzés akkor j�
 ### 7. Futtatás és renderelés
 
 ```bash
-quarto render _doc_\XXXX_<slug>.ipynb --execute
+quarto render _doc_\models_doc\XXXX_<slug>.ipynb --execute
 ```
 
 - A Quarto a notebook self-contained frontmatterjét használja.
-- A rendered HTML: `_doc_/XXXX_<slug>.html`.
+- A rendered HTML: `_doc_/models_doc/XXXX_<slug>.html`.
 - Ha a render sikertelen, javítsd a notebookot, és futtasd újra.
 - A render után olvasd vissza a fő outputokat; ne add át a munkát olyan
   notebookkal, amelynek eredményeit az agent nem ellenőrizte és nem értelmezte.
@@ -154,7 +162,7 @@ quarto render _doc_\XXXX_<slug>.ipynb --execute
 A feladat akkor kész, ha:
 
 - a `.ipynb` létezik és minden cell lefutott;
-- a `.html` létezik a `_doc_/`-ban;
+- a `.html` létezik a `_doc_/models_doc/`-ban;
 - nincs placeholder szöveg a rendered outputban;
 - az agent visszaellenőrizte a futott eredményeket;
 - a notebook tartalmaz végső, decision-oriented értelmezést.

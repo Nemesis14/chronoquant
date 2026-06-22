@@ -1,7 +1,7 @@
 # Docs Skill — Local Documentation
 
-ChronoQuant documentation lives in `_doc_/`. Read this before creating or
-updating module documentation.
+ChronoQuant documentation lives in `_doc_/`, split into **three global zones** by
+document type and owner agent. Read this before creating or updating any documentation.
 
 ---
 
@@ -12,113 +12,137 @@ create or update docs speculatively. If no task and no request: skip entirely.
 
 ---
 
-## Structure
+## Three-Zone Structure
 
-`_doc_/` is a flat numbered file collection — files are NOT nested in subdirectories.
-The numbering encodes **both the topic block AND the reading order within each block**.
-
-**Ordering rule: methodology/concept docs always have a lower number than their corresponding
-code docs within the same topic block.** Never assign a code doc number lower than its
-methodology doc within the same block.
+`_doc_/` is organised into **three zone subdirectories**, each owned by exactly
+one agent (single writer). The topic numbering (1xxx db, 2xxx features, 5xxx
+modelling …) is preserved **inside each zone**, so cross-references stay predictable.
 
 ```
 _doc_/
-  0000_project_overview.md   ← global project overview
+  0000_project_overview.md       ← global, root (orchestrator session-startup read)
+  0001_agentic_system.md         ← global, root (agentic system description)
+                                    ← ONLY these two files stay at the root
 
-  # Database Infrastructure (1xxx)
-  1000_database.md           ← X000: database domain overview (DuckDB schema, ER diagram)
-  1001_database_module.md    ← X001: database Python module overview
-  1100_store.md              ← X100: store almodul (duckdb_store, duckdb_query, stats)
-  1110_duckdb_store.md       ← X110: duckdb_store.py kód referencia
-  1120_duckdb_query.md       ← X110: duckdb_query.py kód referencia
-  1130_duckdb_stats.md       ← X110: duckdb_stats.py kód referencia
-  1140_validate.md           ← X110: validate.py kód referencia
-  1150_toolkit.md            ← X110: toolkit.py kód referencia
-  1200_sync_tables.md        ← X100: sync_tables almodul overview
-  1210_sync_ohlcv.md         ← X110: sync_ohlcv.py kód referencia
-  1230_sync_predictions.md   ← X110: sync_predictions.py kód referencia
-  1300_tests.md              ← X100: tests almodul overview
-  1310_store_tests.md        ← X110: store teszt suite
-  1320_pipeline_tests.md     ← X110: sync pipeline teszt suite
+  database_and_code_doc/         ← ZONE 1 — implementation/code reference
+    0002_data_architecture.md    ← cross-domain arch ref (numbered 0002 but lives in zone 1)
+    0003_runtime_flow.md         ← cross-domain runtime flow ref (lives in zone 1)
+    0004_model_lifecycle.md      ← cross-domain model lifecycle ref (lives in zone 1)
+    1xxx–8xxx *.md               ← per-module code reference, DB schema
+  methodology_doc/               ← ZONE 2 — rationale, decisions, methodology
+    1xxx–8xxx *.md               ← per-module methodology docs
+  models_doc/                    ← ZONE 3 — per-model reports (.ipynb → Quarto)
 
-  # Features (2xxx) — metodológia ELŐBB, kód UTÁNA
-  2000_features.md           ← X000: feature layer metodológia (25 csoport, lag, warmup)
-  2010_feature_engineering.md ← X010: feature selection elmélet (quality, redundancy, stability)
-  2100_sync_features.md      ← X100: sync_features.py kód referencia
-  2200_features_polars.md    ← X100: _features_polars.py kód referencia
-
-  # Targets (3xxx) — metodológia ELŐBB, kód UTÁNA
-  3000_targets.md            ← X000: target layer metodológia (fw60 logreturn, MFE)
-  3100_sync_targets.md       ← X100: sync_targets.py kód referencia
-
-  # Quant Train (4xxx) — metodológia ELŐBB, kód UTÁNA
-  4000_quant_train.md        ← X000: quant_train metodológia (INNER JOIN handoff)
-  4100_quant_train.md        ← X100: quant_train séma, rebuild, CLI referencia
-
-  # Sampling / Modelling (5xxx)
-  5000_modelling.md          ← X000: modeling domain overview (TOC)
-  5010_sampling_yearly.md    ← X010: yearly random-hour sampling metodológia (aktív)
-  5100_sampling_config.md    ← X100: YearlySamplingConfig dataclass
-  5200_sampling_artifacts.md ← X100: write_yearly_artifacts / load_yearly_sample
-  5300_create_sample.md      ← X100: create_yearly_sample orchestrator + CLI
-  5400_sampling.md           ← ARCHÍV: expanding window CV (nem aktív)
-  5410_sampling_splits.md    ← ARCHÍV: expanding window splits
-  5420_sampling_audit.md     ← ARCHÍV: feature table audit
-
-  # Strategy (6xxx)
-  6000_strategy.md           ← X000: strategy domain methodology
-
-  # Trading Runtime (7xxx)
-  7000_trading.md            ← X000: trading runtime domain overview
-  7100_live_trading.md       ← X100: runtime methodology + submodule map
-  7110_run_service.md        ← X110: 01_run_service.py CLI
-  7120_trading_service.md    ← X110: live/service.py main loop
-  7130_trading_journal.md    ← X110: live/journal.py trading.db access
-  7140_trading_exchange.md   ← X110: live/exchange.py Binance client
-  7150_trading_state_strategy.md ← X110: live/state.py + live/strategy.py
-
-  # UI Dashboard (8xxx)
-  8000_ui.md                 ← X000: UI domain overview
-  8100_dashboard.md          ← X100: dashboard methodology + submodule map
-  8110_ui_main.md            ← X110: ui/main.py Streamlit page
-  8120_ui_data.md            ← X110: ui/data.py read access layer
-  8130_ui_sync.md            ← X110: ui/sync.py + sync_runner.py background sync
-  8140_ui_runners.md         ← X110: ui/trading_runner.py + dashboard_logging.py
-  8150_ui_components.md      ← X110: ui/components/* + binance_data.py
-
-  analysis/                  ← analyst_agent: EDA, specs, sample quality notebooks
+  _plans_/                       ← draft system plans (not a canonical zone)
 ```
+
+**Root rule:** Only `0000_project_overview.md` and `0001_agentic_system.md` live at the
+`_doc_/` root. Every other doc — including cross-domain architectural references (0002+)
+— lives inside one of the three zone subdirectories. When a new global reference doc is
+needed beyond 0001, place it in `database_and_code_doc/` if it describes system architecture
+or data flow, or in `methodology_doc/` if it is rationale-only.
+
+### Zone → owner → content → format
+
+| Zone | Single writer | Content | Levels | Format |
+|------|---------------|---------|--------|--------|
+| `database_and_code_doc/` | **code_doc_agent** (exclusive) | DB schema, code reference; mermaid/UML; every function broken down | DB schema + X110 code-reference (incl. code-type X100, e.g. `2100_sync_features`, `4100_quant_train`) | `.md` |
+| `methodology_doc/` | **methodology_agent** (exclusive) | Rationale, decisions, methodology; many diagrams; **nothing about code** | X000 domain overviews + X010–X099 methodology + methodology-type X100 | `.md` |
+| `models_doc/` | **analyst_agent** (exclusive) | One report per model, references methodology; Quarto + CSS + plot palette | per-model | `.ipynb` (+ rendered `.html`) |
+
+**Single-writer rule:** no agent writes into another agent's zone. If a doc needs
+content from another zone, **link** to it — do not duplicate or cross-write.
+
+### Zone assignment rule (by content, not by level number alone)
+
+A file lands in the zone matching its **dominant content type**:
+
+- **Code reference** — describes `.py` files, functions, CLI, DB schema/ER → `database_and_code_doc/`
+  (this includes code-type X100 overviews such as `2100_sync_features`, `2200_features_polars`,
+  `3100_sync_targets`, `4100_quant_train`, and the entire 1xxx infrastructure block).
+- **Methodology / rationale** — describes *why*, decisions, alternatives, parameters, with
+  **no code** → `methodology_doc/` (X000 domain overviews, X010 methodology, methodology X100).
+- **Per-model analysis report** → `models_doc/` as a notebook.
+
+---
+
+## Cross-Reference Rule (one-directional)
+
+Cross-references between zones are **one-directional**, an evolution of the old Entry-Gate principle:
+
+- **`database_and_code_doc` → `methodology_doc` is MANDATORY**: code docs link *up* to the
+  "why" (the methodology doc explains the rationale the code implements).
+- **`methodology_doc` is code-free and MUST NOT link down to code**: it never references
+  `database_and_code_doc` files, so it stays stable across refactors.
+- **`models_doc` → `methodology_doc`**: model reports reference the methodology they apply.
+
+```
+methodology_doc/  ◀── database_and_code_doc/   (code links up to rationale)
+       ▲
+       └────────── models_doc/                  (reports link to methodology)
+   (methodology never links down)
+```
+
+### Entry Gate (preserved)
+
+Methodology comes **before** code documentation. If an X000/X100 methodology doc does
+not yet exist for a topic, **do not** write the corresponding X110 code reference —
+open a `todo_` ticket for the `methodology_agent` first. The X100 methodology sections
+spec lives in `.agent/skills/methodology_doc_skill.md`.
+
+---
+
+## models_doc — registry + rendered report
+
+Zone 3 is **not** hand-maintained markdown. Each model gets **one `.ipynb`** that:
+
+- pulls per-instance data from the **registry + model artifact** (the modeling_agent is
+  the *source*; the analyst_agent is the *owner/renderer*),
+- references the relevant `methodology_doc` pages for the "why",
+- renders to `.html` via Quarto (CSS + plot palette in `analyst/`).
+
+**Per-instance data never grows the `_doc_` tree as static markdown** — 50 models must
+not mean 50 hand-written pages. The data comes from registry queries; the report renders it.
 
 ---
 
 ## Doc File Naming
 
-Files in `_doc_/` use a **hierarchikus számozási séma**:
+Files keep the **hierarchical numbering scheme** inside their zone:
 
-| Szint | Minta | Példa | Leírás |
-|-------|-------|-------|--------|
-| Domain overview | `X000` | `5000_modelling.md` | Teljes domain áttekintője |
-| Metodológia | `X010–X099` | `2010_feature_engineering.md` | Módszertani háttér, döntések |
-| Almodul overview | `X100` | `5100_sampling_config.md` | Almodul áttekintője |
-| Részletes fájl | `X110` | `1110_duckdb_store.md` | Egy Python fájl / komponens |
-| Globális | `0000` | `0000_project_overview.md` | Kivétel — project-szintű |
+| Level | Pattern | Example | Zone |
+|-------|---------|---------|------|
+| Domain overview | `X000` | `5000_modelling.md` | methodology_doc |
+| Methodology | `X010–X099` | `2010_feature_engineering.md` | methodology_doc |
+| Submodule overview (methodology) | `X100` | `7100_live_trading.md` | methodology_doc |
+| Submodule / file (code) | `X100`/`X110` | `1110_duckdb_store.md`, `2100_sync_features.md` | database_and_code_doc |
+| Global root | `0000`/`0001` | `0000_project_overview.md` | **`_doc_/` root only** |
+| Cross-domain arch ref | `0002+` | `0002_data_architecture.md` | database_and_code_doc |
 
-### Topic block assignment
+### Topic blocks (numbering kept across zones)
 
-| Tartomány | Domain | Elv |
-|-----------|--------|-----|
-| `0000` | project overview | reserved |
-| `1000–1999` | Database Infrastructure | store + sync OHLCV/predictions + tests |
-| `2000–2999` | Features | 2000–2099: metodológia → 2100+: kód |
-| `3000–3999` | Targets | 3000–3099: metodológia → 3100+: kód |
-| `4000–4999` | Quant Train | 4000–4099: metodológia → 4100+: kód |
-| `5000–5999` | Sampling / Modelling | 5000–5099: overview/metod → 5100+: részletek |
-| `6000–6999` | Strategy | 6000–6099: methodology |
-| `7000–7999` | Trading Runtime | 7000–7099: overview/metod → 7100+: runtime details |
-| `8000–8999` | UI Dashboard | 8000–8099: overview/metod → 8100+: dashboard details |
+| Range | Domain |
+|-------|--------|
+| `0000–0001` | global (root) |
+| `1000–1999` | Database Infrastructure |
+| `2000–2999` | Features |
+| `3000–3999` | Targets |
+| `4000–4999` | Quant Train |
+| `5000–5999` | Sampling / Modelling |
+| `6000–6999` | Strategy |
+| `7000–7999` | Trading Runtime |
+| `8000–8999` | UI Dashboard |
 
-**Kötelező sorrend minden blokkon belül:** metodológia szám < kód szám.
-Ha egy témához új kód doc kerül, a száma nagyobb kell legyen a kapcsolódó metod docnál.
+**Ordering invariant (per block):** the methodology number is lower than its code number.
+A new code doc must get a number higher than its related methodology doc.
+
+---
+
+## Navigation
+
+There is **no separate TOC-index file**. Navigation relies on the speaking, numbered
+filenames + `Glob`/`Grep`. The consolidated Quarto render (`analyst/doc_renderer/`)
+provides the reading-order TOC for the HTML output.
 
 ---
 
@@ -178,9 +202,9 @@ sequenceDiagram
 ### Quarto TOC / Mermaid Render Notes
 
 - `_chronoquant_docs.ipynb` is generated by
-  `analyst/doc_renderer/build_doc_notebook.py`; its Raw-cell frontmatter can
-  override `analyst/_quarto.yml`. When changing global doc layout, update both
-  if the generated notebook must keep the setting.
+  `analyst/doc_renderer/build_doc_notebook.py`; it walks the three zones in
+  topic-number order. Its Raw-cell frontmatter can override `analyst/_quarto.yml`.
+  When changing global doc layout, update both if the generated notebook must keep the setting.
 - Current working TOC grid for consolidated docs: `sidebar-width: 380px`,
   `body-width: 900px`, `margin-width: 140px`, `gutter-width: 2rem`.
 - The left TOC needs both enough sidebar grid width and CSS width. In
@@ -195,7 +219,7 @@ sequenceDiagram
 
 ## Documentation Types
 
-### 1. Database Doc
+### 1. Database Doc (`database_and_code_doc/`)
 
 Required when documenting a DuckDB schema, table, or store module.
 
@@ -233,7 +257,7 @@ Purpose: …
 
 ---
 
-### 2. Flow / Module Doc
+### 2. Flow / Module Doc (`database_and_code_doc/`)
 
 Required when documenting a `.py` file, a package, or a data pipeline.
 
@@ -278,29 +302,32 @@ Returns: `type` — what it means.
 
 ## Documentation Ordering Principle
 
-**Minden témában a sorrend kötelező: Overview → Metodológia → Technikai részletek.**
+**Within every topic the order is mandatory: Overview → Methodology → Technical details.**
 
-Ez az egész dokumentáció rendező elve — vonatkozik mind a fájl belső struktúrájára,
-mind az X000/X100/X110 szintek közötti hierarchiára.
+This is the organising principle of the whole documentation — it applies both to the
+internal structure of a file and to the X000 → X100 → X110 level hierarchy. With the
+three-zone split, the methodology (zone 2) precedes the code reference (zone 1) by topic
+number, and the code reference links up to it.
 
 ```
-X000 fájl  — domain overview: flowchart, magas szintű leírás, almodulok listája
-X100 fájl  — alfejezet overview + 6 metodológiai szekció (miért, döntések, kockázatok)
-X110+ fájl — teljes kód referencia: függvények, paraméterek, diagramok .py szinten
+X000 file  — domain overview: flowchart, high-level description, submodule list   (methodology_doc)
+X010–X099  — methodology: why, decisions, risks, parameters                       (methodology_doc)
+X100       — submodule overview: methodology X100 → methodology_doc;
+             code X100 (sync_*, schema/CLI) → database_and_code_doc
+X110+      — full code reference: functions, parameters, .py-level diagrams        (database_and_code_doc)
 ```
 
-**Belső fájl-struktúra (minden szinten):**
-1. `## Overview` — egy bekezdés + flowchart: mi ez és hol kapcsolódik a pipeline-ba
-2. `## Üzleti és módszertani háttér` — miért, alternatívák, kulcsfogalmak, paraméterek
-3. Táblák / függvények / komponensek — konkrét technikai leírás
+**Internal file structure (every level):**
+1. `## Overview` — one paragraph + flowchart: what it is and where it connects in the pipeline
+2. `## Üzleti és módszertani háttér` — methodology files only (why, alternatives, key concepts, parameters)
+3. Tables / functions / components — concrete technical description (code files)
 
-**Redundancia-szabály:** Az overview a high-level logikát és struktúrát írja le.
-A részletes alfejezetek kibontják, de nem megismétlik az overviewt.
-Dedikált tartalomismétlés tilos — cross-reference linkkel hivatkozz.
+**Redundancy rule:** the overview describes the high-level logic and structure. Detailed
+subsections expand it but do not repeat it. Dedicated content duplication is forbidden —
+cross-reference with a link instead.
 
-**Mermaid kötelező:** Minden X100 fájlban legalább 2–3 Mermaid diagram.
-Az `## Overview`-ban mindig legyen pipeline flowchart.
-Minden módszertani döntéshez (pl. miért expanding window?) saját diagram.
+**Mermaid mandatory:** at least 2–3 Mermaid diagrams per X100 file. The `## Overview`
+always has a pipeline flowchart. Each methodological decision gets its own diagram.
 
 ## Layout Rule: Always Top-Down
 
@@ -309,24 +336,24 @@ then drills down into subsections. Never start with details.
 
 ```
 1. Module overview + overview diagram
-2. Methodology sections (why, decisions, risks)
-3. Subsection per table / function / component
+2. Methodology sections (why, decisions, risks)   ← methodology_doc
+3. Subsection per table / function / component     ← database_and_code_doc
 4. Each subsection has its own focused diagram
 ```
 
 ---
 
-## Methodology Rule: X000 és X100 fájlok módszertani szekciói
+## Methodology Rule: X000 and X100 methodology files
 
-**Az X000 és X100 szintű fájlok üzleti és módszertani szekciói a `methodology_agent`
-feladata — a code_doc_agent CSAK X110+ fájlokat ír.**
+**Business and methodological content is the `methodology_agent`'s job and lives in
+`methodology_doc/` — the `code_doc_agent` writes ONLY code reference in `database_and_code_doc/`.**
 
-Ha egy X100 fájlban hiányzik az `## Üzleti és módszertani háttér` szekció:
-- Ne töltsd ki
-- Nyiss `todo_` ticketet a `methodology_agent`-nek
-- Az X110 fájlokat addig ne írd meg
+If a code-reference doc needs methodology context that does not yet exist:
+- Do not write it yourself
+- Open a `todo_` ticket for the `methodology_agent`
+- Hold the code reference until the methodology doc exists (Entry Gate)
 
-Az X100 fájlokban kötelező hat szekció részletes specifikációja:
+The mandatory six-section spec for methodology X100 files:
 → `.agent/skills/methodology_doc_skill.md`
 
 ---
@@ -336,7 +363,8 @@ Az X100 fájlokban kötelező hat szekció részletes specifikációja:
 Task files in `_jira_/` may reference `_doc_/` pages for context:
 ```markdown
 ## Scope
-See `_doc_/store/schema.md` for current DuckDB schema.
+See `_doc_/database_and_code_doc/1110_duckdb_store.md` for the store code reference.
+See `_doc_/methodology_doc/3000_targets.md` for the target methodology.
 ```
 
 This keeps task files concise while pointing to stable reference docs.

@@ -23,6 +23,10 @@ Read these before starting work:
 - `.agent/tools/ast_grep_tool.md`
 - `.agent/tools/uv_tool.md`
 
+Load on demand (only when relevant):
+
+- `.agent/skills/deploy_skill.md` — élesítés, cutover, rollback (sync_predictions, reg.deployments)
+
 Load relevant module docs (only for affected modules):
 
 - `_doc_/1000_database.md` — if touching database schema

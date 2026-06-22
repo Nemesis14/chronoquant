@@ -1,338 +1,76 @@
-"""Yearly sampling orchestrator — runs DB load → hourly select → fold-assign → write.
+"""Snapshot-native sampling orchestrator — snap source, model.__sample output, reg.feature_sets.
 
-Source table: quant_train (feat_* + target columns, NULL targets excluded).
-Only this module imports utils and duckdb; yearly_sampler and artifacts are project-agnostic.
+DuckDB-native sampling path (plan section 5, steps 2-3, and 5.1):
+
+  * **Source** is an immutable ``snap."<snapshot_id>"`` table (frozen by the
+    snapshot layer), *not* the mutable ``quant_train`` table — this is what makes
+    a model reproducible.
+  * **Output** is a small ``model."<model_id>__sample"`` table inside the lab
+    database: ``open_time`` + the model's target column(s) + ``fold_id`` only.
+    Features stay in the snapshot; downstream steps project them via the
+    ``__train_input`` view (plan 5.1) — there is no per-model feature copy.
+  * **Feature filtering** is a *logical* feature_set, registered in
+    ``reg.feature_sets`` (selected_cols, n_input, n_selected); no physical column
+    drop happens here.
+
+The hourly select + walk-forward ``fold_id`` are a single deterministic SQL
+statement over the snapshot (see ``snapshot_sampler``).  The walk-forward fold
+semantics (train/valid/shift months, n_folds, 240-min purge, ``fold_id`` Int8
+0..n with 0 = train-only) reproduce the previous Polars path exactly — only the
+source and the output changed, never the methodology.
+
+Only this module touches utils and the lab connection; ``snapshot_sampler`` and
+``yearly_sampler`` are IO-free.
 """
 
-import calendar
+from __future__ import annotations
+
+import json
+import logging
 from pathlib import Path
+from typing import Any
 
 import duckdb
-import polars as pl
 
 import utils
-from modeling.sampling.artifacts import write_yearly_artifacts
-from modeling.sampling.config import WalkForwardSamplingConfig, YearlySamplingConfig
-from modeling.sampling.yearly_sampler import (
-    assign_fold_ids,
-    assign_walk_forward_fold_ids,
-    generate_walk_forward_folds,
-    select_hourly_observations,
+from data_handling.store import registry
+from modeling.sampling.snapshot_sampler import (
+    build_feature_set_id,
+    build_sample_ctas_sql,
+    sample_table_fqn,
 )
+from modeling.sampling.yearly_sampler import generate_walk_forward_folds
+
+logger = logging.getLogger(__name__)
+
+# Map a model target_name to the strategy direction token (plan 6).
+_DIRECTION_BY_TARGET_PREFIX = {"long": "l", "short": "s"}
 
 
-def create_model_sample(model_id: str) -> None:
-    """Generate and persist a yearly sample for a specific model into its artifact directory.
+def create_model_sample(model_id: str, snapshot_id: str) -> dict[str, Any]:
+    """Create the ``model."<model_id>__sample"`` table for a config-defined model.
 
-    Reads model config (asset_id, target_name, sample_id, artifact_dir).
-    Includes only the model's own target column and all feat_* columns.
-    Writes sample_train_valid.parquet, metadata.json, audit.json to artifact_dir.
+    Resolves the model's asset, target column, walk-forward parameters and feature
+    selection from config, then samples deterministically over the immutable
+    ``snap."<snapshot_id>"`` and registers the logical feature_set.
 
-    Args:
-        model_id : Model key from config/models.json.
-
-    Raises:
-        ValueError: If model_id is not found or no data for the sample year.
-        RuntimeError: If quant_train table does not exist.
-    """
-    models_cfg = utils.load_models_config()
-    if model_id not in models_cfg.get("models", {}):
-        raise ValueError(f"Model not found in config/models.json: {model_id}")
-
-    meta         = models_cfg["models"][model_id]
-    asset_id     = meta["asset_id"]
-    target_name  = meta["target_name"]
-    sample_id    = meta["sampling"]["sample_id"]
-    artifact_dir = Path(utils._resolve_path(meta["artifact_dir"]))
-
-    year = int(sample_id.split("_yearly_")[-1])
-    seed = 42 + year
-
-    config = YearlySamplingConfig(
-        sample_id   = sample_id,
-        asset_id    = asset_id,
-        year        = year,
-        seed        = seed,
-        target_cols = (target_name,),
-        feature_cols= (),
-    )
-
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    create_yearly_sample(config, output_dir=artifact_dir)
-
-
-def create_yearly_sample(
-    config    : YearlySamplingConfig,
-    output_dir: Path | None = None,
-) -> None:
-    """Generate and persist a yearly random-hour sample for the given config.
-
-    Source: quant_train table (feat_* columns + target columns).
-
-    Steps:
-        1. Load quant_train rows for config.year from DuckDB (NULL targets excluded).
-        2. Resolve feature columns: use config.feature_cols if non-empty, else all feat_*.
-        3. Select one random minute per hour (select_hourly_observations).
-        4. Assign fold_id 1..n_folds to every row (assign_fold_ids).
-        5. Write metadata.json, audit.json, sample_train_valid.parquet.
+    Steps (plan 5, steps 2-3):
+      1. open the lab connection (lab default + live RO + reg),
+      2. generate the walk-forward fold windows (existing semantics),
+      3. CTAS ``model."<model_id>__sample"`` = hourly select + fold_id over the snap,
+      4. register the feature selection in ``reg.feature_sets`` and link it on
+         ``reg.models``.
 
     Args:
-        config     : Frozen YearlySamplingConfig with all required parameters.
-        output_dir : Directory to write artifacts. Defaults to
-                     database/{asset_id}/samples/{sample_id}/.
+        model_id    : Model key from config/models.json.
+        snapshot_id : Immutable snapshot id (``snap."<id>"``) to sample from.
+
+    Returns:
+        Summary dict: ``model_id``, ``snapshot_id``, ``sample_table``, ``n_rows``,
+        ``fold_row_counts``, ``feature_set_id``, ``n_input``, ``n_selected``.
 
     Raises:
-        ValueError: If quant_train has no rows with valid targets for config.year.
-        RuntimeError: If quant_train table does not exist in the database.
-    """
-    db_path    = utils.load_asset_config(config.asset_id)["database"]["db_path"]
-    sample_dir = output_dir if output_dir is not None else Path(
-        f"database/{config.asset_id}/samples/{config.sample_id}"
-    )
-
-    null_checks = " AND ".join(f"{col} IS NOT NULL" for col in config.target_cols)
-
-    conn = duckdb.connect(db_path, read_only=True)
-    try:
-        feat_cols = _resolve_feature_cols(conn, config.feature_cols)
-        target_select = ", ".join(config.target_cols)
-        feat_select   = ", ".join(feat_cols) if feat_cols else ""
-        col_select    = f"open_time, {feat_select + ', ' if feat_select else ''}{target_select}"
-
-        df: pl.DataFrame = conn.execute(
-            f"""
-            SELECT {col_select}
-            FROM quant_train
-            WHERE YEAR(open_time) = {config.year}
-              AND {null_checks}
-            ORDER BY open_time
-            """
-        ).pl()
-
-        total_rows_row = conn.execute(
-            f"SELECT COUNT(*) FROM quant_train WHERE YEAR(open_time) = {config.year}"
-        ).fetchone()
-        total_rows = int(total_rows_row[0]) if total_rows_row else 0
-    finally:
-        conn.close()
-
-    if len(df) == 0:
-        raise ValueError(
-            f"No data with valid targets found for year {config.year} "
-            f"in asset '{config.asset_id}'."
-        )
-
-    hourly_df                    = select_hourly_observations(df, config.year, config.seed)
-    fold_df, fold_week_assignments = assign_fold_ids(hourly_df, config.year, config.seed, config.n_folds)
-
-    # Enforce column order: open_time, target(s), fold_id, feat_*
-    _target_cols = list(config.target_cols)
-    _feat_cols   = sorted(c for c in fold_df.columns if c.startswith("feat_"))
-    _col_order   = ["open_time"] + _target_cols + ["fold_id"] + _feat_cols
-    fold_df      = fold_df.select(_col_order)
-
-    fold_row_counts = _fold_counts(fold_df)
-
-    expected_hours = 8784 if calendar.isleap(config.year) else 8760
-    audit = {
-        "total_quant_train_rows_in_year": total_rows,
-        "source_rows_with_valid_targets": len(df),
-        "expected_hours"                : expected_hours,
-        "actual_hourly_rows"            : len(hourly_df),
-        "missing_hours"                 : expected_hours - len(hourly_df),
-    }
-
-    metadata = {
-        "sample_id"            : config.sample_id,
-        "asset_id"             : config.asset_id,
-        "year"                 : config.year,
-        "seed"                 : config.seed,
-        "purge_minutes"        : config.purge_minutes,
-        "n_folds"              : config.n_folds,
-        "target_cols"          : list(config.target_cols),
-        "feature_cols"         : feat_cols,
-        "fold_week_assignments": {str(k): v for k, v in fold_week_assignments.items()},
-        "fold_row_counts"      : fold_row_counts,
-    }
-
-    write_yearly_artifacts(sample_dir, metadata, fold_df, audit)
-
-
-def create_walk_forward_sample(
-    config    : WalkForwardSamplingConfig,
-    output_dir: Path | None = None,
-) -> None:
-    """Generate and persist a walk-forward CV sample for the given config.
-
-    Source: quant_train table (feat_* columns + target columns).
-
-    The sample covers from the anchor year's first month through the last fold's
-    validation window end.  Exactly one random minute per hour is selected
-    (``select_hourly_observations``), applied to the full date range.
-
-    fold_id assignment:
-      - Rows inside a fold's validation window → that fold's fold_id (1..n)
-      - All other rows → fold_id = 0 (train-only)
-
-    Steps:
-        1. Generate fold time windows (``generate_walk_forward_folds``).
-        2. Load quant_train rows for anchor_year_start … last_valid_end from DuckDB.
-        3. Select one random minute per hour (``select_hourly_observations``),
-           filtering for the anchor year slice, then extended to full range.
-        4. Assign fold_id via validation window membership.
-        5. Write metadata.json, audit.json, sample_train_valid.parquet.
-
-    Args:
-        config     : Frozen WalkForwardSamplingConfig.
-        output_dir : Directory to write artifacts.  Defaults to
-                     database/{asset_id}/samples/{sample_id}/.
-
-    Raises:
-        ValueError : If quant_train has no rows for the required date range.
-        RuntimeError: If quant_train table does not exist.
-    """
-    db_path    = utils.load_asset_config(config.asset_id)["database"]["db_path"]
-    sample_dir = output_dir if output_dir is not None else Path(
-        f"database/{config.asset_id}/samples/{config.sample_id}"
-    )
-
-    # 1. Generate fold windows
-    fold_time_windows = generate_walk_forward_folds(
-        year          = config.year,
-        train_months  = config.train_months,
-        valid_months  = config.valid_months,
-        shift_months  = config.shift_months,
-        purge_minutes = config.purge_minutes,
-        n_folds       = config.n_folds,
-    )
-
-    range_start = f"{config.year}-01-01"
-    range_end   = fold_time_windows[-1]["valid_end"]
-
-    null_checks = " AND ".join(f"{col} IS NOT NULL" for col in config.target_cols)
-
-    conn = duckdb.connect(db_path, read_only=True)
-    try:
-        feat_cols     = _resolve_feature_cols(conn, config.feature_cols)
-        target_select = ", ".join(config.target_cols)
-        feat_select   = ", ".join(feat_cols) if feat_cols else ""
-        col_select    = f"open_time, {feat_select + ', ' if feat_select else ''}{target_select}"
-
-        df: pl.DataFrame = conn.execute(
-            f"""
-            SELECT {col_select}
-            FROM quant_train
-            WHERE open_time >= '{range_start}'
-              AND open_time <= '{range_end} 23:59:59'
-              AND {null_checks}
-            ORDER BY open_time
-            """
-        ).pl()
-
-        total_rows_row = conn.execute(
-            f"""
-            SELECT COUNT(*) FROM quant_train
-            WHERE open_time >= '{range_start}'
-              AND open_time <= '{range_end} 23:59:59'
-            """
-        ).fetchone()
-        total_rows = int(total_rows_row[0]) if total_rows_row else 0
-    finally:
-        conn.close()
-
-    if len(df) == 0:
-        raise ValueError(
-            f"No data with valid targets found for range {range_start}…{range_end} "
-            f"in asset '{config.asset_id}'."
-        )
-
-    # 3. Select one random minute per hour — use anchor year seed but apply to full range
-    #    select_hourly_observations filters by year; we need to extend it to cover
-    #    multi-year ranges by calling it per year and concatenating.
-    years_in_range: list[int] = []
-    start_y = config.year
-    end_y   = int(range_end[:4])
-    for y in range(start_y, end_y + 1):
-        years_in_range.append(y)
-
-    hourly_parts: list[pl.DataFrame] = []
-    for y in years_in_range:
-        yearly_seed = config.seed + (y - config.year)
-        part = (
-            df.filter(pl.col("open_time").dt.year() == y)
-            .with_columns(
-                pl.col("open_time").dt.truncate("1h").alias("_hour"),
-                pl.col("open_time").cast(pl.Int64).hash(seed=yearly_seed, seed_1=yearly_seed + 1).alias("_rand"),
-            )
-            .sort(["_hour", "_rand"])
-            .unique(subset=["_hour"], keep="first", maintain_order=False)
-            .drop(["_hour", "_rand"])
-            .sort("open_time")
-        )
-        hourly_parts.append(part)
-
-    hourly_df = pl.concat(hourly_parts).sort("open_time")
-
-    # 4. Assign fold_ids via validation window membership
-    fold_df = assign_walk_forward_fold_ids(hourly_df, fold_time_windows)
-
-    # Enforce column order: open_time, target(s), fold_id, feat_*
-    _target_cols = list(config.target_cols)
-    _feat_cols   = sorted(c for c in fold_df.columns if c.startswith("feat_"))
-    _col_order   = ["open_time"] + _target_cols + ["fold_id"] + _feat_cols
-    fold_df      = fold_df.select(_col_order)
-
-    fold_row_counts = _fold_counts(fold_df)
-
-    # For multi-year ranges, sum up expected hours per year
-    expected_hours = sum(
-        8784 if calendar.isleap(y) else 8760 for y in years_in_range
-    )
-
-    audit = {
-        "total_quant_train_rows_in_range": total_rows,
-        "source_rows_with_valid_targets" : len(df),
-        "expected_hours"                 : expected_hours,
-        "actual_hourly_rows"             : len(hourly_df),
-        "missing_hours"                  : expected_hours - len(hourly_df),
-        "date_range_start"               : range_start,
-        "date_range_end"                 : range_end,
-        "years_covered"                  : years_in_range,
-    }
-
-    metadata = {
-        "sample_id"        : config.sample_id,
-        "asset_id"         : config.asset_id,
-        "year"             : config.year,
-        "seed"             : config.seed,
-        "purge_minutes"    : config.purge_minutes,
-        "train_months"     : config.train_months,
-        "valid_months"     : config.valid_months,
-        "shift_months"     : config.shift_months,
-        "target_cols"      : list(config.target_cols),
-        "feature_cols"     : feat_cols,
-        "fold_time_windows": fold_time_windows,
-        "fold_row_counts"  : fold_row_counts,
-        "sampling_mode"    : "walk_forward",
-    }
-
-    sample_dir.mkdir(parents=True, exist_ok=True)
-    write_yearly_artifacts(sample_dir, metadata, fold_df, audit)
-
-
-def create_model_walk_forward_sample(model_id: str) -> None:
-    """Generate and persist a walk-forward sample for a specific model.
-
-    Reads model config (asset_id, target_name, sample_id, artifact_dir).
-    Uses WalkForwardSamplingConfig with default walk-forward parameters.
-    Writes sample_train_valid.parquet, metadata.json, audit.json to artifact_dir.
-
-    Args:
-        model_id : Model key from config/models.json.
-
-    Raises:
-        ValueError: If model_id is not found or no data for the sample range.
-        RuntimeError: If quant_train table does not exist in the database.
+        ValueError: If the model is unknown or the snapshot has no usable rows.
     """
     models_cfg = utils.load_models_config()
     if model_id not in models_cfg.get("models", {}):
@@ -341,75 +79,258 @@ def create_model_walk_forward_sample(model_id: str) -> None:
     meta          = models_cfg["models"][model_id]
     asset_id      = meta["asset_id"]
     target_name   = meta["target_name"]
-    sampling_meta = meta["sampling"]
-    sample_id     = sampling_meta["sample_id"]
+    sampling_meta = meta.get("sampling", {})
     artifact_dir  = Path(utils._resolve_path(meta["artifact_dir"]))
 
-    if "year" in sampling_meta:
-        year = int(sampling_meta["year"])
-    elif "_yearly_" in sample_id:
-        year = int(sample_id.split("_yearly_")[-1])
-    else:
-        year = int(sample_id.split("_")[-1])
-    seed = 42 + year
+    horizon      = _horizon_from_target(target_name)
+    direction    = _direction_from_target(target_name)
+    year         = _anchor_year(sampling_meta)
+    seed         = 42 + year
+    train_months = int(sampling_meta.get("train_months", 9))
+    valid_months = int(sampling_meta.get("valid_months", 3))
+    shift_months = int(sampling_meta.get("shift_months", 3))
+    n_folds      = int(sampling_meta.get("n_folds", 4))
+    purge_minutes = int(sampling_meta.get("purge_minutes", 240))
 
-    config = WalkForwardSamplingConfig(
-        sample_id    = sample_id,
-        asset_id     = asset_id,
-        year         = year,
-        seed         = seed,
-        train_months = int(sampling_meta.get("train_months", 9)),
-        valid_months = int(sampling_meta.get("valid_months", 3)),
-        shift_months = int(sampling_meta.get("shift_months", 3)),
-        n_folds      = int(sampling_meta.get("n_folds", 4)),
-        target_cols  = (target_name,),
-        feature_cols = (),
-    )
+    selected_cols = _resolve_selected_features(artifact_dir, target_name)
 
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    create_walk_forward_sample(config, output_dir=artifact_dir)
+    conn = utils.open_lab_connection(asset_id)
+    try:
+        return create_snapshot_sample(
+            conn          = conn,
+            model_id      = model_id,
+            snapshot_id   = snapshot_id,
+            asset_id      = asset_id,
+            target_cols   = [target_name],
+            horizon       = horizon,
+            direction     = direction,
+            year          = year,
+            seed          = seed,
+            train_months  = train_months,
+            valid_months  = valid_months,
+            shift_months  = shift_months,
+            n_folds       = n_folds,
+            purge_minutes = purge_minutes,
+            selected_cols = selected_cols,
+        )
+    finally:
+        conn.close()
 
 
-# %% Internal
+def create_snapshot_sample(
+    conn          : duckdb.DuckDBPyConnection,
+    model_id      : str,
+    snapshot_id   : str,
+    asset_id      : str,
+    target_cols   : list[str],
+    horizon       : int = 60,
+    direction     : str = "l",
+    year          : int = 2023,
+    seed          : int = 42,
+    train_months  : int = 9,
+    valid_months  : int = 3,
+    shift_months  : int = 3,
+    n_folds       : int = 4,
+    purge_minutes : int = 240,
+    selected_cols : list[str] | None = None,
+) -> dict[str, Any]:
+    """Build the sample table + reg.feature_sets row on an open lab connection.
 
+    Pure orchestration over the IO-free SQL builders — owns the DuckDB execution
+    and the registry write.  Deterministic: an immutable snapshot + fixed seed +
+    fixed fold parameters yields a bit-identical sample table.
 
-def _resolve_feature_cols(
-    conn        : duckdb.DuckDBPyConnection,
-    feature_cols: tuple[str, ...],
-) -> list[str]:
-    """Return the feature column list to select from quant_train.
+    Args:
+        conn          : Open lab connection (lab default + ``snap``/``model`` + ``reg``).
+        model_id      : Owning model id (sample table token + reg.models link).
+        snapshot_id   : Immutable source snapshot id.
+        asset_id      : Asset key (for the feature_set_id and reg links).
+        target_cols   : Target column(s) to carry into the sample.
+        horizon       : Forward-window bar count (feature_set_id token).
+        direction     : ``l``/``s``/``combo`` (feature_set_id token).
+        year          : Anchor calendar year for the walk-forward folds.
+        seed          : Reproducibility seed for the per-hour pick.
+        train_months  : Walk-forward training window length (months).
+        valid_months  : Walk-forward validation window length (months).
+        shift_months  : Months to shift between successive folds.
+        n_folds       : Number of folds (validation windows 1..n; 0 = train-only).
+        purge_minutes : Purge gap in minutes (metadata; applied at search time).
+        selected_cols : Logical feature_set columns.  If None, all feat_* columns
+                        of the snapshot are taken as the selection.
 
-    If ``feature_cols`` is non-empty, validate that each column exists and
-    starts with 'feat_', then return it as a list.  If empty, discover all
-    feat_* columns from the quant_train schema.
+    Returns:
+        Summary dict (see :func:`create_model_sample`).
 
     Raises:
-        RuntimeError: If quant_train does not exist.
-        ValueError: If a requested column is missing from quant_train.
+        ValueError: If the snapshot table is missing or has no usable rows.
     """
-    try:
-        schema_rows = conn.execute("DESCRIBE quant_train").fetchall()
-    except Exception as exc:
-        raise RuntimeError(
-            "quant_train table not found — run src/data_handling/03_build_quant_train.py first."
-        ) from exc
+    _ensure_model_schema(conn)
 
-    all_cols = {row[0] for row in schema_rows}
+    if not _snapshot_exists(conn, snapshot_id):
+        raise ValueError(
+            f"Snapshot table snap.\"{snapshot_id}\" not found — create it first "
+            "(src/data_handling/05_create_snapshot.py)."
+        )
 
-    if feature_cols:
-        missing = [c for c in feature_cols if c not in all_cols]
-        if missing:
-            raise ValueError(f"Requested feature columns not in quant_train: {missing}")
-        return list(feature_cols)
+    all_feat_cols = _snapshot_feature_columns(conn, snapshot_id)
+    n_input       = len(all_feat_cols)
+    selected      = list(selected_cols) if selected_cols else all_feat_cols
 
-    # Auto-discover: all feat_* columns, sorted for reproducibility.
-    return sorted(c for c in all_cols if c.startswith("feat_"))
-
-
-def _fold_counts(fold_df: pl.DataFrame) -> dict[str, int]:
-    rows = (
-        fold_df.group_by("fold_id")
-        .agg(pl.len().alias("count"))
-        .to_dict(as_series=False)
+    fold_time_windows = generate_walk_forward_folds(
+        year          = year,
+        train_months  = train_months,
+        valid_months  = valid_months,
+        shift_months  = shift_months,
+        purge_minutes = purge_minutes,
+        n_folds       = n_folds,
     )
-    return {str(k): v for k, v in zip(rows["fold_id"], rows["count"], strict=False)}
+
+    ctas_sql = build_sample_ctas_sql(
+        model_id          = model_id,
+        snapshot_id       = snapshot_id,
+        seed              = seed,
+        target_cols       = target_cols,
+        fold_time_windows = fold_time_windows,
+    )
+    conn.execute(ctas_sql)
+
+    sample_fqn = sample_table_fqn(model_id)
+    n_rows_row = conn.execute(f"SELECT COUNT(*) FROM {sample_fqn}").fetchone()
+    n_rows     = int(n_rows_row[0]) if n_rows_row else 0
+    if n_rows == 0:
+        raise ValueError(
+            f"Sample is empty — snapshot snap.\"{snapshot_id}\" has no rows with "
+            f"non-null targets {target_cols}."
+        )
+
+    fold_row_counts = _fold_counts(conn, sample_fqn)
+
+    feature_set_id = build_feature_set_id(asset_id, horizon, direction, selected)
+    registry.upsert(
+        conn,
+        "feature_sets",
+        {
+            "feature_set_id": feature_set_id,
+            "snapshot_id":    snapshot_id,
+            "n_input":        n_input,
+            "n_selected":     len(selected),
+            "selected_cols":  selected,
+            "status":         "candidate",
+        },
+    )
+    _link_model(conn, model_id, snapshot_id, feature_set_id)
+
+    logger.info(
+        "create_snapshot_sample: %s rows=%d folds=%s fs=%s (n_input=%d n_selected=%d)",
+        sample_fqn, n_rows, fold_row_counts, feature_set_id, n_input, len(selected),
+    )
+    return {
+        "model_id":        model_id,
+        "snapshot_id":     snapshot_id,
+        "sample_table":    sample_fqn,
+        "n_rows":          n_rows,
+        "fold_row_counts": fold_row_counts,
+        "feature_set_id":  feature_set_id,
+        "n_input":         n_input,
+        "n_selected":      len(selected),
+    }
+
+
+# %% Internal — config resolution
+
+
+def _horizon_from_target(target_name: str) -> int:
+    """Parse the forward-window bar count from a target name (e.g. long_mfe_fw60 -> 60)."""
+    token = target_name.rsplit("_fw", 1)
+    if len(token) == 2 and token[1].isdigit():
+        return int(token[1])
+    return 60
+
+
+def _direction_from_target(target_name: str) -> str:
+    """Map a target prefix to the direction token (long -> l, short -> s)."""
+    prefix = target_name.split("_", 1)[0]
+    return _DIRECTION_BY_TARGET_PREFIX.get(prefix, "l")
+
+
+def _anchor_year(sampling_meta: dict[str, Any]) -> int:
+    """Resolve the anchor calendar year from sampling metadata (matches legacy logic)."""
+    if "year" in sampling_meta:
+        return int(sampling_meta["year"])
+    sample_id = sampling_meta.get("sample_id", "")
+    if "_yearly_" in sample_id:
+        return int(sample_id.split("_yearly_")[-1])
+    if sample_id:
+        tail = sample_id.split("_")[-1]
+        if tail.isdigit():
+            return int(tail)
+    return 2023
+
+
+def _resolve_selected_features(artifact_dir: Path, target_name: str) -> list[str] | None:
+    """Read the FE feature_set.json selection, if present, else None (= all feat_*).
+
+    The feature_engineering step (plan 5, step 3) writes ``selected`` into
+    ``<artifact_dir>/feature_engineering/feature_set.json``.  When that file is
+    absent (sample created before FE), the full feat_* superset is the selection.
+    """
+    fe_path = artifact_dir / "feature_engineering" / "feature_set.json"
+    if not fe_path.exists():
+        return None
+    payload  = json.loads(fe_path.read_text(encoding="utf-8"))
+    selected = payload.get("selected")
+    if not selected:
+        return None
+    return [c for c in selected if isinstance(c, str) and c.startswith("feat_")]
+
+
+# %% Internal — DuckDB helpers
+
+
+def _ensure_model_schema(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create the ``model`` schema in the (default) lab database if absent."""
+    conn.execute("CREATE SCHEMA IF NOT EXISTS model")
+
+
+def _snapshot_exists(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> bool:
+    """Return True if the snap.\"<snapshot_id>\" table exists in the lab database."""
+    row = conn.execute(
+        "SELECT 1 FROM information_schema.tables"
+        " WHERE table_schema = 'snap' AND table_name = ?",
+        [snapshot_id],
+    ).fetchone()
+    return row is not None
+
+
+def _snapshot_feature_columns(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> list[str]:
+    """Return the snapshot's feat_* columns, sorted (the logical feature superset)."""
+    rows = conn.execute(f'SELECT * FROM snap."{snapshot_id}" LIMIT 0').description
+    cols = [d[0] for d in rows]
+    return sorted(c for c in cols if c.startswith("feat_"))
+
+
+def _fold_counts(conn: duckdb.DuckDBPyConnection, sample_fqn: str) -> dict[str, int]:
+    """Return per-fold row counts as a {fold_id_str: count} dict."""
+    rows = conn.execute(
+        f"SELECT fold_id, COUNT(*) FROM {sample_fqn} GROUP BY fold_id ORDER BY fold_id"
+    ).fetchall()
+    return {str(r[0]): int(r[1]) for r in rows}
+
+
+def _link_model(
+    conn           : duckdb.DuckDBPyConnection,
+    model_id       : str,
+    snapshot_id    : str,
+    feature_set_id : str,
+) -> None:
+    """Upsert the model's snapshot + feature_set link into reg.models (idempotent)."""
+    registry.upsert(
+        conn,
+        "models",
+        {
+            "model_id":       model_id,
+            "snapshot_id":    snapshot_id,
+            "feature_set_id": feature_set_id,
+            "status":         "sampled",
+        },
+    )

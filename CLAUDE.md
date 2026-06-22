@@ -171,9 +171,9 @@ Mindkét esetben a ticket validálása (→ `done_`) a **validator_agent** felad
 | `src/strategy/` (isotonic calibration, Optuna sweep, strategy artifacts) | `modeling_agent` |
 | `src/trading/` (live service, journal, exchange client) | `ui_agent` |
 | `src/ui/` (Streamlit dashboard, pages, components) | `ui_agent` |
-| `.agent/`, tooling, infra, dependencies | `code_doc_agent` |
-| `_doc_/analysis/`, ML EDA, feature/model analysis notebooks | `analyst_agent` |
-| `_doc_/` X000, X100 szintek — módszertani háttér és üzleti rationale | `methodology_agent` |
+| `.agent/`, tooling, infra, dependencies; `_doc_/database_and_code_doc/` (kód-referencia zóna) | `code_doc_agent` |
+| `_doc_/models_doc/` (modell-report notebookok, .ipynb→Quarto), ML EDA | `analyst_agent` |
+| `_doc_/methodology_doc/` (X000/X100 módszertani háttér és üzleti rationale, kód-mentes) | `methodology_agent` |
 | `research/` | `analyst_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 

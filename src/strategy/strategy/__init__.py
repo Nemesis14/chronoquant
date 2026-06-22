@@ -1,8 +1,9 @@
 """ChronoQuant strategy subpackage.
 
 Modules:
-    build_table : Strategy table build from two model predictions + targets.
-    calibrate   : Isotonic regression score calibration.
-    optimize    : Optuna-based entry/exit parameter optimization.
-    artifacts   : strategy_artifact.json read/write.
+    build_table   : Scored-table build from the snap ⋈ model.__pred join.
+    calibrate     : Rank + isotonic regression score calibration.
+    optimize      : Optuna-based entry/exit parameter optimization.
+    artifacts     : strat.* table writes + strategy_artifact.json + registry.
+    session_naming: Strategy session_id derivation.
 """

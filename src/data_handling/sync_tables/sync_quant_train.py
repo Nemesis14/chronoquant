@@ -20,7 +20,6 @@ Range rebuild (optional): DELETE range + INSERT — for incremental pipeline use
 from __future__ import annotations
 
 import logging
-
 from pathlib import Path
 
 import utils

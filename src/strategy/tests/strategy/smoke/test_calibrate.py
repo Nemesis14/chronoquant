@@ -18,8 +18,8 @@ pytestmark = pytest.mark.smoke
 # ---------------------------------------------------------------------------
 
 
-def _make_strategy_table(n: int = 200) -> pd.DataFrame:
-    """Return a synthetic strategy_table DataFrame."""
+def _make_scored_table(n: int = 200) -> pd.DataFrame:
+    """Return a synthetic scored table (output of build_scored_table)."""
     rng = np.random.default_rng(42)
     open_times = pd.date_range("2025-10-01", periods=n, freq="min")
     return pd.DataFrame({
@@ -37,65 +37,57 @@ def _make_strategy_table(n: int = 200) -> pd.DataFrame:
 
 
 def test_fit_calibration_adds_cal_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """fit_calibration() runs without error and adds all expected columns."""
+    """fit_calibration() returns a calibrated DataFrame with all expected columns."""
     import utils
 
-    session_id   = "test_calib_session"
-    artifact_dir = tmp_path / "artifacts" / session_id
-    artifact_dir.mkdir(parents=True)
+    session_id = "test_calib_session"
 
-    # Write synthetic strategy_table.parquet
-    df = _make_strategy_table(200)
-    parquet_path = artifact_dir / "strategy_table.parquet"
-    df.to_parquet(parquet_path, compression="zstd", index=False)
-
-    # Patch utils._resolve_path to point at tmp_path
+    # Patch utils._resolve_path to point at tmp_path (artifact files land here)
     monkeypatch.setattr(utils, "_resolve_path", lambda p: str(tmp_path / p))
 
-    # start / end cover first 100 rows (~100 minutes from 2025-10-01)
-    iso_long, iso_short = fit_calibration(
+    scored = _make_scored_table(200)
+    calibrated, iso_long, iso_short = fit_calibration(
         session_id = session_id,
+        scored_df  = scored,
         start      = "2025-10-01",
         end        = "2025-10-01",
     )
 
-    # Reload updated parquet
-    updated = pd.read_parquet(parquet_path)
-
-    # Isotonic columns still present
-    assert "pred_long_cal"  in updated.columns, "pred_long_cal missing after calibration"
-    assert "pred_short_cal" in updated.columns, "pred_short_cal missing after calibration"
+    # Isotonic columns present
+    assert "pred_long_cal"  in calibrated.columns, "pred_long_cal missing after calibration"
+    assert "pred_short_cal" in calibrated.columns, "pred_short_cal missing after calibration"
 
     # Rank columns present
-    assert "score_pct_long"  in updated.columns, "score_pct_long missing"
-    assert "score_pct_short" in updated.columns, "score_pct_short missing"
-    assert "bucket_long"     in updated.columns, "bucket_long missing"
-    assert "bucket_short"    in updated.columns, "bucket_short missing"
+    assert "score_pct_long"  in calibrated.columns, "score_pct_long missing"
+    assert "score_pct_short" in calibrated.columns, "score_pct_short missing"
+    assert "bucket_long"     in calibrated.columns, "bucket_long missing"
+    assert "bucket_short"    in calibrated.columns, "bucket_short missing"
 
     # Bucket values are ints in 1-10
-    assert updated["bucket_long"].between(1, 10).all(),  "bucket_long out of 1-10 range"
-    assert updated["bucket_short"].between(1, 10).all(), "bucket_short out of 1-10 range"
-    assert updated["bucket_long"].dtype  in (np.dtype("int32"), np.dtype("int64")), \
+    assert calibrated["bucket_long"].between(1, 10).all(),  "bucket_long out of 1-10 range"
+    assert calibrated["bucket_short"].between(1, 10).all(), "bucket_short out of 1-10 range"
+    assert calibrated["bucket_long"].dtype  in (np.dtype("int32"), np.dtype("int64")), \
         "bucket_long not int dtype"
-    assert updated["bucket_short"].dtype in (np.dtype("int32"), np.dtype("int64")), \
+    assert calibrated["bucket_short"].dtype in (np.dtype("int32"), np.dtype("int64")), \
         "bucket_short not int dtype"
 
     # Row count unchanged
-    assert len(updated) == 200, "Row count changed unexpectedly"
+    assert len(calibrated) == 200, "Row count changed unexpectedly"
     assert iso_long  is not None
     assert iso_short is not None
 
     # Rank lookup parquets exist
+    artifact_dir      = tmp_path / "artifacts" / session_id
     lookup_long_path  = artifact_dir / "rank_lookup_long.parquet"
     lookup_short_path = artifact_dir / "rank_lookup_short.parquet"
     assert lookup_long_path.exists(),  "rank_lookup_long.parquet not created"
     assert lookup_short_path.exists(), "rank_lookup_short.parquet not created"
 
+    # isotonic pkl files exist
+    assert (artifact_dir / "isotonic_long.pkl").exists(),  "isotonic_long.pkl not created"
+    assert (artifact_dir / "isotonic_short.pkl").exists(), "isotonic_short.pkl not created"
+
     # Lookup parquet has required columns
     lookup_long = pd.read_parquet(lookup_long_path)
     for col in ("score_raw", "score_pct", "bucket_id"):
         assert col in lookup_long.columns, f"rank_lookup_long missing column: {col}"
-
-    lookup_short = pd.read_parquet(lookup_short_path)
-    for col in ("score_raw", "score_pct", "bucket_id"):
-        assert col in lookup_short.columns, f"rank_lookup_short missing column: {col}"

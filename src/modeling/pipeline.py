@@ -11,6 +11,7 @@ Steps (in order):
     feature_engineering Run 01_feature_engineering.ipynb via papermill → artifact/feature_engineering/
     search              Hyperparameter search → artifact/search/
     train               Fit final model → artifact/model.pkl, features.json, params.json
+    predict             Score the full snapshot range → model."<model_id>__pred" table
 
 When --step is omitted, all steps run in order.
 """
@@ -27,7 +28,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 import utils  # noqa: E402
 
 NOTEBOOK_TEMPLATE = _ROOT / "src" / "modeling" / "01_feature_engineering.ipynb"
-ALL_STEPS = ["setup", "sample", "feature_engineering", "search", "train"]
+ALL_STEPS = ["setup", "sample", "feature_engineering", "search", "train", "predict"]
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +44,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--step", choices=ALL_STEPS, default=None,
         help="Single pipeline step to run. Omit to run all steps in order. "
-             "Steps: setup → sample → feature_engineering → search → train",
+             "Steps: setup → sample → feature_engineering → search → train → predict",
     )
     parser.add_argument(
         "--stage", choices=["smoke", "explore", "refine"], default="smoke",
@@ -60,6 +61,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--fold-limit", type=int, default=None,
         help="Limit to first N validation folds in search step. Default: stage default",
+    )
+    parser.add_argument(
+        "--snapshot", default=None,
+        help="Snapshot id for the 'sample' step. Overrides sampling.snapshot_id in models.json.",
     )
     return parser.parse_args()
 
@@ -88,32 +93,55 @@ def step_setup(model_id: str, meta: dict, artifact_dir: Path) -> None:
     manifest_path.write_text(json.dumps(manifest, indent=4), encoding="utf-8")
     print(f"[setup] manifest.json written -> {manifest_path}")
 
+    # Provenance: reg.models draft + manifest provenance (snapshot_id, content_sha256).
+    from modeling import provenance
+    provenance.register_model_draft(model_id, meta, artifact_dir)
+    provenance.register_artifacts(model_id, [("manifest", manifest_path)])
+    print("[setup] reg.models draft + manifest provenance written")
+
 
 # ---------------------------------------------------------------------------
 # Step: sample
 # ---------------------------------------------------------------------------
 
-def step_sample(model_id: str, artifact_dir: Path) -> None:
-    """Create model-specific sample.
+def step_sample(model_id: str, artifact_dir: Path, snapshot_id: str | None = None) -> None:
+    """Create the model's ``model."<model_id>__sample"`` table from a snapshot.
 
-    Dispatches to walk-forward or yearly sampling based on the 'sampling_mode'
-    key in config/models.json.  If absent or 'yearly', uses the legacy yearly
-    random-week sampler.  If 'walk_forward', uses the walk-forward CV sampler.
+    Snapshot-native path (plan 5, steps 2-3): the source is an immutable
+    ``snap."<snapshot_id>"`` table and the output is a small DuckDB table
+    (open_time + target(s) + fold_id) in the lab database; the feature selection
+    is registered in ``reg.feature_sets``.  The ``snapshot_id`` may be passed
+    explicitly (e.g. from ``--snapshot`` CLI arg) or resolved from the model's
+    sampling config (``sampling.snapshot_id``).
     """
-    print(f"[sample] Creating model-specific sample in: {artifact_dir}")
-    models_cfg   = utils.load_models_config()
-    meta         = models_cfg["models"][model_id]
-    sampling_mode = meta.get("sampling", {}).get("sampling_mode", "yearly")
+    print(f"[sample] Creating model.\"{model_id}__sample\" from snapshot")
+    models_cfg  = utils.load_models_config()
+    meta        = models_cfg["models"][model_id]
+    if not snapshot_id:
+        snapshot_id = meta.get("sampling", {}).get("snapshot_id")
+    if not snapshot_id:
+        raise ValueError(
+            f"Model {model_id} has no sampling.snapshot_id — pass --snapshot <id> "
+            "or set sampling.snapshot_id in config/models.json after running "
+            "src/data_handling/05_create_snapshot.py."
+        )
 
-    if sampling_mode == "walk_forward":
-        from modeling.sampling import create_model_walk_forward_sample
-        create_model_walk_forward_sample(model_id)
-        print(f"[sample] Walk-forward sample written -> {artifact_dir / 'sample_train_valid.parquet'}")
-    else:
-        from modeling.sampling import create_model_sample
-        create_model_sample(model_id)
-        print(f"[sample] Yearly sample written -> {artifact_dir / 'sample_train_valid.parquet'}")
+    from modeling.sampling import create_model_sample
+    summary = create_model_sample(model_id, snapshot_id)
+    print(
+        f"[sample] {summary['sample_table']} created: rows={summary['n_rows']} "
+        f"folds={summary['fold_row_counts']} feature_set={summary['feature_set_id']} "
+        f"(n_input={summary['n_input']} n_selected={summary['n_selected']})"
+    )
 
+    # Provenance: create_model_sample already upserts reg.models (status='sampled')
+    # + snapshot/feature_set link; here we record the manifest provenance fields.
+    from modeling import provenance
+    provenance.update_manifest_provenance(
+        artifact_dir,
+        snapshot_id    = summary["snapshot_id"],
+        feature_set_id = summary["feature_set_id"],
+    )
     _update_manifest_status(artifact_dir, "sample_done")
 
 
@@ -163,6 +191,16 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
     else:
         print(f"[feature_engineering] WARNING: quarto render failed:\n{result.stderr}")
 
+    # Provenance: link the FE-selected feature_set + register notebook/html artifacts.
+    from modeling import provenance
+    feature_set_id = provenance.link_feature_set(model_id, asset_id=meta.get("asset_id"))
+    provenance.register_artifacts(
+        model_id,
+        [("fe_notebook", output_nb), ("fe_html", output_html)],
+        asset_id=meta.get("asset_id"),
+    )
+    print(f"[feature_engineering] reg.feature_sets linked: {feature_set_id}")
+
     _update_manifest_status(artifact_dir, "feature_engineering_done")
 
 
@@ -203,6 +241,27 @@ def step_train(model_id: str) -> None:
         f"output_dir={result.get('artifact_dir')}"
     )
     _update_manifest_status(_artifact_dir_for(model_id), "train_done")
+
+
+# ---------------------------------------------------------------------------
+# Step: predict
+# ---------------------------------------------------------------------------
+
+def step_predict(model_id: str) -> None:
+    """Score the full snapshot range and write ``model."<model_id>__pred"`` (plan 5 step 6).
+
+    Offline prediction: the trained model scores the entire immutable snapshot
+    range into a separate ``model."<id>__pred"`` table (open_time, pred), leaving
+    the snapshot untouched. Sets ``reg.models`` status to ``predicted``.
+    """
+    from modeling.predict import predict_offline
+    print(f"[predict] Scoring full snapshot range for: {model_id}")
+    result = predict_offline(model_id, verify_snapshot=False)
+    print(
+        f"[predict] {result['pred_table']} written: rows={result['n_rows']} "
+        f"snapshot={result['snapshot_id']} immutable={result['snapshot_immutable']}"
+    )
+    _update_manifest_status(_artifact_dir_for(model_id), "predict_done")
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +311,7 @@ def main() -> None:
         if step == "setup":
             step_setup(model_id, meta, artifact_dir)
         elif step == "sample":
-            step_sample(model_id, artifact_dir)
+            step_sample(model_id, artifact_dir, snapshot_id=args.snapshot)
         elif step == "feature_engineering":
             step_feature_engineering(model_id, meta, artifact_dir)
         elif step == "search":
@@ -265,6 +324,8 @@ def main() -> None:
             )
         elif step == "train":
             step_train(model_id)
+        elif step == "predict":
+            step_predict(model_id)
 
     print(f"\n[pipeline] All steps complete for {model_id}")
 

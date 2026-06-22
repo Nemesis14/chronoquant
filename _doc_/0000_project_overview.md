@@ -1,7 +1,12 @@
 ﻿# ChronoQuant — Project Overview
 
 Single source of truth for the orchestrator. Detailed module documentation lives
-in flat numbered `_doc_/XXXX_*.md` files; this file is for cross-domain context only.
+in three zone subdirectories under `_doc_/` (database_and_code_doc / methodology_doc / models_doc); this file is for cross-domain context only.
+
+**Adat-architektúra referenciák (epic_031 DuckDB-natív migráció után):**
+- `_doc_/database_and_code_doc/0002_data_architecture.md` — 3-fájlos tárolási topológia, sémák, ATTACH
+- `_doc_/database_and_code_doc/0003_runtime_flow.md` — éles folyamat: sync → live predict → trade → deploy
+- `_doc_/database_and_code_doc/0004_model_lifecycle.md` — modell életciklus: snapshot → sample → FE → search → train → predict → deploy/cutover
 
 ---
 
@@ -36,16 +41,16 @@ Owns all live data: ingestion, storage, sync, and validation.
 
 ### `src/modeling/` — Offline ML development
 Produces model artifacts from historical data. Runs ad-hoc, not in production.
-- Creates yearly samples (parquet), searches hyperparameters, fits final models
-- Outputs: `model.pkl`, `features.json`, `params.json`, updated `sample_train_valid.parquet`
-- Does not operate live; does not decide thresholds or rules; does not produce OOS scores
+- Snapshot-natív pipeline: `snap."<snapshot_id>"` a forrás; kimenetek DuckDB táblák (`model.__sample`, `model.__pred`) + fájl-artefaktok
+- Outputs: `model.pkl`, `features.json`, `params.json`, `model."<id>__pred"` (offline predikció); registry provenance minden lépésnél
+- Does not operate live; does not decide thresholds or rules
 
 ### `src/strategy/` — Offline strategy calibration
 Consumes model artifacts to calibrate trading rules. Runs ad-hoc, not in production.
-- Builds strategy table: both model predictions + targets from `quant_train` (DuckDB)
-- Calibrates raw regression scores via isotonic regression → E[mfe | score]
+- Strategy tábla: `snap ⋈ model_long.__pred ⋈ model_short.__pred` JOIN (parquet-mozgatás nélkül)
+- Calibrates raw regression scores via rank percentile lookup + isotonic regression
 - Optimises entry/exit/cooldown with Optuna (continuous MFE objective)
-- Outputs: `strategy_artifact.json`, `isotonic_long/short.pkl`, `strategy_table.parquet`, `sweep_results.csv`
+- Outputs: `strat."<session>__trades/__equity/__cutoffs"` (lab.duckdb) + `strategy_artifact.json`, `rank_lookup_*.parquet`, `isotonic_*.pkl` (fájl); reg.strategies + reg.artifacts bejegyzés
 
 ### `src/trading/` — Live operations only
 Runs the calibrated strategy live. Does not calibrate or optimise — only executes.
@@ -66,37 +71,40 @@ Exploratory code, prototypes, and ideas not yet ready for production.
 
 ## Data Flow
 
+A rendszer DuckDB-natív, 3-fájlos architektúrán alapul (epic_031 után).
+Részletes leírás: → `_doc_/database_and_code_doc/0002_data_architecture.md` (topológia),
+`_doc_/database_and_code_doc/0003_runtime_flow.md` (éles folyamat), `_doc_/database_and_code_doc/0004_model_lifecycle.md` (modell életciklus).
+
 ```
 Binance API
     │
     ▼
-database/  ──sync──▶  ohlcv  ──sync──▶  feat_ohlcv_quant  ──sync──▶  target
-                                                │                         │
-                                                └──────────┬─────────────┘
-                                                           │
-modeling/                                           quant_train (ad-hoc build)
-  0_create_sample   ◀──────────────────────────────────────┘
-  1_feature_engineering
-  2_hyper_param_search
-  3_fit_model  ──────────▶  model artifact (model.pkl + features.json + params.json)
-                            sample_train_valid.parquet (pred_{dir} added)
+live.duckdb (main séma)
+  sync ──▶  ohlcv ──▶ feat_ohlcv_quant ──▶ target ──▶ quant_train
+  sync_predictions ──▶ predictions (long/short stamp)
 
-strategy/             ◀──  model artifacts (model.pkl + features.json) × 2 models
-  0_build_strategy_table   ◀──  quant_train (DuckDB) + target (DuckDB)
-                           ──▶  strategy_table.parquet
-  1_calibrate_scores       ◀──  strategy_table.parquet
-                           ──▶  isotonic_long/short.pkl + updated strategy_table.parquet
-  2_optimize_strategy      ◀──  strategy_table.parquet (calibrated)
-                           ──▶  strategy_artifact.json + sweep_results.csv
+lab.duckdb (snap / model / strat sémák)
+  05_create_snapshot   ◀── quant_train (ATTACH RO)  ──▶  snap.<snapshot_id> (immutable CTAS)
+  create_sample        ◀── snap.<snapshot_id>        ──▶  model.<id>__sample (hourly+fold)
+  pipeline FE          ◀── model.__sample             ──▶  reg.feature_sets (logikai szures)
+  pipeline search      ◀── model.__train_input VIEW   ──▶  reg.search_runs + search artifacts
+  pipeline train       ◀── model.__train_input VIEW   ──▶  model.pkl + artifacts/
+  predict_offline      ◀── snap.<snapshot_id>         ──▶  model.<id>__pred (teljes range)
+  00_run_strategy_session ◀── snap x model_long.__pred x model_short.__pred JOIN
+                        ──▶  strat.<session>__trades/__equity/__cutoffs (lab.duckdb)
+                        ──▶  strategy_artifact.json + rank_lookup*.parquet (artifacts/)
+
+registry.duckdb (reg séma)
+  minden lepesnel: reg.snapshots / models / feature_sets / search_runs / strategies / deployments / artifacts
+
+deploy/cutover:
+  06_trigger_deploy.py  ──▶  reg.deployments (pending)
+  sync_predictions      ──▶  predictions (backfill+swap, atomikus tranzakcio)
 
 trading/
-  live loop           ◀──  predictions table (database sync)
-                      ◀──  strategy_artifact.json + isotonic_long/short.pkl
-                      ──▶  trade journal
+  live loop  ◀──  predictions (live.duckdb)  ◀──  strategy_artifact.json + rank_lookup*.parquet
 
-database/  ◀──  prediction sync uses model artifact  ──▶  predictions table
-
-ui/  ◀──  predictions table + strategy artifact + trade journal
+ui/  ◀──  predictions + strat.* táblák (lab.duckdb ATTACH) + trade journal
 ```
 
 ---
@@ -105,15 +113,19 @@ ui/  ◀──  predictions table + strategy artifact + trade journal
 
 | Data type | Where | Reason |
 |-----------|-------|--------|
-| Live OHLCV, features, targets, predictions | DuckDB | Synced, queryable, updatable |
-| `quant_train` | DuckDB | Ad-hoc join table, rebuilt before training |
-| Yearly samples | Parquet (`artifacts/<model_id>/sample_train_valid.parquet`) | Model-specific; contains all feat_* + own target + pred_{dir} (after train step) |
-| Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output |
+| Live OHLCV, features, targets, predictions | `live.duckdb` main séma | Synced, queryable, updatable |
+| `quant_train` | `live.duckdb` main séma | Ad-hoc join table, rebuilt before training |
+| Range snapshots | `lab.duckdb` snap séma (`snap."<snapshot_id>"`) | Immutable CTAS + content-hash; reprodukálható modell-alap |
+| Hourly samples + fold_id | `lab.duckdb` model séma (`model."<id>__sample"`) | Kicsi (~tízezer sor); sokszor olvasható |
+| Offline predictions (teljes range) | `lab.duckdb` model séma (`model."<id>__pred"`) | Snapshot-tól elkülönítve; snap hash sértetlen marad |
+| Strategy tables (trades/equity/cutoffs) | `lab.duckdb` strat séma (`strat."<session>__*"`) | UI és validáció közvetlen query-vel éri el |
+| Registry (provenance lánc) | `registry.duckdb` reg séma | Normalizált igazságforrás; assets → snapshots → models → strategies → deployments |
+| Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output; feature_set.json → reg.feature_sets |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
-| Strategy artifacts | `artifacts/{session_id}/` — naming: `strategy_{asset}_fw{horizon}_{start}_{end}` (e.g. `strategy_lgbm_solusdt_fw60_2101_2605`); contains `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `strategy_table.parquet`, `sweep_results.csv`, `trades.parquet`, `equity_curve.parquet`, `summary.json`, `strategy_report.ipynb/.html` | Produced by `src/strategy/`; runtime use by live trading loop |
+| Strategy artifacts | `artifacts/<session_id>/` — `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `sweep_results.csv` | Runtime use by live trading loop; útvonalak a reg.artifacts-ban |
 
-**Rule:** if a table needs to be synced incrementally → DuckDB. If it is a static
-snapshot produced by a modeling or analysis run → Parquet.
+**Rule:** strukturált, queryolható adat → DuckDB (séma + tábla). Blob és ember-report → fájl.
+Mindent a registry köt össze. Részletek: → `_doc_/database_and_code_doc/0002_data_architecture.md`
 
 ---
 
@@ -157,10 +169,13 @@ src/
 research/           Sandbox — explorations not yet production-ready
   elliott/            Elliott wave parser, validators, scanners, backtest
 
-src/analyst/        Analyst Python segédmodulok (table_formatting, plot_utils, db_utils, CSS, _quarto.yml)
-_doc_/              Module documentation + analyst notebooks
-  XXXX_*.ipynb        Analyst notebookok (közvetlenül itt)
-  XXXX_*.html         Quarto-rendered HTML output
+analyst/            Analyst Python segédmodulok (table_formatting, plot_utils, db_utils, CSS, _quarto.yml, doc_renderer/)
+_doc_/              Dokumentáció — három zóna + globális gyökér
+  0000_*, 0001_*      Globális (project overview, agentic rendszer)
+  database_and_code_doc/   ZÓNA 1 — DB séma + kód-referencia (.md) — code_doc_agent
+  methodology_doc/         ZÓNA 2 — rationale, döntések, módszertan (.md, kód-mentes) — methodology_agent
+  models_doc/              ZÓNA 3 — modellenkénti report (.ipynb→Quarto) — analyst_agent
+  _plans_/                 Draft rendszertervek (nem kanonikus zóna)
 _jira_/             Local task tracking (epics → tasks → stories); jira.json = epic counter
 .agent/             Agent rules, skills, tool docs
 config/             JSON config files (assets, features, models, strategies, trading…)
@@ -185,27 +200,38 @@ artifacts/          Model and strategy artifacts
     summary.json                    Session summary: n_trades, win_rate, gross_return, equity_basis
     strategy_report.ipynb           Analyst report notebook
     strategy_report.html            Quarto-rendered HTML report
-database/           DuckDB files only (samples no longer stored here)
+database/           DuckDB files (3-fájlos topológia — részletek: _doc_/database_and_code_doc/0002_data_architecture.md)
   solusdt/
-    solusdt.duckdb
+    solusdt.duckdb         <- LIVE (main séma)
+    solusdt_lab.duckdb     <- LAB (snap / model / strat sémák)
+  _registry/
+    registry.duckdb        <- REGISTRY (reg séma, globális)
 ```
 
 ---
 
 ## Database (DuckDB)
 
-**One DuckDB file per asset:** `database/<asset_id>/<asset_id>.duckdb`
+**3-fájlos topológia (epic_031 után):**
+
+| Fájl | Séma | Tartalom |
+|------|------|---------|
+| `database/solusdt/solusdt.duckdb` | `main` | LIVE: ohlcv, feat_ohlcv_quant, target, quant_train, predictions |
+| `database/solusdt/solusdt_lab.duckdb` | `snap`, `model`, `strat` | LAB: immutable snapshots, sample/pred táblák, strategy táblák |
+| `database/_registry/registry.duckdb` | `reg` (default main) | REGISTRY: assets, snapshots, feature_sets, models, search_runs, strategies, deployments, artifacts |
+
+Részletes leírás: → `_doc_/database_and_code_doc/0002_data_architecture.md`
 
 Currently only one active asset: **solusdt** (SOLUSDT, 1m, futures).
 
-### Tables
+### Live táblák (main séma)
 
 | Table | Primary Key | Purpose |
 |-------|-------------|---------|
 | `ohlcv` | `open_time` TIMESTAMP | Raw 1-minute candles from Binance |
 | `target` | `open_time` TIMESTAMP | fw60 forward outcomes: `long_mfe_fw60`, `short_mfe_fw60` + 8 further columns |
 | `feat_ohlcv_quant` | `open_time` TIMESTAMP | Quantitative features (`feat_` prefix) |
-| `predictions` | `open_time` TIMESTAMP | Model probability scores + signals |
+| `predictions` | `open_time` TIMESTAMP | Model scores + signals + `long_model_id` / `short_model_id` stamp |
 | `quant_train` | `open_time` TIMESTAMP | Ad-hoc join: all `feat_*` + `long_mfe_fw60` + `short_mfe_fw60`; NULL targets excluded |
 
 `quant_train` is rebuilt ad-hoc before training via `src/data_handling/03_build_quant_train.py`.
@@ -242,6 +268,9 @@ pl. `lgbm_solusdt_l_fw60_2101_2605` (anchor 2023-01, valid through 2026-05)
 ### Pipeline (runs offline, in order)
 
 ```bash
+# Snapshot létrehozása (egyszer, vagy újrahasználat a registry-ből):
+uv run python src/data_handling/05_create_snapshot.py --asset-id solusdt --start 2021-01-01 --end 2025-12-31
+
 # Teljes pipeline egy modellre:
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021
 
@@ -251,15 +280,20 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step s
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step feature_engineering
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage smoke
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step predict
+
+# Deploy trigger:
+uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_combo_2101_2605
 ```
 
-| Lépés | Input | Output (artifact-ban) |
-|-------|-------|----------------------|
-| `setup` | `config/models.json` | `manifest.json` |
-| `sample` | `quant_train` (DuckDB) | `sample_train_valid.parquet`, `metadata.json`, `audit.json` |
-| `feature_engineering` | `sample_train_valid.parquet` (artifact) | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` |
-| `search` | `sample_train_valid.parquet` + `feature_set.json` (artifact) | `search/search_best.json`, `search_trials.jsonl` |
-| `train` | `sample_train_valid.parquet` + search results | `model.pkl`, `features.json`, `params.json`, `sample_train_valid.parquet` (pred hozzáadva) |
+| Lépés | Input | Output |
+|-------|-------|--------|
+| `setup` | `config/models.json` | `manifest.json` (artifact); `reg.models` draft |
+| `sample` | `snap."<snapshot_id>"` (lab.duckdb) | `model."<id>__sample"` (lab.duckdb); `reg.feature_sets`, `reg.models` sampled |
+| `feature_engineering` | `model.__sample` | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` (artifact); `reg.feature_sets` link |
+| `search` | `model."<id>__train_input"` VIEW | `search/search_best.json`, `search_trials.jsonl` (artifact); `reg.search_runs` |
+| `train` | `model."<id>__train_input"` VIEW | `model.pkl`, `features.json`, `params.json` (artifact); `reg.models` trained |
+| `predict` | `snap."<snapshot_id>"` + `model.pkl` | `model."<id>__pred"` (lab.duckdb); `reg.models` predicted |
 
 ### Yearly sample model
 
@@ -370,7 +404,9 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 - **Polars for features:** feature computation uses Polars; pandas allowed elsewhere
 - **No print() in library code** — use `logging` or `st.*`
 - **Upserts only** — no delete/truncate patterns in sync operations
-- **DuckDB = synced/live, Parquet = static snapshots** — never invert this
+- **DuckDB-natív:** strukturált adat → DuckDB (séma+tábla); blob/report → fájl; registry köti össze
+- **3-fájlos topológia:** live.duckdb (sync) / lab.duckdb (modellezés) / registry.duckdb (katalógus); ATTACH-cal egyetlen connectionból joinolható
+- **Snapshot = immutable:** a `snap."<snapshot_id>"` tábla tartalma soha nem íródik felül; új adatállapot = új snapshot_id
 - **Elliott and research are isolated** — nothing in `research/` feeds the live pipeline
 
 ---
@@ -382,7 +418,7 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 | Database Agent | `src/data_handling/`, `config/assets.json`, DuckDB schema |
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts; `src/strategy/` |
 | UI Agent | `src/ui/`, `src/trading/` |
-| Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/` X110+ code reference files |
-| Analyst Agent | `_doc_/XXXX_*.ipynb` (elemzési notebookok), `src/analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`); user-célból indul, nem spec-ből; interaktív session |
-| Methodology Agent | `_doc_/` X000, X100 levels — business rationale, methodological decisions, parameter justification |
+| Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/database_and_code_doc/` (DB séma + kód-referencia zóna) |
+| Analyst Agent | `_doc_/models_doc/` (modell-report notebookok, .ipynb→Quarto), `analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`, `doc_renderer/`); user-célból indul, nem spec-ből; interaktív session |
+| Methodology Agent | `_doc_/methodology_doc/` — business rationale, methodological decisions, parameter justification (kód-mentes) |
 | Validator Agent | `pr_` ticket validation: ruff + pyright + pytest, then `done_` promotion |

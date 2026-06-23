@@ -6,6 +6,9 @@ A `BinanceFuturesClient` egy vékony adapter a `python-binance` Futures API föl
 Két futási módja van: `dry_run`, ahol a rendszer csak szimulált fill választ ad,
 és `live`, ahol aláírt market ordereket küld.
 
+> Módszertani háttér (dry-run vs live mód, Binance Futures integrációs döntések):
+> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
+
 ---
 
 ## Overview
@@ -94,3 +97,10 @@ Beolvassa a Binance kulcsokat `config/env.json` által mutatott fájlból, majd 
 szerveridő alapján korrigálja a `timestamp_offset` értéket.
 
 Returns: `binance.client.Client`
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7120_trading_service.md`](7120_trading_service.md) — `BinanceFuturesClient` hívási kontextus
+- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — live trading módszertan

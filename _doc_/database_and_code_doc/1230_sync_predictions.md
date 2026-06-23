@@ -1,14 +1,14 @@
 # sync_predictions.py — Inference és Predikció Beírás
 
-`src/database/sync_tables/sync_predictions.py`
+`src/data_handling/sync_tables/sync_predictions.py`
 
 Champion modellek betöltése, feature snapshot összeállítása ASOF join-nal, inference futtatása, unified long+short predikciók beírása.
 
 ---
 
-## `sync_predictions(start_time, end_time, asset_id)`
+## `sync_predictions(start_time, end_time, asset_id, backfill)`
 
-**Célja:** Predikciók generálása a megadott időtartományra és beírás a `predictions` táblába.
+**Célja:** Predikciók generálása a megadott időtartományra és beírás a `predictions` táblába. Deploy detektálás: ha `reg.deployments`-ben `status='pending'` sor van, atomikus predictions csere (cutover) fut.
 
 **Paraméterek:**
 
@@ -17,6 +17,7 @@ Champion modellek betöltése, feature snapshot összeállítása ASOF join-nal,
 | `start_time` | `str` | — | Inference kezdete (`YYYY-MM-DD HH:MM:SS`) |
 | `end_time` | `str \| None` | `None` | Inference vége (`None` = legújabb feature bar) |
 | `asset_id` | `str \| None` | `None` | Asset azonosító |
+| `backfill` | `bool` | `False` | Ha `True`, `backfill_predictions` használata (gap-fill, nem MAX-alapú) |
 
 ---
 
@@ -64,14 +65,14 @@ sequenceDiagram
 
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
-| `model_id` | `str` | Model azonosító (`<model_id>`) |
-| `model_meta` | `dict` | Model konfiguráció (paths, trainer, stb.) |
+| `model_id` | `str` | Model azonosító (csak log üzenetekhez) |
+| `model_meta` | `dict` | Model konfiguráció (`artifact_dir`, `trainer`, stb.) |
 
-**Visszatérési érték:** `tuple[Any, list[str]]` — `(model_object, feature_list)`
+**Visszatérési érték:** `tuple[object, list[str]] | None` — `(model_object, feature_list)` vagy `None` ha az artifact hiányzik.
 
 **Paths:**
-- `models/<model_id>/model.pkl` → `pickle.load`
-- `models/<model_id>/features.json` → JSON lista (feature nevekkel)
+- `utils._resolve_path(model_meta["artifact_dir"])/features.json` → JSON payload
+- `utils._resolve_path(model_meta["artifact_dir"])/model.pkl` → `pickle.load`
 
 ---
 
@@ -120,5 +121,23 @@ Az `insert_predictions` a következő egyesített DataFrame-et kapja:
 | `open_time` | `feat_ohlcv_quant.open_time` |
 | `close` | `feat_ohlcv_quant.close` |
 | `label_end_ts` | `open_time + fw_minutes` (config) |
+| `long_mfe_fw60` | `target` tábla join (vagy `NULL`) |
+| `short_mfe_fw60` | `target` tábla join (vagy `NULL`) |
 | `long_pred` | `_run_inference(long_model)` |
 | `short_pred` | `_run_inference(short_model)` |
+| `long_model_id` | `long_id` (champion model ID) |
+| `short_model_id` | `short_id` (champion model ID) |
+
+---
+
+## Deploy / Cutover
+
+Ha `reg.deployments`-ben `status='pending'` sor található az adott assetre, a `sync_predictions` atomikus predictions cserét hajt végre:
+
+1. `_detect_pending_deployment(asset_id)` — lekérdezi a pending sort
+2. `_resolve_strategy(strategy_id)` — long/short model_id-k a `reg.strategies`-ből
+3. `_load_pred_table_as_df(lab_path, long_id, short_id)` — pred táblák JOIN-ja a lab DB-ből
+4. `BEGIN; DELETE FROM predictions; INSERT ...; COMMIT` — atomikus csere
+5. `_activate_deployment(deployment_id)` — `pending → active` a registryben
+
+DuckDB MVCC garantálja, hogy a trading service sosem lát részleges táblát.

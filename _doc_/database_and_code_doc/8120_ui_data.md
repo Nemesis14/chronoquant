@@ -6,6 +6,9 @@ A dashboard olvasási rétege. Egyetlen modulban fogja össze a konfigurációs,
 DuckDB, trading journal és artifact alapú olvasásokat, hogy a Streamlit oldal
 és a komponensek ne közvetlenül SQL-lel dolgozzanak.
 
+> Módszertani háttér (adatréteg design, UI olvasási kontraktus):
+> → [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md)
+
 ---
 
 ## Overview
@@ -118,3 +121,12 @@ Long/short predikció oszlopnevek feloldása.
 ### `_read_sql(...)`, `_scalar(...)`, `_db_path(...)`, `_session_artifact_path(...)`, `_repo_path(...)`, `_quote_identifier(...)`, `_json_safe(...)`
 
 Közös SQL/path/JSON segédek.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`8110_ui_main.md`](8110_ui_main.md) — a fő orchestrációs oldal
+- [`8150_ui_components.md`](8150_ui_components.md) — komponensek, amelyek ezt a réteget hívják
+- [`7130_trading_journal.md`](7130_trading_journal.md) — journal read API
+- [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md) — dashboard módszertan

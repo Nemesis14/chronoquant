@@ -6,10 +6,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from trading.live.state import COOLDOWN, FLAT, LONG, TradingState
+from trading.live.state import FLAT, LONG, SHORT, TradingState
 from trading.live.strategy import (
     ENTER_LONG,
+    ENTER_SHORT,
     EXIT_LONG,
+    EXIT_SHORT,
     HOLD,
     evaluate,
 )
@@ -21,150 +23,189 @@ pytestmark = pytest.mark.smoke
 # ---------------------------------------------------------------------------
 
 _DECISION_PARAMS = {
-    "long_entry_pct"  : 0.90,
-    "short_entry_pct" : 0.90,
-    "min_edge_gap"    : 0.05,
-    "min_hold_minutes": 5,
+    "entry_cutoff"    : 0.97,
     "max_hold_minutes": 60,
-    "cooldown_minutes": 30,
-    "rearm_pct"       : 0.60,
-    "conflict_rule"   : "highest_edge",
+    "tp_spec"         : "0.75x_bucket_mean",
+    "sl_spec"         : "none",
+    "directions"      : ["long", "short"],
+    "same_bar_conflict_rule": "sl_first",
 }
 
 _NOW = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
 
 
-def _flat_armed() -> TradingState:
-    return TradingState(status=FLAT, armed=True)
-
-
-def _flat_unarmed() -> TradingState:
-    return TradingState(status=FLAT, armed=False)
+def _flat() -> TradingState:
+    return TradingState(status=FLAT)
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# FLAT state tests
 # ---------------------------------------------------------------------------
 
 
-def test_flat_armed_above_threshold_returns_enter_long() -> None:
-    """FLAT + armed + score_pct_long >= long_entry_pct → ENTER_LONG."""
-    state = _flat_armed()
+def test_flat_long_above_cutoff_returns_enter_long() -> None:
+    """FLAT + score_pct_long >= entry_cutoff → ENTER_LONG."""
+    state = _flat()
     decision, _reason = evaluate(
         state,
-        score_pct_long  = 0.95,
-        score_pct_short = 0.10,
+        score_pct_long  = 0.98,
+        score_pct_short = 0.50,
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == ENTER_LONG
 
 
-def test_flat_armed_both_below_threshold_returns_hold() -> None:
-    """FLAT + armed + both percentiles below thresholds → HOLD."""
-    state = _flat_armed()
+def test_flat_short_above_cutoff_returns_enter_short() -> None:
+    """FLAT + (1 - score_pct_short) >= entry_cutoff → ENTER_SHORT.
+
+    score_pct_short = 0.02 → 1 - 0.02 = 0.98 >= 0.97.
+    """
+    state = _flat()
     decision, _reason = evaluate(
         state,
         score_pct_long  = 0.50,
-        score_pct_short = 0.40,
+        score_pct_short = 0.02,
+        decision_params = _DECISION_PARAMS,
+        now             = _NOW,
+    )
+    assert decision == ENTER_SHORT
+
+
+def test_flat_both_below_cutoff_returns_hold() -> None:
+    """FLAT + both below entry_cutoff → HOLD."""
+    state = _flat()
+    decision, _reason = evaluate(
+        state,
+        score_pct_long  = 0.80,
+        score_pct_short = 0.20,   # 1 - 0.20 = 0.80 < 0.97
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == HOLD
 
 
-def test_flat_armed_both_signal_long_edge_wins() -> None:
-    """FLAT + armed + both signal, long edge > min_edge_gap → ENTER_LONG."""
-    state = _flat_armed()
+def test_flat_both_signal_long_priority() -> None:
+    """FLAT + both long and short trigger → ENTER_LONG (long has priority)."""
+    state = _flat()
+    # long: 0.98 >= 0.97 ✓
+    # short: 1 - 0.01 = 0.99 >= 0.97 ✓
     decision, _reason = evaluate(
         state,
-        score_pct_long  = 0.97,
-        score_pct_short = 0.91,
+        score_pct_long  = 0.98,
+        score_pct_short = 0.01,
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == ENTER_LONG
 
 
-def test_flat_armed_both_signal_edge_gap_insufficient_returns_hold() -> None:
-    """FLAT + armed + both signal, edge gap < min_edge_gap → HOLD."""
-    state = _flat_armed()
-    # edge_long = 0.93 - 0.91 = 0.02 < 0.05
-    # edge_short = 0.91 - 0.93 < 0 — edge_long wins but < min_edge_gap
-    decision, _reason = evaluate(
-        state,
-        score_pct_long  = 0.93,
-        score_pct_short = 0.91,
-        decision_params = _DECISION_PARAMS,
-        now             = _NOW,
-    )
-    assert decision == HOLD
+# ---------------------------------------------------------------------------
+# LONG state tests
+# ---------------------------------------------------------------------------
 
 
 def test_long_max_hold_exceeded_returns_exit_long() -> None:
     """LONG + hold >= max_hold_minutes → EXIT_LONG."""
     entry = _NOW - timedelta(minutes=60)
-    state = TradingState(status=LONG, armed=False, entry_time=entry)
+    state = TradingState(status=LONG, entry_time=entry)
     decision, _reason = evaluate(
         state,
         score_pct_long  = 0.95,
-        score_pct_short = 0.10,
+        score_pct_short = 0.50,
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == EXIT_LONG
 
 
-def test_long_opposite_short_signal_after_min_hold_returns_exit_long() -> None:
-    """LONG + opposite short signal + min_hold elapsed → EXIT_LONG."""
-    entry = _NOW - timedelta(minutes=10)  # > min_hold_minutes=5
-    state = TradingState(status=LONG, armed=False, entry_time=entry)
+def test_long_under_max_hold_returns_hold() -> None:
+    """LONG + hold < max_hold_minutes → HOLD."""
+    entry = _NOW - timedelta(minutes=30)
+    state = TradingState(status=LONG, entry_time=entry)
     decision, _reason = evaluate(
         state,
-        score_pct_long  = 0.85,
-        score_pct_short = 0.92,  # >= short_entry_pct=0.90
-        decision_params = _DECISION_PARAMS,
-        now             = _NOW,
-    )
-    assert decision == EXIT_LONG
-
-
-def test_long_signal_decay_after_min_hold_returns_exit_long() -> None:
-    """LONG + score_pct_long < rearm_pct + min_hold elapsed → EXIT_LONG."""
-    entry = _NOW - timedelta(minutes=10)  # > min_hold_minutes=5
-    state = TradingState(status=LONG, armed=False, entry_time=entry)
-    decision, _reason = evaluate(
-        state,
-        score_pct_long  = 0.40,  # < rearm_pct=0.60
-        score_pct_short = 0.30,
-        decision_params = _DECISION_PARAMS,
-        now             = _NOW,
-    )
-    assert decision == EXIT_LONG
-
-
-def test_cooldown_active_returns_hold() -> None:
-    """COOLDOWN + cooldown_until in the future → HOLD."""
-    future = _NOW + timedelta(minutes=30)
-    state = TradingState(status=COOLDOWN, armed=False, cooldown_until=future)
-    decision, _reason = evaluate(
-        state,
-        score_pct_long  = 0.10,
-        score_pct_short = 0.10,
+        score_pct_long  = 0.60,
+        score_pct_short = 0.50,
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == HOLD
 
 
-def test_flat_not_armed_returns_hold() -> None:
-    """FLAT + not armed → HOLD regardless of percentile scores."""
-    state = _flat_unarmed()
+# ---------------------------------------------------------------------------
+# SHORT state tests
+# ---------------------------------------------------------------------------
+
+
+def test_short_max_hold_exceeded_returns_exit_short() -> None:
+    """SHORT + hold >= max_hold_minutes → EXIT_SHORT."""
+    entry = _NOW - timedelta(minutes=60)
+    state = TradingState(status=SHORT, entry_time=entry)
     decision, _reason = evaluate(
+        state,
+        score_pct_long  = 0.50,
+        score_pct_short = 0.10,
+        decision_params = _DECISION_PARAMS,
+        now             = _NOW,
+    )
+    assert decision == EXIT_SHORT
+
+
+def test_short_under_max_hold_returns_hold() -> None:
+    """SHORT + hold < max_hold_minutes → HOLD."""
+    entry = _NOW - timedelta(minutes=30)
+    state = TradingState(status=SHORT, entry_time=entry)
+    decision, _reason = evaluate(
+        state,
+        score_pct_long  = 0.50,
+        score_pct_short = 0.20,
+        decision_params = _DECISION_PARAMS,
+        now             = _NOW,
+    )
+    assert decision == HOLD
+
+
+# ---------------------------------------------------------------------------
+# Edge / boundary tests
+# ---------------------------------------------------------------------------
+
+
+def test_entry_cutoff_exact_boundary_long() -> None:
+    """score_pct_long exactly at entry_cutoff → ENTER_LONG (>= is inclusive)."""
+    state = _flat()
+    decision, _reason = evaluate(
+        state,
+        score_pct_long  = 0.97,
+        score_pct_short = 0.50,
+        decision_params = _DECISION_PARAMS,
+        now             = _NOW,
+    )
+    assert decision == ENTER_LONG
+
+
+def test_entry_cutoff_exact_boundary_short() -> None:
+    """(1 - score_pct_short) exactly at entry_cutoff → ENTER_SHORT."""
+    state = _flat()
+    decision, _reason = evaluate(
+        state,
+        score_pct_long  = 0.50,
+        score_pct_short = 0.03,   # 1 - 0.03 = 0.97 exactly
+        decision_params = _DECISION_PARAMS,
+        now             = _NOW,
+    )
+    assert decision == ENTER_SHORT
+
+
+def test_unknown_status_returns_hold() -> None:
+    """Unknown state.status → HOLD (fallback branch)."""
+    state = TradingState(status="MYSTERY")
+    decision, reason = evaluate(
         state,
         score_pct_long  = 0.99,
-        score_pct_short = 0.99,
+        score_pct_short = 0.01,
         decision_params = _DECISION_PARAMS,
         now             = _NOW,
     )
     assert decision == HOLD
+    assert "unknown_status" in reason

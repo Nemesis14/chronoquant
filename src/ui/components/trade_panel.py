@@ -278,12 +278,29 @@ def _render_trading_positions_card() -> None:
 
 
 def _render_signal_trigger_card(asset_id: str | None) -> None:
+    status  = trading_runner.get_trading_status()
+    running = trading_runner.is_trading_running()
     signals = trading_runner.get_recent_signals(limit=1)
+
+    if running:
+        mode       = (status or {}).get("mode", "—")
+        mode_color = _GOLD if mode == "dry_run" else _RED if mode == "live" else _MUTED
+        started    = _fmt_time((status or {}).get("started_at"))
+        dot        = f'<span style="color:{_GREEN};">●</span>'
+        card_header = (
+            f'<div style="{_HDR}">{dot} Auto Trading'
+            f'&nbsp;<span style="color:{mode_color}; font-size:12px; font-weight:400;">[{mode}]</span>'
+            f'</div>'
+            f'<div style="font-size:12px; color:{_MUTED}; margin-bottom:8px;">Started: {started}</div>'
+            f'<div style="border-top:1px solid {_GRID}; margin-bottom:8px;"></div>'
+        )
+    else:
+        card_header = f'<div style="{_HDR}">Trading State</div>'
 
     if not signals:
         st.markdown(
             f'<div style="{_CARD}">'
-            f'<div style="{_HDR}">Trading State</div>'
+            f'{card_header}'
             f'<div style="{_LBL}">Nincs aktív kereskedési service</div>'
             f'</div>',
             unsafe_allow_html=True,
@@ -302,7 +319,6 @@ def _render_signal_trigger_card(asset_id: str | None) -> None:
     else:
         dec_color = _MUTED
 
-    status    = trading_runner.get_trading_status()
     state_str = (status or {}).get("state", "FLAT")
     state_color = (
         _GREEN if state_str in ("LONG",)
@@ -324,7 +340,7 @@ def _render_signal_trigger_card(asset_id: str | None) -> None:
 
     st.markdown(
         f'<div style="{_CARD}">'
-        f'<div style="{_HDR}">Trading State</div>'
+        f'{card_header}'
         f'<div style="font-size:15px; font-weight:700; color:{state_color}; margin-bottom:10px;">{escape(state_str)}</div>'
         f'<div style="border-top:1px solid {_GRID}; padding-top:8px;">'
         f'<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">'
@@ -375,7 +391,6 @@ def render_trade_panel(asset_id: str | None) -> None:
             trades_df = st.session_state[cache_trades]
 
     if asset_id in ("solusdt", "solusdt_fw60"):
-        _render_trading_status_card()
         _render_signal_trigger_card(asset_id)
         _render_trading_positions_card()
 

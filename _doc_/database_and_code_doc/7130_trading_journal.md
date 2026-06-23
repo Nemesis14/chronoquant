@@ -5,6 +5,9 @@
 A modul a `trading.db` teljes írható/olvasható szerződése. Minden write tranzakcióban
 fut, a dashboard oldali olvasások pedig ugyanerről a sémáról épülnek.
 
+> Módszertani háttér (journal design, audit trail):
+> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
+
 ---
 
 ## Overview
@@ -138,3 +141,11 @@ Returns: `None`
 ### `_export_table(...)`, `_write_run_summary(...)`
 
 Alacsony szintű export segédek.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7120_trading_service.md`](7120_trading_service.md) — journal write hívások kontextusa
+- [`8140_ui_runners.md`](8140_ui_runners.md) — dashboard journal read wrapper
+- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — live trading módszertan

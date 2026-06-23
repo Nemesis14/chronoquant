@@ -47,8 +47,12 @@ erDiagram
         TIMESTAMP open_time PK
         DOUBLE close
         TIMESTAMP label_end_ts
+        DOUBLE long_mfe_fw60 "fw60 long outcome (NULL in live sync)"
+        DOUBLE short_mfe_fw60 "fw60 short outcome (NULL in live sync)"
         DOUBLE long_pred "long model prediction score"
         DOUBLE short_pred "short model prediction score"
+        VARCHAR long_model_id "model ID stamp"
+        VARCHAR short_model_id "model ID stamp"
     }
 
     quant_train {
@@ -188,20 +192,28 @@ Az ASOF join (`predictions` ↔ `feat_ohlcv_quant`) az `available_ts` oszlopon a
 | `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC |
 | `close` | `DOUBLE` | Bar záróára (az `ohlcv.close`-val egyezik) |
 | `label_end_ts` | `TIMESTAMP` | A forward window vége: `open_time + fw_minutes` |
+| `long_mfe_fw60` | `DOUBLE` | Fw60 long outcome (target join-ból; live sync esetén `NULL`) |
+| `short_mfe_fw60` | `DOUBLE` | Fw60 short outcome (target join-ból; live sync esetén `NULL`) |
 | `long_pred` | `DOUBLE` | Long modell predikciós értéke (`predict_proba` vagy `predict`, config szerint) |
 | `short_pred` | `DOUBLE` | Short modell predikciós értéke (`predict_proba` vagy `predict`, config szerint) |
+| `long_model_id` | `VARCHAR` | A long predikciót generáló model ID stamp |
+| `short_model_id` | `VARCHAR` | A short predikciót generáló model ID stamp |
 
 ```sql
 CREATE TABLE IF NOT EXISTS predictions (
-    open_time    TIMESTAMP PRIMARY KEY,
-    close        DOUBLE,
-    label_end_ts TIMESTAMP,
-    long_pred    DOUBLE,
-    short_pred   DOUBLE
+    open_time       TIMESTAMP PRIMARY KEY,
+    close           DOUBLE,
+    label_end_ts    TIMESTAMP,
+    long_mfe_fw60   DOUBLE,
+    short_mfe_fw60  DOUBLE,
+    long_pred       DOUBLE,
+    short_pred      DOUBLE,
+    long_model_id   VARCHAR,
+    short_model_id  VARCHAR
 )
 ```
 
-**Legacy oszlopok:** `dataset_split`, `fold_id`, valamint a régi `trg_*` bináris target oszlopok — ha jelen vannak, az `ensure_tables` migráció során `ALTER TABLE DROP COLUMN`-nal törlődnek.
+**Legacy oszlopok:** `dataset_split`, `fold_id`, valamint a régi `trg_*` bináris target oszlopok — verziózott migrációk (v3, v4) távolítják el `ALTER TABLE DROP COLUMN`-nal.
 
 ---
 
@@ -215,7 +227,7 @@ CREATE TABLE IF NOT EXISTS predictions (
 - Full rebuild: `CREATE OR REPLACE TABLE` (determinisztikus)
 - Range rebuild: `DELETE + INSERT` a megadott `open_time` ablakra
 
-**CLI:** `uv run python src/database/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
+**CLI:** `uv run python src/data_handling/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
 
 **Kód referencia:** [`_doc_/4100_quant_train.md`](4100_quant_train.md)
 

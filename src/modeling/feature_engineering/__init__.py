@@ -25,13 +25,16 @@ Analysis steps (implemented by analyst_agent in t106–t110):
 from .config import FeatureEngineeringConfig
 from .quality import analyze_quality
 from .redundancy import analyze_redundancy
+from .sample_scope import SampleScopeMeta, materialize_sample_scoped_quant_train
 from .stability import analyze_stability
 from .target_relation import analyze_target_relation
 
 __all__ = [
     "FeatureEngineeringConfig",
+    "SampleScopeMeta",
     "analyze_quality",
     "analyze_target_relation",
     "analyze_redundancy",
     "analyze_stability",
+    "materialize_sample_scoped_quant_train",
 ]

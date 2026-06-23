@@ -6,7 +6,7 @@ adja a modellezés reprodukálható adat-alapját: minden modell egy konkrét, s
 nem változó adatállapotból tanul.
 
 > Tárolási topológia és a rétegek (live / lab / registry) átfogó leírása:
-> → `_doc_/database_and_code_doc/0002_data_architecture.md`. Ez a doc kizárólag a snapshot réteg
+> → `_doc_/0002_data_architecture.md`. Ez a doc kizárólag a snapshot réteg
 > **miértjeit** és módszertani szabályait írja le, nem ismétli a topológiát.
 
 ---
@@ -200,7 +200,7 @@ sértetlen marad.
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Tárolási topológia (live / lab / registry, ATTACH) | `_doc_/database_and_code_doc/0002_data_architecture.md` |
+| Tárolási topológia (live / lab / registry, ATTACH) | `_doc_/0002_data_architecture.md` |
 | Registry séma + entitás-életciklus | [1500_registry.md](1500_registry.md) |
 | Sampling a snapshot fölött | [5400_sampling.md](5400_sampling.md), [5010_sampling_yearly.md](5010_sampling_yearly.md) |
 | quant_train (a snapshot forrása) | [4000_quant_train.md](4000_quant_train.md) |

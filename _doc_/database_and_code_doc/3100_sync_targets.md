@@ -1,9 +1,25 @@
 # sync_targets.py — fw60 Forward Outcome Számítás
 
-`src/database/sync_tables/sync_targets.py`
+`src/data_handling/sync_tables/sync_targets.py`
 
 Minden `sync_targets` hívás teljes rebuild — DELETE+INSERT az összes tárolt OHLCV bar alapján.
 A régi bináris `trg_*` target rendszer eltávolítva (epic-011).
+
+> Módszertani háttér (fw60 forward outcome definíció, target rationale, lookahead bias protection):
+> → [`../methodology_doc/3000_targets.md`](../methodology_doc/3000_targets.md)
+
+---
+
+## Overview
+
+```mermaid
+flowchart TD
+  OHLCV["DuckDB ohlcv tábla"] --> ST["sync_targets()"]
+  ST --> COD["_compute_outcome_df()\nDuckDB window SQL"]
+  COD --> INS["insert_target(conn, df)"]
+  INS --> TGT["target tábla\n(10 fw60 outcome oszlop)"]
+  ST --> META["_update_metadata_outcomes()\nasset_id.json frissítése"]
+```
 
 ---
 

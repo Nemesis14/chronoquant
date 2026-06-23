@@ -37,7 +37,7 @@ from data_handling.sync_tables.sync_predictions import sync_predictions
 from strategy.strategy.artifacts import read_strategy_artifact
 from trading.live import journal, strategy
 from trading.live.exchange import BinanceFuturesClient
-from trading.live.state import COOLDOWN, FLAT, TradingState
+from trading.live.state import FLAT, TradingState
 
 logger = logging.getLogger("chronoquant.trading")
 
@@ -161,7 +161,7 @@ class TradingService:
                 open_pos.get("entry_price", 0), open_pos.get("quantity", 0),
             )
         else:
-            logger.info("Reconcile: no open position — starting FLAT armed=True")
+            logger.info("Reconcile: no open position — starting FLAT")
 
         self.exchange.set_leverage()
         logger.info("Service ready (run_id=%s)", self.run_id)
@@ -183,11 +183,8 @@ class TradingService:
         # 3. Convert raw scores to rank percentiles
         score_pct_long, score_pct_short = self._to_percentiles(pred_long, pred_short)
 
-        # 4. Evaluate cooldown / rearm transitions before strategy decision
+        # 4. Evaluate strategy
         now = datetime.now(UTC)
-        self._apply_cooldown_rearm(score_pct_long, score_pct_short, now)
-
-        # 5. Evaluate strategy
         decision, reason = strategy.evaluate(
             self.state, score_pct_long, score_pct_short,
             self.decision_params, now,
@@ -224,29 +221,6 @@ class TradingService:
             np.interp(pred_short, self._rank_scores_short, self._rank_pct_short).clip(0.0, 1.0)
         )
         return pct_long, pct_short
-
-    def _apply_cooldown_rearm(
-        self,
-        score_pct_long  : float,
-        score_pct_short : float,
-        now             : datetime,
-    ) -> None:
-        assert self.state is not None
-        if self.state.status != COOLDOWN:
-            return
-
-        if self.state.cooldown_until and now < self.state.cooldown_until:
-            return
-
-        # Cooldown elapsed — rearm when both percentiles are below threshold
-        rearm_pct = float(self.decision_params["rearm_pct"])
-        if score_pct_long <= rearm_pct and score_pct_short <= rearm_pct:
-            self.state.armed  = True
-            self.state.status = FLAT
-            logger.info(
-                "Rearmed — entering FLAT long_pct=%.3f short_pct=%.3f",
-                score_pct_long, score_pct_short,
-            )
 
     def _execute(
         self,
@@ -322,7 +296,6 @@ class TradingService:
         self.state.entry_time  = datetime.now(UTC)
         self.state.entry_price = avg_price
         self.state.quantity    = filled_qty
-        self.state.armed       = False
 
         logger.info(
             "Opened %s | price=%.4f qty=%s reason=%s",
@@ -377,16 +350,12 @@ class TradingService:
         )
 
         self.state.record_trade_result(pnl_usdt)
-        cooldown_min = int(self.decision_params.get("cooldown_minutes", 60))
-        self.state.cooldown_until = datetime.now(UTC).replace(microsecond=0) + timedelta(
-            minutes=cooldown_min
-        )
-        self.state.status = COOLDOWN
+        self.state.status = FLAT
         self.state.clear_position()
 
         logger.info(
-            "Closed %s | exit=%.4f pnl=%.4f USDT reason=%s cooldown=%dmin",
-            side, avg_price, pnl_usdt, reason, cooldown_min,
+            "Closed %s | exit=%.4f pnl=%.4f USDT reason=%s",
+            side, avg_price, pnl_usdt, reason,
         )
         _dash_log(
             f"[trading] CLOSED {side} exit={avg_price:.4f} pnl={pnl_usdt:+.4f} USDT reason={reason}",

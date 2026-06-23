@@ -20,7 +20,6 @@ flowchart TD
 **Aktív target oszlopok:** `long_mfe_fw60`, `short_mfe_fw60` — 60-perces forward logreturn outcome-ok.
 
 **Implementáció:** [`src/data_handling/sync_tables/sync_targets.py`](src/data_handling/sync_tables/sync_targets.py)
-**Kód referencia:** [`_doc_/3100_sync_targets.md`](../database_and_code_doc/3100_sync_targets.md)
 
 ---
 

@@ -1,10 +1,13 @@
 # 7150 - Trading State And Strategy
 
-`src/trading/live/state.py`  
+`src/trading/live/state.py`
 `src/trading/live/strategy.py`
 
 Ez a két fájl a live runtime döntési magja: az egyik a mutable állapotot tartja,
 a másik egyetlen bar alapján visszaadja a következő akciót.
+
+> Módszertani háttér (state machine design, entry/exit logika, cooldown rationale):
+> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
 
 ---
 
@@ -104,3 +107,10 @@ flowchart TD
 A fenti contractot a `src/trading/tests/live/smoke/` smoke tesztjei fedik:
 - `test_strategy.py`
 - `test_state.py`
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7120_trading_service.md`](7120_trading_service.md) — `evaluate` és `TradingState` hívási kontextus
+- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — state machine és döntési logika módszertana

@@ -6,6 +6,9 @@ A `TradingService` a live trading runtime központi orchestratora. Egyetlen
 objektumba fogja a strategy artifact betöltését, az 1m szinkront, a percentile
 konverziót, a döntéshozást, a Binance végrehajtást és a journalinget.
 
+> Módszertani háttér (cycle design, cooldown logic, risk limits):
+> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
+
 ---
 
 ## Overview
@@ -178,3 +181,13 @@ Runtime guard és lifecycle helper függvények:
 - journalozott hibabejegyzés;
 - perc-határra alvás;
 - run lezárása és opcionális export.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7110_run_service.md`](7110_run_service.md) — headless CLI belépési pont
+- [`7130_trading_journal.md`](7130_trading_journal.md) — journal írási API
+- [`7140_trading_exchange.md`](7140_trading_exchange.md) — `BinanceFuturesClient`
+- [`7150_trading_state_strategy.md`](7150_trading_state_strategy.md) — `TradingState` és `evaluate`
+- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — live trading módszertan

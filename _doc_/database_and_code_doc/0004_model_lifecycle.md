@@ -60,7 +60,7 @@ flowchart TD
 A `snapshot_id` formátuma: `{asset}_fw{h}_{range}__{hash8}`
 (pl. `solusdt_fw60_2023__a37d2703`).
 
-Részletek: → [1400_snapshots.md](methodology_doc/1400_snapshots.md)
+Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
 
 ---
 
@@ -83,35 +83,50 @@ flowchart TD
 ```
 
 A sample kicsi (~tízezer sor hourly felbontásban). A feat_* oszlopok a snapshotban
-maradnak — a downstream a `model.__train_input` view-n projektál (nincs per-modell
-feature-másolat).
+maradnak — a downstream lépések közvetlen `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`
+joinnal dolgoznak (nincs per-modell feature-másolat).
 
 Walk-forward CV paraméterek: `train_months=9`, `valid_months=3`, `shift_months=3`,
 `n_folds=4`, `purge_minutes=240`. A `fold_id=0` jelöli a train-only sorokat.
+
+**I5 garantálva:** A `fold_id` INT8 oszlop minden sorban jelen van.
+**I6 garantálva:** Egy `model_id`-hez pontosan egy `target_name` tartozik (`config/models.json`).
+
+Részletes invariáns összefoglaló (I1–I7): → [4100_quant_train.md](4100_quant_train.md#invariánsok--sample-scoped-pipeline)
 
 ---
 
 ## 3. Feature Engineering
 
-A feature engineering nem hoz létre szűkebb DuckDB táblát — kimenete egy
-**logikai feature_set**: a kiválasztott oszlopok listája, amelyet a registry
-tárol.
+A feature engineering az adott modell mintáját materializálja egy lokális
+`quant_train` munkatáblába a `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`
+joinból. Kimenete továbbra is egy **logikai feature_set**: a kiválasztott
+oszlopok listája, amelyet a registry tárol.
 
 ```mermaid
 flowchart LR
-  SAMP["model.&lt;id&gt;__sample (olvassa)"]
+  SNAP["snap.&lt;snapshot_id&gt;"]
+  SAMP["model.&lt;id&gt;__sample"]
   FE_NB["01_feature_engineering.ipynb (fut, EDA)"]
+  TEMP["temp quant_train\n(sample-scope materializacio)"]
   FS_JSON["feature_set.json (artifacts/)"]
   FS_REG["reg.feature_sets (selected_cols JSON)"]
-  TRAIN_V["model.&lt;id&gt;__train_input VIEW\n(projekcio a feature_set-re a sample-bol)"]
+  JOIN["snap ⋈ model.__sample JOIN\n(search/train input)"]
 
-  SAMP --> FE_NB --> FS_JSON --> FS_REG
-  FS_REG -.->|"szures"| TRAIN_V
-  SAMP -.->|"alap"| TRAIN_V
+  SNAP --> TEMP
+  SAMP --> TEMP --> FE_NB --> FS_JSON --> FS_REG
+  SNAP --> JOIN
+  SAMP --> JOIN
+  FS_REG -.->|"selected feature lista"| JOIN
 ```
 
-A `__train_input` view-t a search és a train lépés olvassa — columnar projekció,
-fizikai tábla-másolat nélkül.
+A search és a train lépés a snapshotból és a sample-ból közvetlenül építi a
+betanítási mátrixot — columnar projekcióval, fizikai feature-másolat nélkül.
+
+**I1 kikényszerítve (FE input):** `materialize_sample_scoped_quant_train` ellenőrzi,
+hogy a TEMP `quant_train` sorszáma == `model.__sample` sorszáma.
+**I7 garantálva:** A `feature_set.json["provenance"]` tartalmazza: `snapshot_id`,
+`sample_table`, `sample_rows`, `joined_rows`, `source_contract: "snap ⋈ model.__sample"`.
 
 ---
 
@@ -119,7 +134,7 @@ fizikai tábla-másolat nélkül.
 
 ```mermaid
 flowchart TD
-  TV["model.&lt;id&gt;__train_input VIEW (feature_set projakcio)"]
+  TV["snap.&lt;snapshot_id&gt; ⋈ model.&lt;id&gt;__sample\n(feature_set projekcio)"]
   OPT["Optuna sweep (Top10 Lift + fold-stability penalty)"]
   BEST["search_best.json + trials.jsonl (artifacts/search/)"]
   SR["reg.search_runs INSERT (best_params, objective, stage=candidate)"]
@@ -134,12 +149,12 @@ veszíti el a kész eredményt.
 
 ## 5. Train
 
-A tréning a `model.__train_input` view-ból dolgozik, kimenete a model bináris és
+A tréning a `snap ⋈ model.__sample` joinból dolgozik, kimenete a model bináris és
 az artifact fájlok.
 
 ```mermaid
 flowchart TD
-  TV["model.&lt;id&gt;__train_input VIEW"]
+  TV["snap.&lt;snapshot_id&gt; ⋈ model.&lt;id&gt;__sample"]
   LGB["LightGBM fit (fold-CV, walk-forward)"]
   PKL["model.pkl + features.json + params.json + metrics.json (artifacts/)"]
   REG_T["reg.models UPDATE (status=trained, oos_metric, search_run_id)"]
@@ -268,8 +283,11 @@ mit lehet újrahasználni:
 |------|-----------|
 | Tárolási topológia (3 fájl, sémák) | [0002_data_architecture.md](0002_data_architecture.md) |
 | Éles folyamat (sync → predict → trade → cutover) | [0003_runtime_flow.md](0003_runtime_flow.md) |
-| Snapshot réteg — miért és hogyan | [methodology_doc/1400_snapshots.md](methodology_doc/1400_snapshots.md) |
-| Registry séma + életciklus | [methodology_doc/1500_registry.md](methodology_doc/1500_registry.md) |
-| Sampling metodológia | [methodology_doc/5400_sampling.md](methodology_doc/5400_sampling.md) |
-| Hyperparameter search | [methodology_doc/5500_hyper_param_search.md](methodology_doc/5500_hyper_param_search.md) |
-| Strategy metodológia | [methodology_doc/6000_strategy.md](methodology_doc/6000_strategy.md) |
+| Snapshot réteg — miért és hogyan | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
+| Registry séma + életciklus | [1500_registry.md](../methodology_doc/1500_registry.md) |
+| Sampling metodológia | [5400_sampling.md](../methodology_doc/5400_sampling.md) |
+| Hyperparameter search | [5500_hyper_param_search.md](../methodology_doc/5500_hyper_param_search.md) |
+| Strategy metodológia | [6000_strategy.md](../methodology_doc/6000_strategy.md) |
+| quant_train tábla + I1-I7 invariánsok | [4100_quant_train.md](4100_quant_train.md) |
+| Sampling kód-ref (create_model_sample) | [5300_create_sample.md](5300_create_sample.md) |
+| Pipeline / predict / provenance kód-ref | [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) |

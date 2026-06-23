@@ -65,22 +65,8 @@ változóban. A `trading_runner.py` module-szintű singletonként tartja a servi
 
 ## Almodulok
 
-### [8110_ui_main.md](../database_and_code_doc/8110_ui_main.md)
-
-Az oldal skeletonje, sidebar, chart és panel layout.
-
-### [8120_ui_data.md](../database_and_code_doc/8120_ui_data.md)
-
-DB, strategy artifact, journal és summary olvasás.
-
-### [8130_ui_sync.md](../database_and_code_doc/8130_ui_sync.md)
-
-Perces adatfrissítés, lock és auto-sync state kezelés.
-
-### [8140_ui_runners.md](../database_and_code_doc/8140_ui_runners.md)
-
-Trading service singleton kezelés és dashboard logfájl.
-
-### [8150_ui_components.md](../database_and_code_doc/8150_ui_components.md)
-
-Chartok, trade panel, log panel, formázás és Binance trade read.
+- Oldal-skeleton és layout orchestration.
+- Read-layer az adatforrások előtt.
+- Perces háttérszinkron és session-state kezelés.
+- Trading runner és dashboard logkezelés.
+- Vizualizációs komponensek és külső read-only adatlekérés.

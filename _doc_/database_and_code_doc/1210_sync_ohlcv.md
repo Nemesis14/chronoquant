@@ -1,6 +1,6 @@
 # sync_ohlcv.py — Binance OHLCV Szinkron
 
-`src/database/sync_tables/sync_ohlcv.py`
+`src/data_handling/sync_tables/sync_ohlcv.py`
 
 Inkrementális Binance 1-perces kline szinkronizálás. Minden futás az utolsó tárolt bar utántól kezdi, 1000 klines/batch lapozással.
 
@@ -90,11 +90,11 @@ Az `sync_ohlcv` a `02_sync_pipeline.py` unified CLI-n keresztül hívható:
 
 ```bash
 # OHLCV szinkron egy konkrét kezdőponttól
-uv run python src/database/02_sync_pipeline.py --start "2024-01-01 00:00:00" --tables ohlcv --asset-id solusdt
+uv run python src/data_handling/02_sync_pipeline.py --start "2024-01-01 00:00:00" --tables ohlcv --asset-id solusdt
 
 # Az utolsó tárolt sortól indul (alapértelmezett, OHLCV + derived táblák)
-uv run python src/database/02_sync_pipeline.py
+uv run python src/data_handling/02_sync_pipeline.py
 
 # Csak OHLCV (derived rebuild nélkül)
-uv run python src/database/02_sync_pipeline.py --tables ohlcv
+uv run python src/data_handling/02_sync_pipeline.py --tables ohlcv
 ```

@@ -1,14 +1,17 @@
 # 8150 - UI Components
 
-`src/ui/components/charts.py`  
-`src/ui/components/trade_panel.py`  
-`src/ui/components/log_panel.py`  
-`src/ui/components/formatting.py`  
+`src/ui/components/charts.py`
+`src/ui/components/trade_panel.py`
+`src/ui/components/log_panel.py`
+`src/ui/components/formatting.py`
 `src/ui/binance_data.py`
 
 A dashboard megjelenítési logikája ezekben a komponensmodulokban él. A page
 szintű orchestration nem rajzol közvetlenül komplex HTML-t vagy chartot, hanem
 ezekre a segédmodulokra támaszkodik.
+
+> Módszertani háttér (chart design, trade panel layout, component separation):
+> → [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md)
 
 ---
 
@@ -103,3 +106,11 @@ Fő függvények:
 - `_normalize_futures`
 - `_normalize_spot`
 - `_empty_frame`
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`8110_ui_main.md`](8110_ui_main.md) — `render_asset_chart` és `render_trade_panel` hívási kontextus
+- [`8120_ui_data.md`](8120_ui_data.md) — adatbetöltési réteg (komponensek input source-ja)
+- [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md) — dashboard módszertan

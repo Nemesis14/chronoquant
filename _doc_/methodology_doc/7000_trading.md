@@ -47,8 +47,6 @@ flowchart TD
 | Szám | Fájl | Tartalom | Szint |
 |------|------|----------|-------|
 | 7100 | [7100_live_trading.md](7100_live_trading.md) | Runtime metodológia és almodul-térkép | X100 |
-| 7110 | [7110_run_service.md](../database_and_code_doc/7110_run_service.md) | `01_run_service.py` CLI entrypoint | X110 |
-| 7120 | [7120_trading_service.md](../database_and_code_doc/7120_trading_service.md) | `live/service.py` fő loop | X110 |
-| 7130 | [7130_trading_journal.md](../database_and_code_doc/7130_trading_journal.md) | `live/journal.py` trading DB contract | X110 |
-| 7140 | [7140_trading_exchange.md](../database_and_code_doc/7140_trading_exchange.md) | `live/exchange.py` Binance kliens | X110 |
-| 7150 | [7150_trading_state_strategy.md](../database_and_code_doc/7150_trading_state_strategy.md) | `live/state.py` és `live/strategy.py` döntési mag | X110 |
+
+Részletes kódszintű bontás külön a code-doc zónában él; a methodology zóna itt
+szándékosan csak a runtime döntési és operációs elveket rögzíti.

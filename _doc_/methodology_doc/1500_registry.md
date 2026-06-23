@@ -8,7 +8,7 @@ státusza (`draft → … → archived`), és a registry jegyzi fel a hash-eket,
 konvenciókban éltek.
 
 > Tárolási topológia és a rétegek (live / lab / registry) átfogó leírása:
-> → `_doc_/database_and_code_doc/0002_data_architecture.md`. Ez a doc kizárólag a registry réteg
+> → `_doc_/0002_data_architecture.md`. Ez a doc kizárólag a registry réteg
 > **miértjeit** és módszertani szabályait írja le, nem ismétli a topológiát.
 
 ---
@@ -277,7 +277,7 @@ kód módosítása nélkül.
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Tárolási topológia (live / lab / registry, ATTACH) | `_doc_/database_and_code_doc/0002_data_architecture.md` |
+| Tárolási topológia (live / lab / registry, ATTACH) | `_doc_/0002_data_architecture.md` |
 | Snapshot réteg + content-hash (a registry forrása) | [1400_snapshots.md](1400_snapshots.md) |
 | Sampling a snapshot fölött | [5400_sampling.md](5400_sampling.md) |
 | quant_train (a snapshot forrása) | [4000_quant_train.md](4000_quant_train.md) |

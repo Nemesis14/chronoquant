@@ -6,6 +6,10 @@ A dashboard belépési pontja. Beállítja a Streamlit page configot, inicializ�
 az alap session state-et, kezeli az auto-sync és trading control gombokat, majd
 kirendereli a chart és a jobb oldali trade panel elrendezést.
 
+> Módszertani háttér (dashboard design, layout döntések):
+> → [`../methodology_doc/8000_ui.md`](../methodology_doc/8000_ui.md)
+> → [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md)
+
 ---
 
 ## Overview
@@ -78,3 +82,13 @@ A fájl végén:
 - sidebar épül;
 - `active_asset_id = "solusdt_fw60"` és `asset_label = "SOL / 1m"` rögzül;
 - `st.columns([3, 1])` layoutban balra a chart és log, jobbra a trade panel kerül.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`8120_ui_data.md`](8120_ui_data.md) — dashboard olvasási réteg
+- [`8130_ui_sync.md`](8130_ui_sync.md) — sync layer
+- [`8140_ui_runners.md`](8140_ui_runners.md) — trading runner + logging
+- [`8150_ui_components.md`](8150_ui_components.md) — chart és panel komponensek
+- [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md) — dashboard módszertan

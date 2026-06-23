@@ -1,18 +1,22 @@
-# src/database/ — Database Module
+# src/data_handling/ — Database Module
 
-A `src/database/` modul kezeli az összes piaci adatot: Binance OHLCV szinkront, feature számítást, target labeleket, predikciók beírását és a DuckDB store réteget. Ez a fő adatvezeték, amelyből a modeling és a UI olvas.
+A `src/data_handling/` modul kezeli az összes piaci adatot: Binance OHLCV szinkront, feature számítást, target labeleket, predikciók beírását és a DuckDB store réteget. Ez a fő adatvezeték, amelyből a modeling és a UI olvas.
 
 ---
 
 ## Modul struktúra
 
 ```
-src/database/
+src/data_handling/
 ├── store/                  DuckDB store réteg (írás, olvasás, validáció, statisztikák)
 ├── sync_tables/            Sync pipeline (ohlcv → features → targets → predictions)
 ├── tests/                  Pytest tesztek (smoke, sanity, perf, integration)
 ├── 01_validate_stats.py    CLI: DB stat riport
-└── 02_sync_pipeline.py     CLI: Unified sync belépési pont (OHLCV + derived táblák)
+├── 02_sync_pipeline.py     CLI: Unified sync belépési pont (OHLCV + derived táblák)
+├── 03_build_quant_train.py CLI: quant_train tábla rebuild
+├── 04_backfill_predictions.py CLI: Historikus predikció gap feltöltés
+├── 05_create_snapshot.py   CLI: quant_train snapshot létrehozás
+└── 06_trigger_deploy.py    CLI: Deployment pending sor regisztrálás
 ```
 
 Részletes dokumentáció:
@@ -51,12 +55,17 @@ Minden réteg az előző réteg `MAX(open_time)` értékétől indul — az oper
 **Célja:** Gyors DB egészség-ellenőrzés — megjeleníti az összes tábla sorát, időtartományát, null arányát és lekérdezési teljesítményét.
 
 ```bash
-uv run python src/database/01_validate_stats.py
+uv run python src/data_handling/01_validate_stats.py
+uv run python src/data_handling/01_validate_stats.py --asset-id solusdt
 ```
 
-Belső hívása: `collect_duckdb_stats_report(db_path, tables)` → `format_duckdb_stats_report(report)` → stdout.
+| Argument | Alap | Leírás |
+|----------|------|--------|
+| `--asset-id` | config default | Asset azonosító |
 
-**Tábla lista:** `["ohlcv", "target", "feat_ohlcv_quant", "predictions"]`
+Belső hívása: `collect_duckdb_stats_report(db_path)` → `format_duckdb_stats_report(report)` → stdout.
+
+**Tábla lista:** `["ohlcv", "target", "feat_ohlcv_quant", "predictions", "quant_train"]` (alapértelmezett a stats modulban)
 
 ---
 
@@ -66,16 +75,16 @@ Belső hívása: `collect_duckdb_stats_report(db_path, tables)` → `format_duck
 
 ```bash
 # Teljes sync (OHLCV + összes derived tábla)
-uv run python src/database/02_sync_pipeline.py
+uv run python src/data_handling/02_sync_pipeline.py
 
 # Csak derived táblák (Binance fetch kihagyva)
-uv run python src/database/02_sync_pipeline.py --skip-ohlcv
+uv run python src/data_handling/02_sync_pipeline.py --skip-ohlcv
 
 # OHLCV szinkron konkrét kezdőponttól
-uv run python src/database/02_sync_pipeline.py --start "2024-01-01 00:00:00" --asset-id solusdt
+uv run python src/data_handling/02_sync_pipeline.py --start "2024-01-01 00:00:00" --asset-id solusdt
 
 # Csak features és predictions egy dátumtartományra
-uv run python src/database/02_sync_pipeline.py \
+uv run python src/data_handling/02_sync_pipeline.py \
     --tables features,predictions \
     --start "2025-01-01 00:00:00" \
     --end   "2025-06-01 00:00:00" \
@@ -91,9 +100,9 @@ uv run python src/database/02_sync_pipeline.py \
 | `--skip-ohlcv` | — | Binance fetch kihagyása, csak derived rebuild |
 | `--tables` | `ohlcv,targets,features,predictions` | Vesszővel elválasztott tábla szűkítés |
 
-**Függőségi sorrend** (mindig betartva): `ohlcv` → `targets` → `features` → `predictions`.
+**Függőségi sorrend** (mindig betartva): `ohlcv` → `targets` (full range) → `features` (chunked) → `predictions` (chunked).
 
-**Log fájl:** `database/<asset_id>/logs/sync_pipeline_<timestamp>.log`
+**Log fájl:** A logolás rotating file handler-rel a `database/<asset_id>/logs/` mappába ír.
 
 ---
 
@@ -108,4 +117,4 @@ A modul **csak** a `src/utils.py` API-n keresztül fér hozzá konfigurációhoz
 | `utils.load_models_config()` | Champion modellek, path-ok |
 | `utils.champion_models_for_asset(model_cfg, asset_id)` | Aktív long+short modell ID-k és metaadatok |
 
-Közvetlen JSON olvasás tiltott a `src/database/` teljes kódbázisában.
+Közvetlen JSON olvasás tiltott a `src/data_handling/` teljes kódbázisában.

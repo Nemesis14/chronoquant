@@ -87,7 +87,15 @@ def test_fit_calibration_adds_cal_columns(tmp_path: Path, monkeypatch: pytest.Mo
     assert (artifact_dir / "isotonic_long.pkl").exists(),  "isotonic_long.pkl not created"
     assert (artifact_dir / "isotonic_short.pkl").exists(), "isotonic_short.pkl not created"
 
-    # Lookup parquet has required columns
+    # New bucket stats columns present on calibrated df
+    for col in (
+        "bucket_mean_mfe_long", "bucket_mean_mfe_short",
+        "bucket_median_mfe_long", "bucket_median_mfe_short",
+        "bucket_p75_mfe_long", "bucket_p75_mfe_short",
+    ):
+        assert col in calibrated.columns, f"calibrated df missing column: {col}"
+
+    # Lookup parquet has required columns including new stats
     lookup_long = pd.read_parquet(lookup_long_path)
-    for col in ("score_raw", "score_pct", "bucket_id"):
+    for col in ("score_raw", "score_pct", "bucket_id", "bucket_median_mfe", "bucket_p75_mfe"):
         assert col in lookup_long.columns, f"rank_lookup_long missing column: {col}"

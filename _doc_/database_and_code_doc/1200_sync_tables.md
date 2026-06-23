@@ -1,6 +1,6 @@
 # sync_tables/ — Sync Pipeline
 
-A `src/database/sync_tables/` könyvtár felelős az összes adat mozgatásáért és transzformálásáért: Binance API → OHLCV → features → targets → predictions. Minden funkció idempotens — biztonságosan újrafuttatható.
+A `src/data_handling/sync_tables/` könyvtár felelős az összes adat mozgatásáért és transzformálásáért: Binance API → OHLCV → features → targets → predictions. Minden funkció idempotens — biztonságosan újrafuttatható.
 
 ---
 
@@ -56,9 +56,11 @@ Feature számítás Polars LazyFrame pipeline-nal. t-1 lag minden OHLCV-alapú f
 
 Champion modellek betöltése és inference futtatása. Unified long+short output egy sorban.
 
-**Belépési pont:** `sync_predictions(start_time, end_time, asset_id)`
+**Belépési pont:** `sync_predictions(start_time, end_time, asset_id, backfill=False)`
 
-**Kulcs lépések:** `champion_models_for_asset` → `_load_model_artifacts` → ASOF join features → `_run_inference` → `insert_predictions`
+**Kulcs lépések:** `champion_models_for_asset` → `_load_model_artifacts` → feature query → target join → `_run_inference` → `insert_predictions` / `backfill_predictions`
+
+**Deploy detektálás:** Minden híváskor ellenőrzi a `reg.deployments` pending sorát — ha talál, atomikus predictions csere (cutover) fut.
 
 ---
 

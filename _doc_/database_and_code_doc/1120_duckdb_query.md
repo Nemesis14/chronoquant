@@ -1,6 +1,6 @@
 # duckdb_query.py — Lekérdezések
 
-`src/database/store/duckdb_query.py`
+`src/data_handling/store/duckdb_query.py`
 
 Read-only lekérdezési réteg. Minden függvény önálló db_path-on dolgozik — nem tart fenn nyitott kapcsolatot. Pandas és Polars kimenet egyaránt elérhető.
 
@@ -83,7 +83,7 @@ A feature computation (`sync_features.py`) ezt használja a OHLCV adatok betölt
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
 | `db_path` | `str` | DuckDB fájl elérési útja |
-| `feature_cols` | `list[str]` | Feature oszlopok listája (`feat_*`) |
+| `feature_cols` | `list[str] \| None` | Feature oszlopok listája (`feat_*`); `None` = összes `feat_*` oszlop |
 | `start` | `str \| None` | Időtartomány kezdete |
 | `end` | `str \| None` | Időtartomány vége |
 

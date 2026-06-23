@@ -1,6 +1,6 @@
 # tests/sync_tables/ + sync_pipeline/ — Pipeline Tesztek
 
-`src/database/tests/sync_tables/` és `src/database/tests/sync_pipeline/`
+`src/data_handling/tests/sync_tables/` és `src/data_handling/tests/sync_pipeline/`
 
 Pipeline tesztek három szinten: smoke (mock adattal), sanity (lookahead bias ellenőrzés), integration (cross-layer teljes pipeline flow). A `sync_pipeline/smoke/` a CLI belépési pont helper függvényeit teszteli.
 
@@ -36,10 +36,8 @@ Minden smoke teszt szintetikus adattal és mocked Binance API-val fut. Nem igén
 
 | Teszt | Mit ellenőriz |
 |-------|---------------|
-| `test_sync_predictions_long_pred_written` | `long_pred` oszlop jelen van a táblában |
-| `test_sync_predictions_short_pred_written` | `short_pred` oszlop jelen van a táblában |
-| `test_sync_predictions_idempotent` | Újrafuttatásra 0 új sor |
-| `test_sync_predictions_scores_in_range` | `long_pred`, `short_pred` ∈ [0, 1] a szintetikus mock modellre |
+| `test_sync_predictions_writes_long_and_short_columns` | `long_pred`, `short_pred` oszlopok jelen vannak, értékek ∈ [0, 1] |
+| `test_sync_predictions_is_idempotent` | Újrafuttatásra sor szám nem nő |
 
 ---
 

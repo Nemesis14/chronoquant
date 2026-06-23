@@ -1,6 +1,6 @@
 # toolkit.py — Dataset Inspekciós Segédek
 
-`src/database/store/toolkit.py`
+`src/data_handling/store/toolkit.py`
 
 DS workflow segédek gyors dataset inspekciókhoz. Nem üzleti logika — kényelmi wrapperek notebook és REPL használatra.
 
@@ -32,7 +32,7 @@ DS workflow segédek gyors dataset inspekciókhoz. Nem üzleti logika — kénye
 
 ---
 
-## `get_dataset_columns(asset_id, dataset)`
+## `get_dataset_columns(dataset, asset_id)`
 
 **Célja:** Dataset oszlopnevei.
 
@@ -40,7 +40,7 @@ DS workflow segédek gyors dataset inspekciókhoz. Nem üzleti logika — kénye
 
 ---
 
-## `get_row_count(asset_id, dataset)`
+## `get_row_count(dataset, asset_id)`
 
 **Célja:** Sorok száma egy datasetben.
 
@@ -48,11 +48,18 @@ DS workflow segédek gyors dataset inspekciókhoz. Nem üzleti logika — kénye
 
 ---
 
-## `get_time_range(asset_id, dataset)`
+## `get_time_range(dataset, asset_id)`
 
 **Célja:** Az adott dataset időtartományának lekérdezése.
 
-**Visszatérési érték:** `tuple[pd.Timestamp | None, pd.Timestamp | None]` — `(min_ts, max_ts)`
+**Paraméterek:**
+
+| Paraméter | Típus | Leírás |
+|-----------|-------|--------|
+| `dataset` | `str` | Dataset neve |
+| `asset_id` | `str \| None` | Asset azonosító (`None` = config default) |
+
+**Visszatérési érték:** `tuple[str | None, str | None]` — `(min_ts, max_ts)` string formátumban, vagy `(None, None)` ha üres
 
 ---
 
@@ -62,26 +69,16 @@ DS workflow segédek gyors dataset inspekciókhoz. Nem üzleti logika — kénye
 
 **Példa kimenet:**
 ```
-=== solusdt DB Summary ===
-ohlcv:
-  Rows: 1,234,567
-  Range: 2022-01-01 00:00:00 → 2026-06-14 23:59:00
-
-feat_ohlcv_quant:
-  Rows: 1,230,000
-  Range: 2022-01-15 00:01:00 → 2026-06-14 23:59:00
-
-target:
-  Rows: 1,234,507
-  Range: 2022-01-01 00:00:00 → 2026-06-14 22:59:00
-
-predictions:
-  Rows: 1,180,000
-  Range: 2023-06-01 00:00:00 → 2026-06-14 23:59:00
+DB path: database/solusdt/solusdt.duckdb
+------------------------------------------------------------
+ohlcv                 rows= 1,234,567  cols=  10  2022-01-01 00:00:00 -> 2026-06-14 23:59:00
+feat_ohlcv_quant      rows= 1,230,000  cols= 115  2022-01-15 00:01:00 -> 2026-06-14 23:59:00
+target                rows= 1,234,507  cols=  11  2022-01-01 00:00:00 -> 2026-06-14 22:59:00
+predictions           rows= 1,180,000  cols=   9  2023-06-01 00:00:00 -> 2026-06-14 23:59:00
 ```
 
 **Felhasználás:**
 ```python
-from database.store.toolkit import print_summary
+from data_handling.store.toolkit import print_summary
 print_summary("solusdt")
 ```

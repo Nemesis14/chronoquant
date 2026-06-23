@@ -1,62 +1,153 @@
-﻿# 5000 — Modeling
+# 5000 - Modelling
 
-A modeling domain a ChronoQuant ML pipeline szíve: nyers OHLCV adatokból
-folytonos előrejelzéseket állít elő LightGBM regresszorokkal (fw60 MFE target).
+A modelling domain celja, hogy a live adatfolyambol reprodukalhato modell-artifactok
+es ugyanarra a snapshotra vonatkozo offline predikciok keszuljenek. Az aktiv
+folyamat mar nem a regi, kozvetlen `quant_train`-centrikus utvonalra epul, hanem
+egy snapshot-alapu, registryvel kovetett pipeline-ra.
 
----
-
-## Overview
-
-A pipeline öt lépésből áll: feature számítás → sample definíció → modell tanítás →
-predikció szinkronizálás → kereskedési jelzések. Minden lépés idempotens és
-önállóan újrafuttatható.
+## Domain attekintes
 
 ```mermaid
 flowchart TD
-  A[ohlcv táblázat] --> B[feat_ohlcv_quant]
-  B --> C[00_create_sample.py\nsampling modul]
-  C --> D[database/solusdt/samples/]
-  D --> E[01_train_model.py\nlightgbm_model]
-  E --> F[models/ artifact]
-  F --> G[sync_predictions\npredict / predict_proba]
-  G --> H[predictions táblázat]
-  H --> I[trading/strategy.py\njelzések]
+  QT[quant_train eloallitas]
+  SNAP[immutable snapshot]
+  SAMPLE[model.__sample]
+  FE[feature engineering]
+  SEARCH[hyperparameter search]
+  TRAIN[final training]
+  PRED[offline prediction]
+  STRAT[strategy session]
+
+  QT --> SNAP --> SAMPLE --> FE --> SEARCH --> TRAIN --> PRED --> STRAT
 ```
 
+A lenyegi valtas az, hogy a reprodukalhatosag horgonya a snapshot lett. A minta,
+a feature-szelekcio, a keresesi eredmeny, a vegso modell es az offline predikcio
+mind ugyanahhoz a befagyasztott adathalmazhoz kotodik.
+
+## Uzleti es modszertani rationale
+
+A projektben a modellezes nem pusztan score-generalas, hanem ellenorizheto
+eloallitas: barmely modellrol vissza kell tudni mondani, melyik snapshotbol
+tanult, milyen feature-listat hasznalt, milyen keresesi szabaly alapjan lett
+kivalasztva, es milyen teljes snapshot-tartomanyon adott predikciot.
+
+Ezert a domain ket kerdesre ad valaszt:
+
+1. Hogyan lesz a valtozo live adatbol stabil fejlesztesi alap?
+2. Hogyan lehet a kutatasi lepest ugy vegigvinni, hogy a strategy es a trading
+   mar ugyanarra az adat-szerzodesre tamaszkodjon?
+
+## Alfejezetek
+
+| Fajl | Szerep | Statusz |
+|------|--------|---------|
+| [5400_sampling.md](5400_sampling.md) | Aktiv sampling metodika: snapshot-native, walk-forward, orankenti mintavalasztas | aktiv |
+| [5500_hyper_param_search.md](5500_hyper_param_search.md) | LightGBM hiperparameter-kereses, Top10 Lift objective | aktiv |
+| [5600_model_training.md](5600_model_training.md) | Vegso fit, refit-all logika, artifact-szerzodes | aktiv |
+| [5700_offline_prediction.md](5700_offline_prediction.md) | Teljes snapshot score-olasa kulon predikcios tablaba | aktiv |
+| [5010_sampling_yearly.md](5010_sampling_yearly.md) | Retired yearly/random-week sampling megkozelites | legacy |
+
+## Kereszt-domain elvek
+
+- A snapshot az egyetlen modszertani horgony. Ha a snapshot valtozik, uj modell
+  csaladrol beszelunk.
+- A feature-szelekcio logikai, nem fizikai. A feature-set azonosito es a
+  `selected` lista a leirando dontes, nem egy masolatban letrehozott tabla.
+- A keresesi, training es predikcios lepest kulon tartjuk. Ettol lesz a pipeline
+  debuggolhato es ujrafuttathato.
+- A strategy domain csak olyan modellre epulhet, amely mar vegigment a
+  `sample -> feature_engineering -> search -> train -> predict` lanc teljes
+  szerzodesen.
+
+## Ismert gyenge pontok
+
+- A `quant_train` tovabbra is fontos upstream staging tabla, de mar nem az aktiv
+  modellfogyasztasi felulet. A snapshot az egyetlen reprodukalhatosagi horgony.
+- A feature engineering a notebookon belul tovabbra is `quant_train` nevu
+  munkatablan fut, de ez mar az adott `snap ⋈ model.__sample` join lokalis
+  materializacioja, nem egy teljes idoszeletre vagott altalanos tabla.
+- A strategy optimalizacio jelenleg same-window modban tortenik, tehat a strategy
+  riportok nem fuggetlen holdout-bizonyitekok.
+
+## Sample-scope döntés és pipeline invariánsok
+
+Az aktív pipeline egyetlen, jól definiált adat-szerződésen alapul: a `snap ⋈ model.__sample`
+INNER JOIN az egyetlen érvényes kapu a modell-fejlesztési lépések (FE, search, train) felé.
+Az alábbi invariánsok és döntések ennek a módszertani hátterét adják.
+
+### A vs B döntés: miért a sorpontos INNER JOIN, nem az időablakos szűkítés?
+
+| Megközelítés | Mit jelent | Előny | Hátrány | Státusz |
+|---|---|---|---|---|
+| **A — snap ⋈ model.__sample INNER JOIN** | FE, search, train pontosan azokat a sorokat látja, amelyeket a sampling kiválasztott | Row-exact match: nincs extra vagy hiányzó sor a downstream lépésekben | Explicit JOIN, nem triviális | **Választott** |
+| **B — MIN/MAX(open_time) alapú időablak-szűkítés** | A sample időtartományából leolvasott legkorábbi és legkésőbbi időpont alapján az összes percet beereszti | Egyszerűbb SQL | Az óránkénti mintavétel nem konzisztens időablakon belüli sűrűséggel — B minden percet beereszt, ami soha nem volt a sample-ben | Elvetett |
+
+**A lényegi módszertani ok:** a sampling óránként egy determinisztikus percet választ ki. Az adott
+óra többi 59 percét szándékosan kihagyjuk. Ha B megközelítéssel `MIN/MAX` időablakot
+használnánk, beengednénk ezeket a kihagyott perceket — az FE, a search és a train olyan
+sorokat is elemzne, amelyek sosem részei a modell tényleges fejlesztési mintájának.
+Ez az I1-I2 invariáns megsértése lenne.
+
+### I1-I7 invariánsok — módszertani szint
+
+Az alábbi invariánsok az aktív pipeline reprodukálhatóságát és integritását biztosítják.
+A kód-szintű implementáció részletei a kód-referencia zónában találhatók; itt a módszertani
+indoklás kerül középpontba.
+
+| ID | Invariáns neve | Mit garantál | Miért fontos |
+|----|---------------|--------------|-------------|
+| **I1** | Sample rowcount conservation (FE input) | A FE munkatábla pontosan annyi sort tartalmaz, mint a `model.__sample` | Ha az FE több sort lát, más adatot elemez, mint amire a modell tanul. Ha kevesebbet, a tanítási adatok egy részéhez nem létezik elemzett feature-minőség. |
+| **I2** | Sample rowcount conservation (search/train) | A search és train lépés input-sora == `model.__sample` sora | Ellenkező esetben a hyperparameter-döntés és a final fit más adaton születik meg, mint amit a sampling definiált. |
+| **I3** | Snapshot immutability | `snap."<snapshot_id>"` tartalma a létrehozás után soha nem változik | Ha a snapshot módosulna két pipeline-lépés között, a FE és a training különböző adatot olvasna — a reprodukálhatóság megtörne. |
+| **I4** | Feature-scope konzisztencia | `feature_set.json["selected"]` == `features.json["features"]` == `reg.feature_sets.selected_cols` | A feature-kiválasztás döntése egyszer születik meg (FE lépésben), és azt a search, train és predict lépések változtatás nélkül öröklik. |
+| **I5** | fold_id traceability | `model.__sample` tartalmaz `fold_id` (Int8) oszlopot | Nélküle a search nem tud validációs ablakokat definiálni → nem lehet megakadályozni az időbeli szivárgást a CV során. |
+| **I6** | target_col rögzítése modellhez | Egy `model_id`-hez pontosan egy `target_name` tartozik | A long és short modellek különböző célváltozót optimalizálnak. Keveredés esetén a modell a téveset tanulja. |
+| **I7** | Provenance traceability | `feature_set.json["provenance"]` tartalmaz `snapshot_id`, `sample_table`, `sample_rows`, `joined_rows`, `source_contract` | A pipeline minden lépése visszanyomozható forrásra. Nélküle nem megválaszolható: "ez a modell melyik adatból tanult?" |
+
+### Provenance szerződés: miért szükséges a `source_contract` mező?
+
+A `feature_set.json["provenance"]` blokk legfontosabb mezője a `source_contract: "snap ⋈ model.__sample"`.
+Ez nem technikai részlet, hanem **módszertani nyilatkozat**: explicit deklarálja, hogy az FE lépés
+a sorpontos INNER JOIN path-ot alkalmazta, nem időablakos szűkítést.
+
+**Miért kell ez?**
+
+- Egy jövőbeli FE futtatás — ha csak a kódra támaszkodna — nem tudná garantálni, hogy az előző
+  futtatással azonos scope-ot alkalmazott. A `source_contract` egy olvasható és auditálható jel.
+- A `sample_rows == joined_rows` összehasonlítás az I1 invariáns post-hoc verifikációja:
+  a mező kitöltésekor ellenőrzött, hogy a materializáció nem vesztett és nem nyert sort.
+- A strategy és a trading réteg (deploy-időben) az `artifacts/` mappából olvas. Ha kérdés merül
+  fel ("mi volt az FE inputja?"), a provenance blokk egyetlen helyen válaszol.
+
+### Predict step scope aszimmetria: miért a teljes snapshot?
+
+A predict lépés szándékosan **eltér** az I1-I2 által megkövetelt sample-scope alól:
+a `model."<model_id>__pred"` a teljes snapshot range összes barjára tartalmaz előrejelzést,
+nem csak a sample soraira.
+
+| Kérdés | Válasz |
+|--------|--------|
+| Miért kell a teljes snapshot range? | A strategy backtest és az offline kiértékelés minden historikus barhoz igényel score-t. Ha csak a sample sorokat score-olnánk, a predikciós idősor lyukas lenne. |
+| Nem sérti ez a sample-scope elvét? | Nem. A sample-scope a *fejlesztési* fázisra vonatkozik (FE, search, train). A predict lépés már a *kész, befagyasztott* modellt alkalmazza — ez nem új tanítás, hanem inference. |
+| Nem látja-e a modell "jövőbeli" adatot? | Nem. A predict step nem tanít, csak alkalmazza a `model.pkl`-t; a snapshot immutable, és a score-olt adatok mind korábbiak a modell training-cutoff-jánál. |
+
+A predict step ezért a sample-scope és az I1-I2 invariánsok alól **tudatosan kivétel** —
+ez a helyes viselkedés, és explicit dokumentált döntés, nem hiányosság.
+
 ---
 
-## Aktív modellek konfiguráció
+## Validacios elvek
 
-### Éves modellek (naming convention v4)
+Az alábbi elvek a modellezési pipeline minden futtatására vonatkoznak.
 
-Model ID minta: `lgbm_{asset}_{direction}_fw{horizon}_{year}`
+- Minden aktív modellnek visszafejthető legyen a `snapshot_id`, `feature_set_id`
+  és a search outputja.
+- A sample, a training és a predict step ugyanarra a snapshotra mutasson.
+- A modelling dokumentáció ne keverje az aktív és a legacy sampling fogalmakat.
+- Az I1-I7 invariánsok teljesülése ellenőrzendő minden pipeline-futtatás után
+  (rowcount match, snapshot hash, provenance blokk meglét).
 
-| Model ID minta | Irány | Target | Évek |
-|----------------|-------|--------|------|
-| `lgbm_solusdt_l_fw60_{year}` | Long | `long_mfe_fw60` | 2021-2025 |
-| `lgbm_solusdt_s_fw60_{year}` | Short | `short_mfe_fw60` | 2021-2025 |
-
-- **Target szemantika:** `fw60` = 60-perces forward ablak (`t+1..t+60`); `long_mfe_fw60` = log(max future close / close[t]); `short_mfe_fw60` = log(min future close / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
-- **Feature prefix:** `feat_` | **Target oszlopok:** `long_mfe_fw60`, `short_mfe_fw60`
-- **t-1 lag kötelező** minden feature-ön tanítás előtt
-
----
-
-## Fejezetek
-
-| Szám | Fájl | Tartalom | Szint | Állapot |
-|------|------|----------|-------|---------|
-| 5010 | [5010_sampling_yearly.md](5010_sampling_yearly.md) | Yearly random-hour sampling — teljes metodológia | X100 | kész |
-| 5100 | [5100_sampling_config.md](../database_and_code_doc/5100_sampling_config.md) | YearlySamplingConfig dataclass | X110 | kész |
-| 5200 | [5200_sampling_artifacts.md](../database_and_code_doc/5200_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample | X110 | kész |
-| 5300 | [5300_create_sample.md](../database_and_code_doc/5300_create_sample.md) | create_yearly_sample orchestrator + CLI | X110 | kész |
-| 2000 | [2000_features.md](2000_features.md) | Feature layer metodológia (208 feat, 25 csoport) | X100 | kész |
-| 2010 | [2010_feature_engineering.md](2010_feature_engineering.md) | Feature selection — quality, target relation, redundancy, stability | X100 | kész |
-| 3000 | [3000_targets.md](3000_targets.md) | Target layer metodológia (fw60 logreturn outcome-ok) | X100 | kész |
-| 4000 | [4000_quant_train.md](4000_quant_train.md) | quant_train table — INNER JOIN handoff, rebuild szemantika | X100 | kész |
-| — | — | LightGBM model (training, CV, hyperparameter search) | X100 | tervezett |
-| — | — | Evaluation / backtest | X100 | tervezett |
-| — | — | Elliott waves (kutatás, izolált) | X100 | tervezett |
-| 5400 | [5400_sampling.md](5400_sampling.md) | **ARCHÍV** — expanding window CV (nem aktív) | archív | archív |
-| 5410 | [5410_sampling_splits.md](../database_and_code_doc/5410_sampling_splits.md) | **ARCHÍV** — expanding window splits | archív | archív |
-| 5420 | [5420_sampling_audit.md](../database_and_code_doc/5420_sampling_audit.md) | **ARCHÍV** — feature table audit | archív | archív |
+Invariáns-vezérelt validáció részletes módszertani háttere: fenti "Sample-scope döntés
+és pipeline invariánsok" szekció. Kód-referencia szintű implementáció:
+→ [4100_quant_train.md](../database_and_code_doc/4100_quant_train.md)

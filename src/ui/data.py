@@ -86,9 +86,10 @@ def load_long_short_strategies(
         artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     except Exception:
         return {}, {}
-    params    = artifact.get("decision_params", {})
-    long_cfg  = {"entry_pct": params.get("long_entry_pct"),  "rearm_pct": params.get("rearm_pct")}
-    short_cfg = {"entry_pct": params.get("short_entry_pct"), "rearm_pct": params.get("rearm_pct")}
+    params       = artifact.get("decision_params", {})
+    entry_cutoff = params.get("entry_cutoff")
+    long_cfg     = {"entry_cutoff": entry_cutoff}
+    short_cfg    = {"entry_cutoff": entry_cutoff}   # short uses inverted signal but same threshold
     return long_cfg, short_cfg
 
 
@@ -354,10 +355,25 @@ def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
 
 
 def backtest_summary(asset_id: str | None = None) -> dict:
-    path = _session_artifact_path("summary.json")
+    path = _session_artifact_path("strategy_artifact.json")
     if not path or not path.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        artifact = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return artifact.get("metrics", {})
+
+
+def load_strategy_artifact() -> dict:
+    """Return the full strategy_artifact.json for the active session, or empty dict."""
+    path = _session_artifact_path("strategy_artifact.json")
+    if not path or not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
 
 
 def recent_orders(limit: int = 200, asset_id: str | None = None) -> pd.DataFrame:

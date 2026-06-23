@@ -6,6 +6,10 @@ Headless CLI entrypoint a live trading service-hez. Betölti a trading configot,
 opcionálisan felülírja a módot, live módban interaktív jóváhagyást kér, majd a
 `TradingService` foreground loopját futtatja.
 
+> Módszertani háttér (live trading rationale, mode design, signal lifecycle):
+> → [`../methodology_doc/7000_trading.md`](../methodology_doc/7000_trading.md)
+> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
+
 ---
 
 ## Overview
@@ -51,7 +55,27 @@ flowchart TD
   J --> K["service._run()"]
 ```
 
+## CLI Paraméterek
+
+```powershell
+# Dry-run mód (biztonságos, szimulált orderek)
+uv run python src/trading/01_run_service.py --mode dry_run
+
+# Live mód (valós Binance Futures orderek — interaktív megerősítés kell)
+uv run python src/trading/01_run_service.py --mode live
+
+# Config szerinti mód (--mode elhagyható)
+uv run python src/trading/01_run_service.py
+```
+
 ## Signal kezelés
 
 - `SIGINT` és `SIGTERM` esetén a handler `service.stop()`-ot hív.
 - A tényleges ciklus leállítása nem itt, hanem a service loopban történik.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7120_trading_service.md`](7120_trading_service.md) — `TradingService` loop kód-referencia
+- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — live trading módszertan

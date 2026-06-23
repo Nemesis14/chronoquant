@@ -1,6 +1,6 @@
 # snapshots.py + 05_create_snapshot.py — Snapshot Kód-referencia
 
-`src/data_handling/store/snapshots.py`
+`src/data_handling/store/snapshots.py`  
 `src/data_handling/05_create_snapshot.py`
 
 A `live.quant_train` egy idő-range-ének befagyasztása immutable `snap."<snapshot_id>"`
@@ -122,9 +122,13 @@ ahol `hash8` a `content_sha256` első `HASH8_LEN` (8) hex karaktere.
 
 ### `compute_content_sha256(conn, range_start, range_end)`
 
-**Célja:** A range content-hash-ének és sorszámának kiszámítása. A hash sha256 a teljes
-rendezett sor-tartalom fölött (minden oszlop, `ORDER BY open_time`), `to_json(t)` +
-`string_agg(..., '\n')`. Üres range esetén `sha256('')`. Ez hajtja a reuse-detektálást.
+**Célja:** A range content-hash-ének és sorszámának kiszámítása. A hash sha256 egy
+memóriahatékony fingerprint fölött: `n=<row_count>|sum_hash=<SUM(hash(open_time))>|min=<min_t>|max=<max_t>`.
+Ez hajtja a reuse-detektálást. Üres range esetén `ValueError`.
+
+**Megjegyzés az algoritmusról:** A korábbi `to_json(t) + string_agg(...)` megközelítés
+12+ GB memóriát igényelt 5 éves perces adaton — a `SUM(hash(open_time))` alapú
+fingerprint OOM-mentes és determinista.
 
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|

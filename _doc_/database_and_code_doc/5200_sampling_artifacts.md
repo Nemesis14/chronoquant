@@ -2,7 +2,9 @@
 
 Artifact IO modul: yearly formátumhoz `write_yearly_artifacts` / `load_yearly_sample`;
 legacy expanding-window formátumhoz `write_sample_artifacts` / `load_sample_definition`
-(visszafele kompatibilitás). Forrás: [sampling/artifacts.py](../src/modeling/sampling/artifacts.py)
+(visszafele kompatibilitás). Forrás: [sampling/artifacts.py](../../src/modeling/sampling/artifacts.py)
+
+Metodológiai háttér: [5400_sampling.md](../methodology_doc/5400_sampling.md)
 
 ---
 
@@ -81,10 +83,14 @@ sample = load_yearly_sample("database/solusdt/samples/solusdt_fw60_yearly_2021")
 
 ### `sample_train_valid.parquet`
 
+> **Megjegyzés:** Ez a **yearly parquet (legacy)** formátum sémája. Az aktív pipeline
+> `model."<model_id>__sample"` DuckDB táblájában nincs `feat_*` — azok a snapshotban
+> maradnak. Csak `open_time`, target és `fold_id` kerül a sample táblába.
+
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|
 | `open_time` | `Datetime` | Timestamp (UTC) |
-| `feat_*` | `Float64` | Kvantitatív feature-ök |
+| `feat_*` | `Float64` | Kvantitatív feature-ök (csak yearly legacy parquetben) |
 | `long_mfe_fw60` | `Float64` | Long target |
 | `short_mfe_fw60` | `Float64` | Short target |
 | `segment` | `Utf8` | `train` / `valid` / `purge` |
@@ -112,4 +118,4 @@ kompatibilitás miatt maradnak a kódban — új munkában ne használd.
 |------|----------|
 | [5010_sampling_yearly.md](../methodology_doc/5010_sampling_yearly.md) | Yearly sampling teljes metodológiája |
 | [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig dataclass |
-| [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample orchestrator |
+| [5300_create_sample.md](5300_create_sample.md) | create_yearly_sample (legacy) + create_model_sample (aktív) |

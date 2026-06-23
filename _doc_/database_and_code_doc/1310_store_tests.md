@@ -1,6 +1,6 @@
 # tests/store/ — Store Tesztek
 
-`src/database/tests/store/`
+`src/data_handling/tests/store/`
 
 Store réteg tesztjei három szinten: smoke (szintaxis + alapfunkció), sanity (éles DB adatintegritás), perf (wall-clock teljesítmény).
 
@@ -46,6 +46,16 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 
 ---
 
+### `test_quant_train.py`
+
+| Teszt | Mit ellenőriz |
+|-------|---------------|
+| `test_rebuild_quant_train_full` | Full rebuild: sorok száma, oszlopok (feat_* + target) megvannak |
+| `test_rebuild_quant_train_range` | Range rebuild: csak a megadott tartomány kerül be |
+| `test_rebuild_quant_train_excludes_null_targets` | NULL target sorok kizárva a quant_train-ből |
+
+---
+
 ### `test_duckdb_stats_audit.py`
 
 `raw_manifest_audit` és `log_dataset_check` szintetikus adaton és hiányzó DB/tábla esetén.
@@ -63,7 +73,7 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 
 ## sanity/ — Éles DB Adat-invariánsok
 
-**Előfeltétel:** Éles `database/solusdt/solusdt.duckdb` DB megléte. Ha hiányzik, minden teszt `pytest.skip()`.
+**Előfeltétel:** Éles DB megléte. Ha hiányzik, minden teszt `pytest.skip()`.
 
 ### `test_ohlcv.py`
 
@@ -131,9 +141,28 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 
 ---
 
+### `test_quant_train.py` (sanity)
+
+| Teszt | Mit ellenőriz |
+|-------|---------------|
+| `test_quant_train_table_exists` | `quant_train` tábla létezik és nem üres |
+| `test_quant_train_no_null_targets` | `long_mfe_fw60`, `short_mfe_fw60` — nincs NULL (kizárva volt) |
+| `test_quant_train_open_time_subset_of_ohlcv` | `quant_train.open_time ⊆ ohlcv.open_time` |
+
+---
+
 ## perf/ — Teljesítmény Benchmarkok
 
 Wall-clock idő mérés az éles DB-n. Skippel ha a DB hiányzik.
+
+### `test_quant_train_timing.py`
+
+| Teszt | Limit |
+|-------|-------|
+| `test_timing_quant_train_count` | COUNT(*) < 2s |
+| `test_timing_quant_train_range_query_30d` | 30 napos range < 5s |
+
+---
 
 ### `test_query_timing.py`
 

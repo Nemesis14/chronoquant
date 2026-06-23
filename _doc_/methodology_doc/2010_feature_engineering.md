@@ -8,9 +8,12 @@
 
 ## Célja
 
-A `quant_train` DuckDB tábla `feat_*` oszlopait négy egymástól független dimenzió
-mentén vizsgálja. Az eredmény egy determinisztikusan generált `feature_set.json`,
-amelyet a `00_create_sample.py` és a `02_hyper_param_search.py` fogyaszt.
+Egy modellhez tartozó, sample-scope-os `quant_train` munkatáblán vizsgálja a
+`feat_*` oszlopokat négy egymástól független dimenzió mentén. Az input nem a
+teljes időablakra vágott upstream `quant_train`, hanem a kiválasztott
+`snap."<snapshot_id>" ⋈ model."<model_id>__sample"` join lokális materializációja.
+Az eredmény egy determinisztikusan generált `feature_set.json`, amelyet a
+`02_hyper_param_search.py` és a training lépés fogyaszt.
 
 ---
 
@@ -18,12 +21,12 @@ amelyet a `00_create_sample.py` és a `02_hyper_param_search.py` fogyaszt.
 
 | Forrás | Tartalom |
 |--------|----------|
-| `quant_train` DuckDB tábla | `feat_*` oszlopok + `long_mfe_fw60`, `short_mfe_fw60` target oszlopok |
+| sample-scope `quant_train` temp tábla | `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`; `feat_*` oszlopok + `long_mfe_fw60`, `short_mfe_fw60` target oszlopok |
 | `FeatureEngineeringConfig` | Küszöbértékek minden analízis lépéshez |
 
-A `quant_train` tábla csak NULL-mentes target sorokat tartalmaz (a build pipeline
-garantálja). Az első ~1441 sor `feat_*` értékei NULL-ok lehetnek (t-1 lag warmup),
-de a sampling lookback offset kizárja ezeket a tanítási ablakból.
+A lokális `quant_train` csak az adott modell mintájának sorait tartalmazza. Az
+első ~1441 sor `feat_*` értékei NULL-ok lehetnek (t-1 lag warmup), de a sampling
+lookback offset kizárja ezeket a tanítási ablakból.
 
 ---
 
@@ -103,6 +106,7 @@ Egy feature a **selected** listába kerül, ha mind a négy feltétel teljesül:
 {
   "run_id": "run_20240601_120000",
   "asset_id": "solusdt",
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
   "created_at": "2024-06-01 12:00:00",
   "target_cols": ["long_mfe_fw60", "short_mfe_fw60"],
   "selected": ["feat_rsi_14", "feat_roc_10", ...],
@@ -110,6 +114,13 @@ Egy feature a **selected** listába kerül, ha mind a négy feltétel teljesül:
     {"col": "feat_foo", "reason": "quality: null_rate=0.05 > max=0.01"}
   ],
   "review": ["feat_bar"],
+  "provenance": {
+    "snapshot_id": "solusdt_fw60_2101_2605__21668185",
+    "sample_table": "model.\"lgbm_solusdt_l_fw60_2101_2605__sample\"",
+    "sample_rows": 12345,
+    "joined_rows": 12345,
+    "source_contract": "snap ⋈ model.__sample"
+  },
   "thresholds": {
     "max_null_rate": 0.01,
     "max_inf_rate": 0.001,

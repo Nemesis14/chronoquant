@@ -1,5 +1,7 @@
 """Smoke tests for walk-forward sampling config metadata handling."""
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from modeling.sampling.config import WalkForwardSamplingConfig
@@ -44,7 +46,7 @@ def test_walk_forward_config_frozen() -> None:
         year=2021,
         seed=63,
     )
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         cfg.n_folds = 99  # type: ignore[misc]
 
 

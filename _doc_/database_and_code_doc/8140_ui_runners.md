@@ -1,10 +1,13 @@
 # 8140 - UI Runners And Logging
 
-`src/ui/trading_runner.py`  
+`src/ui/trading_runner.py`
 `src/ui/dashboard_logging.py`
 
 Ez a dokumentum a dashboard két infrastrukturális segédmodulját írja le:
 a trading service singleton wrapperét és a fájl alapú dashboard loggert.
+
+> Módszertani háttér (singleton lifecycle, dashboard logging design):
+> → [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md)
 
 ---
 
@@ -81,3 +84,12 @@ Returns: `list[str]` - a fájl vége `deque`-vel beolvasva.
 ### `clear_logs()`
 
 Returns: `None` - lenullázza a logfájlt.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`7120_trading_service.md`](7120_trading_service.md) — `TradingService` lifecycle és `start()/stop()/is_running()`
+- [`7130_trading_journal.md`](7130_trading_journal.md) — journal read API (status, signals, positions)
+- [`8110_ui_main.md`](8110_ui_main.md) — trading control gombok
+- [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md) — dashboard módszertan

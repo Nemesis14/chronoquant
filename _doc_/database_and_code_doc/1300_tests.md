@@ -1,6 +1,6 @@
 # tests/ — Teszt Áttekintés
 
-`src/database/tests/`
+`src/data_handling/tests/`
 
 A database modul tesztjei négy szinten ellenőrzik az adatintegritást, store működést és pipeline helyességét.
 
@@ -9,7 +9,7 @@ A database modul tesztjei négy szinten ellenőrzik az adatintegritást, store m
 ## Teszt struktúra
 
 ```
-src/database/tests/
+src/data_handling/tests/
 ├── store/
 │   ├── conftest.py          db_path és conn fixture-ök
 │   ├── smoke/               Gyors szintaktikai ellenőrzések
@@ -58,19 +58,19 @@ Read-only DuckDB kapcsolat az éles DB-re. Az összes `sanity` és `perf` teszt 
 
 ```bash
 # Összes database teszt
-uv run pytest src/database/tests/ -v
+uv run pytest src/data_handling/tests/ -v
 
 # Csak smoke tesztek (gyors, CI-ban)
-uv run pytest src/database/tests/ -m smoke -v
+uv run pytest src/data_handling/tests/ -m smoke -v
 
 # Csak sanity (éles DB kell)
-uv run pytest src/database/tests/ -m sanity -v
+uv run pytest src/data_handling/tests/ -m sanity -v
 
 # Perf benchmarkok
-uv run pytest src/database/tests/ -m perf -v -s
+uv run pytest src/data_handling/tests/ -m perf -v -s
 
 # Integration tesztek (synthetic data, mock models)
-uv run pytest src/database/tests/ -m integration -v
+uv run pytest src/data_handling/tests/ -m integration -v
 ```
 
 A `-s` flag a `print()` kimeneteket is megjeleníti — perf teszteknél fontos a timing értékek láthatóságához.

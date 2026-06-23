@@ -91,7 +91,7 @@ lab.duckdb (snap / model / strat sémák)
   pipeline train       ◀── model.__train_input VIEW   ──▶  model.pkl + artifacts/
   predict_offline      ◀── snap.<snapshot_id>         ──▶  model.<id>__pred (teljes range)
   00_run_strategy_session ◀── snap x model_long.__pred x model_short.__pred JOIN
-                        ──▶  strat.<session>__trades/__equity/__cutoffs (lab.duckdb)
+                        ──▶  strat.<session>__trades/__equity/__cutoffs/__summary/__grid_results (lab.duckdb)
                         ──▶  strategy_artifact.json + rank_lookup*.parquet (artifacts/)
 
 registry.duckdb (reg séma)
@@ -153,11 +153,9 @@ src/
     03_fit_model.py
 
   strategy/         Offline strategy calibration (ad-hoc, not in production)
-    strategy/           build_table, calibrate, optimize, artifacts library
+    strategy/           build_table, calibrate, search, artifacts library
     tests/              Smoke tests
-    00_build_strategy_table.py
-    01_calibrate_scores.py
-    02_optimize_strategy.py
+    00_run_strategy_session.py
 
   trading/          Live trading operations only
     live/               TradingService, exchange client, journal, state machine, strategy evaluator
@@ -187,19 +185,13 @@ artifacts/          Model and strategy artifacts
     model.pkl / features.json / params.json
     search/                         Hyperparameter search results
     feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
-  <session_id>/                     Strategy session — naming: strategy_{asset}_fw{horizon}_{start}_{end}
-                                    e.g. strategy_lgbm_solusdt_fw60_2101_2605
-                                    (asset=solusdt, horizon=60, start=2021-01, end=2026-05; no date suffix)
-    strategy_table.parquet          open_time | pred_long_raw | pred_short_raw | pred_long_cal | pred_short_cal | long_mfe_fw60 | short_mfe_fw60
+  <session_id>/                     Strategy session — naming: strat_solusdt_fw60_combo_{start}_{end}
     isotonic_long.pkl               Fitted sklearn IsotonicRegression (long direction)
     isotonic_short.pkl              Fitted sklearn IsotonicRegression (short direction)
-    strategy_artifact.json          Entry/exit/cooldown thresholds + metrics + artifact path refs
-    sweep_results.csv               Optuna trial log
-    trades.parquet                  Trade ledger (entry_time, exit_time, direction, hold_minutes, exit_reason, …)
-    equity_curve.parquet            Cumulative MFE per trade (proxy equity curve)
-    summary.json                    Session summary: n_trades, win_rate, gross_return, equity_basis
-    strategy_report.ipynb           Analyst report notebook
-    strategy_report.html            Quarto-rendered HTML report
+    rank_lookup_long.parquet        Rank percentile lookup — score_raw|score_pct|bucket_id|bucket_mean/median/p75_mfe
+    rank_lookup_short.parquet       Rank percentile lookup (short direction)
+    strategy_artifact.json          Grid search best setup + decision_params + search_info + strat table refs
+    sweep_results_grid.csv          Grid search results: all (direction, entry_cutoff, tp_spec, sl_spec) combinations
 database/           DuckDB files (3-fájlos topológia — részletek: _doc_/database_and_code_doc/0002_data_architecture.md)
   solusdt/
     solusdt.duckdb         <- LIVE (main séma)
@@ -360,24 +352,37 @@ the trained `model.pkl` — no pre-computed OOS parquet is needed or produced.
 Strategy calibration is performed offline by `src/strategy/`, then the artifact drives the live service.
 
 **Offline calibration (`src/strategy/`):**
-- `00_build_strategy_table.py` — loads both model predictions from `quant_train` (DuckDB) for a date range
-- `01_calibrate_scores.py` — fits rank percentile lookup (primary) + isotonic regression (secondary) per direction; single `--start/--end` window
-- `02_optimize_strategy.py` — Optuna sweep; objective: mean(bucket_mean_mfe | entry fired); rank-first entry/exit logic; requires `--long-model`, `--short-model`, `--start`, `--end`
-- Produces: `strategy_artifact.json` + `rank_lookup_long/short.parquet` + `isotonic_long/short.pkl` + `strategy_table.parquet` + `sweep_results.csv` in `artifacts/{session_id}/`
-- **Signal mode:** `rank_first` — entry based on score percentile in calibration distribution, not raw score threshold
-- **Evaluation mode:** `same_window` — calibration, optimization, and reported metrics use the same session window
+- `00_run_strategy_session.py` — full session CLI: scored join → calibrate → grid search
+  - `build_table.build_scored_table` — snap ⋈ model_long.__pred ⋈ model_short.__pred ⋈ live.ohlcv JOIN
+  - `calibrate.fit_calibration` — fits rank percentile lookup (primary) + isotonic regression (secondary); new: bucket median + p75 stats
+  - `search.search_strategy` — deterministic grid search over (entry_cutoff × tp_spec × sl_spec); objective: max total realized `fact_log_return`
+- Produces: `strategy_artifact.json` + `rank_lookup_long/short.parquet` + `isotonic_long/short.pkl` + `sweep_results_grid.csv` in `artifacts/{session_id}/`
+- **Signal mode:** `rank_first` — entry based on score percentile in calibration distribution
+- **Evaluation mode:** `same_window` — calibration and search use the same session window
+- **Search space:** entry_cutoff ∈ [0.90..0.99] × tp_spec (bucket_mean/median/p75/0.75×mean/0.50×mean) × sl_spec (none/0.5×TP/1.0×TP/1.5×TP/2.0×TP) = 200 setups per direction
+- **TP/SL execution:** intrabar high/low touch; long TP `high ≥ entry*exp(tp_lr)`, SL `low ≤ entry*exp(-sl_lr)`; same-bar conflict → SL wins (conservative); timeout = 60 min at close; re-entry next bar after exit
+- **Short ranking inversion:** `short_mfe_fw60 = log(fw_min/close) < 0` (profitable short = negatív érték) → alacsony `score_pct_short` = legjobb short; entry feltétel: `(1 - score_pct_short) >= entry_cutoff`
+- Módszertani részletek: → `_doc_/methodology_doc/6300_strategy_grid_search.md`
 
-**`strategy_artifact.json` contract:**
+**`strategy_artifact.json` contract (epic_035 után):**
 - `signal_mode: "rank_first"`, `evaluation_mode: "same_window"`, `fit_period`
-- `decision_params`: `long/short_entry_pct`, `min_edge_gap`, `min/max_hold_minutes`, `cooldown_minutes`, `rearm_pct`, `conflict_rule: "highest_edge"`
+- `decision_params`: `entry_cutoff`, `tp_spec`, `sl_spec`, `directions`, `max_hold_minutes: 60`, `same_bar_conflict_rule: "sl_first"`
+- `search_info`: `search_type: "grid"`, `n_setups_evaluated`, `best_objective: "total_fact_log_return"`, `best_value`
 
-**Live state machine (`src/trading/live/`):**
-- **States:** FLAT → LONG / SHORT → COOLDOWN → FLAT
-- **Entry:** `score_pct_long >= long_entry_pct` → ENTER_LONG; conflict → `highest_edge` rule
-- **Exit:** `max_hold_minutes` elapsed, or `opposite_edge`, or `signal_decay` (score_pct < rearm_pct)
-- **Rearm:** after `cooldown_minutes` AND both `score_pct <= rearm_pct` → FLAT
+**strat.* DuckDB táblák (epic_035 után):**
+- `strat."<session>__trades"` — trade ledger: entry/exit_time/price, fact_log_return, tp_lr, sl_lr, exit_reason, tp_spec, sl_spec
+- `strat."<session>__equity"` — cumulative_fact_log_return equity curve
+- `strat."<session>__cutoffs"` — per-direction decile bucket cutoffs
+- `strat."<session>__summary"` — 1-soros aggregált összesítő (n_trades, total/avg fact_log_return, compounded_return_pct, win_rate)
+- `strat."<session>__grid_results"` — az összes keresési setup eredménye
+
+**Live state machine (`src/trading/live/`) — epic_036 után:**
+- **States:** FLAT → LONG / SHORT → FLAT (COOLDOWN state eltávolítva)
+- Entry: `score_pct_long >= entry_cutoff` (long); `(1 - score_pct_short) >= entry_cutoff` (short — invertált ranking, mert `short_mfe_fw60 < 0`)
+- Exit: `hold_minutes >= max_hold_minutes` (timeout-only; intrabar TP/SL a live service-ben külön epicben)
 - Service loads `strategy_artifact.json` + rank lookup parquets; converts raw predictions to percentiles via `np.interp` at each bar
-- `config/trading.json`: `strategy_session_id` (replaces legacy `long/short_strategy_id`)
+- `config/trading.json`: `strategy_session_id`
+- ⚠️ Intrabar TP/SL monitoring (bracket order) a live service-ben még nem implementált — külön epic szükséges
 
 ---
 

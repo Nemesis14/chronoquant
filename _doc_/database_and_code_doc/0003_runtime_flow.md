@@ -23,7 +23,7 @@ sequenceDiagram
     S->>P: sync_predictions meghivas
     P->>DB: olvassa: quant_train (feat_* + close)
     P->>P: model.pkl + rank_lookup betoltes
-    P->>DB: upsert predictions (pred_long, pred_short, long_model_id, short_model_id)
+    P->>DB: upsert predictions (long_pred, short_pred, long_model_id, short_model_id)
     T->>DB: olvassa: predictions (legfrissebb sor)
     T->>T: strategy_artifact + state machine alkalmaz
     T->>T: trade journal frissit (ha signal keletkezik)
@@ -186,6 +186,6 @@ A lab adat (`model.__pred` táblák) megmarad a lab DB-ben — a visszacsere nem
 |------|-----------|
 | Tárolási topológia (3 fájl, sémák) | [0002_data_architecture.md](0002_data_architecture.md) |
 | Modell életciklus (hogyan keletkezik a pred tábla) | [0004_model_lifecycle.md](0004_model_lifecycle.md) |
-| Registry séma + deployments tábla | [methodology_doc/1500_registry.md](methodology_doc/1500_registry.md) |
-| Snapshot + immutability | [methodology_doc/1400_snapshots.md](methodology_doc/1400_snapshots.md) |
-| Trading state machine | [methodology_doc/7100_live_trading.md](methodology_doc/7100_live_trading.md) |
+| Registry séma + deployments tábla | [1500_registry.md](../methodology_doc/1500_registry.md) |
+| Snapshot + immutability | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
+| Trading state machine | [7100_live_trading.md](../methodology_doc/7100_live_trading.md) |

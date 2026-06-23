@@ -123,7 +123,7 @@ EXISTS` szemantikával jön létre; a tartalom soha nem íródik felül.
 A `snapshot_id` formátuma: `{asset}_fw{h}_{range}__{hash8}`
 (pl. `solusdt_fw60_2023__a37d2703`).
 
-Részletek: → [1400_snapshots.md](methodology_doc/1400_snapshots.md)
+Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
 
 ### `model` séma — lab.duckdb
 
@@ -152,7 +152,7 @@ Az UI és a deploy folyamat ezekből olvassa az élesítés előtti teljesítmé
 ### `reg` séma — registry.duckdb
 
 8 tábla, normalizált igazságforrás. A séma a `registry.duckdb` **default (main)**
-sémájában él (ATTACH alias = `reg`). Részletek: → [1500_registry.md](methodology_doc/1500_registry.md)
+sémájában él (ATTACH alias = `reg`). Részletek: → [1500_registry.md](../methodology_doc/1500_registry.md)
 
 ---
 
@@ -171,7 +171,7 @@ stateDiagram-v2
 ```
 
 A `content_sha256` és `feature_set_hash` biztosítják a reuse-detektálást és a
-reprodukálhatóságot. Részletek: → [1400_snapshots.md](methodology_doc/1400_snapshots.md)
+reprodukálhatóságot. Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
 
 ---
 
@@ -201,8 +201,8 @@ nem érinti. A két folyamat párhuzamosan futhat.
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Snapshot réteg — miért és hogyan | [1400_snapshots.md](methodology_doc/1400_snapshots.md) |
-| Registry séma + életciklus | [1500_registry.md](methodology_doc/1500_registry.md) |
+| Snapshot réteg — miért és hogyan | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
+| Registry séma + életciklus | [1500_registry.md](../methodology_doc/1500_registry.md) |
 | Éles folyamat (sync → predict → trade) | [0003_runtime_flow.md](0003_runtime_flow.md) |
 | Modell életciklus (snapshot → deploy) | [0004_model_lifecycle.md](0004_model_lifecycle.md) |
-| quant_train metodológia | [methodology_doc/4000_quant_train.md](methodology_doc/4000_quant_train.md) |
+| quant_train metodológia | [4000_quant_train.md](../methodology_doc/4000_quant_train.md) |

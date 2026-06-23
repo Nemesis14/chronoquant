@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import FrozenInstanceError
+from datetime import datetime
 
 import duckdb
 import pytest
@@ -66,6 +67,7 @@ def test_public_imports() -> None:
         analyze_redundancy,
         analyze_stability,
         analyze_target_relation,
+        materialize_sample_scoped_quant_train,
     )
 
 
@@ -204,3 +206,74 @@ def test_stability_has_buckets_for_each_feature(mem_conn, cfg) -> None:
     assert set(features) == {"feat_rsi_14", "feat_roc_10"}
 
 
+def test_materialize_sample_scoped_quant_train_uses_exact_sample_rows() -> None:
+    from modeling.feature_engineering import materialize_sample_scoped_quant_train
+
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE SCHEMA snap")
+    conn.execute("CREATE SCHEMA model")
+    conn.execute("""
+        CREATE TABLE snap."snap_test" AS
+        SELECT
+            TIMESTAMP '2024-01-01 00:00:00' + INTERVAL (i) MINUTE AS open_time,
+            i::DOUBLE AS feat_rsi_14,
+            (i * 10)::DOUBLE AS feat_roc_10,
+            (i * 0.1)::DOUBLE AS long_mfe_fw60,
+            (i * -0.1)::DOUBLE AS short_mfe_fw60
+        FROM generate_series(0, 4) t(i)
+    """)
+    conn.execute("""
+        CREATE TABLE model."demo__sample" AS
+        SELECT *
+        FROM (
+            VALUES
+                (TIMESTAMP '2024-01-01 00:01:00', 0.1, 1),
+                (TIMESTAMP '2024-01-01 00:03:00', 0.3, 2)
+        ) AS t(open_time, long_mfe_fw60, fold_id)
+    """)
+
+    meta = materialize_sample_scoped_quant_train(conn, "demo", "snap_test")
+    rows = conn.execute("""
+        SELECT open_time, feat_rsi_14, long_mfe_fw60, short_mfe_fw60
+        FROM quant_train
+        ORDER BY open_time
+    """).fetchall()
+    conn.close()
+
+    assert meta.row_count == 2
+    assert meta.sample_row_count == 2
+    assert rows == [
+        (datetime(2024, 1, 1, 0, 1), 1.0, 0.1, -0.1),
+        (datetime(2024, 1, 1, 0, 3), 3.0, 0.3, -0.3),
+    ]
+
+
+def test_materialize_sample_scoped_quant_train_raises_on_missing_snapshot_rows() -> None:
+    from modeling.feature_engineering import materialize_sample_scoped_quant_train
+
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE SCHEMA snap")
+    conn.execute("CREATE SCHEMA model")
+    conn.execute("""
+        CREATE TABLE snap."snap_test" AS
+        SELECT
+            TIMESTAMP '2024-01-01 00:00:00' AS open_time,
+            1.0 AS feat_rsi_14,
+            2.0 AS feat_roc_10,
+            0.1 AS long_mfe_fw60,
+            -0.1 AS short_mfe_fw60
+    """)
+    conn.execute("""
+        CREATE TABLE model."demo__sample" AS
+        SELECT *
+        FROM (
+            VALUES
+                (TIMESTAMP '2024-01-01 00:00:00', 0.1, 1),
+                (TIMESTAMP '2024-01-01 00:01:00', 0.2, 1)
+        ) AS t(open_time, long_mfe_fw60, fold_id)
+    """)
+
+    with pytest.raises(RuntimeError, match="join lost rows"):
+        materialize_sample_scoped_quant_train(conn, "demo", "snap_test")
+
+    conn.close()

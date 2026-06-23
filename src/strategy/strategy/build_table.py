@@ -17,6 +17,14 @@ No model.pkl is loaded and no parquet is written here — the scoring already
 happened offline; this step is a pure DuckDB join returning an in-memory
 DataFrame.  Output ``strat.*`` tables are written downstream (optimize step).
 
+Contract note — predict scope vs. sample scope
+    The ``model."<model_id>__pred"`` tables cover the **full snapshot range**
+    (every bar in ``snap."<snapshot_id>"``), not just the training sample rows.
+    This is intentional: the offline predict step scores all historical bars so
+    the strategy can calibrate and optimize over any sub-window of the snapshot.
+    The ``model."<model_id>__sample"`` table (training scope) is irrelevant here
+    and is never read by the strategy layer.
+
 Callers reach the lab/live/registry topology through ``utils.open_lab_connection``
 (config-gateway), never by opening DuckDB files directly.
 

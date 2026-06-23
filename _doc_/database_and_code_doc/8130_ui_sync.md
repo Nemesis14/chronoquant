@@ -1,11 +1,14 @@
 # 8130 - UI Sync Layer
 
-`src/ui/sync.py`  
+`src/ui/sync.py`
 `src/ui/sync_runner.py`
 
 A dashboard sync rétege két részre bomlik: a `sync.py` a tényleges szinkront
 futtatja és a per-asset lockot kezeli, a `sync_runner.py` pedig a Streamlit
 session state, background thread és auto-trigger logikát adja.
+
+> Módszertani háttér (UI sync design, auto-trigger döntések):
+> → [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md)
 
 ---
 
@@ -104,3 +107,11 @@ Returns: `None`
 ### `_result_payload(result)`, `_current_closed_minute(epoch)`, `_now_label()`, `_now_epoch()`
 
 UI-specifikus payload és idősegédek.
+
+---
+
+## Kapcsolódó dokumentumok
+
+- [`8110_ui_main.md`](8110_ui_main.md) — sync control gombok orchestrációja
+- [`1210_sync_ohlcv.md`](1210_sync_ohlcv.md) — `sync_ohlcv` — az OHLCV sync backend
+- [`../methodology_doc/8100_dashboard.md`](../methodology_doc/8100_dashboard.md) — dashboard módszertan

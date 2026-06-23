@@ -5,37 +5,43 @@
   "signal_mode": "rank_first",
   "evaluation_mode": "same_window",
   "fit_period": {
-    "start": "2025-12-01",
-    "end": "2026-05-31"
+    "start": "2025-01-01",
+    "end": "2026-05-01"
   },
   "rank_lookup_long_path": "rank_lookup_long.parquet",
   "rank_lookup_short_path": "rank_lookup_short.parquet",
   "isotonic_long_path": "isotonic_long.pkl",
   "isotonic_short_path": "isotonic_short.pkl",
   "decision_params": {
-    "long_entry_pct": 0.8959098018514238,
-    "short_entry_pct": 0.9899563960183192,
-    "min_edge_gap": 0.22058925425251613,
-    "max_hold_minutes": 143,
-    "cooldown_minutes": 105,
-    "min_hold_minutes": 7,
-    "rearm_pct": 0.40050171487438413,
-    "conflict_rule": "highest_edge"
+    "entry_cutoff": 0.97,
+    "tp_spec": "0.75x_bucket_mean",
+    "sl_spec": "none",
+    "directions": [
+      "long",
+      "short"
+    ],
+    "max_hold_minutes": 60,
+    "same_bar_conflict_rule": "sl_first"
   },
-  "optuna_best_trial": {
-    "value": 0.006318950826804731,
-    "n_trials": 200
+  "search_info": {
+    "search_type": "grid",
+    "n_setups_evaluated": 400,
+    "best_objective": "total_fact_log_return",
+    "best_value": 0.400547
   },
   "metrics": {
-    "n_trades": 134,
-    "total_return": 0.846739,
-    "win_rate": 0.8134,
-    "sharpe": 22.7929,
-    "max_drawdown": -0.013624,
+    "n_trades": 319,
+    "total_fact_log_return": 0.400547,
+    "avg_fact_log_return": 0.001256,
+    "compounded_return_pct": 49.2641,
+    "win_rate": 0.6332,
+    "avg_hold_minutes": 37.42,
     "sufficient_sample": true
   },
   "trades_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__trades\"",
   "equity_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__equity\"",
   "cutoffs_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__cutoffs\"",
-  "calibrated_at": "2026-06-22T05:04:31Z"
+  "summary_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__summary\"",
+  "grid_results_table": "strat.\"strat_solusdt_fw60_combo_2101_2605__grid_results\"",
+  "calibrated_at": "2026-06-22T17:07:08Z"
 }

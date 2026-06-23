@@ -75,26 +75,36 @@ def _build_rank_lookup(
     bucket_id  = np.minimum(np.ceil(score_pct * 10).astype(int), 10)            # 1-10
 
     # Aggregate stats per bucket — vectorised over 10 possible buckets
-    bucket_mean_mfe  = np.empty(n, dtype=float)
-    bucket_hit_rate  = np.empty(n, dtype=float)
+    bucket_mean_mfe   = np.empty(n, dtype=float)
+    bucket_hit_rate   = np.empty(n, dtype=float)
+    bucket_median_mfe = np.empty(n, dtype=float)
+    bucket_p75_mfe    = np.empty(n, dtype=float)
 
     for bid in range(1, 11):
         mask = bucket_id == bid
         if mask.any():
-            bm  = float(mfe_s[mask].mean())
-            bhr = float((mfe_s[mask] > 0).mean())
+            bm     = float(mfe_s[mask].mean())
+            bhr    = float((mfe_s[mask] > 0).mean())
+            bmed   = float(np.median(mfe_s[mask]))
+            bp75   = float(np.percentile(mfe_s[mask], 75))
         else:
-            bm  = 0.0
-            bhr = 0.0
-        bucket_mean_mfe[mask] = bm
-        bucket_hit_rate[mask] = bhr
+            bm     = 0.0
+            bhr    = 0.0
+            bmed   = 0.0
+            bp75   = 0.0
+        bucket_mean_mfe[mask]   = bm
+        bucket_hit_rate[mask]   = bhr
+        bucket_median_mfe[mask] = bmed
+        bucket_p75_mfe[mask]    = bp75
 
     return pd.DataFrame({
-        "score_raw"       : scores_s,
-        "score_pct"       : score_pct,
-        "bucket_id"       : bucket_id,
-        "bucket_mean_mfe" : bucket_mean_mfe,
-        "bucket_hit_rate" : bucket_hit_rate,
+        "score_raw"        : scores_s,
+        "score_pct"        : score_pct,
+        "bucket_id"        : bucket_id,
+        "bucket_mean_mfe"  : bucket_mean_mfe,
+        "bucket_hit_rate"  : bucket_hit_rate,
+        "bucket_median_mfe": bucket_median_mfe,
+        "bucket_p75_mfe"   : bucket_p75_mfe,
     })
 
 
@@ -114,11 +124,13 @@ def fit_calibration(
     direction, and applies all calibrations to the entire scored table.
 
     New columns added to the returned DataFrame:
-        score_pct_long, score_pct_short      — interpolated percentile (0.0-1.0)
-        bucket_long, bucket_short            — decile bucket int 1-10
-        bucket_mean_mfe_long/short           — bucket mean realized MFE
-        bucket_hit_rate_long/short           — bucket fraction(mfe > 0)
-        pred_long_cal, pred_short_cal        — isotonic-predicted MFE
+        score_pct_long, score_pct_short         — interpolated percentile (0.0-1.0)
+        bucket_long, bucket_short               — decile bucket int 1-10
+        bucket_mean_mfe_long/short              — bucket mean realized MFE
+        bucket_hit_rate_long/short              — bucket fraction(mfe > 0)
+        bucket_median_mfe_long/short            — bucket median realized MFE
+        bucket_p75_mfe_long/short               — bucket 75th-percentile MFE
+        pred_long_cal, pred_short_cal           — isotonic-predicted MFE
 
     File artifacts written to artifacts/{session_id}/:
         rank_lookup_long.parquet
@@ -199,19 +211,27 @@ def fit_calibration(
             .to_dict()
         )
 
-    long_mean_map  = _bucket_stat_map(lookup_long,  "bucket_mean_mfe")
-    long_hr_map    = _bucket_stat_map(lookup_long,  "bucket_hit_rate")
-    short_mean_map = _bucket_stat_map(lookup_short, "bucket_mean_mfe")
-    short_hr_map   = _bucket_stat_map(lookup_short, "bucket_hit_rate")
+    long_mean_map   = _bucket_stat_map(lookup_long,  "bucket_mean_mfe")
+    long_hr_map     = _bucket_stat_map(lookup_long,  "bucket_hit_rate")
+    long_median_map = _bucket_stat_map(lookup_long,  "bucket_median_mfe")
+    long_p75_map    = _bucket_stat_map(lookup_long,  "bucket_p75_mfe")
+    short_mean_map  = _bucket_stat_map(lookup_short, "bucket_mean_mfe")
+    short_hr_map    = _bucket_stat_map(lookup_short, "bucket_hit_rate")
+    short_median_map = _bucket_stat_map(lookup_short, "bucket_median_mfe")
+    short_p75_map    = _bucket_stat_map(lookup_short, "bucket_p75_mfe")
 
-    df["score_pct_long"]          = score_pct_long
-    df["score_pct_short"]         = score_pct_short
-    df["bucket_long"]             = bucket_long_arr
-    df["bucket_short"]            = bucket_short_arr
-    df["bucket_mean_mfe_long"]    = pd.array(bucket_long_arr).map(long_mean_map)   # type: ignore[attr-defined]
-    df["bucket_mean_mfe_short"]   = pd.array(bucket_short_arr).map(short_mean_map) # type: ignore[attr-defined]
-    df["bucket_hit_rate_long"]    = pd.array(bucket_long_arr).map(long_hr_map)     # type: ignore[attr-defined]
-    df["bucket_hit_rate_short"]   = pd.array(bucket_short_arr).map(short_hr_map)   # type: ignore[attr-defined]
+    df["score_pct_long"]             = score_pct_long
+    df["score_pct_short"]            = score_pct_short
+    df["bucket_long"]                = bucket_long_arr
+    df["bucket_short"]               = bucket_short_arr
+    df["bucket_mean_mfe_long"]       = pd.array(bucket_long_arr).map(long_mean_map)    # type: ignore[attr-defined]
+    df["bucket_mean_mfe_short"]      = pd.array(bucket_short_arr).map(short_mean_map)  # type: ignore[attr-defined]
+    df["bucket_hit_rate_long"]       = pd.array(bucket_long_arr).map(long_hr_map)      # type: ignore[attr-defined]
+    df["bucket_hit_rate_short"]      = pd.array(bucket_short_arr).map(short_hr_map)    # type: ignore[attr-defined]
+    df["bucket_median_mfe_long"]     = pd.array(bucket_long_arr).map(long_median_map)  # type: ignore[attr-defined]
+    df["bucket_p75_mfe_long"]        = pd.array(bucket_long_arr).map(long_p75_map)     # type: ignore[attr-defined]
+    df["bucket_median_mfe_short"]    = pd.array(bucket_short_arr).map(short_median_map) # type: ignore[attr-defined]
+    df["bucket_p75_mfe_short"]       = pd.array(bucket_short_arr).map(short_p75_map)   # type: ignore[attr-defined]
 
     # --- Fit isotonic regression calibrators (secondary layer) ---
     iso_long  = IsotonicRegression(out_of_bounds="clip", increasing=True)

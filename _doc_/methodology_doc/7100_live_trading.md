@@ -83,22 +83,8 @@ stateDiagram-v2
 
 ## Almodulok
 
-### [7110_run_service.md](../database_and_code_doc/7110_run_service.md)
-
-Foreground CLI indítás, signal handling, live megerősítés.
-
-### [7120_trading_service.md](../database_and_code_doc/7120_trading_service.md)
-
-A teljes percenkénti service loop: sync, beolvasás, döntés, végrehajtás, journaling.
-
-### [7130_trading_journal.md](../database_and_code_doc/7130_trading_journal.md)
-
-`trading.db` séma, insert/read/export felület.
-
-### [7140_trading_exchange.md](../database_and_code_doc/7140_trading_exchange.md)
-
-Binance Futures kliens dry-run és live order placmenttel.
-
-### [7150_trading_state_strategy.md](../database_and_code_doc/7150_trading_state_strategy.md)
-
-Állapot és döntési logika: `TradingState`, `evaluate()`.
+- Service indítás és leállítás.
+- Percenkénti futási ciklus: sync, legfrissebb predikció beolvasása, döntés, végrehajtás.
+- Trading journal és állapotnaplózás.
+- Exchange kapcsolat dry-run és live módban.
+- Állapotgép és döntési logika.

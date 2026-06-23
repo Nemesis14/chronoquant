@@ -1,136 +1,102 @@
-﻿# 4000 — quant_train Table
+# 4000 - quant_train
 
-A `quant_train` tábla a modeling pipeline egyetlen stabil belépési pontja: a `feat_ohlcv_quant` és a `target` tábla INNER JOIN-jából épül fel, és kizárólag ad-hoc rebuild-del frissül — soha nem a live sync pipeline részént.
-
----
+A `quant_train` tabla a feature- es targetreteget egyetlen modellezesre alkalmas
+nezetbe rendezi. Fontos upstream staging felulet, de az aktiv modellezesi pipeline
+mar nem kozvetlenul ezt fogyasztja a sampling, training es predict lepesben.
 
 ## Overview
 
 ```mermaid
 flowchart TD
-  F[feat_ohlcv_quant\nopen_time + feat_* + metaadatok]
-  T[target\nopen_time + fw60 outcome-ok]
-  QT[(quant_train\nopen_time + feat_* + long_mfe_fw60 + short_mfe_fw60)]
-  FE[01_feature_engineering.ipynb\nfeature szelekció + minőség]
-  SM[00_create_sample.py\nyearly random-hour sampling]
-  LGBM[03_fit_model.py\nLightGBM tanítás]
+  FEAT[feat_ohlcv_quant]
+  TGT[target]
+  QT[quant_train]
+  SNAP[snapshot create]
+  FE[feature engineering notebook]
 
-  F -->|INNER JOIN\non open_time\nNULL target kizárva| QT
-  T -->|INNER JOIN\non open_time| QT
+  FEAT --> QT
+  TGT --> QT
+  QT --> SNAP
   QT --> FE
-  QT --> SM
-  SM --> LGBM
 ```
 
-A `quant_train` kizárja az `available_ts`, `lookback_end_ts`, `close`, és minden auxiliary fw60 oszlopot — csak a `feat_*` prefix és a két elsődleges target kerül bele.
-
-**Kód referencia:** [`_doc_/4100_quant_train.md`](../database_and_code_doc/4100_quant_train.md)
-**Implementáció:** [`src/data_handling/sync_tables/sync_quant_train.py`](src/data_handling/sync_tables/sync_quant_train.py)
-**CLI:** `uv run python src/data_handling/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
-
----
-
-## Üzleti és módszertani háttér
+## Uzleti es modszertani hatter
 
 ### Miért kritikus ez a lépés?
 
-A `quant_train` az ML pipeline stabil handoff-pontja az adat-réteg és a modellező réteg között. Ha ez a tábla sérült (pl. NULL targeteket tartalmaz, vagy hiányzó feature oszlopai vannak), az összes downstream munka — feature engineering, sampling, LightGBM tanítás — helytelen vagy félrevezető eredményt ad, és a hiba a későbbi artifactokban jelenik meg, nem a tábla építésekor.
-
-A NULL target sorok kizárása ezen a szinten kritikus: ha az utolsó 60 sor (ahol nincs elegendő forward data) bekerülne a tanítóba, a modell `0`-ként tanulná meg ezeket, holott ezek ismeretlen állapotú sorok.
+A `quant_train` biztosítja, hogy a feature- és targetréteg konzisztensen legyen
+összeillesztve, és ne kerüljenek be NULL targetes sorok a modellezés előszobájába.
+Ha ez a tábla hibás, a rá épülő snapshot és feature engineering is rossz alapot kap.
 
 ### Miért ezt a megközelítést?
 
-```mermaid
-flowchart LR
-  Q[quant_train felépítése] --> A[Live sync pipeline\nNO: folyamatosan frissülő join\nNO: tanítás alatt változhat\nNO: nem reprodukálható]
-  Q --> B[Ad-hoc rebuild DuckDB-ben\nOK: tanítás előtt lefuttatott\nOK: teljes újraépítés = determinisztikus\nOK: Választott]
-  Q --> C[Parquet snapshot\nWARN: reprodukálható, de nehéz frissíteni\nWARN: inkompatibilis a live query-vel]
-```
-
 | Megközelítés | Előny | Hátrány | Státusz |
-|---|---|---|---|
-| Ad-hoc DuckDB rebuild (jelenlegi) | Determinisztikus, lekérdezhető, frissíthető range-rebuild-del | Manuálisan kell futtatni tanítás előtt | ✅ Választott |
-| Live sync pipeline | Mindig aktuális | Tanítás alatt változhat → nem reprodukálható; overhead minden sync-nél | ❌ Elvetett — pipeline inkonzisztencia kockázata |
-| Parquet snapshot | Reprodukálható snapshot | Nem frissíthető inkrementálisan; DuckDB query nem tud rá csatlakozni | ⚠️ Csak archív célra |
+|--------------|-------|---------|---------|
+| Külön materializált `quant_train` staging tábla | Egyértelmű join-pont, könnyebb audit és snapshotképzés | Fenntart egy plusz köztes réteget | Valasztott |
+| Minden lépés közvetlenül a feature + target táblából joinol | Kevesebb köztes objektum | Szétszórt, ismétlődő logika | Elvetett |
+| A live tábla közvetlen modellezési forrásként | Egyszerűnek tűnik | Gyengébb reprodukálhatóság és nehezebb audit | Elvetett |
+| Csak notebook-on-the-fly join | Gyors kísérletezés | Nincs egységes modell-előszoba | Elvetett |
 
-### INNER JOIN szemantika: miért nem LEFT JOIN?
+### INNER JOIN + NULL-szűrés: miért kell és hogyan működik?
 
 ```mermaid
 graph TD
-  F[feat_ohlcv_quant\n~összes perc] --> J{INNER JOIN\non open_time}
-  T[target\nnull az utolsó 60 sorban] --> J
-  J --> QT[quant_train\nnull-free sorok]
-  J -->|kizárva| NL[null target sorok\nazaz az utolsó 60 perc]
+  F[feature sorok]
+  T[target sorok]
+  J[INNER JOIN open_time-on]
+  N[NULL target sorok kiesnek]
+  Q[quant_train csak teljes sorokkal]
+
+  F --> J
+  T --> J --> N --> Q
 ```
 
-Az INNER JOIN dupla védelmet nyújt:
-1. Csak azok a sorok kerülnek be, ahol a target tábla row-ja létezik
-2. A `WHERE long_mfe_fw60 IS NOT NULL AND short_mfe_fw60 IS NOT NULL` feltétel kizárja a NULL forward outcome-okat
+Ez a logika azt garantálja, hogy a target horizon végén jelentkező ismeretlen sorok
+ne csússzanak be sem a snapshotkészítésbe, sem a későbbi elemzésbe.
 
-LEFT JOIN esetén NULL targetű sorok bekerülnének, és a dataset loadernek minden betöltésnél kellene szűrni — ez hibalehetőség, és a NULL-ok véletlenül 0-vá imputálódhatnának.
+**Szabály:** a `quant_train` nem tartalmazhat NULL aktív targetet.
 
-### Full vs. Range rebuild: mikor melyik?
+### Upstream staging szerep: miért fontos a pontos pozíció?
 
 ```mermaid
-flowchart TD
-  A{Rebuild típus?} -->|"--start és --end\nnem adott meg"| B[Full rebuild\nCREATE OR REPLACE TABLE\ndeterminisztikus]
-  A -->|"--start és --end\nmegadva"| C[Range rebuild\nDELETE + INSERT\naz adott ablakra]
-  B --> E[teljes tábla frissítve]
-  C --> E
-  E -->|mindkét mód| F[idempotens eredmény]
+flowchart LR
+  QT[quant_train]
+  SNAP[snapshot]
+  SAMPLE[model.__sample]
+  TRAIN[training]
+
+  QT --> SNAP --> SAMPLE --> TRAIN
 ```
 
-| Mód | Mikor | SQL |
-|-----|-------|-----|
-| **Full rebuild** | Első feltöltés, teljes újraépítés, schema változás után | `CREATE OR REPLACE TABLE quant_train AS SELECT ...` |
-| **Range rebuild** | Inkrementális frissítés (pl. új OHLCV adat érkezett) | `DELETE ... WHERE open_time BETWEEN start AND end` + `INSERT INTO ...` |
+A korábbi leírások túl erősen úgy kezelték a `quant_train`-t, mintha ez lenne a
+végső modellezési input. A jelenlegi kódban ez már csak egy stabil előkészítő réteg:
+snapshot innen készül, de a sample, training és predict már a snapshotból dolgozik.
 
-Mindkét mód **idempotens** — biztonságos többszöri futtatásra.
-
-### Kizárt oszlopok: miért nem kerül be az összes?
-
-A `quant_train` szándékosan szűk scope-ú:
-
-| Kizárt oszlop | Forrás | Miért kizárt |
-|---|---|---|
-| `close` | feat_ohlcv_quant | Nem feature — árszint, non-stacionárius; nem kell a modellnek |
-| `available_ts`, `lookback_end_ts` | feat_ohlcv_quant | Metadata — sampling és pipeline kontroll, nem ML input |
-| `fw60_close`, `fw60_max`, `fw60_min`, stb. | target | Auxiliary outcome-ok — csak `long_mfe_fw60` és `short_mfe_fw60` az aktív target |
-| `long_pred`, `short_pred` | predictions | Predikciók nem kerülhetnek vissza tanítóba — feedback loop |
+**Szabály:** ha ellentmondás van a régi dokumentáció és a pipeline között, a
+snapshot-native útvonal az elsődleges igazság.
 
 ### Paraméter alapértékek és indoklásuk
 
-| Paraméter | Érték | Indoklás |
-|---|---|---|
-| Target oszlopok | `long_mfe_fw60`, `short_mfe_fw60` | Aktív fw60 logreturn target páros; bővítés esetén új rebuild szükséges |
-| NULL szűrés | `IS NOT NULL` mindkét targetre | Védi a modellt a forward-edge soroktól; soha ne imputálj 0-val |
-| Rebuild mód default | Full rebuild | Biztonságos és determinisztikus; range rebuild csak ha tanítás-előtti inkrementális frissítés szükséges |
-| DuckDB táblanév | `quant_train` | Fix — a downstream pipeline (sampling, training) erre a névre hivatkozik |
+| Paraméter | Alapérték | Indoklás |
+|-----------|-----------|----------|
+| join kulcs | `open_time` | Az egyetlen közös időbeli azonosító a feature és target réteg között |
+| rebuild mód | teljes rebuild alapértelmezésben | Egyszerű, determinisztikus, könnyen auditálható |
+| range rebuild | opcionális | Inkrementális karbantartásra használható, de nem ez a fő kutatási út |
+| target oszlopok | aktív MFE céloszlopok | A feature engineering ezekkel dolgozik együtt |
 
 ### Ismert kockázatok és korlátok
 
 | Kockázat | Tünet | Mitigáció |
-|---|---|---|
-| Stale tábla (nem rebuild-elt tanítás előtt) | Hiányzó legfrissebb adatok; model training régi datán tanul | Kötelező futtatni a `03_build_quant_train.py`-t tanítás előtt — checklist pontja |
-| Schema drift (új feature oszlop `feat_ohlcv_quant`-ban) | Hiányzó feature oszlop a `quant_train`-ben | Full rebuild kötelező ha `sync_features` megváltozott |
-| Range rebuild időablak túl szűk | Overlap az INNER JOIN-nal, NULL sorok maradnak | Rebuild a target sync teljes tartományán futtasd, ne csak az OHLCV tartományán |
-| `feat_ohlcv_quant` és `target` eltérő adathatárok | Kevesebb sor a quant_train-ben mint várható | Ellenőrizd mindkét tábla `MAX(open_time)`-ját; futtasd mindkét sync-et az újraépítés előtt |
-| `quant_train` vs yearly sample artifact konfúzió | A sample parquet csak `open_time`, `segment`, `fold_id` és target adatot ad; a feature mátrix DuckDB-ből töltődik vissza | Training célra ne feltételezz materializált sample DuckDB táblát |
+|----------|-------|-----------|
+| Dokumentációs félreértés | A `quant_train`-t végső training source-nak írják le | A modell-domainben explicit jelölni kell az upstream szerepet |
+| Schema drift | Új feature megjelenik, de a staging nem frissül | Rebuild és staging audit |
+| Stale staging | Régi adathatárral készül snapshot | Snapshot előtt build és határellenőrzés |
+| Duplikált open_time | Inkonzisztens join és hibás snapshot | Validációs ellenőrzések a staging táblára |
 
 ### Validációs checklist
 
-- [ ] `quant_train` tábla létezik: `SHOW TABLES` tartalmazza
-- [ ] `SELECT COUNT(*) FROM quant_train WHERE long_mfe_fw60 IS NULL` → 0 (nincs NULL target)
-- [ ] `SELECT COUNT(*) FROM quant_train WHERE short_mfe_fw60 IS NULL` → 0
-- [ ] `SELECT MAX(open_time) FROM quant_train` ≥ `SELECT MAX(open_time) FROM target WHERE long_mfe_fw60 IS NOT NULL` − 1 perc
-- [ ] Oszlopok: `open_time`, összes `feat_*`, `long_mfe_fw60`, `short_mfe_fw60` — semmi más (pl. `close`, `available_ts`, `trg_*`)
-- [ ] Rebuild futott le a legutóbbi `sync_features` és `sync_targets` után
-- [ ] `DESCRIBE quant_train` feat_ oszlopszáma megegyezik `feat_ohlcv_quant`-éval
-
----
-
-## Alfejezetek
-
-| Szám | Fájl | Tartalom |
-|------|------|----------|
-| 4100 | [4100_quant_train.md](../database_and_code_doc/4100_quant_train.md) | Részletes séma, rebuild szemantika, CLI referencia |
+- [ ] A `quant_train` a feature és target réteg INNER JOIN-jából épül.
+- [ ] Az aktív target oszlopok nem tartalmaznak NULL értéket.
+- [ ] A staging táblában az `open_time` egyedi és rendezett.
+- [ ] A snapshotképzés mindig a frissített `quant_train`-re épül.
+- [ ] A dokumentáció egyértelműen upstream stagingként kezeli, nem végső modellezési inputként.

@@ -131,7 +131,7 @@ sequenceDiagram
 | `_PK` | `dict[str, str]` | Táblánkénti elsődleges kulcs oszlop (upsert/get/set_status) |
 | `_JSON_COLS` | `dict[str, frozenset[str]]` | JSON-típusú oszlopok: `feature_sets.selected_cols`, `search_runs.best_params` |
 
-### `_migration_001_reg_schema(conn)`
+### `_migration_001_reg_schema(conn)` — v1
 
 **Célja:** A 8 katalógus-tábla létrehozása (ER per plan 4.3) a registry.duckdb **default
 (main)** sémájában. A `reg` névtér a plan SQL-jében az ATTACH alias, ezért a táblák nem nested
@@ -153,6 +153,25 @@ A 8 tábla séma-kivonata (minden táblának van `status DEFAULT 'draft'`, `crea
 | `artifacts` | `artifact_id` | owner_id (polimorf), kind, path |
 
 > A teljes ER és az entitás-relációk rationale-ja: [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md).
+
+### `_migration_002_deployments_lifecycle(conn)` — v2
+
+**Célja:** Két lifecycle oszlop hozzáadása a `deployments` táblához (deploy/cutover
+munkamenethez). Mindkettő nullable — pending/inactive soroknál `NULL`.
+
+| Oszlop | Típus | Leírás |
+|--------|-------|--------|
+| `activated_at` | `TIMESTAMP` | Mikor vált aktívvá a deployment |
+| `previous_strategy_id` | `VARCHAR` | A leváltott strategy_id (rollback referencia) |
+
+### `REG_MIGRATIONS` lista
+
+```python
+REG_MIGRATIONS = [
+    Migration(version=1, name="reg_schema_initial",         apply=_migration_001_reg_schema),
+    Migration(version=2, name="deployments_lifecycle_cols", apply=_migration_002_deployments_lifecycle),
+]
+```
 
 ---
 

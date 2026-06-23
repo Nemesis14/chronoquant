@@ -1,6 +1,6 @@
 # store/ — DuckDB Store Réteg
 
-A `src/database/store/` könyvtár kezeli az összes alacsony szintű DuckDB interakciót: séma létrehozást, adatbeírást, lekérdezést, validációt és statisztikákat.
+A `src/data_handling/store/` könyvtár kezeli az összes alacsony szintű DuckDB interakciót: séma létrehozást, adatbeírást, lekérdezést, validációt és statisztikákat.
 
 ---
 
@@ -34,13 +34,15 @@ DuckDB kapcsolat kezelés, séma inicializálás és adatbeírás.
 
 **Kulcs funkciók:**
 - `get_connection(db_path)` — DuckDB kapcsolat megnyitása, parent dir létrehozása
-- `ensure_tables(conn)` — Táblák létrehozása + legacy migráció (`dataset_split`, `fold_id` drop)
+- `ensure_tables(conn)` — Verziózott migrációk futtatása (`LIVE_DB_MIGRATIONS` v1–v5, idempotens)
 - `_ensure_feat_ohlcv_quant_table(conn, df)` — Dinamikus séma: tábla létrehozása vagy oszlopbővítés
 - `_insert_append_only(conn, table, df)` — Core append logika `MAX(open_time)` alapon
 - `insert_ohlcv(conn, df)` — OHLCV beírás (10 oszlop szűrés + append)
 - `insert_feat_ohlcv_quant(conn, df)` — Feature beírás (dinamikus séma + append)
-- `insert_target(conn, df)` — Target beírás (DELETE+INSERT, teljes rebuild szemantika)
+- `insert_target(conn, df)` — Target beírás (DELETE WHERE IN + INSERT)
 - `insert_predictions(conn, df)` — Prediction beírás (séma DB-ből, append)
+- `backfill_predictions(conn, df)` — Historikus gap-fill (INSERT OR IGNORE)
+- `rebuild_quant_train(conn, start, end)` — quant_train teljes vagy range rebuild
 
 ---
 
@@ -102,5 +104,7 @@ DS workflow segédek — dataset inspekció és összefoglalók.
 |-------|-----------|----------|
 | `ohlcv` | Append-only (`MAX(open_time)` alap) | `insert_ohlcv` |
 | `feat_ohlcv_quant` | Append-only + dinamikus séma | `insert_feat_ohlcv_quant` |
-| `target` | DELETE+INSERT (teljes rebuild) | `insert_target` |
+| `target` | DELETE WHERE IN + INSERT (teljes rebuild) | `insert_target` |
 | `predictions` | Append-only | `insert_predictions` |
+| `predictions` | Gap-fill (INSERT OR IGNORE) | `backfill_predictions` |
+| `quant_train` | Full rebuild (CREATE OR REPLACE) / Range (DELETE+INSERT) | `rebuild_quant_train` |

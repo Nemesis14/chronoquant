@@ -357,6 +357,12 @@ def _load_search_dataset(
             ORDER BY s.open_time
         """
         df = conn.execute(sql).df()
+
+        # I2 invariant logging: joined rows should equal model.__sample rowcount.
+        sample_row = conn.execute(
+            f'SELECT COUNT(*) FROM model."{model_id}__sample"'
+        ).fetchone()
+        sample_count = int(sample_row[0]) if sample_row else -1
     finally:
         conn.close()
 
@@ -366,8 +372,8 @@ def _load_search_dataset(
         df = df.iloc[::row_stride].copy().reset_index(drop=True)
 
     logger.info(
-        "[Data] target=%s  total_rows=%d",
-        target_col, len(df),
+        "[Data] target=%s  joined_rows=%d  sample_rows=%d  (I2: snap ⋈ model.__sample)",
+        target_col, len(df), sample_count,
     )
 
     dataset = ModelingDataset(

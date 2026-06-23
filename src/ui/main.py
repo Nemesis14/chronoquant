@@ -6,12 +6,13 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 import streamlit as st
+from html import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ui import data, trading_runner
 from ui.components.charts import PLOTLY_CHART_CONFIG, prediction_price_figure
-from ui.components.formatting import _GOLD, _GRID, _MUTED, _RED, _TEXT
+from ui.components.formatting import _GOLD, _GREEN, _GRID, _MUTED, _PANEL, _RED, _TEXT
 from ui.components.log_panel import render_log_panel
 from ui.components.trade_panel import render_trade_panel
 from ui.dashboard_logging import get_dashboard_logger
@@ -169,16 +170,93 @@ def render_asset_chart(asset_id: str | None) -> None:
 
     fig = prediction_price_figure(
         df,
-        entry_threshold       = long_strategy.get("entry_pct"),
-        rearm_threshold       = long_strategy.get("rearm_pct"),
+        entry_threshold       = long_strategy.get("entry_cutoff"),
+        rearm_threshold       = None,
         exit_threshold        = None,
-        short_entry_threshold = short_strategy.get("entry_pct"),
-        short_rearm_threshold = short_strategy.get("rearm_pct"),
+        short_entry_threshold = short_strategy.get("entry_cutoff"),
+        short_rearm_threshold = None,
         short_exit_threshold  = None,
         active_trade          = active_trade,
         focus_hours           = focus_hours,
     )
     st.plotly_chart(fig, config=PLOTLY_CHART_CONFIG, width="stretch")
+
+
+def _render_strategy_card() -> None:
+    artifact = data.load_strategy_artifact()
+    if not artifact:
+        return
+
+    session_id       = artifact.get("session_id", "—")
+    fit_period       = artifact.get("fit_period", {})
+    fit_start        = str(fit_period.get("start", ""))[:7] if fit_period.get("start") else "—"
+    fit_end          = str(fit_period.get("end",   ""))[:7] if fit_period.get("end")   else "—"
+    params           = artifact.get("decision_params", {})
+    metrics          = artifact.get("metrics", {})
+
+    entry_cutoff     = params.get("entry_cutoff")
+    tp_spec          = params.get("tp_spec")          or "—"
+    sl_spec          = params.get("sl_spec")          or "—"
+    max_hold_minutes = params.get("max_hold_minutes")
+    n_trades         = metrics.get("n_trades")
+    win_rate         = metrics.get("win_rate")
+    comp_return      = metrics.get("compounded_return_pct")
+    avg_hold         = metrics.get("avg_hold_minutes")
+
+    entry_lbl = f"{entry_cutoff * 100:.0f}%" if entry_cutoff     is not None else "—"
+    hold_lbl  = f"{int(max_hold_minutes)} min" if max_hold_minutes is not None else "—"
+    wr_lbl    = f"{win_rate * 100:.1f}%"       if win_rate        is not None else "—"
+    ret_lbl   = f"+{comp_return:.1f}%"         if comp_return     is not None else "—"
+    trade_lbl = f"{int(n_trades)}"             if n_trades        is not None else "—"
+    avg_lbl   = f"{avg_hold:.1f} min"          if avg_hold        is not None else "—"
+
+    _C   = (f"border:1px solid {_GRID}; border-radius:6px; "
+            f"padding:10px 12px; background:{_PANEL}; margin-bottom:10px;")
+    _LBL = f"color:{_MUTED}; font-size:11px;"
+    _VAL = f"color:{_TEXT}; font-size:12px; font-weight:500;"
+
+    header_text = f"{escape(session_id)} &nbsp;|&nbsp; {fit_start} → {fit_end}"
+
+    long_row = (
+        f'<div style="border-bottom:1px solid {_GRID}; padding:5px 0; font-size:12px;'
+        f' display:grid; grid-template-columns:52px 58px 1fr; gap:4px; align-items:center;">'
+        f'<span style="color:{_GREEN}; font-weight:700;">▲ LONG</span>'
+        f'<span style="color:{_TEXT};">entry {entry_lbl}</span>'
+        f'<span style="color:{_MUTED}; font-size:11px;">TP: {escape(tp_spec)}</span>'
+        f'</div>'
+    )
+    short_row = (
+        f'<div style="padding:5px 0; font-size:12px;'
+        f' display:grid; grid-template-columns:52px 58px 1fr; gap:4px; align-items:center;">'
+        f'<span style="color:{_RED}; font-weight:700;">▼ SHORT</span>'
+        f'<span style="color:{_TEXT};">entry {entry_lbl}</span>'
+        f'<span style="color:{_MUTED}; font-size:11px;">SL: {escape(sl_spec)} &nbsp; hold: {hold_lbl}</span>'
+        f'</div>'
+    )
+    metrics_html = (
+        f'<div style="border-top:1px solid {_GRID}; margin-top:6px; padding-top:6px;'
+        f' display:grid; grid-template-columns:1fr 1fr; gap:3px 8px; font-size:12px;">'
+        f'<div><span style="{_LBL}">Trades </span><span style="{_VAL}">{trade_lbl}</span></div>'
+        f'<div><span style="{_LBL}">Win </span>'
+        f'<span style="color:{_GREEN}; font-size:12px; font-weight:600;">{wr_lbl}</span></div>'
+        f'<div><span style="{_LBL}">Return </span>'
+        f'<span style="color:{_GREEN}; font-size:12px; font-weight:600;">{ret_lbl}</span></div>'
+        f'<div><span style="{_LBL}">Avg hold </span><span style="{_VAL}">{avg_lbl}</span></div>'
+        f'</div>'
+    )
+
+    st.markdown(
+        f'<div style="{_C}">'
+        f'<div style="color:{_TEXT}; font-size:12px; font-weight:700; margin-bottom:8px;">'
+        f'Aktív Stratégia &nbsp;'
+        f'<span style="color:{_MUTED}; font-size:11px; font-weight:400;">{header_text}</span>'
+        f'</div>'
+        f'{long_row}'
+        f'{short_row}'
+        f'{metrics_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_trading_controls() -> None:
@@ -244,3 +322,4 @@ with col_chart:
 
 with col_trade:
     render_trade_panel(active_asset_id)
+    _render_strategy_card()

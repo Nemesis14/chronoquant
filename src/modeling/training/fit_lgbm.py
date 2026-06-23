@@ -163,8 +163,20 @@ def _load_train_data(
             ORDER BY s.open_time
         """
         df = conn.execute(sql).df()
+
+        # I2 invariant logging: joined rows should equal model.__sample rowcount.
+        sample_row = conn.execute(
+            f'SELECT COUNT(*) FROM model."{model_id}__sample"'
+        ).fetchone()
+        sample_count = int(sample_row[0]) if sample_row else -1
     finally:
         conn.close()
+
+    logger.info(
+        "[fit_lgbm] _load_train_data: model=%s  joined_rows=%d  sample_rows=%d"
+        "  (I2: snap ⋈ model.__sample)",
+        model_id, len(df), sample_count,
+    )
 
     df["open_time"] = pd.to_datetime(df["open_time"])
 

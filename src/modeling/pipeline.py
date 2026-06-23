@@ -149,7 +149,12 @@ def step_sample(model_id: str, artifact_dir: Path, snapshot_id: str | None = Non
 # Step: feature_engineering
 # ---------------------------------------------------------------------------
 
-def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> None:
+def step_feature_engineering(
+    model_id: str,
+    meta: dict,
+    artifact_dir: Path,
+    snapshot_id: str | None = None,
+) -> None:
     try:
         import papermill as pm
     except ImportError:
@@ -165,10 +170,19 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
     # Sample is now model-specific and lives in the artifact directory.
     sample_dir = str(artifact_dir)
 
+    # Resolve snapshot_id: explicit arg > manifest.json > models.json fallback.
+    # The notebook has its own fallback chain (models.json → reg.models), but
+    # passing SNAPSHOT_ID explicitly ensures --snapshot CLI overrides propagate.
+    if not snapshot_id:
+        snapshot_id = meta.get("sampling", {}).get("snapshot_id", "")
+    snapshot_id = snapshot_id or ""
+
     print("[feature_engineering] Running notebook via papermill...")
-    print(f"  template  : {NOTEBOOK_TEMPLATE}")
-    print(f"  output    : {output_nb}")
-    print(f"  sample_dir: {sample_dir}")
+    print(f"  template   : {NOTEBOOK_TEMPLATE}")
+    print(f"  output     : {output_nb}")
+    print(f"  sample_dir : {sample_dir}")
+    if snapshot_id:
+        print(f"  snapshot_id: {snapshot_id}")
 
     pm.execute_notebook(
         str(NOTEBOOK_TEMPLATE),
@@ -177,6 +191,7 @@ def step_feature_engineering(model_id: str, meta: dict, artifact_dir: Path) -> N
             "ARTIFACT_DIR": str(artifact_dir),
             "SAMPLE_DIR"  : sample_dir,
             "MODEL_ID"    : model_id,
+            "SNAPSHOT_ID" : snapshot_id,
         },
         kernel_name="python3",
     )
@@ -313,7 +328,7 @@ def main() -> None:
         elif step == "sample":
             step_sample(model_id, artifact_dir, snapshot_id=args.snapshot)
         elif step == "feature_engineering":
-            step_feature_engineering(model_id, meta, artifact_dir)
+            step_feature_engineering(model_id, meta, artifact_dir, snapshot_id=args.snapshot)
         elif step == "search":
             step_search(
                 model_id,

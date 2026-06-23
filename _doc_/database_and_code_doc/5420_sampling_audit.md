@@ -3,7 +3,9 @@
 A feature tábla auditor meghatározza a biztonságos adathatárokat és minőségi
 metrikákat a `feat_ohlcv_quant` és `target` táblákra. Csak read-only DuckDB
 lekérdezéseket futtat — nincs Polars, nincs pandas.
-Forrás: [sampling/audit.py](../src/modeling/quantitative/sampling/audit.py)
+Forrás: [sampling/audit.py](../../src/modeling/sampling/audit.py)
+
+Metodológiai háttér: [5400_sampling.md](../methodology_doc/5400_sampling.md)
 
 ---
 

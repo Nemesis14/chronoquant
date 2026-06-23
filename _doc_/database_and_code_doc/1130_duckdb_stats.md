@@ -1,6 +1,6 @@
 # duckdb_stats.py — DB Statisztikák és Audit
 
-`src/database/store/duckdb_stats.py`
+`src/data_handling/store/duckdb_stats.py`
 
 DB egészség-ellenőrzés: sorok, időtartományok, null arányok és lekérdezési teljesítmény minden táblára. Dataset integritás audit és logolás. A `01_validate_stats.py` CLI script és a `02_sync_pipeline.py` hívja.
 
@@ -21,6 +21,7 @@ Egy tábla pillanatképe:
 | `max_open_time` | `str \| None` | Legújabb `open_time` |
 | `column_count` | `int` | Oszlopok száma |
 | `null_ratios` | `dict[str, float]` | Null arány max 5 nem-`open_time` oszlopra (0.0–1.0) |
+| `dup_count` | `int` | Duplikált `open_time` értékek száma (`COUNT(*) - COUNT(DISTINCT ...)`) |
 
 ---
 
@@ -59,7 +60,7 @@ Teljes riport:
 | Paraméter | Típus | Leírás |
 |-----------|-------|--------|
 | `db_path` | `str` | DuckDB fájl elérési útja |
-| `tables` | `list[str] \| None` | Vizsgálandó táblák. Alap: `["ohlcv", "target", "feat_ohlcv_quant", "predictions"]` |
+| `tables` | `list[str] \| None` | Vizsgálandó táblák. Alap: `["ohlcv", "target", "feat_ohlcv_quant", "predictions", "quant_train"]` |
 
 **Visszatérési érték:** `DuckDBStatsReport`
 
@@ -146,9 +147,9 @@ db_path: database/solusdt/solusdt.duckdb
 informational: timing metrics do not fail validation by themselves
 
 Tables:
-- ohlcv: status=OK rows=1234567 min=2022-01-01 00:00:00 max=2026-06-14 23:59:00 cols=10
+- ohlcv: status=OK rows=1234567 min=2022-01-01 00:00:00 max=2026-06-14 23:59:00 cols=10 dups=0
   null_ratios: open=0.000, high=0.000, low=0.000, close=0.000, volume=0.000
-- target: status=OK rows=1234567 ...
+- target: status=OK rows=1234567 ... dups=0
 
 Timings:
 - range_ohlcv_1d: status=OK elapsed_ms=12.345 row_count=1440 rows=1440

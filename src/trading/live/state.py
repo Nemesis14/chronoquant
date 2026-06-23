@@ -1,7 +1,7 @@
 """Trading state machine dataclass for the live trading loop.
 
-Tracks open position details, daily risk counters, and the arm/cooldown
-lifecycle used by the strategy evaluator.
+Tracks open position details and daily risk counters.
+State machine: FLAT → LONG/SHORT → FLAT.
 """
 
 from __future__ import annotations
@@ -9,10 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-FLAT     = "FLAT"
-LONG     = "LONG"
-SHORT    = "SHORT"
-COOLDOWN = "COOLDOWN"
+FLAT  = "FLAT"
+LONG  = "LONG"
+SHORT = "SHORT"
 
 
 # %% TradingState
@@ -22,9 +21,7 @@ COOLDOWN = "COOLDOWN"
 class TradingState:
     """Mutable runtime state for one trading service run."""
 
-    status         : str           = FLAT
-    armed          : bool          = True
-    cooldown_until : datetime | None = None
+    status : str = FLAT
 
     # Open position
     position_id : str | None   = None
@@ -80,5 +77,4 @@ class TradingState:
                 state.entry_time = dt
             state.entry_price = open_position.get("entry_price")
             state.quantity    = open_position.get("quantity")
-            state.armed       = False
         return state

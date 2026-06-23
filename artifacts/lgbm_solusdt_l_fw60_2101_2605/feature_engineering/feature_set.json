@@ -1,8 +1,9 @@
 {
-  "run_id": "run_20260621_231507",
+  "run_id": "run_20260622_110246",
   "asset_id": "solusdt",
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
   "target_col": "long_mfe_fw60",
-  "created_at": "2026-06-21 23:45:18",
+  "created_at": "2026-06-22 11:06:13",
   "target_cols": [
     "long_mfe_fw60"
   ],
@@ -24,16 +25,15 @@
     "feat_ema_ratio_140",
     "feat_wma_ratio_14",
     "feat_kama_ratio_10_2_30",
-    "feat_bb_width_14",
     "feat_bb_position_14",
     "feat_bb_position_140",
     "feat_volume_ratio_14",
     "feat_obv_roc_14",
     "feat_mfi_14",
     "feat_cmf_20",
+    "feat_returns_log",
     "feat_returns_sma_14",
-    "feat_hml_range",
-    "feat_ohlc_range",
+    "feat_returns_kurt_14",
     "feat_higher_low_count_5",
     "feat_lower_high_count_5",
     "feat_lower_low_count_5",
@@ -77,8 +77,6 @@
     "feat_ema_slope_10",
     "feat_ema_slope_30",
     "feat_rsi_delta_5",
-    "feat_volume_confirmed_return_10",
-    "feat_volume_confirmed_return_30",
     "feat_taker_flow_confirmed_return_10",
     "feat_hour_sin",
     "feat_hour_cos",
@@ -87,48 +85,35 @@
     "feat_weekend",
     "feat_session_asia",
     "feat_session_us",
-    "feat_gk_vol_10",
-    "feat_gk_vol_30",
-    "feat_gk_vol_60",
     "feat_return_autocorr_lag1_30",
     "feat_return_autocorr_lag1_60",
     "feat_variance_ratio_10_60",
     "feat_recovery_ratio_10",
-    "feat_max_drawdown_10",
     "feat_recovery_ratio_30",
     "feat_max_drawdown_30",
     "feat_recovery_ratio_60",
-    "feat_max_drawdown_60",
     "feat_time_since_low_10",
     "feat_time_since_high_30",
     "feat_time_since_low_30",
     "feat_time_since_low_60",
-    "feat_inside_bar",
-    "feat_engulf_bull",
     "feat_engulf_bear",
     "feat_bull_bars_ratio_10",
     "feat_bull_bars_ratio_30",
     "feat_bull_bars_ratio_60",
     "feat_gap_open",
-    "feat_efficiency_ratio_10",
     "feat_efficiency_ratio_30",
     "feat_efficiency_ratio_60",
     "feat_atr_dist_high_10",
     "feat_atr_dist_low_10",
     "feat_atr_dist_high_30",
     "feat_atr_dist_low_30",
-    "feat_atr_dist_high_60",
     "feat_atr_dist_low_60",
     "feat_pos_return_mean_10",
-    "feat_neg_return_mean_10",
     "feat_return_asymmetry_10",
-    "feat_pos_return_mean_30",
     "feat_return_asymmetry_30",
     "feat_return_asymmetry_60",
-    "feat_rsi_delta_10",
     "feat_rsi_delta_30",
     "feat_roc_delta_30",
-    "feat_return_momentum_delta_30",
     "feat_tenkan_ratio",
     "feat_kijun_ratio",
     "feat_senkou_b_ratio",
@@ -136,16 +121,11 @@
     "feat_price_vs_tenkan",
     "feat_price_vs_kijun",
     "feat_ichimoku_cloud_thickness",
-    "feat_donchian_width_10",
     "feat_donchian_breakout_10",
-    "feat_donchian_width_30",
     "feat_donchian_position_30",
-    "feat_donchian_breakout_30",
-    "feat_donchian_width_60",
     "feat_donchian_position_60",
-    "feat_donchian_breakout_60",
     "feat_lr_slope_10",
-    "feat_lr_r2_10",
+    "feat_lr_residual_10",
     "feat_lr_slope_30",
     "feat_lr_r2_30",
     "feat_lr_residual_30",
@@ -163,15 +143,7 @@
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_returns_log",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
       "col": "feat_returns_skew_14",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_returns_kurt_14",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -255,6 +227,14 @@
       "reason": "relation: weak signal across all targets"
     },
     {
+      "col": "feat_volume_confirmed_return_10",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_volume_confirmed_return_30",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_taker_flow_confirmed_return_30",
       "reason": "redundancy: redundant in cluster_104; representative=feat_taker_flow_confirmed_return_10"
     },
@@ -279,10 +259,6 @@
       "reason": "relation: weak signal across all targets"
     },
     {
-      "col": "feat_doji",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
       "col": "feat_hammer",
       "reason": "relation: weak signal across all targets"
     },
@@ -291,16 +267,32 @@
       "reason": "relation: weak signal across all targets"
     },
     {
+      "col": "feat_inside_bar",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_outside_bar",
       "reason": "relation: weak signal across all targets"
     },
     {
+      "col": "feat_engulf_bull",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_gap_open_abs_sma_10",
-      "reason": "quality: variance=5.19e-09 < min=1e-08"
+      "reason": "quality: variance=5.07e-09 < min=1e-08"
     },
     {
       "col": "feat_gap_open_abs_sma_30",
-      "reason": "quality: variance=4.55e-09 < min=1e-08"
+      "reason": "quality: variance=4.52e-09 < min=1e-08"
+    },
+    {
+      "col": "feat_efficiency_ratio_10",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_atr_dist_high_60",
+      "reason": "relation: weak signal across all targets"
     },
     {
       "col": "feat_prev_session_high_dist",
@@ -311,6 +303,10 @@
       "reason": "expert: time-of-day / session-anchored feature"
     },
     {
+      "col": "feat_rsi_delta_10",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_roc_delta_10",
       "reason": "relation: weak signal across all targets"
     },
@@ -319,11 +315,23 @@
       "reason": "relation: weak signal across all targets"
     },
     {
+      "col": "feat_return_momentum_delta_30",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
       "col": "feat_donchian_position_10",
       "reason": "redundancy: redundant in cluster_182; representative=feat_recovery_ratio_10"
     },
     {
-      "col": "feat_lr_residual_10",
+      "col": "feat_donchian_breakout_30",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_donchian_breakout_60",
+      "reason": "relation: weak signal across all targets"
+    },
+    {
+      "col": "feat_lr_r2_10",
       "reason": "relation: weak signal across all targets"
     },
     {
@@ -344,6 +352,7 @@
     }
   ],
   "review": [
+    "feat_bb_width_14",
     "feat_bb_width_140",
     "feat_atr_14",
     "feat_natr_14",
@@ -352,15 +361,37 @@
     "feat_obv",
     "feat_ad_line",
     "feat_returns_std_14",
+    "feat_hml_range",
+    "feat_ohlc_range",
     "feat_avg_trade_quote_30",
     "feat_body_ratio_sma_30",
     "feat_parkinson_vol_10",
+    "feat_gk_vol_10",
     "feat_parkinson_vol_30",
+    "feat_gk_vol_30",
     "feat_parkinson_vol_60",
+    "feat_gk_vol_60",
+    "feat_max_drawdown_10",
+    "feat_max_drawdown_60",
+    "feat_doji",
+    "feat_neg_return_mean_10",
+    "feat_pos_return_mean_30",
     "feat_neg_return_mean_30",
     "feat_pos_return_mean_60",
-    "feat_neg_return_mean_60"
+    "feat_neg_return_mean_60",
+    "feat_donchian_width_10",
+    "feat_donchian_width_30",
+    "feat_donchian_width_60"
   ],
+  "provenance": {
+    "snapshot_id": "solusdt_fw60_2101_2605__21668185",
+    "sample_table": "model.\"lgbm_solusdt_l_fw60_2101_2605__sample\"",
+    "sample_rows": 47448,
+    "joined_rows": 47448,
+    "min_open_time": "2021-01-01 00:58:00",
+    "max_open_time": "2026-05-31 23:50:00",
+    "source_contract": "snap \u22c8 model.__sample"
+  },
   "thresholds": {
     "max_null_rate": 0.01,
     "max_inf_rate": 0.001,

@@ -2,7 +2,7 @@
     "schema_version": 3,
     "strategies": {
         "strat_solusdt_fw60_combo_2101_2605": {
-            "description": "Champion combo strategy for SOLUSDT fw60. Isotonic-calibrated rank_first signals, Optuna-optimised thresholds on 2025-12-01 to 2026-05-31 window. 134 trades, 81.3% WR, +84.7% return, max_dd -1.4%.",
+            "description": "Rebuilt SOLUSDT fw60 strategy: long-only, enter on D10, take profit at average D10 1h target log return, otherwise exit after 60 minutes at close.",
             "asset_id": "solusdt",
             "model_id_long": "lgbm_solusdt_l_fw60_2101_2605",
             "model_id_short": "lgbm_solusdt_s_fw60_2101_2605",

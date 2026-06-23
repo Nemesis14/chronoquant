@@ -1,6 +1,6 @@
 # validate.py — Integritás Ellenőrzés
 
-`src/database/store/validate.py`
+`src/data_handling/store/validate.py`
 
 Adatintegritás invariánsok ellenőrzése. Minden függvény `AssertionError`-t dob ha az ellenőrzés sikertelen. A `check_*` függvények a `01_validate_stats.py` pipeline részeként futnak és CI-ban is futtathatók.
 
@@ -38,17 +38,37 @@ SELECT COUNT(*) FROM feat_ohlcv_quant
 WHERE available_ts > open_time
 ```
 
-**Hiba esetén:** `AssertionError` — a pipeline megáll és a hibát javítani kell.
+**Visszatérési érték:** `int` — `0` ha nincs hiba.
+
+**Raises:**
+- `FileNotFoundError` — ha a .duckdb fájl vagy a `feat_ohlcv_quant` tábla nem létezik
+- `AssertionError` — ha `available_ts > open_time` feltétel sérül
+
+**Megjegyzés:** Ha az `available_ts` oszlop hiányzik (rebuild szükséges), `logging.warning` és `0` visszatérés (nem hiba).
+
+---
+
+## `check_quant_train_no_duplicates(db_path)`
+
+**Célja:** Ellenőrzi, hogy a `quant_train` táblában nincs duplikált `open_time`.
+
+**Visszatérési érték:** `int` — `0` ha nincs duplikát.
+
+**Raises:** `AssertionError` — ha duplikált `open_time` értékek találhatók.
+
+**Megjegyzés:** Ha a DB fájl vagy a tábla hiányzik, `logging.warning` és `0` visszatérés (graceful).
 
 ---
 
 ## `check_target_no_current_bar(db_path)`
 
-**Célja:** Ellenőrzi, hogy a `target` tábla utolsó `horizon` (=60) sorában a target oszlopok `NULL`-ok.
+**Célja:** Ellenőrzi, hogy a `target` tábla tartalmaz NULL target sorokat (az utolsó ~60 bar). Strukturális ellenőrzés — a tényleges ablakhelyesség az SQL `ROWS BETWEEN 1 FOLLOWING AND 60 FOLLOWING` által garantált.
 
 **Invariáns:** Az utolsó 60 bar jövőbeli záróára még nem ismert — a labelek `NULL`-ok kell legyenek.
 
-**Hiba esetén:** `AssertionError` — az utolsó sorok NULL kell legyenek.
+**Visszatérési érték:** `int` — mindig `0` (placeholder ellenőrzés).
+
+**Megjegyzés:** Nem dob `AssertionError`-t — csak `logging.warning` ha nem talál NULL sorokat. Ha a DB vagy tábla hiányzik, gracefully tér vissza `0`-val.
 
 ---
 
@@ -99,10 +119,10 @@ check_sample_table(
 
 ```bash
 # Standalone (01_validate_stats.py részeként)
-uv run python src/database/01_validate_stats.py
+uv run python src/data_handling/01_validate_stats.py
 
 # Direkt hívás Python-ból
-from database.store.validate import (
+from data_handling.store.validate import (
     check_no_future_features,
     check_quant_train_no_duplicates,
     check_sample_table,

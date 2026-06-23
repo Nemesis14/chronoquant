@@ -4,6 +4,13 @@
 # Purpose:
 #  - Load aligned model matrices from feat_ohlcv_quant and target datasets
 #  - Keep dataset preparation independent from model family and feature selection
+#
+# DEPRECATED — load_modeling_dataset() is a legacy path (feat_ohlcv_quant + target
+# table join, time-range scoped).  The pipeline steps (search, train) use the
+# snapshot-native path instead: snap."<snapshot_id>" INNER JOIN
+# model."<model_id>__sample" on open_time (see lgbm_search._load_search_dataset
+# and fit_lgbm._load_train_data).  This module is retained for compatibility but
+# is no longer called from any pipeline step.
 # =============================================================================
 
 from dataclasses import dataclass

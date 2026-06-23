@@ -21,11 +21,10 @@ def test_hold_minutes_returns_zero_when_no_entry_time() -> None:
     assert state.hold_minutes() == 0.0
 
 
-def test_from_db_no_position_returns_flat_armed() -> None:
-    """TradingState.from_db(run_id, None) → FLAT, armed=True."""
+def test_from_db_no_position_returns_flat() -> None:
+    """TradingState.from_db(run_id, None) → FLAT."""
     state = TradingState.from_db("run_001", None)
     assert state.status == FLAT
-    assert state.armed is True
 
 
 def test_from_db_with_position_restores_side() -> None:
@@ -40,7 +39,6 @@ def test_from_db_with_position_restores_side() -> None:
     state = TradingState.from_db("run_002", pos)
     assert state.side == LONG
     assert state.status == LONG
-    assert state.armed is False
 
 
 def test_record_trade_result_increments_daily_counter() -> None:

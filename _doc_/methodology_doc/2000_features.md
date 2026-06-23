@@ -21,7 +21,6 @@ flowchart TD
 
 **Implementáció:** [`src/data_handling/sync_tables/_features_polars.py`](src/data_handling/sync_tables/_features_polars.py)
 **Konfiguráció:** [`config/features.json`](config/features.json)
-**Kód referencia:** [`_doc_/2200_features_polars.md`](../database_and_code_doc/2200_features_polars.md)
 
 ---
 

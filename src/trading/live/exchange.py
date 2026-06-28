@@ -14,11 +14,8 @@ import utils
 
 logger = logging.getLogger(__name__)
 
-# Binance Futures lot size for SOLUSDT perpetual: step 0.1 SOL
-_SOL_QTY_STEP = 0.1
 
-
-def _round_qty(qty: float, step: float = _SOL_QTY_STEP) -> float:
+def _round_qty(qty: float, step: float) -> float:
     return round(int(qty / step) * step, 8)
 
 
@@ -44,6 +41,18 @@ class BinanceFuturesClient:
         self.quote_order_qty = quote_order_qty
         self.mode            = mode
         self._client: object | None = None
+
+        assets_cfg = utils.load_assets_config()
+        assets = assets_cfg.get("assets", {})
+        symbol_upper = symbol.upper()
+        self._qty_step: float = next(
+            (
+                float(asset.get("qty_step", 0.1))
+                for asset in assets.values()
+                if asset.get("symbol", "").upper() == symbol_upper
+            ),
+            0.1,
+        )
 
         if mode == "live":
             self._client = self._make_client()
@@ -85,7 +94,7 @@ class BinanceFuturesClient:
     # --- orders ---
 
     def open_long(self, mark_price: float) -> dict:
-        qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price)
+        qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price, self._qty_step)
         logger.info(
             "[%s] OPEN LONG %s qty=%s notional=%.2f USDT price=~%.4f",
             self.mode, self.symbol, qty, qty * mark_price, mark_price,
@@ -95,14 +104,14 @@ class BinanceFuturesClient:
         return self._place_order("BUY", qty, reduce_only=False)
 
     def close_long(self, quantity: float, mark_price: float) -> dict:
-        qty = _round_qty(quantity)
+        qty = _round_qty(quantity, self._qty_step)
         logger.info("[%s] CLOSE LONG %s qty=%s price=~%.4f", self.mode, self.symbol, qty, mark_price)
         if self.mode == "dry_run":
             return self._dry_fill("SELL", qty, mark_price)
         return self._place_order("SELL", qty, reduce_only=True)
 
     def open_short(self, mark_price: float) -> dict:
-        qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price)
+        qty = _round_qty((self.quote_order_qty * self.leverage) / mark_price, self._qty_step)
         logger.info(
             "[%s] OPEN SHORT %s qty=%s notional=%.2f USDT price=~%.4f",
             self.mode, self.symbol, qty, qty * mark_price, mark_price,
@@ -112,7 +121,7 @@ class BinanceFuturesClient:
         return self._place_order("SELL", qty, reduce_only=False)
 
     def close_short(self, quantity: float, mark_price: float) -> dict:
-        qty = _round_qty(quantity)
+        qty = _round_qty(quantity, self._qty_step)
         logger.info("[%s] CLOSE SHORT %s qty=%s price=~%.4f", self.mode, self.symbol, qty, mark_price)
         if self.mode == "dry_run":
             return self._dry_fill("BUY", qty, mark_price)

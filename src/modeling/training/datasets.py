@@ -14,6 +14,7 @@
 # =============================================================================
 
 from dataclasses import dataclass
+from typing import cast
 
 import pandas as pd
 
@@ -109,7 +110,11 @@ def load_modeling_dataset(
     )
 
     # --- join on open_time ---
-    if feat_df.empty or target_df.empty:
+    # query_range() returns pd.DataFrame in "pandas" mode (default); cast to
+    # pd.DataFrame to satisfy pyright after the t250 query_range return-type broadening.
+    feat_df_pd   = cast(pd.DataFrame, feat_df)
+    target_df_pd = cast(pd.DataFrame, target_df)
+    if feat_df_pd.empty or target_df_pd.empty:
         return ModelingDataset(
             open_time    = pd.Series(dtype="datetime64[ns]"),
             X            = pd.DataFrame(columns=feature_cols),
@@ -118,9 +123,9 @@ def load_modeling_dataset(
             feature_cols = feature_cols,
         )
 
-    feat_df["open_time"]   = pd.to_datetime(feat_df["open_time"])
-    target_df["open_time"] = pd.to_datetime(target_df["open_time"])
-    df = feat_df.merge(target_df, on="open_time", how="inner")
+    feat_df_pd["open_time"]   = pd.to_datetime(feat_df_pd["open_time"])
+    target_df_pd["open_time"] = pd.to_datetime(target_df_pd["open_time"])
+    df = feat_df_pd.merge(target_df_pd, on="open_time", how="inner")
 
     if row_stride > 1:
         df = df.iloc[::row_stride].copy()

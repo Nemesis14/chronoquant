@@ -47,12 +47,12 @@ def _parse_args() -> argparse.Namespace:
              "Steps: setup → sample → feature_engineering → search → train → predict",
     )
     parser.add_argument(
-        "--stage", choices=["smoke", "explore", "refine"], default="smoke",
-        help="Search stage (only used for 'search' step). Default: smoke",
+        "--stage", choices=["smoke", "explore", "refine"], default=None,
+        help="Search stage (only used for 'search' step). Default: None (no stage cap — n-trials governs)",
     )
     parser.add_argument(
-        "--n-trials", type=int, default=60,
-        help="Max search trials (only for 'search' step). Default: 60",
+        "--n-trials", type=int, default=100,
+        help="Max search trials (only for 'search' step). Default: 100",
     )
     parser.add_argument(
         "--timeout-hours", type=float, default=None,
@@ -128,9 +128,10 @@ def step_sample(model_id: str, artifact_dir: Path, snapshot_id: str | None = Non
 
     from modeling.sampling import create_model_sample
     summary = create_model_sample(model_id, snapshot_id)
+    splits_or_folds = summary.get("split_row_counts") or summary.get("fold_row_counts", {})
     print(
         f"[sample] {summary['sample_table']} created: rows={summary['n_rows']} "
-        f"folds={summary['fold_row_counts']} feature_set={summary['feature_set_id']} "
+        f"splits={splits_or_folds} feature_set={summary['feature_set_id']} "
         f"(n_input={summary['n_input']} n_selected={summary['n_selected']})"
     )
 
@@ -228,7 +229,6 @@ def step_search(
     stage:         str,
     n_trials:      int,
     timeout_hours: float | None = None,
-    fold_limit:    int | None   = None,
 ) -> None:
     from modeling.search.lgbm_search import run_search
     print(f"[search] Starting hyperparameter search — stage={stage}, n_trials={n_trials}")
@@ -237,7 +237,6 @@ def step_search(
         stage         = stage,
         n_trials      = n_trials,
         timeout_hours = timeout_hours,
-        fold_limit    = fold_limit,
     )
     _update_manifest_status(_artifact_dir_for(model_id), "search_done")
 
@@ -335,7 +334,6 @@ def main() -> None:
                 args.stage,
                 args.n_trials,
                 timeout_hours = args.timeout_hours,
-                fold_limit    = args.fold_limit,
             )
         elif step == "train":
             step_train(model_id)

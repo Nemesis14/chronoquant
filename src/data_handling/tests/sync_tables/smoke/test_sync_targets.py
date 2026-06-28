@@ -6,7 +6,9 @@ Uses isolated tmp_path stores — no real database required.
 """
 
 from pathlib import Path
+from typing import cast
 
+import pandas as pd
 import polars as pl
 import pytest
 
@@ -99,7 +101,7 @@ def test_sync_targets_writes_fw60_outcome_columns(
     sync_targets_module.sync_targets()
     sync_targets_module.sync_targets()  # idempotency check
 
-    df = query_range(str(db_path), "target")
+    df = cast(pd.DataFrame, query_range(str(db_path), "target"))
 
     for col in _FW60_OUTCOME_COLS:
         assert col in df.columns, f"fw60 outcome column missing: {col}"
@@ -125,7 +127,7 @@ def test_sync_targets_last_rows_are_null(
 
     sync_targets_module.sync_targets()
 
-    df         = query_range(str(db_path), "target")
+    df         = cast(pd.DataFrame, query_range(str(db_path), "target"))
     null_count = df["long_mfe_fw60"].isna().sum()
 
     assert null_count == _HORIZON, (
@@ -151,7 +153,7 @@ def test_sync_targets_fw60_values_are_nonzero(
 
     sync_targets_module.sync_targets()
 
-    df    = query_range(str(db_path), "target")
+    df    = cast(pd.DataFrame, query_range(str(db_path), "target"))
     valid = df[df["long_mfe_fw60"].notna()]
 
     assert len(valid) > 0, "No valid rows with non-null fw60 outcomes"

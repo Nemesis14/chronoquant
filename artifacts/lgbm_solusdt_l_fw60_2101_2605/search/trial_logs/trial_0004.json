@@ -1,6 +1,6 @@
 {
   "trial_no": 4,
-  "param_hash": "7b488e351d1783e8",
+  "param_hash": "12da091a79005208",
   "params": {
     "num_leaves": 4,
     "max_depth": 2,
@@ -16,47 +16,18 @@
     "path_smooth": 0.35500125258511606,
     "extra_trees": false
   },
-  "elapsed_s": 7.1,
-  "objective_score": -0.0064308061162298555,
-  "mean_top10_lift": 0.006517768568654861,
-  "std_top10_lift": 0.00017392490485001197,
-  "mean_spearman_rho": 0.29136545410321546,
-  "mean_decile_monotonicity": 0.8888888888888888,
-  "mean_valid_rmse": 0.007065759781458654,
-  "std_valid_rmse": 0.0008688529373997844,
-  "mean_train_rmse": 0.009023693799623738,
-  "mean_valid_mae": 0.0047247799260105375,
-  "mean_train_mae": 0.005325917613618622,
-  "n_features": 145,
-  "row_stride": 1,
-  "fold_summary": [
-    {
-      "fold": 1,
-      "fold_week": "2023-10-01_2024-05-31",
-      "train_rmse": 0.008975203139267548,
-      "valid_rmse": 0.007934612718858439,
-      "train_mae": 0.0052493120953242805,
-      "valid_mae": 0.005356753195750256,
-      "top10_lift": 0.006343843663804849,
-      "spearman_rho": 0.2727253178210326,
-      "decile_monotonicity": 0.7777777777777778,
-      "train_n": 41588,
-      "valid_n": 5856,
-      "best_iteration": 270
-    },
-    {
-      "fold": 2,
-      "fold_week": "2024-06-01_2025-01-31",
-      "train_rmse": 0.009072184459979928,
-      "valid_rmse": 0.00619690684405887,
-      "train_mae": 0.005402523131912965,
-      "valid_mae": 0.004092806656270819,
-      "top10_lift": 0.006691693473504873,
-      "spearman_rho": 0.3100055903853984,
-      "decile_monotonicity": 1.0,
-      "train_n": 41564,
-      "valid_n": 5880,
-      "best_iteration": 2991
-    }
-  ]
+  "elapsed_s": 7.6,
+  "objective_score": -1.9505322278524981,
+  "valid_ratio_p925": 1.9505322278524981,
+  "train_ratio_p925": 2.660677501831803,
+  "train_valid_gap": 0.7101452739793048,
+  "spearman_rho": 0.29128174736648066,
+  "decile_monotonicity": 1.0,
+  "valid_rmse": 0.009536137296340935,
+  "train_rmse": 0.01593258735379402,
+  "valid_mae": 0.00800438573761141,
+  "train_mae": 0.01244648862260551,
+  "best_iteration": 1987,
+  "n_features": 131,
+  "row_stride": 1
 }

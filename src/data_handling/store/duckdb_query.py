@@ -2,11 +2,13 @@
 
 Queries ohlcv, target, feat_ohlcv_quant, and predictions from the persistent
 .duckdb file.  The db_path is passed directly as an absolute file path.
-All connections are short-lived.  query_range() returns pandas; query_range_pl() returns Polars.
+All connections are short-lived.  query_range() supports both pandas and Polars
+output via the format parameter.  query_range_pl() is a backward-compatible wrapper.
 """
 
 import logging
 from pathlib import Path
+from typing import Literal
 
 import duckdb
 import pandas as pd
@@ -36,12 +38,32 @@ def _connect(db_path: str) -> duckdb.DuckDBPyConnection | None:
     return duckdb.connect(str(p), read_only=True)
 
 
-def _tbl_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
-    """Return True if the named table exists in the connected database."""
-    result = conn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-        [table],
-    ).fetchone()
+def _tbl_exists(
+    conn   : duckdb.DuckDBPyConnection,
+    table  : str,
+    schema : str | None = None,
+) -> bool:
+    """Return True if the named table exists in the connected database.
+
+    Args:
+        conn   : Open DuckDB connection.
+        table  : Table name to check.
+        schema : Optional schema name; when provided the check is schema-scoped.
+
+    Returns:
+        True when the table (optionally in the given schema) is present.
+    """
+    if schema is not None:
+        result = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.tables"
+            " WHERE table_schema = ? AND table_name = ?",
+            [schema, table],
+        ).fetchone()
+    else:
+        result = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+            [table],
+        ).fetchone()
     return bool(result and result[0] > 0)
 
 
@@ -54,7 +76,8 @@ def query_range(
     start    : str | None = None,
     end      : str | None = None,
     columns  : list[str] | None = None,
-) -> pd.DataFrame:
+    format   : Literal["pandas", "polars"] = "pandas",
+) -> "pd.DataFrame | pl.DataFrame":
     """Query rows from a native DuckDB table within an optional open_time range.
 
     Args:
@@ -63,17 +86,18 @@ def query_range(
         start    : Optional lower bound, inclusive. YYYY-MM-DD HH:MM:SS.
         end      : Optional upper bound, inclusive. YYYY-MM-DD HH:MM:SS.
         columns  : Optional list of columns to SELECT. None = all columns.
+        format   : Output format — 'pandas' (default) or 'polars'.
 
     Returns:
         DataFrame sorted by open_time, or empty DataFrame if table not found.
     """
     conn = _connect(db_path)
     if conn is None:
-        return pd.DataFrame()
+        return pl.DataFrame() if format == "polars" else pd.DataFrame()
     try:
         if not _tbl_exists(conn, dataset):
             logger.debug("query_range: table not found: %s", dataset)
-            return pd.DataFrame()
+            return pl.DataFrame() if format == "polars" else pd.DataFrame()
 
         col_expr   = ", ".join(f'"{c}"' for c in columns) if columns else "*"
         conditions : list[str] = []
@@ -87,8 +111,9 @@ def query_range(
         where = " AND ".join(conditions) if conditions else "1=1"
         sql   = f"SELECT {col_expr} FROM {dataset} WHERE {where} ORDER BY open_time ASC"
 
-        logger.debug("query_range: dataset=%s start=%s end=%s", dataset, start, end)
-        df = conn.execute(sql, params).df()
+        logger.debug("query_range: dataset=%s start=%s end=%s format=%s", dataset, start, end, format)
+        result = conn.execute(sql, params)
+        df = result.pl() if format == "polars" else result.df()
         logger.debug("query_range: rows=%d", len(df))
         return df
     except Exception:
@@ -105,7 +130,7 @@ def query_range_pl(
     end      : str | None = None,
     columns  : list[str] | None = None,
 ) -> pl.DataFrame:
-    """Same as query_range but returns a Polars DataFrame (zero-copy from DuckDB).
+    """Backward-compatible wrapper: query_range with format='polars'.
 
     Args:
         db_path  : Absolute path to the asset .duckdb file.
@@ -117,35 +142,9 @@ def query_range_pl(
     Returns:
         Polars DataFrame sorted by open_time, or empty DataFrame if table not found.
     """
-    conn = _connect(db_path)
-    if conn is None:
-        return pl.DataFrame()
-    try:
-        if not _tbl_exists(conn, dataset):
-            logger.debug("query_range_pl: table not found: %s", dataset)
-            return pl.DataFrame()
-
-        col_expr   = ", ".join(f'"{c}"' for c in columns) if columns else "*"
-        conditions : list[str] = []
-        params     : list[str] = []
-        if start:
-            conditions.append("open_time >= ?")
-            params.append(start)
-        if end:
-            conditions.append("open_time <= ?")
-            params.append(end)
-        where = " AND ".join(conditions) if conditions else "1=1"
-        sql   = f"SELECT {col_expr} FROM {dataset} WHERE {where} ORDER BY open_time ASC"
-
-        logger.debug("query_range_pl: dataset=%s start=%s end=%s", dataset, start, end)
-        df = conn.execute(sql, params).pl()
-        logger.debug("query_range_pl: rows=%d", len(df))
-        return df
-    except Exception:
-        logger.exception("query_range_pl sikertelen: dataset=%s", dataset)
-        raise
-    finally:
-        conn.close()
+    result = query_range(db_path, dataset, start=start, end=end, columns=columns, format="polars")
+    assert isinstance(result, pl.DataFrame)
+    return result
 
 
 

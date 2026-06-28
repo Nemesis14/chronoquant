@@ -69,16 +69,24 @@ Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
 A sampling az immutable snapshot fölött dolgozik. Forrása a `snap."<snapshot_id>"`
 tábla (nem a `quant_train`), kimenete `model."<model_id>__sample"` DuckDB tábla.
 
+Az aktív champion modellek `train_valid_split` módot használnak: egyetlen kronológiai
+felosztás, `split` TINYINT oszloppal (0=train, 1=valid). A legacy `walk_forward` mód
+`fold_id` TINYINT oszlopot produkál (0=train-only, 1..n=valid fold).
+
 ```mermaid
 flowchart TD
   SNAP["snap.&lt;snapshot_id&gt; (immutable)"]
   HOURLY["hourly select (QUALIFY ROW_NUMBER per hour, seed-del)"]
-  FOLD["fold_id hozzarendeles (walk-forward CASE)"]
-  SAMP_T["model.&lt;id&gt;__sample (open_time + target + fold_id)"]
+  MODE{sampling_mode}
+  SPLIT["split indicator\n0=train, 1=valid"]
+  FOLD["fold_id hozzarendeles\nwalk-forward CASE"]
+  SAMP_T["model.&lt;id&gt;__sample\n(open_time + target + split/fold_id)"]
   FS["reg.feature_sets (selected_cols, n_input, n_selected)"]
   REG_M["reg.models upsert (snapshot_id + feature_set_id, status=sampled)"]
 
-  SNAP --> HOURLY --> FOLD --> SAMP_T
+  SNAP --> HOURLY --> MODE
+  MODE -- train_valid_split --> SPLIT --> SAMP_T
+  MODE -- walk_forward --> FOLD --> SAMP_T
   SAMP_T --> FS --> REG_M
 ```
 
@@ -86,10 +94,10 @@ A sample kicsi (~tízezer sor hourly felbontásban). A feat_* oszlopok a snapsho
 maradnak — a downstream lépések közvetlen `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`
 joinnal dolgoznak (nincs per-modell feature-másolat).
 
-Walk-forward CV paraméterek: `train_months=9`, `valid_months=3`, `shift_months=3`,
-`n_folds=4`, `purge_minutes=240`. A `fold_id=0` jelöli a train-only sorokat.
+**Train/valid split paraméterek (aktív, champion modellek):**
+`train_start`, `train_end`, `valid_start`, `valid_end` dátum határok;
+`feature_lookback_embargo_minutes=240` (train eleje); `target_purge_minutes=60` (train vége).
 
-**I5 garantálva:** A `fold_id` INT8 oszlop minden sorban jelen van.
 **I6 garantálva:** Egy `model_id`-hez pontosan egy `target_name` tartozik (`config/models.json`).
 
 Részletes invariáns összefoglaló (I1–I7): → [4100_quant_train.md](4100_quant_train.md#invariánsok--sample-scoped-pipeline)
@@ -134,13 +142,17 @@ hogy a TEMP `quant_train` sorszáma == `model.__sample` sorszáma.
 
 ```mermaid
 flowchart TD
-  TV["snap.&lt;snapshot_id&gt; ⋈ model.&lt;id&gt;__sample\n(feature_set projekcio)"]
-  OPT["Optuna sweep (Top10 Lift + fold-stability penalty)"]
-  BEST["search_best.json + trials.jsonl (artifacts/search/)"]
+  TV["snap.&lt;snapshot_id&gt; ⋈ model.&lt;id&gt;__sample\n(split col: 0=train, 1=valid)"]
+  OPT["Optuna sweep — objektív: valid_top10_lift\npatience=20 korai megállás"]
+  BEST["search_best.json + search_trials.jsonl (artifacts/search/)"]
   SR["reg.search_runs INSERT (best_params, objective, stage=candidate)"]
 
   TV --> OPT --> BEST --> SR
 ```
+
+Az objektív: `valid_top10_lift` (top 10% predikciók átlagos y_true értéke mínusz overall
+átlag a valid seten). A legjobb trial kiválasztása: max `valid_top10_lift` elsőrendű
+kritérium, `train_valid_gap` másodlagos tiebreaker (top-5 jelölt közül a legkisebb gap-et preferálja).
 
 A search best-effort módon írja a registry-t: egy hiba a search futásában nem
 veszíti el a kész eredményt.

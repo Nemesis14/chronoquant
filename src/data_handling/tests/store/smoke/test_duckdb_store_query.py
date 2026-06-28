@@ -6,6 +6,7 @@ metadata calls, and ASOF timestamp alignment.
 
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 import polars as pl
@@ -182,17 +183,17 @@ def test_query_helpers_handle_ranges_projection_and_missing_tables(tmp_path: Pat
     data_dir = _data_dir(tmp_path)
     _seed_store(data_dir)
 
-    df = query_range(
+    df = cast(pd.DataFrame, query_range(
         data_dir,
         "ohlcv",
         start   = "2024-01-01 00:01:00",
         end     = "2024-01-01 00:02:00",
         columns = ["open_time", "close"],
-    )
+    ))
 
     assert list(df.columns) == ["open_time", "close"]
     assert len(df) == 2
-    assert query_range(data_dir, "missing").empty
+    assert cast(pd.DataFrame, query_range(data_dir, "missing")).empty
     assert dataset_exists(data_dir, "ohlcv")
     assert not dataset_exists(data_dir, "missing")
     assert "feat_rsi_14" in dataset_columns(data_dir, "feat_ohlcv_quant")

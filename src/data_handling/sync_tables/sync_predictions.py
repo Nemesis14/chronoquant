@@ -187,10 +187,34 @@ def sync_predictions(
 # %% Deploy / cutover helpers
 
 
+def ensure_registry_schema(conn: Any) -> None:
+    """Ensure lifecycle columns exist in reg.deployments (idempotent DDL migration).
+
+    Adds activated_at and previous_strategy_id columns when absent.  Safe to call
+    multiple times — uses ADD COLUMN IF NOT EXISTS.
+
+    Args:
+        conn : Open read-write DuckDB connection to the registry database.
+    """
+    for col_def in [
+        "activated_at TIMESTAMP",
+        "previous_strategy_id VARCHAR",
+    ]:
+        col_name = col_def.split()[0]
+        try:
+            conn.execute(
+                f"ALTER TABLE deployments ADD COLUMN IF NOT EXISTS {col_def}"
+            )
+        except Exception:
+            logger.debug("Migration skip in registry: %s", col_name)
+
+
 def _detect_pending_deployment(asset_id: str) -> dict[str, Any] | None:
     """Query reg.deployments for a pending deployment for the given asset.
 
-    Returns the pending deployment row dict, or None if there is none.
+    Read-only after ensure_registry_schema() is called.  The schema migration
+    (ALTER TABLE) is delegated to ensure_registry_schema() and must be called
+    explicitly on a writable connection before this function.
 
     Args:
         asset_id : Asset ID to check (e.g. 'solusdt').
@@ -211,18 +235,8 @@ def _detect_pending_deployment(asset_id: str) -> dict[str, Any] | None:
 
         conn = duckdb.connect(reg_path)
         try:
-            # Ensure the lifecycle columns exist (migration may be pending on this DB)
-            for col_def in [
-                "activated_at TIMESTAMP",
-                "previous_strategy_id VARCHAR",
-            ]:
-                col_name = col_def.split()[0]
-                try:
-                    conn.execute(
-                        f"ALTER TABLE deployments ADD COLUMN IF NOT EXISTS {col_def}"
-                    )
-                except Exception:
-                    logger.debug("Migration skip in registry: %s", col_name)
+            # --- apply registry schema migrations on a writable connection ---
+            ensure_registry_schema(conn)
 
             cursor = conn.execute(
                 "SELECT * FROM deployments WHERE asset_id = ? AND status = 'pending'",

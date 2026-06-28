@@ -1,120 +1,164 @@
 # 5500 - Hyperparameter Search
 
-A hyperparameter search celja nem az altalanos regresszios hiba minimalizalasa,
-hanem annak megkeresese, hogy melyik LightGBM parameterter kozeliti legjobban a
-kereskedheto opportunity-k rangsorát az aktiv fold-szerzodesen.
+A hyperparameter search célja nem az általános regressziós hiba minimalizálása,
+hanem annak megkeresése, hogy melyik LightGBM paraméter- és feature-kombináció
+közelíti legjobban a kereskedelemképes opportunity-k rangsorát az aktív valid perióduson.
+
+Az aktív megközelítés: **joint feature + hyperparameter search** — a feature-szám
+(`feature_k`) is Optuna paraméter, nem fix. A feature-sorrend gain fontossági
+rangsorolásból ered (`run_gain_rank()`).
+
+---
 
 ## Overview
 
 ```mermaid
 flowchart TD
-  FE[feature_set selected lista]
-  SAMPLE[model.__sample + snapshot join]
-  CV[walk-forward fold evaluation]
-  OBJ[Top10 Lift - stabilitasi buntetes]
-  BEST[best_params + search_best]
+  GAIN[run_gain_rank\ngain-based feature ordering]
+  FE[gain_ranked feature lista]
+  SAMPLE[model.__sample\ntrain + valid sorok]
+  SEARCH[Optuna TPE trial-ok\nparams + feature_k]
+  OBJ[valid_ratio_p925\nobjective — long\nvalid_ratio_p075 — short]
+  BEST[best trial\nvalid max + gap diagnosztika]
+  PRUNE[run_prune\nzero split-importance eltávolítás]
+  OUT[best_params + pruned feature lista]
 
-  FE --> SAMPLE --> CV --> OBJ --> BEST
+  GAIN --> FE --> SEARCH
+  SAMPLE --> SEARCH --> OBJ --> BEST --> PRUNE --> OUT
 ```
+
+**Időbeli szerkezet a search alatt:**
+
+```
+2021-01                              2025-04  2025-05            2026-05
+  │                                       │        │                  │
+  │◄──────────── TRAIN (51 hónap) ───────►│        │◄── VALID (12 hó)─►│
+  │                                       │        │                  │
+  │  (tanítás: nem optimized, audit)       │        │  (objective here) │
+```
+
+---
+
+## Üzleti és módszertani háttér
+
+### Miért joint search?
+
+A hagyományos hyperparameter search fix feature listán keresi a legjobb LightGBM
+konfigurációt. A probléma: a LightGBM-nek nincs L1-szerű mechanizmus, amely a
+feature-számlálást direkten büntetné. A `reg_alpha` és `reg_lambda` a levélértékeket
+regularizálják, nem a feature-számot.
+
+**Megoldás:** `feature_k` Optuna integer paraméterként. A gain-fontosság szerint
+sorba rendezett feature lista (`gain_ranked`) első `feature_k` tagját használja
+minden trial — így az optimizer egyszerre keres optimális paramétereket és optimális
+feature-számot.
 
 ```mermaid
 flowchart LR
-  Q[optimalizalando cel]
-  Q --> A[Top10 Lift + fold stability]
-  Q --> B[csak RMSE]
-  Q --> C[binaris accuracy]
+  RANK[gain_ranked lista\n131 feature, gain-fontosság szerint]
+  K[feature_k = Optuna param\nlog-scale, 3–131]
+  SLICE[gain_ranked[:feature_k]\n= trial feature lista]
+  TRIAL[LightGBM trial\noptimized params + slice]
+
+  RANK --> SLICE
+  K --> SLICE
+  SLICE --> TRIAL
 ```
-
-## Uzleti es modszertani hatter
-
-### Miért kritikus ez a lépés?
-
-A modell akkor hasznos a strategy számára, ha a legjobb opportunity-ket a score
-rang elejére teszi. A puszta regressziós pontosság önmagában nem mondja meg, hogy
-a top jelzések tényleg a legérdekesebb percekhez tartoznak-e. Ezért a search
-közvetlenül a hasznos rangsort optimalizálja, és nem egy általános ML tankönyvi
-célt.
 
 ### Miért ezt a megközelítést?
 
 | Megközelítés | Előny | Hátrány | Státusz |
-|--------------|-------|---------|---------|
-| Top10 Lift + fold stability penalty | Kozvetlenul a kereskedheto top opportunity-kre optimalizal | Nem klasszikus, tobb magyarazatot igenyel | Valasztott |
-| Csak RMSE | Ismert es egyszeru | Jo atlaghibat adhat gyenge top-rangsor mellett is | Elvetett |
-| Csak Spearman | Rank-fokuszu | Nem mondja meg, hogy a top zóna gazdaságilag mennyivel jobb | Elvetett |
-| Bináris accuracy | Könnyen kommunikálható | Nem illeszkedik a folytonos MFE targethez | Elvetett |
+|---|---|---|---|
+| **Joint search (feature_k + params)** | Feature-szám és params egyszerre optimalizált; gain-rank jó prior a feature-sorrendhez | ~2× trial-idő feature_k=57-nél, mint K=5-nél | ✅ Aktív |
+| Fix feature lista (131 feature) | Egyszerűbb | Nincs mechanizmus kevesebb feature felé; overfit a search-ben magas | Baseline / research |
+| Gap penalty (λ>0) | Közel nulla train-valid gap | Elveszi a modell komplexitását → discriminative power csökken | Kutatási opció — nem éles |
+| Walk-forward CV | Több ablak → robusztusabb | Implementációs hiba (`_fold_split_walk_forward`); bonyolult | ❌ Kivezetett |
+| Csak RMSE | Egyszerű | Gyenge top-decile rangsor | ❌ Elvetett |
 
-### Top10 Lift objective: miért kell és hogyan működik?
+### Gain rank: miért ez a feature-sorrend?
 
-Az objective a legfelső score-decile realizált targetátlagát veti össze a teljes
-validációs minta átlagával. Itt az a kérdés, hogy a modell a legjobb perceket
-felfelé tudja-e emelni, nem az, hogy minden percet egyformán pontosan becsül-e.
+A `run_gain_rank()` egy LightGBM fit-et futtat `colsample_bytree=1.0`-val (minden
+feature látható), és a gain fontosság szerint rangsorolja a feature-öket csökkenő
+sorrendbe. Ez jobb prior mint a random sorrend, mert:
+
+1. **Az Optuna log-scale `feature_k`-t** kap → kis K-nál sűrűn mintavételez → a
+   legtöbb próba a legfontosabb feature-öket foglalja magában.
+2. A gain fontosság modell-specifikus: a rangsor az aktuális target-re és
+   sample-scope-ra kalibrált.
+3. A prune lépés utólag eltávolítja az elért K-n belüli nulla-split feature-öket.
+
+### Search objective: direction-specifikus ratio
+
+Az objective a modell rangsorolási képességét méri, nem az átlagos hibát:
+
+**Long irány** (`long_mfe_fw60 > 0`):
+```
+valid_ratio_p925 = mean(y_true | score ≥ p92.5) / mean(y_true)
+```
+A top 7.5% pontszámú bar átlagos MFE-je osztva az összes bar átlagával.
+Ratio > 1 azt jelenti, hogy a legjobb pontszámú barok valóban jobb long MFE-t adnak.
+
+**Short irány** (`short_mfe_fw60 < 0`):
+```
+valid_ratio_p075 = mean(y_true | score ≤ p7.5) / mean(y_true)
+```
+A bottom 7.5% pontszámú bar átlagos MFE-je osztva az összes bar átlagával.
+Mivel mindkét szám negatív, ratio > 1 azt jelenti, hogy a legalacsonyabb
+pontszámú barok szignifikánsan nagyobb (negatívabb) short MFE-t adnak — ezek
+a legjobb short belépési pontok. A strategy `(1 - score_pct_short) ≥ cutoff`
+invertált percentilként használja, ami konzisztens a low-score = good-short logikával.
 
 ```mermaid
-flowchart TD
-  SCORE[validacios score-ok]
-  TOP[top 10 szazalek]
-  ALL[teljes validacios minta]
-  LIFT[top atlag - teljes atlag]
+flowchart LR
+  LONG["Long: high score → jó long\nratio_p925 (top 7.5%)"]
+  SHORT["Short: low score → jó short\nratio_p075 (bottom 7.5%)"]
+  OBJ[objective_score = -ratio\nOptuna minimize]
 
-  SCORE --> TOP --> LIFT
-  SCORE --> ALL --> LIFT
+  LONG --> OBJ
+  SHORT --> OBJ
 ```
 
-**Szabály:** a keresés elsődleges kimenete nem egy univerzális "legpontosabb"
-modell, hanem a legjobb rangsoroló modell az aktiv validacios szerzodes szerint.
+### Prune lépés: zero-split feature-ök eltávolítása
 
-### Fold-stabilitás: miért kell és hogyan működik?
-
-Egy olyan modell, amely csak egy foldban jó, de másik háromban szétesik, a live
-üzemben gyenge jelölt. Emiatt a search nemcsak a foldok átlagát nézi, hanem
-bünteti a foldok közötti szórást is.
-
-```mermaid
-graph TD
-  F1[fold 1 lift]
-  F2[fold 2 lift]
-  F3[fold 3 lift]
-  F4[fold 4 lift]
-  OBJ[mean lift - lambda * std lift]
-
-  F1 --> OBJ
-  F2 --> OBJ
-  F3 --> OBJ
-  F4 --> OBJ
-```
-
-**Szabály:** a jobb modell nemcsak magasabb liftet, hanem időben kevésbé szeszélyes
-viselkedést is mutat.
+A best-params-szal fitelt modellnél néhány feature (a `feature_k`-on belül) lehet,
+hogy egyáltalán nem kap split-et — ilyenkor ténylegesen nem használt. A `run_prune()`
+ezeket eltávolítja, és a végső `pruned_joint` feature listát a training lépés veszi át.
 
 ### Paraméter alapértékek és indoklásuk
 
 | Paraméter | Alapérték | Indoklás |
-|-----------|-----------|----------|
-| search engine | Optuna TPE | Jó kompromisszum a strukturált keresés és a kezelhető költség között |
-| `objective` | `regression` | A target folytonos MFE, nem osztálycímke |
-| `n_estimators` | `3000` kereséskor | Elég nagy felső korlát az early stoppinghoz |
-| `early_stopping` | `100` | Védi a trialokat a felesleges túlfuttatástól |
-| stage `smoke` | kevés trial, kevesebb fold | Pipeline sanity check, nem végső keresés |
-| stage `explore` | szélesebb keresés | Régiófeltérképezés az első komoly kereséshez |
-| stage `refine` | szűkebb, rövidebb keresés | Korábbi jó régiók pontosítása |
-| `LIFT_LAMBDA` | `0.5` | A stabilitást érdemben bünteti, de nem nyomja el teljesen a liftet |
+|---|---|---|
+| search engine | Optuna TPE | Strukturált keresés, prior trial-okból tanul |
+| `objective` | `quantile`, `alpha=0.925` | Aszimmetrikus loss: 9.25× érzékenyebb a top-tail barok alulbecslésére |
+| `n_estimators` | `3000` (search) | Felső korlát; early stopping határozza meg a tényleges mélységet |
+| `early_stopping_rounds` | `100` | Védi a trial-okat a felesleges túlfuttatástól |
+| feature_selection | `"joint"` | Joint mode az alapértelmezett; fix mode csak explicit megadásnál |
+| `feature_k` | Optuna integer, log-scale 3–131 | Log-scale favorizálja a kis K-t; 3 az abszolút minimum |
+| max trial | `100` | Felső korlát; valid set overfitting elleni védelem |
+| search objective | `valid_ratio_p925` (long) / `valid_ratio_p075` (short) | Közvetlenül a strategy céljával összhangban |
+| `gap_penalty` | `0.0` | Az éles pipeline nem használ gap penalty-t; kutatási opció |
+
+### Best trial selection
+
+Az Optuna `objective_score = -penalized` értéket minimalizál. A `_select_best_trial`
+az objective_score alapján rendezi a trial-okat (lower = better), és a top-5 közül
+azt választja, amelyiknél a train-valid gap minimális (gap diagnosztika, nem hard filter).
 
 ### Ismert kockázatok és korlátok
 
 | Kockázat | Tünet | Mitigáció |
-|----------|-------|-----------|
-| Objective túl specializált | Jó Top10 Lift, de gyenge általános hiba | RMSE és MAE auditként továbbra is riportálva vannak |
-| Túl kevés trial | Inga-szerű, zajos optimum | Explore és refine szétválasztása |
-| Feature drift | Ugyanaz a search más feature-listán fut | `feature_set.json` kötelező input, provenance rögzítés |
-| Folddrága keresés | Lassú ciklusidő | Kicsi sample, stage-ek, resume és dedup |
-| Overfitting a search objective-re | Szép search score, gyenge stratégia | A strategy domain külön kalibrál és optimalizál, nem közvetlenül a search score-ra épít |
+|---|---|---|
+| Valid set overfitting | Szép search score, gyenge out-of-sample stratégia | Max 100 trial; gain-rank prior a feature-sorrendhez |
+| K=5 fázis (gap penalty nélkül) | Optimalizátor megtalálja az alacsony-K megoldást | Ne adj gap penalty-t — a gain-rank prior és a nagy K-tér az optimizer elé kerül |
+| Feature drift | A gain_rank más rezsimben más sorrendet ad | Periodikus re-run; ha a best K jelentősen változik, modell re-train |
+| Snapshotváltás | Más adatverzió ugyanahhoz a model_id-hoz | Registry link kötelező minden search futásnál |
 
 ### Validációs checklist
 
-- [ ] A search ugyanazt a selected feature-listát használja, amelyet a feature engineering kiadott.
-- [ ] A CV a modell sampling-configjából származó walk-forward szerződést követi.
-- [ ] A purge a foldhatárokon ténylegesen érvényesül.
-- [ ] A best trial mellett foldonkénti lift és audit metrika is elérhető.
-- [ ] A `best_params` és a `search_best` ugyanahhoz a keresési futáshoz tartozik.
-- [ ] A search output visszaköthető a modellhez a registryben.
+- [ ] `run_gain_rank()` lefutott, `feature_set.json["gain_ranked"]` létezik.
+- [ ] `feature_selection="joint"`, `direction` a modell irányával konzisztens.
+- [ ] A valid periódus 2025-05-01 – 2026-05-31 (sampling config-gal összhangban).
+- [ ] A search objective: long → `valid_ratio_p925`; short → `valid_ratio_p075`.
+- [ ] `run_prune()` lefutott, `pruned_joint` (vagy `pruned_<tag>`) létezik a feature_set-ben.
+- [ ] A `best_params` és `search_best` artifact ugyanahhoz a search tag-hez tartozik.
+- [ ] A training lépés a `pruned_joint` feature listát és a megfelelő `search_tag`-et használja.

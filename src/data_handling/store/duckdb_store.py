@@ -11,6 +11,7 @@ from pathlib import Path
 import duckdb
 import polars as pl
 
+from data_handling.store.duckdb_query import _tbl_exists
 from data_handling.store.migrations import Migration, run_migrations
 
 logger = logging.getLogger(__name__)
@@ -170,15 +171,6 @@ def ensure_tables(conn: duckdb.DuckDBPyConnection) -> None:
     logger.debug("ensure_tables: migrations applied")
 
 
-def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
-    """Return True if the named table exists in the connected database."""
-    result = conn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-        [table],
-    ).fetchone()
-    return bool(result and result[0] > 0)
-
-
 def _sql_type_from_polars(dtype: pl.DataType) -> str:
     """Map a Polars dtype to a DuckDB SQL type string."""
     if dtype == pl.Boolean:
@@ -202,7 +194,7 @@ def _ensure_feat_ohlcv_quant_table(conn: duckdb.DuckDBPyConnection, df: pl.DataF
         conn : Open DuckDB connection.
         df   : Polars DataFrame whose columns define the target schema.
     """
-    if not _table_exists(conn, "feat_ohlcv_quant"):
+    if not _tbl_exists(conn, "feat_ohlcv_quant"):
         conn.register("_feat_schema_tmp", df)
         conn.execute("CREATE TABLE feat_ohlcv_quant AS SELECT * FROM _feat_schema_tmp LIMIT 0")
         conn.unregister("_feat_schema_tmp")
@@ -250,10 +242,10 @@ def rebuild_quant_train(
     Returns:
         Total row count in quant_train after rebuild.
     """
-    if not _table_exists(conn, "feat_ohlcv_quant"):
+    if not _tbl_exists(conn, "feat_ohlcv_quant"):
         logger.warning("rebuild_quant_train: feat_ohlcv_quant tabla hianyzik -- skip")
         return 0
-    if not _table_exists(conn, "target"):
+    if not _tbl_exists(conn, "target"):
         logger.warning("rebuild_quant_train: target tabla hianyzik -- skip")
         return 0
 
@@ -286,7 +278,7 @@ def rebuild_quant_train(
         """)
     else:
         # Range rebuild: ensure table exists, then delete + insert
-        if not _table_exists(conn, "quant_train"):
+        if not _tbl_exists(conn, "quant_train"):
             conn.execute(f"""
                 CREATE TABLE quant_train AS
                 SELECT {select_cols}

@@ -26,6 +26,7 @@ dependencies = [
     "polars>=1.0.0",
     "optuna>=4.0.0",
     "papermill>=2.7.0",
+    "tabulate>=0.10.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,193 +1,242 @@
-﻿# 5300 — Sampling Orchestratorok: create_model_sample és create_yearly_sample
+# 5300 — Sampling Orchestratorok: create_model_sample
 
-Két sampling path él a kódbázisban, különböző kimeneti formátummal:
+A `src/modeling/sampling/create_sample.py` valósítja meg a snapshot-native sampling
+path orchestrátorát. Két sampling mode támogatott: **`train_valid_split`** (aktív,
+champion modellek) és **`walk_forward`** (legacy CV, megtartva visszafelé-kompatibilitáshoz).
 
-| Path | Függvény | Kimenet | Mikor |
-|------|----------|---------|-------|
-| **Aktív** — snap-native | `create_model_sample` | `model."<id>__sample"` DuckDB tábla | `pipeline.py step_sample` |
-| **Legacy** — Polars/parquet | `create_yearly_sample` | `sample_train_valid.parquet` + JSON | `00_create_sample.py` standalone |
-
-Az aktív pipeline mindig a snap-native path-ot használja. A yearly parquet path
-visszafele-kompatibilitás és legacy audit célokat szolgál.
+| Mode | Output oszlop | Mikor aktív |
+|------|---------------|-------------|
+| `train_valid_split` | `split` TINYINT (0=train, 1=valid) | Champion modellek (`config/models.json`) |
+| `walk_forward` | `fold_id` TINYINT (0=train-only, 1..n=valid fold) | Legacy CV modellek |
 
 Forrás:
 - [sampling/create_sample.py](../../src/modeling/sampling/create_sample.py)
-- [00_create_sample.py](../../src/modeling/00_create_sample.py)
+- [sampling/snapshot_sampler.py](../../src/modeling/sampling/snapshot_sampler.py)
+- [sampling/config.py](../../src/modeling/sampling/config.py)
 
-Metodológiai háttér: [5400_sampling.md](../methodology_doc/5400_sampling.md) | [5010_sampling_yearly.md](../methodology_doc/5010_sampling_yearly.md)
+→ _doc_/methodology_doc/5400_sampling.md
 
 ---
 
-## Snap-native path (aktív — pipeline.py)
+## Overview
 
-### `create_model_sample(model_id, snapshot_id)`
+```mermaid
+flowchart TD
+  CM[create_model_sample\nmodel_id, snapshot_id]
+  CFG[config/models.json\nsampling_mode]
+  TV[create_snapshot_sample_train_valid_split\ntrain/valid split path]
+  WF[create_snapshot_sample\nwalk-forward CV path]
+  SNAPS[snapshot_sampler\nSQL builder]
+  DB["lab.duckdb\nmodel.__sample CTAS"]
+  REG[reg.feature_sets + reg.models]
+
+  CM --> CFG
+  CFG -- train_valid_split --> TV
+  CFG -- walk_forward --> WF
+  TV --> SNAPS
+  WF --> SNAPS
+  SNAPS --> DB
+  TV --> REG
+  WF --> REG
+```
+
+A kimenet mindkét esetben: `model."<model_id>__sample"` DuckDB tábla —
+`open_time` + target oszlop(ok) + split indicator (`split` vagy `fold_id`).
+A `feat_*` oszlopok a snapshotban maradnak, downstream lépések
+`snap."<snapshot_id>" ⋈ model."<model_id>__sample"` JOIN-nal dolgoznak.
+
+---
+
+## `create_model_sample(model_id, snapshot_id)`
 
 Config-vezérelt belépési pont. Feloldja a modell paramétereit (`config/models.json`),
-megnyitja a lab connectiont, majd delegál a `create_snapshot_sample`-nek.
+megnyitja a lab connectiont, majd `sampling_mode` alapján delegál.
+
+| Paraméter | Típus | Leírás |
+|-----------|-------|--------|
+| `model_id` | `str` | Modell kulcs a `config/models.json`-ból |
+| `snapshot_id` | `str` | Immutable snapshot id (`snap."<id>"`) |
+
+**Visszatérés:** Summary dict — tartalom mode szerint változik (lásd delegált függvényeknél).
+
+**Raises:** `ValueError` ha a modell ismeretlen, a snapshot nem létezik, üres a sample,
+vagy ismeretlen `sampling_mode`.
 
 ```mermaid
 sequenceDiagram
   participant P as pipeline.step_sample
   participant CM as create_model_sample
   participant CFG as config/models.json
-  participant CSS as create_snapshot_sample
+  participant TV as create_snapshot_sample_train_valid_split
+  participant WF as create_snapshot_sample
   participant SNAPS as snapshot_sampler
   participant DB as lab.duckdb
   participant REG as reg.feature_sets + reg.models
 
   P ->> CM: model_id, snapshot_id
-  CM ->> CFG: meta (asset_id, target_name, sampling)
-  CM ->> CSS: conn, model_id, snapshot_id, params
-  CSS ->> SNAPS: generate_walk_forward_folds + build_sample_ctas_sql
-  CSS ->> DB: CTAS model."model_id__sample" FROM snap x model.__sample
-  CSS ->> DB: COUNT + fold_counts ellenőrzés
-  CSS ->> REG: upsert feature_sets + link_model (status=sampled)
-  CSS -->> CM: summary dict
-  CM -->> P: {model_id, snapshot_id, sample_table, n_rows, fold_row_counts, feature_set_id}
+  CM ->> CFG: meta (asset_id, target_name, sampling_mode, params)
+  alt sampling_mode == train_valid_split
+    CM ->> TV: conn, model_id, snapshot_id, params
+    TV ->> SNAPS: build_train_valid_split_ctas_sql
+    TV ->> DB: CTAS model."model_id__sample"
+    TV ->> REG: upsert feature_sets + link_model
+    TV -->> CM: summary dict (split_row_counts)
+  else sampling_mode == walk_forward
+    CM ->> WF: conn, model_id, snapshot_id, params
+    WF ->> SNAPS: build_sample_ctas_sql
+    WF ->> DB: CTAS model."model_id__sample"
+    WF ->> REG: upsert feature_sets + link_model
+    WF -->> CM: summary dict (fold_row_counts)
+  end
+  CM -->> P: summary dict
 ```
-
-| Visszatérési kulcs | Típus | Leírás |
-|-------------------|-------|--------|
-| `model_id` | `str` | Modell azonosító |
-| `snapshot_id` | `str` | Forrás snapshot |
-| `sample_table` | `str` | `model."<model_id>__sample"` tábla FQN |
-| `n_rows` | `int` | Sample sorok száma |
-| `fold_row_counts` | `dict[str, int]` | Per-fold sorok (`{"0": n, "1": n, ...}`) |
-| `feature_set_id` | `str` | Regisztrált `feature_set_id` |
-| `n_input` | `int` | Snapshot `feat_*` oszlopok száma (logikai szuperset) |
-| `n_selected` | `int` | Kiválasztott feature-ök száma (logikai selection) |
-
-**Raises:** `ValueError` ha a modell ismeretlen, a snapshot nem létezik, vagy a sample üres.
 
 ---
 
-### `create_snapshot_sample(conn, model_id, snapshot_id, ...)`
+## `create_snapshot_sample_train_valid_split(conn, model_id, snapshot_id, ...)` [aktív]
 
-Alacsony szintű orchestrator: nyers conn-on fut, IO-free SQL builder-t (`snapshot_sampler`)
-hív, majd elvégzi a DuckDB végrehajtást és a registry írást.
+Train/valid split orchestrator. Egyetlen kronológiai felosztás: train és valid
+időablak, embargo szabályokkal a train oldalon.
 
 ```mermaid
 flowchart TD
-  CSS[create_snapshot_sample\nconn, model_id, snapshot_id, params] --> CHK[snapshot_exists?\nValueError ha nem]
-  CHK --> COLS[_snapshot_feature_columns\nfeat_* superset]
-  COLS --> FOLDS[generate_walk_forward_folds\nfold időablakok]
-  FOLDS --> SQL[build_sample_ctas_sql\nCTAS SQL generálás]
-  SQL --> EXEC[conn.execute\nCREATE OR REPLACE\nmodel.__sample]
-  EXEC --> CNT[COUNT + fold_counts\nn_rows ellenőrzés]
-  CNT --> FSID[build_feature_set_id\nfeature_set_id deriválás]
-  FSID --> REG[registry.upsert\nfeature_sets + models]
-  REG --> RET[summary dict]
+  CHK[snapshot_exists?\nValueError ha nem]
+  COLS[_snapshot_feature_columns\nfeat_* superset]
+  SQL[build_train_valid_split_ctas_sql\nCTAS SQL generálás]
+  EXEC["conn.execute\nCREATE OR REPLACE\nmodel.__sample"]
+  CNT[COUNT + _split_counts\nn_rows ellenőrzés]
+  FSID[build_feature_set_id\nfeature_set_id deriválás]
+  REG[registry.upsert\nfeature_sets + models\nstatus=sampled]
+
+  CHK --> COLS --> SQL --> EXEC --> CNT --> FSID --> REG
 ```
 
-A CTAS SQL az `hourly select + fold_id CASE` egyetlen lépésben, determinisztikusan
-— azonos snapshot + seed + fold paraméterek → bit-azonos `model.__sample` tábla.
+| Paraméter | Típus | Default | Leírás |
+|-----------|-------|---------|--------|
+| `conn` | `DuckDBPyConnection` | — | Nyitott lab connection |
+| `model_id` | `str` | — | Owning model id (tábla token + reg link) |
+| `snapshot_id` | `str` | — | Immutable forrás snapshot |
+| `asset_id` | `str` | — | Asset kulcs (feature_set_id és reg linkekhez) |
+| `target_cols` | `list[str]` | — | Target oszlop(ok) a samplebe |
+| `horizon` | `int` | `60` | Forward-window bar count (feature_set_id token) |
+| `direction` | `str` | `"l"` | `l`/`s`/`combo` (feature_set_id token) |
+| `seed` | `int` | `42` | Reproducibility seed per-hour pickhoz |
+| `train_start` | `str` | `"2021-01-01"` | Train ablak kezdete (YYYY-MM-DD, inclusive) |
+| `train_end` | `str` | `"2025-04-30"` | Train ablak vége (YYYY-MM-DD, inclusive) |
+| `valid_start` | `str` | `"2025-05-01"` | Valid ablak kezdete (YYYY-MM-DD, inclusive) |
+| `valid_end` | `str` | `"2026-05-31"` | Valid ablak vége (YYYY-MM-DD, inclusive) |
+| `feature_lookback_embargo_minutes` | `int` | `240` | Train elejéről kizárt percek (feature warmup) |
+| `target_purge_minutes` | `int` | `60` | Train végéről kizárt percek (target leak megelőzés) |
+| `selected_cols` | `list[str] \| None` | `None` | Logikai feature_set; None = összes feat_* |
 
-**I5 garantálva:** A `fold_id` INT8 oszlop minden sorban jelen van (0 = train-only, 1..n = valid fold).
+**Visszatérési kulcsok:**
+
+| Kulcs | Típus | Leírás |
+|-------|-------|--------|
+| `model_id` | `str` | Modell azonosító |
+| `snapshot_id` | `str` | Forrás snapshot |
+| `sample_table` | `str` | `model."<model_id>__sample"` FQN |
+| `n_rows` | `int` | Összes sample sor |
+| `split_row_counts` | `dict[str, int]` | Per-split sorok (`{"0": n, "1": n}`) |
+| `feature_set_id` | `str` | Regisztrált `feature_set_id` |
+| `n_input` | `int` | Snapshot feat_* oszlopok száma |
+| `n_selected` | `int` | Kiválasztott feature-ök száma |
 
 ---
 
-## Yearly parquet path (legacy — 00_create_sample.py)
+## `TrainValidSplitConfig` — immutable konfiguráció
 
-### Overview
+`src/modeling/sampling/config.py` — fagyasztott dataclass a train/valid split
+paramétereihez. A `create_model_sample` a `config/models.json` `sampling` szekciójából
+olvassa a paramétereket, nem kötelező a dataclass explicit példányosítása.
+
+| Mező | Típus | Default | Leírás |
+|------|-------|---------|--------|
+| `sample_id` | `str` | — | Egyedi azonosító |
+| `asset_id` | `str` | — | Asset kulcs |
+| `train_start` | `str` | — | Train ablak első napja (YYYY-MM-DD, inclusive) |
+| `train_end` | `str` | — | Train ablak utolsó napja (YYYY-MM-DD, inclusive) |
+| `valid_start` | `str` | — | Valid ablak első napja (YYYY-MM-DD, inclusive) |
+| `valid_end` | `str` | — | Valid ablak utolsó napja (YYYY-MM-DD, inclusive) |
+| `seed` | `int` | `42` | Véletlenszám seed per-hour row selectionhoz |
+| `feature_lookback_embargo_minutes` | `int` | `240` | Train elejéről kizárt percek |
+| `target_purge_minutes` | `int` | `60` | Train végéről kizárt percek |
+| `target_cols` | `tuple[str, ...]` | `("long_mfe_fw60", "short_mfe_fw60")` | Target oszlopok |
+
+---
+
+## SQL logika — `build_train_valid_split_select_sql`
+
+`src/modeling/sampling/snapshot_sampler.py` — IO-free SQL builder.
+
+### Két embargo szabály (csak train oldalon)
 
 ```mermaid
-sequenceDiagram
-  participant CLI as 00_create_sample.py
-  participant CS as create_yearly_sample()
-  participant U as utils.load_asset_config
-  participant DB as DuckDB (quant_train)
-  participant HS as select_hourly_observations
-  participant MV as select_monthly_validation_weeks
-  participant AS as assign_segments
-  participant W as write_yearly_artifacts
-
-  CLI ->> CS: YearlySamplingConfig
-  CS ->> U: config.asset_id
-  U -->> CS: db_path
-  CS ->> DB: SELECT feat_* + target FROM quant_train WHERE year = config.year
-  DB -->> CS: pl.DataFrame (~525 000 sor)
-  CS ->> HS: df, config.year, config.seed
-  HS -->> CS: hourly_df (~8 760 sor)
-  CS ->> MV: hourly_df, config.year, config.seed
-  MV -->> CS: 12 (week_start, week_end) tuple
-  CS ->> AS: hourly_df, valid_weeks, config.purge_minutes
-  AS -->> CS: segment_df (train/valid/purge + fold_id)
-  CS ->> CS: audit dict + metadata dict összeállítása
-  CS ->> W: sample_dir, metadata, segment_df, audit
-  W -->> CS: kész (metadata.json, audit.json, sample_train_valid.parquet)
-  CS -->> CLI: return None
-  CLI ->> CLI: load_yearly_sample → print összefoglaló
+flowchart LR
+  TS[train_start] --> FLE[+ feature_lookback_embargo_minutes\nlegkorábbi megtartott sor]
+  TE[train_end] --> TP[- target_purge_minutes\nlegkésőbbi megtartott sor]
+  VS[valid_start] --> VE[valid_end\nnincsen embargo]
 ```
+
+1. **Feature lookback embargo** (`feature_lookback_embargo_minutes = 240`): a train
+   ablak első N perce kizárva — garantálja, hogy minden megtartott sornak teljes
+   feature lookback ablaka legyen a snapshot start előtt.
+2. **Target purge** (`target_purge_minutes = 60`): a train ablak utolsó N perce
+   kizárva — ezeknek a soroknak a target értéke a valid periódusban lévő árból
+   számítódik, így data leak megelőzés.
+
+**Valid oldalon nincs embargo** — a valid feature-számítás visszanéz a train
+történelembe, ami korrekt és elvárt viselkedés.
+
+### QUALIFY ROW_NUMBER (hourly select)
+
+```sql
+QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY date_trunc('hour', open_time)
+    ORDER BY hash(CAST(epoch_ms(open_time) AS BIGINT) + {seed}), open_time
+) = 1
+```
+
+Minden órablokkból pontosan egy sor kerül a samplebe. A `hash(epoch_ms + seed)` content-addressed
+determinizmust biztosít: azonos snapshot + seed → bit-azonos tábla (`CREATE OR REPLACE`).
+
+### `split` indicator oszlop
+
+```sql
+CAST(CASE
+    WHEN CAST(open_time AS DATE) BETWEEN DATE '{valid_start}' AND DATE '{valid_end}'
+        THEN 1
+    ELSE 0
+END AS TINYINT) AS split
+```
+
+| Érték | Jelentés |
+|-------|----------|
+| `0` | Train sor |
+| `1` | Valid sor |
+
+Az output tábla sémája: `open_time`, target oszlop(ok), `split TINYINT`.
 
 ---
 
-## `create_yearly_sample(config)` (legacy)
+## `create_snapshot_sample(conn, model_id, snapshot_id, ...)` [walk-forward, legacy]
 
-> **Megjegyzés:** Ez a függvény a **legacy Polars/parquet path** — az aktív pipeline
-> a `create_model_sample` snap-native path-ot használja. Ez a leírás visszafele-
-> kompatibilitás és audit célokat szolgál.
+> **Megjegyzés:** Ez a függvény a **walk-forward CV path** — az aktív champion
+> modellek a `create_snapshot_sample_train_valid_split`-et használják. Ez a leírás
+> visszafelé-kompatibilitás célját szolgálja.
 
-| Paraméter | Típus | Leírás |
-|-----------|-------|--------|
-| `config` | `YearlySamplingConfig` | Frozen dataclass az összes paraméterrel |
+Walk-forward CV orchestrator. A `generate_walk_forward_folds` + `build_sample_ctas_sql`
+kombinációval generál `fold_id` TINYINT oszlopot (0 = train-only, 1..n = valid fold).
 
-### Lépések
+| Paraméter | Típus | Default | Leírás |
+|-----------|-------|---------|--------|
+| `train_months` | `int` | `9` | Walk-forward train ablak hossza hónapban |
+| `valid_months` | `int` | `3` | Walk-forward valid ablak hossza hónapban |
+| `shift_months` | `int` | `3` | Fold eltolás hónapban |
+| `n_folds` | `int` | `4` | Fold-ok száma |
+| `purge_minutes` | `int` | `240` | Purge zóna percben fold határon |
 
-1. **Útvonalak feloldása** — `utils.load_asset_config(asset_id)` → `db_path`; `sample_dir` = `database/<asset_id>/samples/<sample_id>/`
-2. **DB betöltés** — `live.quant_train`-ből év-szűrt sorok, NULL target sorok kizárva
-3. **Feature column feloldás** — `config.feature_cols` ha nem üres; különben auto-discovery minden `feat_*` oszlop
-4. **Óránkénti kiválasztás** — `select_hourly_observations` → ~8 760 sor/év
-5. **Validációs hetek** — `select_monthly_validation_weeks` → 12 hét (mind a 12 hónapból)
-6. **Szegmens hozzárendelés** — `assign_segments` → `train` / `valid` / `purge` + `fold_id`
-7. **Audit** — `missing_hours`, `actual_hourly_rows`, `total_quant_train_rows_in_year`
-8. **Kiírás** — `write_yearly_artifacts` → `metadata.json`, `audit.json`, `sample_train_valid.parquet`
-
-**Raises:**
-- `ValueError` ha a `quant_train`-nek nincs sora érvényes targettel az adott évre
-- `RuntimeError` ha a `quant_train` tábla nem létezik
-
----
-
-## CLI — `00_create_sample.py`
-
-### Argumentumok
-
-| Argument | Kötelező | Default | Leírás |
-|----------|----------|---------|--------|
-| `--year` | igen | — | Naptári év (pl. `2021`) |
-| `--asset-id` | igen | — | Asset kulcs (`config/assets.json`-ból) |
-| `--seed` | nem | `42 + year` | Véletlenszám seed |
-
-### Példa CLI hívás
-
-```bash
-uv run python src/modeling/00_create_sample.py --year 2021 --asset-id solusdt
-uv run python src/modeling/00_create_sample.py --year 2022 --asset-id solusdt --seed 100
-```
-
-### Output summary
-
-Sikeres futás után a CLI összefoglalót nyomtat:
-
-```
-OK: Sample created at database/solusdt/samples/solusdt_fw60_yearly_2021
-    year         = 2021
-    seed         = 2063
-    valid_weeks  = 12
-    feature_cols = 208
-    total_rows   = 9124
-      train      = 7012
-      valid      = 2016
-      purge      = 96
-```
-
----
-
-## Miért csak az orchestratorban van `utils` import?
-
-Az `yearly_sampler` és `artifacts` modulok szándékosan projekt-agnosztikusak —
-tesztelhetők és újrafelhasználhatók projekt kontextus nélkül. Csak az orchestrator
-ismeri a projekt-specifikus path-konvenciókat és config formátumot.
+**I5 garantálva:** A `fold_id` INT8 oszlop minden sorban jelen van.
 
 ---
 
@@ -195,9 +244,7 @@ ismeri a projekt-specifikus path-konvenciókat és config formátumot.
 
 | Fájl | Tartalom |
 |------|----------|
-| [5010_sampling_yearly.md](../methodology_doc/5010_sampling_yearly.md) | Yearly sampling teljes metodológiája |
 | [5400_sampling.md](../methodology_doc/5400_sampling.md) | Sampling metodológiai háttér |
-| [5100_sampling_config.md](5100_sampling_config.md) | YearlySamplingConfig / WalkForwardSamplingConfig |
-| [5200_sampling_artifacts.md](5200_sampling_artifacts.md) | write_yearly_artifacts / load_yearly_sample (legacy) |
-| [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) | Pipeline orchestrator kód-ref (step_sample hívja ezt) |
+| [5100_sampling_config.md](5100_sampling_config.md) | TrainValidSplitConfig / WalkForwardSamplingConfig |
+| [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) | Pipeline orchestrator (step_sample hívja ezt) |
 | [1510_registry_code.md](1510_registry_code.md) | registry.upsert — reg.feature_sets és reg.models írás |

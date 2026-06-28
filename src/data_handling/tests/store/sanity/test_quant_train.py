@@ -91,8 +91,12 @@ def test_quant_train_open_time_is_unique(tmp_path: Path) -> None:
     import duckdb
     conn = duckdb.connect(db_path, read_only=True)
     try:
-        total = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()[0]
-        distinct = conn.execute("SELECT COUNT(DISTINCT open_time) FROM quant_train").fetchone()[0]
+        row = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()
+        assert row is not None
+        total = row[0]
+        row = conn.execute("SELECT COUNT(DISTINCT open_time) FROM quant_train").fetchone()
+        assert row is not None
+        distinct = row[0]
     finally:
         conn.close()
     assert total == distinct, "open_time must be unique in quant_train"
@@ -103,9 +107,11 @@ def test_quant_train_open_time_not_null(tmp_path: Path) -> None:
     import duckdb
     conn = duckdb.connect(db_path, read_only=True)
     try:
-        null_count = conn.execute(
+        row = conn.execute(
             "SELECT COUNT(*) FROM quant_train WHERE open_time IS NULL"
-        ).fetchone()[0]
+        ).fetchone()
+        assert row is not None
+        null_count = row[0]
     finally:
         conn.close()
     assert null_count == 0
@@ -127,10 +133,12 @@ def test_quant_train_no_null_targets(tmp_path: Path) -> None:
     import duckdb
     conn = duckdb.connect(db_path, read_only=True)
     try:
-        n = conn.execute(
+        row = conn.execute(
             "SELECT COUNT(*) FROM quant_train"
             " WHERE long_mfe_fw60 IS NULL OR short_mfe_fw60 IS NULL"
-        ).fetchone()[0]
+        ).fetchone()
+        assert row is not None
+        n = row[0]
     finally:
         conn.close()
     assert n == 0, "quant_train must not contain NULL target rows"

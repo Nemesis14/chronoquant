@@ -1,0 +1,60 @@
+{
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
+  "feature_key": "top10",
+  "n_selected": 10,
+  "n_zero_split": 0,
+  "n_pruned_selected": 10,
+  "zero_split_features": [],
+  "all_feature_importance": [
+    {
+      "feature": "feat_parkinson_vol_30",
+      "split": 74,
+      "gain": 491.5238623585319
+    },
+    {
+      "feature": "feat_gk_vol_10",
+      "split": 77,
+      "gain": 413.03227069443346
+    },
+    {
+      "feature": "feat_natr_14",
+      "split": 71,
+      "gain": 385.1343792740954
+    },
+    {
+      "feature": "feat_donchian_width_60",
+      "split": 67,
+      "gain": 376.7658225994019
+    },
+    {
+      "feature": "feat_pos_return_mean_60",
+      "split": 99,
+      "gain": 328.2358395711926
+    },
+    {
+      "feature": "feat_gk_vol_60",
+      "split": 58,
+      "gain": 304.3029135997731
+    },
+    {
+      "feature": "feat_max_drawdown_30",
+      "split": 73,
+      "gain": 300.539953812724
+    },
+    {
+      "feature": "feat_hml_range",
+      "split": 92,
+      "gain": 217.88359895825852
+    },
+    {
+      "feature": "feat_neg_return_mean_60",
+      "split": 66,
+      "gain": 210.52238866742118
+    },
+    {
+      "feature": "feat_donchian_width_30",
+      "split": 60,
+      "gain": 166.4032189634745
+    }
+  ]
+}

@@ -10,8 +10,13 @@ Numbering belongs in Quarto config — never write "Figure 1", "Table 2", etc. m
 Régi `_doc_/analysis/_quarto.yml` törölve. Minden notebook self-contained Raw-cell frontmattert
 használ — nincs `_quarto.yml`-függőség. Az alábbi beállítások referenciaként:
 
-CSS elérési út `_doc_/` notebookoknál: `../analyst/chronoquant_analysis.css`
-CSS elérési út `src/modeling/` notebookoknál: `../../analyst/chronoquant_analysis.css`
+CSS elérési út — relatív a notebook fájljához:
+
+| Notebook helye | CSS path |
+|---|---|
+| `_doc_/models_doc/XXXX_slug.ipynb` | `../../analyst/quarto/chronoquant_analysis.css` |
+| `_doc_/XXXX_slug.ipynb` (közvetlen `_doc_/` gyökér) | `../analyst/quarto/chronoquant_analysis.css` |
+| `src/modeling/XXXX_slug.ipynb` | `../../analyst/quarto/chronoquant_analysis.css` |
 
 ```yaml
 project:

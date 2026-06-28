@@ -14,6 +14,7 @@ from pathlib import Path
 import duckdb
 
 from data_handling.store.duckdb_query import (
+    _tbl_exists,
     dataset_exists,
     ohlcv_dataset_exists,
     ohlcv_time_stats,
@@ -60,15 +61,6 @@ class DuckDBStatsReport:
 
 
 # %% Helpers
-
-
-def _table_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
-    """Return True when table exists in the connected database."""
-    row = conn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-        [table],
-    ).fetchone()
-    return bool(row and row[0] > 0)
 
 
 def _fmt_ts(value: object) -> str | None:
@@ -141,7 +133,7 @@ def collect_duckdb_stats_report(
     try:
         table_stats: list[TableStats] = []
         for table in names:
-            if not _table_exists(conn, table):
+            if not _tbl_exists(conn, table):
                 table_stats.append(_empty_table_stats(table, "SKIP_TABLE_MISSING"))
                 continue
 
@@ -264,11 +256,7 @@ def raw_manifest_audit(db_path: str, dataset: str) -> None:
 
     conn = duckdb.connect(str(db_file), read_only=True)
     try:
-        tbl_exists = conn.execute(
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-            [dataset],
-        ).fetchone()
-        if not (tbl_exists and tbl_exists[0] > 0):
+        if not _tbl_exists(conn, dataset):
             logger.warning("%s: raw_manifest_audit - tabla nem talalhato", dataset)
             return
 

@@ -1,276 +1,143 @@
 # 6300 - Execution-Aware Grid Search
 
-A grid search az entry/exit paraméterek teljes, determinisztikus átvizsgálása egy
-valódi végrehajtási modellen mért P&L objektív szerint. Ez váltja fel a korábbi
-Optuna TPE-alapú, proxy-objektívű keresést.
+Az execution-aware grid search célja, hogy a stratégia belépési és kilépési paramétereit ne proxy mutatókon, hanem egy explicit végrehajtási modellen mért realizált loghozam alapján válassza ki. A döntés így nem azt optimalizálja, hogy egy score átlagosan milyen "ígéretes", hanem azt, hogy a tényleges szabálykészlet mit termelne trade-szinten.
 
 ## Overview
 
 ```mermaid
 flowchart TD
-  CAL[kalibrált scored table]
-  GS[grid search — 200 setup/irány]
-  EXEC[intrabar TP/SL végrehajtási modell]
-  OBJ[total fact_log_return]
-  BEST[legjobb setup/irány]
-  ART[strategy artifact]
+  CAL[Kalibrált scored tábla]
+  GRID[Determinista paraméterrács]
+  EXEC[Intrabar TP/SL szimuláció]
+  SCORE[Összesített fact_log_return]
+  BEST[Legjobb setup / irány]
+  ART[Strategy decision contract]
 
-  CAL --> GS --> EXEC --> OBJ --> BEST --> ART
+  CAL --> GRID --> EXEC --> SCORE --> BEST --> ART
 ```
 
 ```mermaid
 flowchart LR
-  Q[optimalizálási megközelítés]
-  Q --> A[teljes grid + valódi végrehajtási P&L]
-  Q --> B[Optuna TPE + proxy bucket_mean_mfe]
-  Q --> C[kézi threshold keresés]
+  M[Optimalizálási módszer]
+  M --> A[Teljes grid + végrehajtott PnL]
+  M --> B[TPE + proxy objective]
+  M --> C[Kézi threshold hangolás]
 ```
 
 ## Üzleti és módszertani háttér
 
-### Miért váltottunk Optuna TPE-ről grid search-re?
+### Miért kritikus ez a lépés?
 
-| Szempont | Optuna TPE | Grid search | Döntés |
-|----------|------------|-------------|--------|
-| Determinizmus | Sztochasztikus mintavétel, futásról futásra eltér | Mindig ugyanaz az eredmény azonos adaton | Grid search |
-| Lefedettség | Néhány trial a 200 lehetséges setup-ból | Teljes lefedés, nincs kihagyott kombináció | Grid search |
-| Objektív | Proxy: `bucket_mean_mfe` (várható MFE közelítés) | Tényleges végrehajtási P&L: `fact_log_return` | Grid search |
-| Reprodukálhatóság | Seed-függő, nehezen auditálható | Bármikor újrafuttatható, azonos kimenet | Grid search |
-| Keresési tér mérete | Nagy tereken indokolt | Kis téren (200 setup) felesleges overhead | Grid search |
+A strategy pipeline ezen a ponton fordítja le a kalibrált score-teret konkrét belépési és kilépési szabállyá. Ha itt rossz az objective vagy a keresési logika, akkor a kiválasztott setup laborban jónak tűnhet, de live környezetben már más döntési szerződést hajt végre.
 
-**Kulcsérv:** ha a keresési tér teljesen lefedható, a TPE mintavételi hibája csak ront.
-A 200 setup/irány egyszerre futtatható, és a legjobb pontot nem kell közelíteni.
+Ez a lépés adja meg azt az egyetlen decision contractot, amelyet a live trading réteg később változtatás nélkül használ. Emiatt itt nem elég "jó közelítést" találni: auditálhatóan meg kell tudni mondani, hogy a választott setup miért éppen ez lett.
 
-### Miért kritikus az objektív csere?
+### Miért ezt a megközelítést?
 
-A `bucket_mean_mfe` azt becsüli, milyen messzire mehet az ár a pozíció nyitása után.
-Ez proxy: nem veszi figyelembe, hogy az exit mikor és milyen áron történik valójában.
-
-A `fact_log_return` ezzel szemben a tényleges végrehajtást szimulálva adja meg minden
-trade log-returnját: figyelembe veszi a TP/SL triggerelést, a same-bar konfliktust,
-a timeout zárást és a re-entry szabályt. Ami a proxy szerint jónak látszik, a valódi
-végrehajtásban veszteséges lehet — és fordítva.
-
-**Szabály:** a grid search kizárólag `fact_log_return` alapján rangsorol. A
-`bucket_mean_mfe` csak a kalibrációhoz marad meg (TP spec számításához — lásd lent).
-
-## Végrehajtási modell (intrabar TP/SL)
-
-Ez az "execution-aware" jelleg lényege: a backtest nem csak a bar close árát nézi,
-hanem az adott bar high és low értékét is, hogy eldöntse, triggerelt-e a TP vagy az SL.
-
-### Long irány
-
-- **TP trigger:** `high[t+1 .. t+60] >= entry_close × exp(tp_lr)` — ha az ár eléri vagy
-  átlépi a TP szintet, az exit TP áron történik.
-- **SL trigger:** `low[t+1 .. t+60] <= entry_close × exp(-sl_lr)` — ha az ár eléri vagy
-  leüti az SL szintet, az exit SL áron történik.
-
-### Short irány
-
-- **TP trigger:** `low[t+1 .. t+60] <= entry_close × exp(-tp_lr)` — az ár leesik a TP szintre.
-- **SL trigger:** `high[t+1 .. t+60] >= entry_close × exp(sl_lr)` — az ár feléri az SL szintet.
-
-### Same-bar konfliktus
-
-Ha ugyanazon a bárán mind a TP, mind az SL trigger teljesül (a high eléri a TP-t és
-a low leüti az SL-t), a rendszer **SL-t feltételez**. Ez konzervatív megközelítés:
-ismeretlen sorrendű mozgásnál a kedvezőtlenebb esetet tételezi fel.
-
-### 60-bar timeout
-
-Ha a pozíció 60 bar után sem zárt TP-vel vagy SL-lel, a 60. bar close áron zár.
-Ez a maximum tartási horizont, összhangban a `fw60` target definícióval.
-
-### Re-entry
-
-Az exit lezárulása utáni következő bartól újabb entry lehetséges. Nincs kötelező
-cooldown: az entry feltétel teljesülése önmagában elegendő az újbóli belépéshez.
-
-```mermaid
-flowchart TD
-  ENTRY[entry bar close]
-  CHECK{következő bar high/low}
-  TP_HIT{TP trigger?}
-  SL_HIT{SL trigger?}
-  BOTH{mindkettő?}
-  TIMEOUT{60. bar?}
-  EXIT_TP[exit TP áron]
-  EXIT_SL[exit SL áron]
-  EXIT_CLOSE[exit close áron]
-
-  ENTRY --> CHECK
-  CHECK --> TP_HIT
-  CHECK --> SL_HIT
-  TP_HIT -- igen --> BOTH
-  SL_HIT -- igen --> BOTH
-  BOTH -- igen --> EXIT_SL
-  BOTH -- nem --> EXIT_TP
-  SL_HIT -- csak SL --> EXIT_SL
-  TIMEOUT -- igen --> EXIT_CLOSE
-  CHECK --> TIMEOUT
-```
-
-## Short irány invertált ranking
-
-A short MFE target definíciója: `short_mfe_fw60 = log(fw_min / close[t])`.
-
-Ha az ár esett a következő 60 barban, `fw_min < close[t]`, tehát a log-arány
-negatív. Ez azt jelenti, hogy egy profitable short lehetőség **alacsony target értéket**
-kap. A modell emiatt alacsony score-t ad a legjobb short lehetőségekre.
-
-Ebből következik az invertált percentile logika:
-
-- `score_pct_short` alacsony (pl. 0.05) = top 5% short lehetőség
-- `score_pct_short` magas (pl. 0.95) = gyenge short lehetőség
-
-**Entry feltétel shorthoz:**
-
-```
-(1 - score_pct_short) >= entry_cutoff
-```
-
-Ez konzisztens a long logikával: long esetén `score_pct_long >= entry_cutoff`.
-Mindkét irányban az entry_cutoff jelöli ki azt a sávot, ahol a legerősebb
-lehetőségek találhatók. A short esetén az invertálás csak azt kompenzálja, hogy
-a score és a profitabilitás fordított irányban mozog.
+| Megközelítés | Előny | Hátrány | Státusz |
+|--------------|-------|---------|---------|
+| Teljes grid search kis, zárt keresési téren és realizált PnL objective-on | Determinisztikus, teljes lefedést ad, könnyen auditálható | Külön végrehajtási modellt kell fenntartani | Választott |
+| TPE / Optuna proxy objective-val | Kevesebb kiértékelés nagy terekben | Kis térben felesleges, és a proxy elvi eltérést visz be | Elvetett |
+| Kézi cutoff és TP/SL választás | Gyors emberi iteráció | Nem reprodukálható és könnyen torzított | Elvetett |
+| Pusztán osztályozási vagy rank-metrikára optimalizálás | Egyszerűbb modell-összevetés | Nem azonos a kereskedési eredménnyel | Elvetett |
 
 ```mermaid
 flowchart LR
-  LONG["long: score_pct >= cutoff\n(magas score = jó long)"]
-  SHORT["short: (1 - score_pct) >= cutoff\n(alacsony score = jó short)"]
-  UNIFIED[mindkét esetben: top entry_cutoff szint]
+  PROXY[Proxy objective]
+  EXECP[Execution-aware objective]
+  LIVE[Live trading viselkedés]
+
+  PROXY --> X[Nem garantált egyezés]
+  EXECP --> LIVE
+```
+
+### Miért kell végrehajtás-alapú objective és hogyan működik?
+
+A score önmagában még nem trade-eredmény. A realizált eredményt az dönti el, hogy belépés után mikor aktiválódik a TP vagy az SL, mi történik ugyanazon a báron, és mi a maximális tartási horizont.
+
+```mermaid
+flowchart TD
+  ENTRY[Entry signal]
+  WINDOW[Következő 60 bar]
+  TP{TP érintve?}
+  SL{SL érintve?}
+  BOTH{Mindkettő ugyanazon a báron?}
+  TO{Timeout?}
+  RTP[TP exit]
+  RSL[SL exit]
+  RTO[Close exit]
+
+  ENTRY --> WINDOW --> TP
+  WINDOW --> SL
+  TP --> BOTH
+  SL --> BOTH
+  BOTH -- igen --> RSL
+  BOTH -- nem, csak TP --> RTP
+  SL -- csak SL --> RSL
+  WINDOW --> TO
+  TO -- igen --> RTO
+```
+
+**Szabály:** a stratégia-rangsor kizárólag realizált `fact_log_return` alapján történik, nem score-minőség vagy proxy MFE alapján.
+
+### Miért kell irányonként egységes, de shortnál invertált belépési logika és hogyan működik?
+
+A long score esetén a magasabb percentilis jelenti az erősebb lehetőséget. A short oldalon viszont a profitábilis helyzet a target definíció miatt alacsonyabb score-percentilishez kötődik, ezért a belépési feltételnek ezt explicit módon invertálnia kell.
+
+```mermaid
+flowchart LR
+  LONG[Long: score_pct >= cutoff]
+  SHORT[Short: 1 - score_pct >= cutoff]
+  UNIFIED[Mindkét oldalon ugyanaz a cutoff-szemantika]
 
   LONG --> UNIFIED
   SHORT --> UNIFIED
 ```
 
-## Keresési tér
+**Szabály:** a cutoff jelentése mindkét irányban ugyanaz: csak a legerősebb score-sávból engedünk belépést.
 
-A grid search 200 setup-ot vizsgál meg irányonként (400 összesen).
+### Paraméter alapértékek és indoklásuk
 
-### Entry cutoff — 8 érték
-
-| Cutoff | Jelentés |
-|--------|----------|
-| 0.90 | top 10% lehetőség |
-| 0.92 | top 8% |
-| 0.94 | top 6% |
-| 0.95 | top 5% |
-| 0.96 | top 4% |
-| 0.97 | top 3% |
-| 0.98 | top 2% |
-| 0.99 | top 1% |
-
-### TP spec — 5 lehetőség
-
-A TP szintet a kalibrációs periódus bucket-statisztikáiból számoljuk. A "bucket"
-az adott score percentile decile-je; az ebben lévő barok realizált MFE-jének
-statisztikái adják a TP referenciát.
-
-| TP spec | Leírás |
-|---------|--------|
-| `bucket_mean_mfe` | az adott score decile átlagos realizált MFE-je |
-| `bucket_median_mfe` | az adott score decile medián realizált MFE-je |
-| `bucket_p75_mfe` | az adott score decile 75. percentilis MFE-je |
-| `0.75 × bucket_mean_mfe` | átlagos MFE 75%-a — konzervatívabb TP |
-| `0.50 × bucket_mean_mfe` | átlagos MFE 50%-a — agresszív TP (hamarabb vesz profitot) |
-
-### SL spec — 5 lehetőség
-
-| SL spec | Leírás |
-|---------|--------|
-| `none` | nincs stop-loss, csak TP és timeout zár |
-| `0.5 × TP` | SL az alkalmazott TP felénél |
-| `1.0 × TP` | szimmetrikus SL: SL = TP távolság |
-| `1.5 × TP` | SL szélesebb mint TP |
-| `2.0 × TP` | SL kétszer akkora mint TP |
-
-**Megjegyzés:** ha a TP spec `none` lenne, az SL spec is `none` — de TP spec mindig
-megadott, az SL spec az opcionális paraméter.
-
-## Kalibráció vs. keresési periódus
-
-A két periódus szétválasztása overfitting ellen véd.
-
-| Periódus | Szerepe | Időszak |
-|----------|---------|---------|
-| Kalibrációs periódus | `rank_lookup` és `isotonic` modell illesztése; bucket statisztikák számítása | 2021–2025 |
-| Keresési periódus | Grid search futtatása; `fact_log_return` összesítése | 2025–2026-05 |
-
-A TP spec (bucket_mean_mfe, stb.) értékeit a **kalibrációs periódusból** számoljuk,
-majd ezeket a konstansokat alkalmazzuk a **keresési periódusban** a TP szintként.
-Így a keresési periódus nem látja a saját bucket-statisztikáit — azok a kalibrációs
-ablakból érkeznek.
-
-```mermaid
-flowchart TD
-  CAL_PERIOD[kalibrációs periódus]
-  SEARCH_PERIOD[keresési periódus]
-  BUCKET_STATS[bucket mean/median/p75 MFE per decile]
-  TP_LEVEL[TP szint = f(bucket_stats, cutoff)]
-  TRADES[trade szimulálás]
-  LR[fact_log_return összeg]
-
-  CAL_PERIOD --> BUCKET_STATS --> TP_LEVEL
-  SEARCH_PERIOD --> TRADES
-  TP_LEVEL --> TRADES --> LR
-```
-
-## Eredmények értelmezése
-
-### Elsődleges metrikák
-
-| Metrika | Definíció | Mire való |
-|---------|-----------|-----------|
-| `total_fact_log_return` | az összes trade log-returnjének összege a keresési periódusban | az objektív, amit a grid search maximalizál |
-| `compounded_return_pct` | `(exp(total_lr) - 1) × 100` | a teljes periódus összetett hozama százalékban |
-| `win_rate` | TP exitek száma / összes exit (TP + SL + timeout) | a kereskedési irány "találati aránya" |
-| `trade_count` | a keresési periódusban keletkező trade-ek száma | alacsony count esetén a metrikák kevésbé megbízhatóak |
-
-**Fontos:** a `compounded_return_pct` a teljes keresési periódus kumulált hozama,
-nem évesített szám. Periódushossztól független összehasonlításhoz a
-`total_fact_log_return` a helyes metrika.
-
-### Eredmények rangsorolása
-
-A grid search kimenetele egy táblázat minden setup × irány kombinációra. A rangsor
-alapja a `total_fact_log_return`. A kiválasztott setup az a kombináció, amely a
-legtöbb valódi P&L-t termelte a keresési periódusban.
-
-### Referencia eredmény (2025–2026-05 keresési periódus)
-
-| Irány | Cutoff | TP spec | SL spec | Trade-szám | Win rate | Összetett hozam |
-|-------|--------|---------|---------|------------|----------|-----------------|
-| long | 0.97 | 0.75 × bucket_mean | none | 319 | 63.3% | 49.3% |
-
-Ez a 16 hónapos keresési periódus alatt elért legjobb setup a long irányban.
-A `none` SL spec azt jelenti, hogy a rendszer SL nélkül, kizárólag TP-re és
-60-bar timeoutra támaszkodik ennél a setup-nál.
+| Paraméter | Alapérték | Indoklás |
+|-----------|-----------|----------|
+| `entry_cutoffs` | `0.90`-`0.99` nyolc lépcsőben | Elég finom rács a top-sáv vizsgálatához, de még teljesen bejárható |
+| `tp_specs` | mean / median / p75 és két konzervatív mean-szorzó | Ugyanarra a bucket-információra több realizációs agresszivitást enged |
+| `sl_specs` | `none`, `0.5x`, `1.0x`, `1.5x`, `2.0x` TP-arány | A stop szélessége jól értelmezhető kockázati tengelyt ad |
+| `max_hold_bars` | `60` | Összhangban marad a `fw60` target-horizonnal és a live tartási szabállyal |
+| same-bar szabály | `SL wins` | Konzervatív döntés ismeretlen intrabar sorrend esetén |
+| kalibrációs periódus | külön a keresési periódustól | Csökkenti a setup-választásba épülő overfittinget |
 
 ### Ismert kockázatok és korlátok
 
 | Kockázat | Tünet | Mitigáció |
 |----------|-------|-----------|
-| Same-window overfitting | A keresési periódus statisztikái optimistábbak lehetnek, mint a jövőbeli teljesítmény | Periódus szétválasztás (kalibráció ≠ keresés), trade count minimum figyelése |
-| Kevés trade magas cutoff-nál | 0.99 cutoff esetén csak néhány trade kerülhet a mintába | Minimum trade-szűrés a rangsorból való kizáráshoz |
-| `none` SL instabilitás | Nagy drawdown egyetlen rossz trade esetén | Manuális post-hoc SL szintszűrés az elfogadott setupoknál |
-| Bucket drift | A kalibrációs periódus bucket-statisztikái elavulhatnak rezsimváltáskor | Rendszeres újrakalibrálás új kalibrációs ablakkal |
+| Ugyanazon rezsim túlfittelése | A kiválasztott setup új időszakon gyorsan romlik | Kalibrációs és keresési periódus szétválasztása, későbbi out-of-sample ellenőrzés |
+| Kevés trade nagyon magas cutoffnál | Jó aggregate return, de gyenge statisztikai megbízhatóság | Minimum trade-count figyelése a döntésnél |
+| Same-bar szabály torzító hatása | Bizonyos setupok túl büntetettek lehetnek | Konzervatív bias elfogadása, mert live-ban az intrabar sorrend nem ismert |
+| Elavuló bucket-statisztikák | A TP-szintek már nem a jelenlegi rezsimet tükrözik | Rendszeres újrakalibrálás |
+| Stop nélküli setup túl nagy drawdownnal | Jó összhozam, de rossz kockázati profil | Post-search kockázati review és elfogadási küszöbök |
 
 ### Validációs checklist
 
-- [ ] A grid search a kalibrált `score_pct_long` és `score_pct_short` mezőket használja, nem a nyers score-t.
-- [ ] A bucket statisztikák kizárólag a kalibrációs periódusból származnak.
 - [ ] A keresési periódus nem fedi át a kalibrációs periódust.
-- [ ] A same-bar konfliktus SL-nyerő szabálya érvényesül a szimulációban.
-- [ ] A `compounded_return_pct` nem évesített értékként van feltüntetve a riportban.
-- [ ] A legjobb setup trade_count értéke meghaladja a minimum küszöböt.
-- [ ] A short irány entry feltétele `(1 - score_pct_short) >= entry_cutoff` formában kerül alkalmazásra.
+- [ ] A grid search minden definiált cutoff, TP-spec és SL-spec kombinációt végigvizsgál.
+- [ ] A rangsor alapja a realizált `fact_log_return`, nem proxy metrika.
+- [ ] A same-bar konfliktus kezelése explicit és konzervatív.
+- [ ] A short irány belépési logikája invertált percentilis-szemantikát használ.
+- [ ] A kiválasztott setup trade-száma elégséges ahhoz, hogy az aggregate metrika értelmezhető legyen.
 
-## Kód-referencia
+## Végrehajtási modell részletei
 
-A grid search implementációjának részletei:
+### Intrabar TP/SL értelmezés
 
-- `_doc_/database_and_code_doc/` — a stratégia kód-referencia zóna dokumentumai
-- A végrehajtási modell (intrabar TP/SL) és a keresési tér paraméterei a stratégia
-  kód-referencia oldalain találhatók
+- Long esetben a TP a jövőbeli high, az SL a jövőbeli low alapján aktiválódik.
+- Short esetben ugyanez tükrözve történik.
+- Ha egyik sem aktiválódik a horizont végéig, a pozíció timeouttal zár.
+
+### Keresési tér logikája
+
+Azért vállalható a teljes grid, mert a paramétertér tudatosan kicsi és előre zárt. Itt a teljes lefedés többet ér, mint egy adaptív kereső heurisztika, mert a döntési kockázat nem a számítási költségből, hanem a félreoptimalizált objective-ból jön.
+
+### Kalibráció és keresés szerepszétválasztása
+
+A kalibrációs ablak feladata a score-percentilis és bucket-statisztika előállítása. A keresési ablak feladata kizárólag annak megmérése, hogy ezekre támaszkodva melyik setup termel a legjobb realizált eredményt. A két szerep összemosása felfújná a keresési eredményt.

@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import sys
+from html import escape
 from pathlib import Path
 
 import duckdb
 import pandas as pd
 import streamlit as st
-from html import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import utils
 from ui import data, trading_runner
 from ui.components.charts import PLOTLY_CHART_CONFIG, prediction_price_figure
-from ui.components.formatting import _GOLD, _GREEN, _GRID, _MUTED, _PANEL, _RED, _TEXT
+from ui.components.formatting import GOLD as _GOLD
+from ui.components.formatting import GREEN as _GREEN
+from ui.components.formatting import GRID as _GRID
+from ui.components.formatting import MUTED as _MUTED
+from ui.components.formatting import PANEL as _PANEL
+from ui.components.formatting import RED as _RED
+from ui.components.formatting import TEXT as _TEXT
 from ui.components.log_panel import render_log_panel
 from ui.components.trade_panel import render_trade_panel
 from ui.dashboard_logging import get_dashboard_logger
@@ -303,7 +310,7 @@ with st.sidebar:
     _render_trading_controls()
 
 
-active_asset_id = "solusdt"
+active_asset_id = utils.load_asset_config(None)["database"]["asset_id"]
 asset_label     = "SOL / 1m"
 
 st.markdown(
@@ -322,4 +329,3 @@ with col_chart:
 
 with col_trade:
     render_trade_panel(active_asset_id)
-    _render_strategy_card()

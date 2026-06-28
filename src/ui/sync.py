@@ -5,7 +5,6 @@ import logging
 import threading
 from contextlib import redirect_stdout
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
@@ -19,8 +18,6 @@ from data_handling.sync_tables.sync_features import sync_features
 from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
 from data_handling.sync_tables.sync_predictions import sync_predictions
 from ui.dashboard_logging import get_dashboard_logger
-
-INITIAL_SYNC_START = "2017-01-01 00:00:00"
 
 _ASSET_SYNC_LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_MUTEX = threading.Lock()
@@ -107,8 +104,8 @@ def _run_database_sync_locked(
 
     rows_before    = ohlcv_row_count(db_path)
     last_open_time = ohlcv_latest_open_time(db_path)
-    start_time     = _next_open_time(last_open_time) if last_open_time else INITIAL_SYNC_START
-    start_ms       = _utc_str_to_ms(start_time)
+    start_time     = utils.next_open_time(last_open_time) if last_open_time else utils.INITIAL_SYNC_START
+    start_ms       = utils.utc_str_to_ms(start_time)
 
     logger.info("OHLCV sync from Binance started at %s", start_time)
     _run_with_logged_stdout(sync_ohlcv, start_ms, asset_id=asset_id, logger=logger)
@@ -136,7 +133,7 @@ def _run_database_sync_locked(
 
     pred_latest_ts  = latest_open_time(db_path, "predictions")
     pred_start_time = (
-        _next_open_time(str(pred_latest_ts))
+        utils.next_open_time(str(pred_latest_ts))
         if pred_latest_ts is not None
         else start_time
     )
@@ -158,21 +155,5 @@ def _run_with_logged_stdout(func, *args, logger: logging.Logger, **kwargs) -> No
     with redirect_stdout(writer):
         func(*args, **kwargs)
     writer.flush()
-
-
-
-def _next_open_time(open_time: str) -> str:
-    value = pd.to_datetime(open_time, errors="raise") + timedelta(minutes=1)
-    return value.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _utc_str_to_ms(value: str) -> int:
-    text = str(value).strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-
-    dt = datetime.fromisoformat(text)
-    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
-    return int(dt.timestamp() * 1000)
 
 

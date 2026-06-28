@@ -1,0 +1,665 @@
+{
+  "model_id": "lgbm_solusdt_s_fw60_2101_2605",
+  "feature_key": "selected",
+  "n_selected": 131,
+  "n_zero_split": 0,
+  "n_pruned_selected": 131,
+  "zero_split_features": [],
+  "all_feature_importance": [
+    {
+      "feature": "feat_bars_into_session_norm",
+      "split": 21,
+      "gain": 11.183695882558823
+    },
+    {
+      "feature": "feat_roc_140",
+      "split": 15,
+      "gain": 8.390592962503433
+    },
+    {
+      "feature": "feat_taker_buy_base_ratio_30",
+      "split": 15,
+      "gain": 8.348845094442368
+    },
+    {
+      "feature": "feat_ema_ratio_140",
+      "split": 12,
+      "gain": 7.918958976864815
+    },
+    {
+      "feature": "feat_adx_neg_14",
+      "split": 12,
+      "gain": 7.1166819632053375
+    },
+    {
+      "feature": "feat_kama_ratio_10_2_30",
+      "split": 11,
+      "gain": 5.645846992731094
+    },
+    {
+      "feature": "feat_adx_pos_14",
+      "split": 8,
+      "gain": 5.581575974822044
+    },
+    {
+      "feature": "feat_day_open_return",
+      "split": 13,
+      "gain": 5.195019975304604
+    },
+    {
+      "feature": "feat_prev_session_high_dist",
+      "split": 12,
+      "gain": 5.030884012579918
+    },
+    {
+      "feature": "feat_prev_session_low_dist",
+      "split": 10,
+      "gain": 4.830823987722397
+    },
+    {
+      "feature": "feat_avg_trade_quote_30",
+      "split": 12,
+      "gain": 4.784212961792946
+    },
+    {
+      "feature": "feat_ad_line",
+      "split": 9,
+      "gain": 4.6877069771289825
+    },
+    {
+      "feature": "feat_bb_position_140",
+      "split": 7,
+      "gain": 4.192985087633133
+    },
+    {
+      "feature": "feat_rolling_drawdown_10",
+      "split": 9,
+      "gain": 4.11074498295784
+    },
+    {
+      "feature": "feat_quote_volume_ratio_60",
+      "split": 8,
+      "gain": 3.9336770474910736
+    },
+    {
+      "feature": "feat_adx_14",
+      "split": 10,
+      "gain": 3.9327909648418427
+    },
+    {
+      "feature": "feat_upper_wick_ratio",
+      "split": 11,
+      "gain": 3.9075619876384735
+    },
+    {
+      "feature": "feat_hour_cos",
+      "split": 11,
+      "gain": 3.839067041873932
+    },
+    {
+      "feature": "feat_volume_sma_14",
+      "split": 11,
+      "gain": 3.548546016216278
+    },
+    {
+      "feature": "feat_trade_count_ratio_30",
+      "split": 7,
+      "gain": 3.446438044309616
+    },
+    {
+      "feature": "feat_atr_14",
+      "split": 7,
+      "gain": 3.429369956254959
+    },
+    {
+      "feature": "feat_lower_wick_ratio",
+      "split": 8,
+      "gain": 3.2115339189767838
+    },
+    {
+      "feature": "feat_tenkan_kijun_delta",
+      "split": 7,
+      "gain": 3.2030199766159058
+    },
+    {
+      "feature": "feat_dayofweek_sin",
+      "split": 9,
+      "gain": 3.196468010544777
+    },
+    {
+      "feature": "feat_returns_std_14",
+      "split": 9,
+      "gain": 3.1345970034599304
+    },
+    {
+      "feature": "feat_macd_12_26",
+      "split": 6,
+      "gain": 2.847368001937866
+    },
+    {
+      "feature": "feat_weekly_open_return",
+      "split": 7,
+      "gain": 2.7564909607172012
+    },
+    {
+      "feature": "feat_volume_confirmed_return_10",
+      "split": 7,
+      "gain": 2.7419590651988983
+    },
+    {
+      "feature": "feat_max_drawdown_10",
+      "split": 6,
+      "gain": 2.6667520105838776
+    },
+    {
+      "feature": "feat_time_since_low_10",
+      "split": 6,
+      "gain": 2.651254966855049
+    },
+    {
+      "feature": "feat_day_range_position",
+      "split": 6,
+      "gain": 2.6068709790706635
+    },
+    {
+      "feature": "feat_trade_count_rank_30",
+      "split": 6,
+      "gain": 2.53229296207428
+    },
+    {
+      "feature": "feat_return_autocorr_lag1_30",
+      "split": 6,
+      "gain": 2.4590649604797363
+    },
+    {
+      "feature": "feat_lr_slope_10",
+      "split": 6,
+      "gain": 2.457108035683632
+    },
+    {
+      "feature": "feat_lr_residual_10",
+      "split": 5,
+      "gain": 2.450941026210785
+    },
+    {
+      "feature": "feat_donchian_width_30",
+      "split": 7,
+      "gain": 2.4111550003290176
+    },
+    {
+      "feature": "feat_ema_slope_10",
+      "split": 5,
+      "gain": 2.4089820235967636
+    },
+    {
+      "feature": "feat_weekend",
+      "split": 8,
+      "gain": 2.354212000966072
+    },
+    {
+      "feature": "feat_senkou_b_ratio",
+      "split": 5,
+      "gain": 2.3411529660224915
+    },
+    {
+      "feature": "feat_bb_width_rank_60",
+      "split": 7,
+      "gain": 2.3279489874839783
+    },
+    {
+      "feature": "feat_body_ratio_sma_10",
+      "split": 7,
+      "gain": 2.315522015094757
+    },
+    {
+      "feature": "feat_rsi_delta_5",
+      "split": 5,
+      "gain": 2.307356983423233
+    },
+    {
+      "feature": "feat_hour_sin",
+      "split": 7,
+      "gain": 2.297185033559799
+    },
+    {
+      "feature": "feat_taker_buy_quote_ratio_10",
+      "split": 7,
+      "gain": 2.273485004901886
+    },
+    {
+      "feature": "feat_dayofweek_cos",
+      "split": 6,
+      "gain": 2.2428380250930786
+    },
+    {
+      "feature": "feat_hml_range",
+      "split": 5,
+      "gain": 2.2389619946479797
+    },
+    {
+      "feature": "feat_neg_return_mean_60",
+      "split": 4,
+      "gain": 2.2349450290203094
+    },
+    {
+      "feature": "feat_ema_slope_30",
+      "split": 3,
+      "gain": 2.2269559502601624
+    },
+    {
+      "feature": "feat_lr_slope_60",
+      "split": 6,
+      "gain": 2.1811889708042145
+    },
+    {
+      "feature": "feat_hist_vol_rank_60",
+      "split": 6,
+      "gain": 2.1775670051574707
+    },
+    {
+      "feature": "feat_signed_body_ratio",
+      "split": 7,
+      "gain": 2.174327000975609
+    },
+    {
+      "feature": "feat_efficiency_ratio_60",
+      "split": 4,
+      "gain": 2.157451957464218
+    },
+    {
+      "feature": "feat_time_since_high_10",
+      "split": 6,
+      "gain": 2.095513015985489
+    },
+    {
+      "feature": "feat_mfi_14",
+      "split": 6,
+      "gain": 2.0440980195999146
+    },
+    {
+      "feature": "feat_atr_dist_low_30",
+      "split": 4,
+      "gain": 2.028750032186508
+    },
+    {
+      "feature": "feat_gap_open",
+      "split": 6,
+      "gain": 1.9836260378360748
+    },
+    {
+      "feature": "feat_dist_rolling_high_30",
+      "split": 5,
+      "gain": 1.9783479869365692
+    },
+    {
+      "feature": "feat_atr_dist_low_60",
+      "split": 5,
+      "gain": 1.9748059809207916
+    },
+    {
+      "feature": "feat_macd_diff",
+      "split": 4,
+      "gain": 1.9550710618495941
+    },
+    {
+      "feature": "feat_quote_volume_rank_10",
+      "split": 3,
+      "gain": 1.9285289645195007
+    },
+    {
+      "feature": "feat_bb_width_140",
+      "split": 5,
+      "gain": 1.8978849947452545
+    },
+    {
+      "feature": "feat_cmf_20",
+      "split": 5,
+      "gain": 1.8714939951896667
+    },
+    {
+      "feature": "feat_body_ratio",
+      "split": 4,
+      "gain": 1.861948013305664
+    },
+    {
+      "feature": "feat_rsi_delta_30",
+      "split": 4,
+      "gain": 1.8507729768753052
+    },
+    {
+      "feature": "feat_close_position",
+      "split": 6,
+      "gain": 1.8347299993038177
+    },
+    {
+      "feature": "feat_bb_width_14",
+      "split": 4,
+      "gain": 1.819091022014618
+    },
+    {
+      "feature": "feat_return_momentum_delta_30",
+      "split": 5,
+      "gain": 1.8051490187644958
+    },
+    {
+      "feature": "feat_obv",
+      "split": 6,
+      "gain": 1.8004010021686554
+    },
+    {
+      "feature": "feat_volume_confirmed_return_30",
+      "split": 3,
+      "gain": 1.7789640426635742
+    },
+    {
+      "feature": "feat_ema_ratio_14",
+      "split": 5,
+      "gain": 1.774842992424965
+    },
+    {
+      "feature": "feat_wick_imbalance_sma_10",
+      "split": 5,
+      "gain": 1.7421359717845917
+    },
+    {
+      "feature": "feat_time_since_low_60",
+      "split": 5,
+      "gain": 1.7351689785718918
+    },
+    {
+      "feature": "feat_return_30",
+      "split": 4,
+      "gain": 1.7232199907302856
+    },
+    {
+      "feature": "feat_body_ratio_sma_30",
+      "split": 4,
+      "gain": 1.6515989899635315
+    },
+    {
+      "feature": "feat_trade_count_accel_10_30",
+      "split": 5,
+      "gain": 1.6319830119609833
+    },
+    {
+      "feature": "feat_returns_log",
+      "split": 4,
+      "gain": 1.594935029745102
+    },
+    {
+      "feature": "feat_max_drawdown_60",
+      "split": 4,
+      "gain": 1.576551005244255
+    },
+    {
+      "feature": "feat_natr_14",
+      "split": 4,
+      "gain": 1.5675939917564392
+    },
+    {
+      "feature": "feat_return_momentum_delta_10",
+      "split": 5,
+      "gain": 1.5511810332536697
+    },
+    {
+      "feature": "feat_volume_ratio_14",
+      "split": 4,
+      "gain": 1.505057007074356
+    },
+    {
+      "feature": "feat_pos_return_mean_10",
+      "split": 3,
+      "gain": 1.4899539649486542
+    },
+    {
+      "feature": "feat_ichimoku_cloud_thickness",
+      "split": 2,
+      "gain": 1.477719008922577
+    },
+    {
+      "feature": "feat_cci_20",
+      "split": 4,
+      "gain": 1.4717829823493958
+    },
+    {
+      "feature": "feat_lr_residual_30",
+      "split": 3,
+      "gain": 1.4502760171890259
+    },
+    {
+      "feature": "feat_hist_vol_20",
+      "split": 4,
+      "gain": 1.4500849843025208
+    },
+    {
+      "feature": "feat_roc_delta_5",
+      "split": 4,
+      "gain": 1.4356729835271835
+    },
+    {
+      "feature": "feat_dist_rolling_high_10",
+      "split": 4,
+      "gain": 1.426743984222412
+    },
+    {
+      "feature": "feat_atr_dist_high_30",
+      "split": 3,
+      "gain": 1.4059769809246063
+    },
+    {
+      "feature": "feat_pos_return_mean_30",
+      "split": 4,
+      "gain": 1.3834790140390396
+    },
+    {
+      "feature": "feat_tenkan_ratio",
+      "split": 2,
+      "gain": 1.371124029159546
+    },
+    {
+      "feature": "feat_lr_r2_60",
+      "split": 4,
+      "gain": 1.3437009900808334
+    },
+    {
+      "feature": "feat_return_60",
+      "split": 4,
+      "gain": 1.335140973329544
+    },
+    {
+      "feature": "feat_wma_ratio_14",
+      "split": 3,
+      "gain": 1.3062999844551086
+    },
+    {
+      "feature": "feat_obv_roc_14",
+      "split": 4,
+      "gain": 1.2782510071992874
+    },
+    {
+      "feature": "feat_vol_adj_return_10",
+      "split": 3,
+      "gain": 1.2633560001850128
+    },
+    {
+      "feature": "feat_efficiency_ratio_10",
+      "split": 4,
+      "gain": 1.2299460172653198
+    },
+    {
+      "feature": "feat_gk_vol_10",
+      "split": 3,
+      "gain": 1.2250029891729355
+    },
+    {
+      "feature": "feat_lower_low_count_5",
+      "split": 4,
+      "gain": 1.2155459970235825
+    },
+    {
+      "feature": "feat_lr_r2_10",
+      "split": 3,
+      "gain": 1.1910350024700165
+    },
+    {
+      "feature": "feat_higher_high_count_5",
+      "split": 3,
+      "gain": 1.1622410416603088
+    },
+    {
+      "feature": "feat_neg_return_mean_10",
+      "split": 3,
+      "gain": 1.141874998807907
+    },
+    {
+      "feature": "feat_donchian_position_30",
+      "split": 3,
+      "gain": 1.1407490074634552
+    },
+    {
+      "feature": "feat_stoch_k_14",
+      "split": 3,
+      "gain": 1.13994300365448
+    },
+    {
+      "feature": "feat_roc_delta_30",
+      "split": 4,
+      "gain": 1.1095789968967438
+    },
+    {
+      "feature": "feat_donchian_width_10",
+      "split": 4,
+      "gain": 1.0330039858818054
+    },
+    {
+      "feature": "feat_neg_return_mean_30",
+      "split": 2,
+      "gain": 1.0313550233840942
+    },
+    {
+      "feature": "feat_atr_dist_high_10",
+      "split": 3,
+      "gain": 1.0176829993724823
+    },
+    {
+      "feature": "feat_recovery_ratio_10",
+      "split": 3,
+      "gain": 0.9672699868679047
+    },
+    {
+      "feature": "feat_returns_sma_14",
+      "split": 3,
+      "gain": 0.9629219770431519
+    },
+    {
+      "feature": "feat_dist_rolling_low_10",
+      "split": 2,
+      "gain": 0.8734749853610992
+    },
+    {
+      "feature": "feat_trade_count_rank_10",
+      "split": 3,
+      "gain": 0.8521689772605896
+    },
+    {
+      "feature": "feat_rsi_14",
+      "split": 2,
+      "gain": 0.8138030171394348
+    },
+    {
+      "feature": "feat_lr_residual_60",
+      "split": 2,
+      "gain": 0.7634070217609406
+    },
+    {
+      "feature": "feat_lr_slope_30",
+      "split": 2,
+      "gain": 0.7464959919452667
+    },
+    {
+      "feature": "feat_roc_14",
+      "split": 3,
+      "gain": 0.7150480002164841
+    },
+    {
+      "feature": "feat_bb_position_14",
+      "split": 2,
+      "gain": 0.710889995098114
+    },
+    {
+      "feature": "feat_dist_rolling_high_60",
+      "split": 1,
+      "gain": 0.6628819704055786
+    },
+    {
+      "feature": "feat_donchian_width_60",
+      "split": 2,
+      "gain": 0.6528099775314331
+    },
+    {
+      "feature": "feat_quote_volume_ratio_30",
+      "split": 2,
+      "gain": 0.6499000042676926
+    },
+    {
+      "feature": "feat_return_10",
+      "split": 2,
+      "gain": 0.6316139847040176
+    },
+    {
+      "feature": "feat_stoch_d_14",
+      "split": 2,
+      "gain": 0.6210449934005737
+    },
+    {
+      "feature": "feat_taker_flow_confirmed_return_10",
+      "split": 1,
+      "gain": 0.6055020093917847
+    },
+    {
+      "feature": "feat_recovery_ratio_60",
+      "split": 1,
+      "gain": 0.4974279999732971
+    },
+    {
+      "feature": "feat_kijun_ratio",
+      "split": 1,
+      "gain": 0.3956109881401062
+    },
+    {
+      "feature": "feat_volume_rank_10",
+      "split": 1,
+      "gain": 0.32381200790405273
+    },
+    {
+      "feature": "feat_dist_rolling_low_30",
+      "split": 1,
+      "gain": 0.2520590126514435
+    },
+    {
+      "feature": "feat_dist_rolling_low_60",
+      "split": 1,
+      "gain": 0.22179299592971802
+    },
+    {
+      "feature": "feat_pos_return_mean_60",
+      "split": 1,
+      "gain": 0.19554699957370758
+    },
+    {
+      "feature": "feat_roc_delta_10",
+      "split": 1,
+      "gain": 0.1951030045747757
+    },
+    {
+      "feature": "feat_macd_signal_12_26_9",
+      "split": 1,
+      "gain": 0.1796649992465973
+    },
+    {
+      "feature": "feat_gk_vol_30",
+      "split": 1,
+      "gain": 0.16116000711917877
+    }
+  ]
+}

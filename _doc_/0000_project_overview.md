@@ -121,6 +121,9 @@ ui/  ◀──  predictions + strat.* táblák (lab.duckdb ATTACH) + trade journ
 | Strategy tables (trades/equity/cutoffs) | `lab.duckdb` strat séma (`strat."<session>__*"`) | UI és validáció közvetlen query-vel éri el |
 | Registry (provenance lánc) | `registry.duckdb` reg séma | Normalizált igazságforrás; assets → snapshots → models → strategies → deployments |
 | Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output; feature_set.json → reg.feature_sets |
+| Model-specifikus elemzések | `artifacts/<model_id>/analysis/` (`.ipynb`, `.html`) | analyst_agent output; konkrét modellhez kötött (train/valid, sweep review stb.) |
+| Stratégia-specifikus elemzések | `artifacts/<session_id>/analysis/` (`.ipynb`, `.html`) | analyst_agent output; konkrét strategy session-höz kötött |
+| Általános adatelemzések | `_doc_/models_doc/XXXX_<slug>.ipynb` + `.html` | analyst_agent output; nem kötött model/session ID-hoz (target, feature, sampling) |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
 | Strategy artifacts | `artifacts/<session_id>/` — `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `sweep_results.csv` | Runtime use by live trading loop; útvonalak a reg.artifacts-ban |
 
@@ -291,35 +294,37 @@ uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat
 
 One sample = one calendar year. Sample ID: `{asset_id}_fw60_yearly_{year}`.
 
-**Két sampling mód** van (`config/models.json` → `sampling.sampling_mode`):
+**Három sampling mód** van (`config/models.json` → `sampling.sampling_mode`):
 
-| Mód | `sampling_mode` | CV struktúra | Fold assignment | Státusz |
+| Mód | `sampling_mode` | CV struktúra | Split indicator | Státusz |
 |-----|----------------|--------------|-----------------|---------|
 | Legacy weekly | `yearly_random_hour` (default) | 4-fold random-week, monthly stratified | `fold_id` 1–4 per week | Legacy |
-| **Walk-forward** | `walk_forward` | 9m train + 3m valid, 3m shift | `fold_id` 1–4 (valid ablak) / `0` (train-only) | **ACTIVE** |
+| Walk-forward | `walk_forward` | 9m train + 3m valid, 3m shift | `fold_id` 1–4 (valid ablak) / `0` (train-only) | Éves modellek |
+| **Train/Valid split** | `train_valid_split` | fix train + fix valid periódus | `split` TINYINT: 0=train, 1=valid | **ACTIVE — champion** |
 
-**Walk-forward CV (ACTIVE):** paraméterek a `config/models.json` → `sampling` szekcióból jönnek (`train_months`, `valid_months`, `shift_months`, `n_folds`). Purge: 240 perc. `metadata.json`-ban: `fold_time_windows` lista (foldonkénti `train_start/end`, `valid_start/end`). `fold_id = 0` a train-only sorokat jelöli.
+**Train/Valid split (ACTIVE — epic_039, champion modellek):** fix dátumhatárok a `config/models.json` → `sampling`-ból (`train_start/end`, `valid_start/end`). Feature lookback embargo: 240 perc a train elején. Target purge: utolsó 60 perc a train végéről. Valid oldalon nincs embargo. Seed=42, óránkénti véletlenszerű perc mintavétel.
 
-| Modell típus | train | valid | shift | n_folds |
-|---|---|---|---|---|
-| Éves (2021–2025) | 9m | 3m | 3m | 4 |
-| Champion (`_2101_2605`) | 9m | 8m | 8m | 4 |
+| Modell típus | sampling_mode | train | valid |
+|---|---|---|---|
+| Éves (2021–2025) | `walk_forward` | 9m (3m shift, 4 fold) | 3m |
+| Champion (`_2101_2605`) | `train_valid_split` | 2021-01-01 – 2025-04-30 | 2025-05-01 – 2026-05-31 |
 
-Éves modellek anchor éve = `sampling.year`; champion modelleknél `sampling.year` adja az anchor-t (2023), a tényleges adattartomány a fold windows-ból számítódik (2023-01 → 2026-05).
+Champion modellek: a valid periódus szándékosan egybeesik a strategy calibrációs ablakkal (2025-05 – 2026-05).
 
-**Search objective (ACTIVE):** Top10 Lift fold-stability penaltyvel:
+**Search objective (ACTIVE — epic_039):** Egyszerű valid top10_lift maximalizálása (fold-stability penalty eltávolítva):
 ```
 top10_lift = mean(y_true | score ∈ top 10%) − mean(y_true | all valid)
-objective  = mean(top10_lift_folds) − 0.5 × std(top10_lift_folds)   [higher is better]
+objective  = valid_top10_lift   [higher is better]
 ```
-Kötelező audit metrikák foldonként: `spearman_rho`, `decile_monotonicity`. Mentve: `search_best.json`, `search_summary.csv`.
+Train top10_lift minden trial-ban riportált (diagnosztika, nem optimized). Optuna patience stopping: patience=20, epsilon=0.001, max 100 trial. Best trial: legmagasabb valid top10_lift, ahol train-valid gap minimális. Mentve: `search_best.json`, `search_trials.jsonl`.
 
 ```
 sample_train_valid.parquet columns (artifacts/<model_id>/):
-  l-irányú model: open_time | long_mfe_fw60  | pred_long  | fold_id | feat_* (all)
-  s-irányú model: open_time | short_mfe_fw60 | pred_short | fold_id | feat_* (all)
+  l-irányú model: open_time | long_mfe_fw60  | pred_long  | fold_id/split | feat_* (all)
+  s-irányú model: open_time | short_mfe_fw60 | pred_short | fold_id/split | feat_* (all)
   — pred_{dir} csak a train step után kerül bele
-  — walk-forward módban fold_id: Int8, 0–4 (0 = train-only); legacy módban: 1–4
+  — walk_forward módban: fold_id Int8, 0–4 (0 = train-only)
+  — train_valid_split módban: split TINYINT, 0=train, 1=valid
 ```
 
 Features a sample parquetban tárolódnak (all feat_* a train_valid-ban). Nincs DB join training közben.
@@ -424,6 +429,6 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts; `src/strategy/` |
 | UI Agent | `src/ui/`, `src/trading/` |
 | Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/database_and_code_doc/` (DB séma + kód-referencia zóna) |
-| Analyst Agent | `_doc_/models_doc/` (modell-report notebookok, .ipynb→Quarto), `analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`, `doc_renderer/`); user-célból indul, nem spec-ből; interaktív session |
+| Analyst Agent | `artifacts/<model_id>/analysis/` és `artifacts/<session_id>/analysis/` (modell/stratégia-specifikus elemzések); `_doc_/models_doc/` (általános adatelemzések); `analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`, `doc_renderer/`); user-célból indul, nem spec-ből; interaktív session |
 | Methodology Agent | `_doc_/methodology_doc/` — business rationale, methodological decisions, parameter justification (kód-mentes) |
 | Validator Agent | `pr_` ticket validation: ruff + pyright + pytest, then `done_` promotion |

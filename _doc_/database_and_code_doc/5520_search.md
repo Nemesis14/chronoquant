@@ -1,15 +1,13 @@
 # 5520 — Hyperparameter Search
 
-A `src/modeling/search/lgbm_search.py` és `src/modeling/02_hyper_param_search.py`
-fájlok valósítják meg a LightGBM hyperparameter keresést walk-forward CV és
-Top10 Lift objektívvel. Optuna TPE (ha telepítve van) vagy seeded random search
-futtatható.
+A `src/modeling/search/lgbm_search.py` valósítja meg a LightGBM hyperparameter
+keresést fix train/valid split alapon, `valid_top10_lift` objektívvel. Optuna TPE
+(ha telepítve van) vagy seeded random search futtatható.
 
 Forrás:
 - [search/lgbm_search.py](../../src/modeling/search/lgbm_search.py)
-- [02_hyper_param_search.py](../../src/modeling/02_hyper_param_search.py)
 
-Metodológiai háttér: [5500_hyper_param_search.md](../methodology_doc/5500_hyper_param_search.md)
+→ _doc_/methodology_doc/5500_hyper_param_search.md
 
 ---
 
@@ -17,63 +15,61 @@ Metodológiai háttér: [5500_hyper_param_search.md](../methodology_doc/5500_hyp
 
 ```mermaid
 flowchart TD
-  CLI[02_hyper_param_search.py\n--model --stage --n-trials] --> RS[run_search\nlgbm_search.py]
+  CLI[pipeline.step_search\n--model --stage --n-trials] --> RS[run_search\nlgbm_search.py]
   RS --> FE[_load_feature_cols\nfeature_set.json]
-  RS --> SM[_load_model_sample_meta\ngenerate_walk_forward_folds]
-  RS --> LD[_load_search_dataset\nsnap x model.__sample JOIN]
+  RS --> LD[_load_search_dataset\nsnap x model.__sample JOIN\nsplit col: 0=train, 1=valid]
   RS --> OPTUNA{Optuna\ntelepitve?}
   OPTUNA -- igen --> OPT[_search_optuna\nTPE sampler]
   OPTUNA -- nem --> RND[_search_random\nseeded random]
-  OPT --> TRIAL[_run_one_trial\nper fold LightGBM fit]
+  OPT --> TRIAL[_run_one_trial\nLightGBM fit\ntrain + valid pred]
   RND --> TRIAL
-  TRIAL --> OBJ[_compute_objective\nTop10 Lift - 0.5 * std]
-  OBJ --> BEST[_update_best\nsearch_best.json]
+  TRIAL --> OBJ[_compute_objective\nvalid_top10_lift]
+  OBJ --> PAT[_check_patience\npatience=20 stopping]
+  OBJ --> BEST[_update_best\n_select_best_trial\nsearch_best.json]
   BEST --> PROV[_register_search_provenance\nreg.search_runs + reg.artifacts]
 ```
 
 ```mermaid
 flowchart LR
   STAGE[stage: smoke / explore / refine] --> DEF[_apply_stage_defaults]
-  DEF --> A[smoke: 5 trials / 2 folds]
-  DEF --> B[explore: 60 trials / all folds]
-  DEF --> C[refine: 30 trials / all folds]
+  DEF --> A[smoke: max 5 trials]
+  DEF --> B[explore: max 60 trials]
+  DEF --> C[refine: max 30 trials]
 ```
 
 ---
 
-## `run_search(model_id, stage, n_trials, timeout_hours, row_stride, fold_limit, retry_failed)`
+## `run_search(model_id, stage, n_trials, timeout_hours, row_stride, retry_failed)`
 
-A fő belépési pont. Betölti a feature listát, meghatározza a fold struktúrát
-(`generate_walk_forward_folds`), betölti a CV adatot a snap ⋈ model.__sample
-JOIN-ból, majd Optuna TPE vagy seeded random kereséssel iterál `n_trials` trial-on.
+A fő belépési pont. Betölti a feature listát, betölti az adatot a snap ⋈ model.__sample
+JOIN-ból (split col alapján), majd Optuna TPE vagy seeded random kereséssel iterál
+trial-okon. Patience-alapú korai megállással.
 
 | Paraméter | Típus | Default | Leírás |
 |-----------|-------|---------|--------|
 | `model_id` | `str` | — | Modell kulcs a `config/models.json`-ból |
 | `stage` | `str` | `"smoke"` | Keresési fázis: `smoke`, `explore`, `refine` |
-| `n_trials` | `int` | `60` | Maximális trial szám (stage cap érvényesül) |
+| `n_trials` | `int` | `100` | Maximális trial szám (`_MAX_TRIALS=100` cap érvényesül) |
 | `timeout_hours` | `float \| None` | `None` | Falióra korlát (nincs ha None) |
-| `row_stride` | `int \| None` | `None` | Mintavételezés: minden N-edik sor (1 = teljes) |
-| `fold_limit` | `int \| None` | `None` | Első N fold használata (default: stage default) |
+| `row_stride` | `int \| None` | `None` | Sub-sampling stride (None = 1 = minden sor) |
 | `retry_failed` | `bool` | `False` | Korábban hibás trial-ok újrafuttatása |
 
 Returns: `dict` — legjobb trial rekord (`trial_no`, `params`, `objective_score`,
-`mean_top10_lift`, `std_top10_lift`, `fold_summary`, stb.).
+`valid_top10_lift`, `train_top10_lift`, `train_valid_gap`, `spearman_rho`, stb.).
 
 ```mermaid
 sequenceDiagram
   participant P as pipeline.step_search
   participant R as run_search
   participant FE as _load_feature_cols
-  participant SM as _load_model_sample_meta
   participant LD as _load_search_dataset
-  participant SR as _search_optuna/_search_random
+  participant SR as _search_optuna / _search_random
   participant PR as _register_search_provenance
+
   P ->> R: model_id, stage, n_trials
   R ->> FE: artifact_dir/feature_engineering/feature_set.json
-  R ->> SM: meta dict -> generate_walk_forward_folds
-  R ->> LD: snap x model.__sample JOIN (DuckDB)
-  R ->> SR: sd, fold_ids, fold_time_windows
+  R ->> LD: snap x model.__sample JOIN (DuckDB, split col)
+  R ->> SR: sd (_SearchDataset), n_trials, patience
   SR -->> R: best trial dict
   R ->> PR: model_id, stage, best, search_dir
   R -->> P: best dict
@@ -83,85 +79,156 @@ sequenceDiagram
 
 ## Adatbetöltés — `_load_search_dataset`
 
-A CV adatot a `snap."<snapshot_id>"` ⋈ `model."<model_id>__sample"` DuckDB JOIN-nal
-olvassa (terv 5.1). A sample tábla tartalmazza: `open_time`, target, `fold_id`; a
-snapshot tartalmazza az összes feature-t.
+A train/valid adatot a `snap."<snapshot_id>"` ⋈ `model."<model_id>__sample"` DuckDB
+JOIN-nal olvassa `open_time`-on. A sample tábla tartalmazza: `open_time`, target,
+`split` (0=train, 1=valid); a snapshot tartalmazza az összes `feat_*` oszlopot.
 
-**I2 (logging):** A JOIN pontosan annyi sort ad vissza, mint amennyi a `model.__sample`-ben
-van — a rowcount eltérés logger warning-ot generál (explicit assert t43 scope-ja).
+```mermaid
+sequenceDiagram
+  participant LD as _load_search_dataset
+  participant DB as lab.duckdb
+  participant DS as _SearchDataset
 
-Returns: `_SearchDataset(dataset: ModelingDataset, fold_ids: pd.Series[Int8])`
+  LD ->> DB: SELECT open_time, target, split, feat_* FROM snap JOIN model.__sample
+  DB -->> LD: DataFrame (split col: 0=train, 1=valid)
+  LD ->> LD: train_mask = split==0, valid_mask = split==1
+  LD ->> DS: DatasetSplit(X_train, y_train, X_eval, y_eval)
+  DS -->> LD: _SearchDataset(train, train_n, valid_n)
+```
+
+Raises: `ValueError` ha a `split` oszlop hiányzik (sampling mode nem `train_valid_split`),
+vagy ha nincs train / valid sor.
 
 ---
 
-## Fold struktúra meghatározása — `_load_model_sample_meta`
+## `_SearchDataset` és `DatasetSplit`
 
-Nem az artifact fájlból olvassa a fold ablakokat, hanem a `config/models.json`
-`sampling` szekciójából determinisztikusan újragenerálja őket a
-`generate_walk_forward_folds` hívásával.
+### `_SearchDataset` (frozen dataclass)
 
-| Kulcs | Leírás |
-|-------|--------|
-| `fold_time_windows` | Walk-forward fold ablak lista |
-| `purge_minutes` | Purge zóna percben |
-| `n_folds` | Fold-ok száma |
+A keresés belső adatstruktúrája. Egyszer épül fel (`_load_search_dataset`),
+minden trial újrahasználja — nincs ismételt DB hívás.
+
+| Mező | Típus | Leírás |
+|------|-------|--------|
+| `train` | `DatasetSplit` | Pre-built train/valid mátrixok |
+| `train_n` | `int` | Train sorok száma |
+| `valid_n` | `int` | Valid sorok száma |
+
+### `DatasetSplit` (frozen dataclass, `modeling.training.training_windows`)
+
+| Mező | Típus | Leírás |
+|------|-------|--------|
+| `X_train` | `pd.DataFrame` | Feature mátrix (train) |
+| `y_train` | `pd.Series` | Target vektor (train) |
+| `X_eval` | `pd.DataFrame` | Feature mátrix (valid) |
+| `y_eval` | `pd.Series` | Target vektor (valid) |
 
 ---
 
-## Objektív függvény — `_compute_objective`
+## Objektív függvény — `valid_top10_lift`
 
 ```
-objective = mean(top10_lift_folds) - 0.5 * std(top10_lift_folds)
-objective_score = -objective   (Optuna minimize irány)
+objective = valid_top10_lift (magasabb = jobb)
+objective_score = -valid_top10_lift (Optuna minimize irány)
 ```
 
-A Top10 Lift a top 10%-os predikciók átlagos y_true értéke mínusz az overall átlag.
-A stabilitási büntetés (`_LIFT_LAMBDA = 0.5 × std`) megakadályozza, hogy a search
-fold-szenzitív megoldásra konvergáljon.
+### Top10 Lift definíció — `_compute_top10_lift(y_true, y_score)`
+
+```
+threshold = percentile(y_score, 90)
+top_mask  = y_score >= threshold
+top10_lift = mean(y_true[top_mask]) - mean(y_true)
+```
+
+A top 10%-os predikciók átlagos y_true értéke mínusz az overall átlag.
+A lift akkor pozitív, ha a modell képes elkülöníteni a magasabb hozamú sorokat.
+
+```mermaid
+flowchart LR
+  SCORE[model predicted scores] --> P90[90th percentile threshold]
+  P90 --> MASK[top 10% mask]
+  MASK --> MEAN_TOP[mean y_true in top 10%]
+  SCORE --> MEAN_ALL[overall mean y_true]
+  MEAN_TOP --> LIFT[lift = mean_top - mean_all]
+```
+
+A `_compute_objective` a trial metrikákból csomagolja az objektívet és az audit metrikákat:
+
+| Mező | Leírás |
+|------|--------|
+| `objective_score` | `-valid_top10_lift` (lower is better, Optuna minimize) |
+| `valid_top10_lift` | Fő objektív |
+| `train_top10_lift` | Diagnosztikai metrika |
+| `train_valid_gap` | `train_top10_lift - valid_top10_lift` (overfit proxy) |
+| `spearman_rho` | Spearman korreláció (valid) |
+| `decile_monotonicity` | Szomszédos decilis párok monoton aránya (valid) |
+| `valid_rmse` | RMSE (valid) |
+| `train_rmse` | RMSE (train) |
+
+---
+
+## Patience stopping — `_check_patience`
 
 ```mermaid
 flowchart TD
-  FM[fold_metrics\ntop10_lift per fold] --> MEAN[mean top10_lift]
-  FM --> STD[std top10_lift]
-  MEAN --> OBJ[objective = mean - 0.5 * std]
-  OBJ --> SCORE[objective_score = -objective\nlower is better]
+  N[completed_trials kevesebb mint patience?] -- igen --> CONT[folytatás]
+  N -- nem --> RECENT[utolsó patience trial]
+  RECENT --> BEST_BEFORE[legjobb valid_top10_lift a patience ablak előtt]
+  BEST_BEFORE --> CMP{best_recent - best_before < epsilon?}
+  CMP -- igen --> STOP[stopping: True]
+  CMP -- nem --> CONT2[folytatás: False]
 ```
 
-Kiegészítő metrikák (nem az objektív részei, de naplózva):
-`mean_spearman_rho`, `mean_decile_monotonicity`, `mean_valid_rmse`, `mean_valid_mae`.
+| Konstans | Érték | Leírás |
+|----------|-------|--------|
+| `_PATIENCE` | `20` | Visszatekintési ablak (trial) |
+| `_PATIENCE_EPSILON` | `0.001` | Minimális javulás threshold |
+
+Feltétel: az utolsó `patience` trial-on belül nincs legalább `epsilon` javulás a megelőző
+legjobb `valid_top10_lift`-hez képest → stopping.
+
+---
+
+## Legjobb trial kiválasztás — `_select_best_trial`
+
+```mermaid
+flowchart TD
+  VALID[valid_top10_lift is not None szűrés] --> SORT[csökkenő valid_top10_lift szerint rendezés]
+  SORT --> TOP5[top-5 jelölt]
+  TOP5 --> GAP[legkisebb train_valid_gap\ngap = train_top10_lift - valid_top10_lift]
+  GAP --> BEST[legjobb trial]
+```
+
+1. Kizárja a `valid_top10_lift` nélküli trial-okat
+2. Csökkenő `valid_top10_lift` szerint rendez
+3. Top-5 jelöltből a legkisebb `|train_valid_gap|`-et választja
+
+A gap **nem** kemény cutoff — másodlagos preferencia az egyenlő teljesítményű jelöltek között.
 
 ---
 
 ## Egy trial futtatása — `_run_one_trial`
 
-Minden paraméter kombinációhoz végigfut az összes fold-on (vagy a `fold_limit`-ig).
-Minden fold-ra: LightGBM fit early stopping-gal (`_ES_ROUNDS = 100`), train +
-valid pred számítás, rank audit metrikák, feature importance, learning curve export
-(`trial_curves/`).
+Minden paraméter kombinációhoz: LightGBM fit a train spliten, early stopping-gal,
+majd train + valid predikció és metrika számítás.
 
-**Early stopping:** `lgb.early_stopping(100)` — 100 round javulás nélkül megáll.
+**Early stopping:** `lgb.early_stopping(_ES_ROUNDS=100)` — 100 round RMSE javulás nélkül megáll.
 
-**Feature importance:** Top 20 feature split + gain alapján, fold-onként összesítve.
+**Metrikák:**
 
----
+| Metrika | Leírás |
+|---------|--------|
+| `train_top10_lift` | Top10 lift a train seten |
+| `valid_top10_lift` | Top10 lift a valid seten (fő objektív) |
+| `train_valid_gap` | `train_top10_lift - valid_top10_lift` |
+| `train_rmse` / `valid_rmse` | RMSE |
+| `train_mae` / `valid_mae` | MAE |
+| `spearman_rho` | Spearman korreláció (valid) |
+| `decile_monotonicity` | Monoton szomszédos decilis párok aránya (valid) |
+| `best_iteration` | LGB best iteration (early stopping után) |
+| `top20_features` | Top 20 feature gain importance |
 
-## Fold split — két mód
-
-### `_fold_split_walk_forward(sd, fold_k, fold_time_windows, purge_minutes)`
-
-Az explicit időablak alapú walk-forward CV fold split. A purge zóna: `train_end`
-és `valid_start` közötti időszak, plusz a `valid_end` utáni `purge_minutes` perc.
-
-| Zóna | Maszk |
-|------|-------|
-| `valid_mask` | `open_time in [valid_start .. valid_end]` |
-| `purge_mask` | `(train_end < t < valid_start)` OR `(valid_end < t <= valid_end + delta)` |
-| `train_mask` | `~valid_mask AND ~purge_mask` |
-
-### `_fold_split_4fold(sd, fold_k, fold_week_assignments, purge_minutes)`
-
-Hét-alapú fold split: a `fold_week_assignments` dict-ből olvassa ki az adott
-fold héthatárait, és a purge zónát heti határok körül alkalmazza.
+Learning curve: `trial_curves/trial_NNNN.json` — lecompressálva `_CURVE_MAX_POINTS=100` pontra.
 
 ---
 
@@ -187,13 +254,13 @@ fold héthatárait, és a purge zónát heti határok körül alkalmazza.
 
 ## Resumable keresés — hash-alapú deduplication
 
-Minden trial paraméterkombináció + `n_features` + `row_stride` SHA256 hash-t
+Minden trial paraméterkombináció + `n_features` + `row_stride` SHA256 hash-t kap
 (`_make_param_hash`, 16 karakter). A `search_trials.jsonl` és `failed_trials.jsonl`
-fájlokból beolvassa a korábbi futások hash-eit — duplikált trial-t nem futtat.
+fájlokból beolvassa a korábbi futások hash-eit — duplikált trial-t nem futtat újra.
 
 ---
 
-## Output fájlok
+## Output fájlok és `search_trials.jsonl` séma
 
 | Fájl | Tartalom |
 |------|----------|
@@ -202,28 +269,28 @@ fájlokból beolvassa a korábbi futások hash-eit — duplikált trial-t nem fu
 | `search/search_trials.jsonl` | Minden elvégzett trial kompakt rekordja |
 | `search/search_summary.csv` | Összefoglaló CSV (trial × metric) |
 | `search/trial_logs/trial_NNNN.json` | Per-trial teljes log |
-| `search/trial_curves/trial_NNNN_fold_NN.json` | Learning curve pontok |
+| `search/trial_curves/trial_NNNN.json` | Learning curve pontok (train + valid RMSE) |
 | `search/failed_trials.jsonl` | Hibás trial rekordok |
 | `search/optuna_study.db` | Optuna SQLite study (ha Optuna fut) |
 
----
+### `search_trials.jsonl` mezők (egy sor = egy trial)
 
-## CLI — `02_hyper_param_search.py`
-
-| Argumentum | Típus | Default | Leírás |
-|------------|-------|---------|--------|
-| `--model` | `str` | kötelező | Modell ID |
-| `--stage` | `str` | `smoke` | `smoke` / `explore` / `refine` |
-| `--n-trials` | `int` | `60` | Max trial szám |
-| `--timeout-hours` | `float` | `None` | Falióra korlát |
-| `--row-stride` | `int` | `None` | Minden N-edik sor |
-| `--fold-limit` | `int` | `None` | Első N fold |
-| `--retry-failed` | flag | `False` | Hibás trial-ok újrafuttatása |
-
-```bash
-uv run python src/modeling/02_hyper_param_search.py --model <model_id> --stage explore --n-trials 60
-uv run python src/modeling/02_hyper_param_search.py --model <model_id> --stage refine --n-trials 30 --timeout-hours 4
-```
+| Mező | Típus | Leírás |
+|------|-------|--------|
+| `trial_no` | `int` | Szekvenciális trial szám |
+| `param_hash` | `str` | 16 karakteres SHA256 hash (deduplication kulcs) |
+| `params` | `dict` | Hyperparaméter dict |
+| `objective_score` | `float` | `-valid_top10_lift` (lower is better) |
+| `valid_top10_lift` | `float` | Fő metrika — valid top10 lift |
+| `train_top10_lift` | `float` | Diagnosztikai — train top10 lift |
+| `train_valid_gap` | `float` | `train_top10_lift - valid_top10_lift` (overfit proxy) |
+| `spearman_rho` | `float \| null` | Spearman korreláció (valid) |
+| `decile_monotonicity` | `float` | Monoton decilis arány (valid) |
+| `valid_rmse` | `float` | RMSE (valid) |
+| `train_rmse` | `float` | RMSE (train) |
+| `valid_mae` | `float` | MAE (valid) |
+| `elapsed_s` | `float` | Trial futási idő másodpercben |
+| `best_iteration` | `int` | LGB best iteration |
 
 ---
 
@@ -234,4 +301,4 @@ uv run python src/modeling/02_hyper_param_search.py --model <model_id> --stage r
 | [5500_hyper_param_search.md](../methodology_doc/5500_hyper_param_search.md) | Search metodológia |
 | [5510_training.md](5510_training.md) | Training kód-ref |
 | [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) | Pipeline / predict / provenance kód-ref |
-| [4100_quant_train.md](4100_quant_train.md) | quant_train tábla + I1-I7 invariáns összefoglaló |
+| [5300_create_sample.md](5300_create_sample.md) | Sampling kód-ref (train/valid split kimenet) |

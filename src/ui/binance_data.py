@@ -97,13 +97,24 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
 
 def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
+    if df.empty:
+        return _empty_frame()
+    realized_pnl = pd.to_numeric(df.get("realizedPnl", 0), errors="coerce").fillna(0.0)
+    # Keep only closing fills (realizedPnl != 0); entry fills have realizedPnl == 0
+    df = df[realized_pnl.abs() >= 0.001].copy()
+    realized_pnl = realized_pnl[df.index]
+    if df.empty:
+        return _empty_frame()
+    # BUY closes a SHORT position; SELL closes a LONG position
+    raw_side = df.get("side", pd.Series(dtype=str)).str.upper()  # type: ignore[union-attr]
+    side     = raw_side.map({"BUY": "SHORT", "SELL": "LONG"}).fillna(raw_side)
     out = _empty_frame()
     out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)  # type: ignore[arg-type]
-    out["side"]       = df.get("side", pd.Series(dtype=str)).str.upper()  # type: ignore[union-attr]
+    out["side"]       = side
     out["price"]      = pd.to_numeric(df.get("price"),      errors="coerce")
     out["qty"]        = pd.to_numeric(df.get("qty"),        errors="coerce")
     out["quote_qty"]  = pd.to_numeric(df.get("quoteQty"),   errors="coerce")
-    out["pnl"]        = pd.to_numeric(df.get("realizedPnl"),errors="coerce")
+    out["pnl"]        = realized_pnl
     out["commission"] = pd.to_numeric(df.get("commission"), errors="coerce")
     out["source"]     = "futures"
     return out.sort_values("time", ascending=False).reset_index(drop=True)
@@ -124,6 +135,31 @@ def _normalize_spot(rows: list[dict]) -> pd.DataFrame:
     out["commission"] = pd.to_numeric(df.get("commission"),errors="coerce")
     out["source"]     = "spot"
     return out.sort_values("time", ascending=False).reset_index(drop=True)
+
+
+def current_position(asset_id: str | None = None) -> dict | None:
+    """Return the current open Binance futures position for the asset, or None."""
+    try:
+        cfg    = utils.load_asset_config(asset_id)
+        symbol = cfg["database"]["symbol"]
+        client = _make_client()
+        positions = client.futures_position_information(symbol=symbol)
+        for p in positions:
+            amt = float(p.get("positionAmt", 0))
+            if amt == 0.0:
+                continue
+            entry = float(p.get("entryPrice", 0))
+            upnl  = float(p.get("unRealizedProfit", 0))
+            return {
+                "side":            "LONG" if amt > 0 else "SHORT",
+                "entry_price":     entry,
+                "quantity":        abs(amt),
+                "unrealized_pnl":  upnl,
+                "_source":         "binance",
+            }
+    except Exception as exc:
+        _logger.warning("Binance current_position failed: %s", exc)
+    return None
 
 
 def _empty_frame() -> pd.DataFrame:

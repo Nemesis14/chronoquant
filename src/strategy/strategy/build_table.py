@@ -40,8 +40,9 @@ import duckdb
 import pandas as pd
 
 import utils
-from data_handling.store import registry
+from data_handling.store.duckdb_query import _tbl_exists
 from modeling.sampling.snapshot_sampler import pred_table_fqn, snapshot_table_fqn
+from utils import _resolve_snapshot_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,34 +52,6 @@ SHORT_MFE_COL = "short_mfe_fw60"
 
 
 # %% Internal helpers
-
-
-def _resolve_snapshot_id(conn: duckdb.DuckDBPyConnection, model_id: str, meta: dict) -> str:
-    """Resolve a model's snapshot_id from reg.models, falling back to config.
-
-    Both the long and the short model are scored against the same snapshot range;
-    the snapshot id is read from the model's registry row (the snapshot it was
-    trained/predicted from) with a ``sampling.snapshot_id`` config fallback.
-    """
-    row = registry.get(conn, "models", model_id)
-    if row is not None and row.get("snapshot_id"):
-        return str(row["snapshot_id"])
-    snapshot_id = meta.get("sampling", {}).get("snapshot_id")
-    if not snapshot_id:
-        raise ValueError(
-            f"No snapshot_id for {model_id} (neither reg.models nor sampling.snapshot_id)."
-        )
-    return str(snapshot_id)
-
-
-def _table_exists(conn: duckdb.DuckDBPyConnection, schema: str, table: str) -> bool:
-    """Return True if ``schema.table`` exists in the lab database."""
-    row = conn.execute(
-        "SELECT 1 FROM information_schema.tables"
-        " WHERE table_schema = ? AND table_name = ?",
-        [schema, table],
-    ).fetchone()
-    return row is not None
 
 
 def _live_ohlcv_available(conn: duckdb.DuckDBPyConnection) -> bool:
@@ -145,13 +118,13 @@ def build_scored_table(
     try:
         snap_id = snapshot_id or _resolve_snapshot_id(conn, long_model_id, long_meta)
 
-        if not _table_exists(conn, "snap", snap_id):
+        if not _tbl_exists(conn, snap_id, "snap"):
             raise ValueError(
                 f'Snapshot table snap."{snap_id}" not found — create it first '
                 "(src/data_handling/05_create_snapshot.py)."
             )
         for mid in (long_model_id, short_model_id):
-            if not _table_exists(conn, "model", f"{mid}__pred"):
+            if not _tbl_exists(conn, f"{mid}__pred", "model"):
                 raise ValueError(
                     f'Prediction table model."{mid}__pred" not found — run the '
                     "offline predict step first (src/modeling/predict.py)."

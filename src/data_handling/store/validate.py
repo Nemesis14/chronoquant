@@ -10,14 +10,9 @@ from pathlib import Path
 
 import duckdb
 
+from data_handling.store.duckdb_query import _tbl_exists
+
 logger = logging.getLogger(__name__)
-
-
-def _tbl_exists(con: duckdb.DuckDBPyConnection, table: str) -> bool:
-    row = con.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]
-    ).fetchone()
-    return bool(row and row[0] > 0)
 
 
 def assert_zero(con: duckdb.DuckDBPyConnection, sql: str, msg: str) -> int:

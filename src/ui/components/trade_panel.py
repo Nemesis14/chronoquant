@@ -7,13 +7,25 @@ import streamlit as st
 
 from ui import binance_data, data, trading_runner
 from ui.components.formatting import (
-    _GOLD,
-    _GREEN,
-    _GRID,
-    _MUTED,
-    _PANEL,
-    _RED,
-    _TEXT,
+    GOLD as _GOLD,
+)
+from ui.components.formatting import (
+    GREEN as _GREEN,
+)
+from ui.components.formatting import (
+    GRID as _GRID,
+)
+from ui.components.formatting import (
+    MUTED as _MUTED,
+)
+from ui.components.formatting import (
+    PANEL as _PANEL,
+)
+from ui.components.formatting import (
+    RED as _RED,
+)
+from ui.components.formatting import (
+    TEXT as _TEXT,
 )
 from ui.dashboard_logging import get_dashboard_logger
 from ui.sync_runner import ensure_sync_state, is_sync_running
@@ -54,30 +66,60 @@ def _render_active_trade_card(position: dict | None) -> None:
         )
         return
 
-    side      = str(position.get("side") or position.get("direction") or "LONG").upper()
-    entry     = position.get("entry_price") or position.get("open_price")
-    sl        = position.get("stop_loss") or position.get("sl_price") or position.get("sl")
-    tp        = position.get("take_profit") or position.get("tp_price") or position.get("tp")
-    open_time = position.get("entry_time") or position.get("open_time") or position.get("created_at")
+    side       = str(position.get("side") or position.get("direction") or "LONG").upper()
+    entry      = position.get("entry_price") or position.get("open_price")
+    sl         = position.get("stop_loss") or position.get("sl_price") or position.get("sl")
+    tp         = position.get("take_profit") or position.get("tp_price") or position.get("tp")
+    open_time  = position.get("entry_time") or position.get("open_time") or position.get("created_at")
+    upnl       = position.get("unrealized_pnl")
+    from_binance = position.get("_source") == "binance"
 
     side_color = _GREEN if "LONG" in side else _RED
     arrow      = "▲" if "LONG" in side else "▼"
+    src_tag    = ' <span style="font-size:11px; font-weight:400; color:#aaa;">[Binance]</span>' if from_binance else ""
+
+    upnl_row = ""
+    if upnl is not None:
+        try:
+            upnl_val   = float(upnl)
+            upnl_color = _GREEN if upnl_val > 0 else _RED if upnl_val < 0 else _MUTED
+            upnl_row   = (
+                f'<span style="{_LBL}">Unrealized PnL</span>'
+                f'<span style="color:{upnl_color}; font-size:14px; font-weight:600;">'
+                f'{upnl_val:+.4f} USDT</span>'
+            )
+        except (TypeError, ValueError):
+            pass
+
+    rows_html = (
+        f'<span style="{_LBL}">Entry</span>'
+        f'<span style="{_VAL}">{_fmt(entry)}</span>'
+    )
+    if sl is not None:
+        rows_html += (
+            f'<span style="{_LBL}">Stop loss</span>'
+            f'<span style="color:{_RED}; font-size:14px; font-weight:500;">{_fmt(sl)}</span>'
+        )
+    if tp is not None:
+        rows_html += (
+            f'<span style="{_LBL}">Take profit</span>'
+            f'<span style="color:{_GREEN}; font-size:14px; font-weight:500;">{_fmt(tp)}</span>'
+        )
+    rows_html += upnl_row
+    if open_time:
+        rows_html += (
+            f'<span style="{_LBL}">Opened</span>'
+            f'<span style="{_VAL}">{_fmt_time(open_time)}</span>'
+        )
 
     st.markdown(
         f"""
         <div style="{_CARD}">
             <div style="color:{side_color}; font-size:14px; font-weight:700; margin-bottom:10px;">
-                {arrow} {side} &nbsp; Active Trade
+                {arrow} {side} &nbsp; Active Trade{src_tag}
             </div>
-            <div style="display:grid; grid-template-columns:90px 1fr; row-gap:7px; font-size:13px;">
-                <span style="{_LBL}">Entry</span>
-                <span style="{_VAL}">{_fmt(entry)}</span>
-                <span style="{_LBL}">Stop loss</span>
-                <span style="color:{_RED}; font-size:14px; font-weight:500;">{_fmt(sl)}</span>
-                <span style="{_LBL}">Take profit</span>
-                <span style="color:{_GREEN}; font-size:14px; font-weight:500;">{_fmt(tp)}</span>
-                <span style="{_LBL}">Opened</span>
-                <span style="{_VAL}">{_fmt_time(open_time)}</span>
+            <div style="display:grid; grid-template-columns:120px 1fr; row-gap:7px; font-size:13px;">
+                {rows_html}
             </div>
         </div>
         """,
@@ -122,7 +164,7 @@ def _binance_trade_row_html(row: dict) -> str:
     ts     = row.get("time")
     source = str(row.get("source", ""))
 
-    side_color = _GREEN if side == "BUY" else _RED if side == "SELL" else _MUTED
+    side_color = _GREEN if side in ("BUY", "LONG") else _RED if side in ("SELL", "SHORT") else _MUTED
     try:
         pnl_val   = float(pnl) if pnl is not None else None
         pnl_str   = f"{pnl_val:+.4f}" if pnl_val is not None else "—"
@@ -182,59 +224,6 @@ def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -
     )
 
 
-def _render_trading_status_card() -> None:
-    status  = trading_runner.get_trading_status()
-    running = trading_runner.is_trading_running()
-
-    if not running and status is None:
-        return
-
-    mode       = (status or {}).get("mode", "—")
-    mode_color = _GOLD if mode == "dry_run" else _RED if mode == "live" else _MUTED
-    service_dot = f'<span style="color:{_GREEN};">●</span>' if running else f'<span style="color:{_MUTED};">○</span>'
-
-    open_pos = (status or {}).get("open_position")
-    last_sig = (status or {}).get("last_signal")
-
-    pos_html = ""
-    if open_pos:
-        side       = open_pos.get("side", "?")
-        side_color = _GREEN if side == "LONG" else _RED
-        arrow      = "▲" if side == "LONG" else "▼"
-        pos_html = (
-            f'<div style="margin-top:8px; border-top:1px solid {_GRID}; padding-top:8px;">'
-            f'<span style="color:{side_color}; font-weight:700;">{arrow} {side}</span>'
-            f'&nbsp; entry <span style="color:{_TEXT};">{_fmt(open_pos.get("entry_price"))}</span>'
-            f'&nbsp; qty <span style="color:{_TEXT};">{_fmt(open_pos.get("quantity"), 2)}</span>'
-            f'</div>'
-        )
-
-    sig_html = ""
-    if last_sig:
-        dec       = last_sig.get("decision", "")
-        dec_color = _GREEN if "ENTER" in dec else _RED if "EXIT" in dec else _MUTED
-        sig_html = (
-            f'<div style="margin-top:6px; font-size:12px;">'
-            f'<span style="{_LBL}">Last signal </span>'
-            f'<span style="color:{dec_color}; font-weight:600;">{dec}</span>'
-            f'<span style="color:{_MUTED}; font-size:11px;"> {_fmt_time(last_sig.get("processed_at"))}</span>'
-            f'</div>'
-            f'<div style="font-size:11px; color:{_MUTED};">{escape(last_sig.get("reason",""))}</div>'
-        )
-
-    started = _fmt_time((status or {}).get("started_at"))
-    st.markdown(
-        f'<div style="{_CARD}">'
-        f'<div style="{_HDR}">{service_dot} Auto Trading'
-        f'&nbsp;<span style="color:{mode_color}; font-size:12px; font-weight:400;">[{mode}]</span>'
-        f'</div>'
-        f'<div style="font-size:12px; color:{_MUTED};">Started: {started}</div>'
-        f'{pos_html}{sig_html}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def _render_trading_positions_card() -> None:
     positions = trading_runner.get_recent_positions(limit=10)
     if not positions:
@@ -277,83 +266,121 @@ def _render_trading_positions_card() -> None:
     )
 
 
+def _render_strategy_card(cfg: dict, direction: str) -> str:
+    """Return HTML for one strategy card (long or short)."""
+    cutoff    = cfg.get("entry_cutoff")
+    n_trades  = cfg.get("n_trades")
+    win_rate  = cfg.get("win_rate")
+    total_lr  = cfg.get("total_lr")
+    compounded = cfg.get("compounded")
+
+    color  = _GREEN if direction == "long" else _RED
+    arrow  = "▲" if direction == "long" else "▼"
+    label  = "Long Strategy" if direction == "long" else "Short Strategy"
+
+    cutoff_str    = f"{cutoff:.1%}" if cutoff is not None else "—"
+    n_str         = str(n_trades) if n_trades is not None else "—"
+    win_str       = f"{win_rate:.1%}" if win_rate is not None else "—"
+    lr_str        = f"{total_lr:+.4f}" if total_lr is not None else "—"
+    compound_str  = f"{compounded:+.1f}%" if compounded is not None else "—"
+
+    win_color     = _GREEN if (win_rate or 0) >= 0.6 else _RED if (win_rate or 0) < 0.5 else _GOLD
+    lr_color      = _GREEN if (total_lr or 0) > 0 else _RED
+
+    return (
+        f'<div style="{_CARD}">'
+        f'<div style="color:{color}; font-size:14px; font-weight:700; margin-bottom:10px;">'
+        f'{arrow} {label}'
+        f'</div>'
+        f'<div style="display:grid; grid-template-columns:120px 1fr; row-gap:6px; font-size:13px;">'
+        f'<span style="{_LBL}">Entry cutoff</span>'
+        f'<span style="{_VAL}">{cutoff_str}</span>'
+        f'<span style="{_LBL}">Trades</span>'
+        f'<span style="{_VAL}">{n_str}</span>'
+        f'<span style="{_LBL}">Win rate</span>'
+        f'<span style="color:{win_color}; font-size:13px; font-weight:500;">{win_str}</span>'
+        f'<span style="{_LBL}">Total log-ret</span>'
+        f'<span style="color:{lr_color}; font-size:13px; font-weight:500;">{lr_str}</span>'
+        f'<span style="{_LBL}">Compounded</span>'
+        f'<span style="color:{lr_color}; font-size:13px; font-weight:500;">{compound_str}</span>'
+        f'</div>'
+        f'</div>'
+    )
+
+
 def _render_signal_trigger_card(asset_id: str | None) -> None:
     status  = trading_runner.get_trading_status()
     running = trading_runner.is_trading_running()
     signals = trading_runner.get_recent_signals(limit=1)
 
+    # --- Trading state header ---
     if running:
         mode       = (status or {}).get("mode", "—")
         mode_color = _GOLD if mode == "dry_run" else _RED if mode == "live" else _MUTED
         started    = _fmt_time((status or {}).get("started_at"))
         dot        = f'<span style="color:{_GREEN};">●</span>'
-        card_header = (
+        state_hdr  = (
             f'<div style="{_HDR}">{dot} Auto Trading'
             f'&nbsp;<span style="color:{mode_color}; font-size:12px; font-weight:400;">[{mode}]</span>'
             f'</div>'
             f'<div style="font-size:12px; color:{_MUTED}; margin-bottom:8px;">Started: {started}</div>'
-            f'<div style="border-top:1px solid {_GRID}; margin-bottom:8px;"></div>'
         )
     else:
-        card_header = f'<div style="{_HDR}">Trading State</div>'
+        state_hdr = f'<div style="{_HDR}">Trading State</div>'
 
-    if not signals:
-        st.markdown(
-            f'<div style="{_CARD}">'
-            f'{card_header}'
-            f'<div style="{_LBL}">Nincs aktív kereskedési service</div>'
-            f'</div>',
-            unsafe_allow_html=True,
+    # --- Last signal row ---
+    if signals:
+        sig       = signals[0]
+        dec       = sig.get("decision", "")
+        bar_ts    = str(sig.get("bar_open_time", ""))[:16]
+        reason    = str(sig.get("reason", ""))[:120]
+        dec_upper = dec.upper()
+        if "ENTER" in dec_upper:
+            dec_color = _GREEN if "LONG" in dec_upper else _RED
+        elif "EXIT" in dec_upper:
+            dec_color = _RED if "LONG" in dec_upper else _GREEN
+        else:
+            dec_color = _MUTED
+
+        state_str = (status or {}).get("state", "FLAT")
+        state_color = (
+            _GREEN if state_str == "LONG"
+            else _RED if state_str == "SHORT"
+            else _GOLD if state_str == "COOLDOWN"
+            else _MUTED
         )
-        return
-
-    sig       = signals[0]
-    dec       = sig.get("decision", "")
-    bar_ts    = str(sig.get("bar_open_time", ""))[:16]
-    reason    = str(sig.get("reason", ""))[:120]
-    dec_upper = dec.upper()
-    if "ENTER" in dec_upper:
-        dec_color = _GREEN if "LONG" in dec_upper else _RED
-    elif "EXIT" in dec_upper:
-        dec_color = _RED if "LONG" in dec_upper else _GREEN
+        signal_html = (
+            f'<div style="border-top:1px solid {_GRID}; padding-top:8px; margin-top:4px;">'
+            f'<div style="font-size:15px; font-weight:700; color:{state_color}; margin-bottom:8px;">'
+            f'{escape(state_str)}</div>'
+            f'<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">'
+            f'<span style="color:{_MUTED};">Legutóbbi döntés</span>'
+            f'<span style="color:{_MUTED}; font-size:11px;">{escape(bar_ts)}</span>'
+            f'</div>'
+            f'<div style="font-size:13px; font-weight:700; color:{dec_color}; margin-bottom:2px;">'
+            f'{escape(dec)}</div>'
+            f'<div style="font-size:11px; color:{_MUTED}; word-break:break-word;">'
+            f'{escape(reason)}</div>'
+            f'</div>'
+        )
     else:
-        dec_color = _MUTED
-
-    state_str = (status or {}).get("state", "FLAT")
-    state_color = (
-        _GREEN if state_str in ("LONG",)
-        else _RED if state_str in ("SHORT",)
-        else _GOLD if state_str == "COOLDOWN"
-        else _MUTED
-    )
-
-    long_cfg, short_cfg = data.load_long_short_strategies(asset_id=asset_id)
-    threshold_html = ""
-    if long_cfg.get("entry_pct") is not None:
-        threshold_html = (
-            f'<div style="font-size:11px; color:{_MUTED}; margin-top:6px;">'
-            f'entry küszöb: long {long_cfg["entry_pct"]:.1%}'
+        signal_html = (
+            f'<div style="{_LBL}; margin-top:4px;">Nincs aktív kereskedési service</div>'
         )
-        if short_cfg.get("entry_pct") is not None:
-            threshold_html += f' / short {short_cfg["entry_pct"]:.1%}'
-        threshold_html += '</div>'
 
     st.markdown(
-        f'<div style="{_CARD}">'
-        f'{card_header}'
-        f'<div style="font-size:15px; font-weight:700; color:{state_color}; margin-bottom:10px;">{escape(state_str)}</div>'
-        f'<div style="border-top:1px solid {_GRID}; padding-top:8px;">'
-        f'<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">'
-        f'<span style="color:{_MUTED};">Legutóbbi döntés</span>'
-        f'<span style="color:{_MUTED}; font-size:11px;">{escape(bar_ts)}</span>'
-        f'</div>'
-        f'<div style="font-size:13px; font-weight:700; color:{dec_color}; margin-bottom:2px;">{escape(dec)}</div>'
-        f'<div style="font-size:11px; color:{_MUTED}; word-break:break-word;">{escape(reason)}</div>'
-        f'</div>'
-        f'{threshold_html}'
-        f'</div>',
+        f'<div style="{_CARD}">{state_hdr}{signal_html}</div>',
         unsafe_allow_html=True,
     )
+
+    # --- Two strategy cards side by side ---
+    long_cfg, short_cfg = data.load_long_short_strategies(asset_id=asset_id)
+    if long_cfg or short_cfg:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(_render_strategy_card(long_cfg, "long"), unsafe_allow_html=True)
+        with col2:
+            st.markdown(_render_strategy_card(short_cfg, "short"), unsafe_allow_html=True)
 
 
 def render_trade_panel(asset_id: str | None) -> None:

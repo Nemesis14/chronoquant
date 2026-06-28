@@ -7,8 +7,14 @@ import copy
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import duckdb
+    import numpy as np
+    import pandas as pd
 
 # %% Path helpers
 
@@ -38,10 +44,7 @@ def _config_root() -> str:
 
 
 def _load_json(path: str) -> dict:
-    if os.path.isabs(path):
-        load_path = path
-    else:
-        load_path = os.path.join(_config_root(), path)
+    load_path = path if os.path.isabs(path) else os.path.join(_config_root(), path)
     with open(load_path, encoding="utf-8-sig") as f:
         return json.load(f)
 
@@ -223,6 +226,57 @@ def open_lab_connection(asset_id: str | None = None):  # noqa: ANN201
         live_path     = live_path,
         registry_path = reg_path,
     )
+
+
+# %% Snapshot helpers — cross-cutting (used by modeling and strategy layers)
+
+
+def _snapshot_exists(conn: "duckdb.DuckDBPyConnection", snapshot_id: str) -> bool:
+    """Return True if snap.\"<snapshot_id>\" exists in the lab database.
+
+    Args:
+        conn        : Open lab DuckDB connection.
+        snapshot_id : Snapshot table name (without schema prefix).
+
+    Returns:
+        True when the table is present in the ``snap`` schema.
+    """
+    row = conn.execute(
+        "SELECT 1 FROM information_schema.tables"
+        " WHERE table_schema = 'snap' AND table_name = ?",
+        [snapshot_id],
+    ).fetchone()
+    return row is not None
+
+
+def _resolve_snapshot_id(
+    conn     : "duckdb.DuckDBPyConnection",
+    model_id : str,
+    meta     : dict,
+) -> str:
+    """Resolve the model's snapshot_id from reg.models, falling back to config.
+
+    Args:
+        conn     : Open lab DuckDB connection.
+        model_id : Model key (used in error message only).
+        meta     : Model config dict (``models.json`` entry for model_id).
+
+    Returns:
+        Resolved snapshot_id string.
+
+    Raises:
+        ValueError: If neither reg.models nor the config carries a snapshot_id.
+    """
+    from data_handling.store import registry
+    row = registry.get(conn, "models", model_id)
+    if row is not None and row.get("snapshot_id"):
+        return str(row["snapshot_id"])
+    snapshot_id = meta.get("sampling", {}).get("snapshot_id")
+    if not snapshot_id:
+        raise ValueError(
+            f"No snapshot_id for {model_id} (reg.models nor sampling.snapshot_id)."
+        )
+    return str(snapshot_id)
 
 
 def load_features_config(asset_id: str | None = None) -> dict:
@@ -495,14 +549,6 @@ def long_short_prediction_columns(model_cfg: dict) -> tuple[str, str]:
     return long_col, short_col
 
 
-def signal_cutoffs_from_config(model_cfg: dict) -> tuple[float, float]:
-    """Return (long_cutoff, short_cutoff) thresholds from the trading strategy config."""
-    cutoffs      = model_cfg.get("trading_strategy", {}).get("cut_offs", {})
-    long_cutoff  = cutoffs.get("long_signal",  {}).get("threshold",  0.0139)
-    short_cutoff = cutoffs.get("short_signal", {}).get("threshold", -0.0142)
-    return float(long_cutoff), float(short_cutoff)
-
-
 # %% Target column name helpers
 
 def _format_quantile(percentile: float) -> str:
@@ -572,10 +618,7 @@ def utc_str_to_ms(s: str) -> int:
         value = value[:-1] + "+00:00"
 
     dt = datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    else:
-        dt = dt.astimezone(UTC)
+    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
     return int(dt.timestamp() * 1000)
 
@@ -596,3 +639,52 @@ def ms_to_utc_str(ms: int) -> str:
         raise ValueError("ms_to_utc_str: ms must be integer milliseconds")
     dt = datetime.fromtimestamp(int(ms) / 1000.0, tz=UTC).replace(microsecond=0)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+# %% Sync helpers
+
+INITIAL_SYNC_START: str = "2017-01-01 00:00:00"
+
+
+def next_open_time(open_time: str) -> str:
+    """Return the next 1-minute bar open time as a UTC string.
+
+    Args:
+        open_time: UTC datetime string of the last known bar open time.
+
+    Returns:
+        UTC datetime string one minute after open_time.
+    """
+    import pandas as _pd  # lazy — avoids polluting pyright namespace
+
+    value = _pd.to_datetime(open_time, errors="raise") + timedelta(minutes=1)
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+# %% Rank percentile helper
+
+
+def apply_rank_percentile(
+    series : "pd.Series",
+    lookup : "tuple[np.ndarray, np.ndarray] | None",
+) -> "pd.Series":
+    """Map raw model scores to rank percentiles via a pre-built lookup table.
+
+    Args:
+        series : Raw prediction scores as a pandas Series.
+        lookup : Tuple of (score_raw, score_pct) numpy arrays, or None to return
+                 series unchanged.
+
+    Returns:
+        Percentile-mapped Series clipped to [0.0, 1.0], or the original series
+        when lookup is None.
+    """
+    import numpy as _np  # lazy — avoids polluting pyright namespace
+    import pandas as _pd  # lazy — avoids polluting pyright namespace
+
+    if lookup is None:
+        return series
+    scores_raw, scores_pct = lookup
+    raw = series.to_numpy(dtype=float)
+    pct = _np.interp(raw, scores_raw, scores_pct).clip(0.0, 1.0)
+    return _pd.Series(pct, index=series.index, name=series.name)

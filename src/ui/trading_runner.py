@@ -9,11 +9,13 @@ from __future__ import annotations
 #  - Provide read functions for the UI to display trading status from trading.db.
 # =============================================================================
 import logging
+import threading
 import traceback
 
 _logger = logging.getLogger("chronoquant.trading")
 
 # Module-level singleton — survives Streamlit session rerenders
+_lock             = threading.Lock()
 _service_instance = None  # TradingService instance
 _last_error: str | None = None  # last startup error, shown in UI
 
@@ -25,11 +27,13 @@ _last_error: str | None = None  # last startup error, shown in UI
 def start_trading(mode: str = "dry_run") -> bool:
     """Start the trading service in a background thread. Returns True if started."""
     global _service_instance, _last_error
-    _last_error = None
 
-    if is_trading_running():
-        _logger.warning("Trading service already running")
-        return False
+    with _lock:
+        if _service_instance is not None and _service_instance.is_running():
+            _logger.warning("Trading service already running")
+            return False
+
+        _last_error = None
 
     try:
         import utils
@@ -38,40 +42,48 @@ def start_trading(mode: str = "dry_run") -> bool:
         config = utils.load_trading_config()
         config["mode"] = mode
 
-        _service_instance = TradingService(config)
-        _service_instance.start()
+        svc = TradingService(config)
+        svc.start()
+
+        with _lock:
+            _service_instance = svc
 
         _logger.info("Trading service thread started (mode=%s)", mode)
         return True
 
     except Exception as exc:
         tb = traceback.format_exc()
-        _last_error = f"{type(exc).__name__}: {exc}\n{tb}"
         _logger.error("Failed to start trading service:\n%s", tb)
-        _service_instance = None
+        with _lock:
+            _last_error = f"{type(exc).__name__}: {exc}\n{tb}"
+            _service_instance = None
         return False
 
 
 def stop_trading() -> None:
     """Signal the trading service to stop."""
-    global _service_instance
-    if _service_instance is not None:
-        _service_instance.stop()
+    with _lock:
+        svc = _service_instance
+    if svc is not None:
+        svc.stop()
         _logger.info("Stop signal sent to trading service")
 
 
 def is_trading_running() -> bool:
-    return _service_instance is not None and _service_instance.is_running()
+    with _lock:
+        return _service_instance is not None and _service_instance.is_running()
 
 
 def get_trading_mode() -> str | None:
-    if _service_instance is not None:
-        return _service_instance.mode
+    with _lock:
+        if _service_instance is not None:
+            return _service_instance.mode
     return None
 
 
 def get_last_error() -> str | None:
-    return _last_error
+    with _lock:
+        return _last_error
 
 
 # =============================================================================

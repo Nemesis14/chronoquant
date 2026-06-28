@@ -9,20 +9,14 @@ Verifies:
 import duckdb
 import pytest
 
+from data_handling.store.duckdb_query import _tbl_exists
+
 pytestmark = pytest.mark.sanity
 
 _HORIZON = 60
 
 
 # %% Helpers
-
-
-def _tbl_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
-    row = conn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-        [table],
-    ).fetchone()
-    return bool(row and row[0] > 0)
 
 
 # %% Forward window starts at t+1

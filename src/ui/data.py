@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import duckdb
 import numpy as np
@@ -11,6 +12,8 @@ import pandas as pd
 
 import utils
 from data_handling.store.duckdb_query import latest_open_time, query_range
+
+logger = logging.getLogger(__name__)
 
 
 def load_dashboard_config(asset_id: str | None = None) -> dict:
@@ -59,6 +62,7 @@ def active_strategy(
                     if scfg.get("asset_id") == features_profile:
                         return sid, scfg
         except Exception:
+            logger.exception("active_strategy: features_profile lookup failed")
             pass
 
     for sid, scfg in strategies.items():
@@ -72,24 +76,28 @@ def active_strategy(
 def load_long_short_strategies(
     asset_id: str | None = None,
 ) -> tuple[dict, dict]:
-    try:
-        trading_cfg = utils.load_trading_config()
-        session_id  = trading_cfg.get("strategy_session_id", "")
-    except Exception:
-        return {}, {}
-    if not session_id:
-        return {}, {}
-    artifact_path = Path(utils._resolve_path(f"artifacts/{session_id}/strategy_artifact.json"))
-    if not artifact_path.exists():
-        return {}, {}
-    try:
-        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}, {}
-    params       = artifact.get("decision_params", {})
-    entry_cutoff = params.get("entry_cutoff")
-    long_cfg     = {"entry_cutoff": entry_cutoff}
-    short_cfg    = {"entry_cutoff": entry_cutoff}   # short uses inverted signal but same threshold
+    long_artifact  = _load_session_artifact(_active_long_session_id())
+    short_artifact = _load_session_artifact(_active_short_session_id())
+    long_params    = long_artifact.get("decision_params", {})
+    short_params   = short_artifact.get("decision_params", {})
+    long_metrics   = long_artifact.get("metrics", {})
+    short_metrics  = short_artifact.get("metrics", {})
+    long_cfg = {
+        "entry_cutoff": long_params.get("entry_cutoff"),
+        "n_trades":     long_metrics.get("n_trades"),
+        "win_rate":     long_metrics.get("win_rate"),
+        "total_lr":     long_metrics.get("total_fact_log_return"),
+        "compounded":   long_metrics.get("compounded_return_pct"),
+        "session_id":   _active_long_session_id(),
+    }
+    short_cfg = {
+        "entry_cutoff": short_params.get("entry_cutoff"),
+        "n_trades":     short_metrics.get("n_trades"),
+        "win_rate":     short_metrics.get("win_rate"),
+        "total_lr":     short_metrics.get("total_fact_log_return"),
+        "compounded":   short_metrics.get("compounded_return_pct"),
+        "session_id":   _active_short_session_id(),
+    }
     return long_cfg, short_cfg
 
 
@@ -152,21 +160,21 @@ def prediction_history(
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = end_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    pred_df = query_range(
+    pred_df = cast(pd.DataFrame, query_range(
         db_path, "predictions",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "close", "long_pred", "short_pred"],
-    )
+    ))
     if pred_df.empty:
         return pd.DataFrame()
 
-    ohlcv_df = query_range(
+    ohlcv_df = cast(pd.DataFrame, query_range(
         db_path, "ohlcv",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "open", "high", "low", "close"],
-    )
+    ))
 
     if not ohlcv_df.empty:
         df = ohlcv_df.merge(
@@ -185,9 +193,9 @@ def prediction_history(
 
     long_lookup, short_lookup = _load_rank_lookups()
     if "long_prediction" in df.columns:
-        df["long_prediction"] = _apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
+        df["long_prediction"] = utils.apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
     if "short_prediction" in df.columns:
-        df["short_prediction"] = _apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
+        df["short_prediction"] = utils.apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
 
     latest_ts = df["open_time"].max()
     start_ts  = latest_ts - pd.Timedelta(hours=int(lookback_hours))
@@ -207,12 +215,12 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
     start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = last_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    pred_df = query_range(
+    pred_df = cast(pd.DataFrame, query_range(
         db_path, "predictions",
         start   = start_str,
         end     = end_str,
         columns = ["open_time", "close", "long_pred", "short_pred"],
-    )
+    ))
     if pred_df.empty:
         return None
 
@@ -222,9 +230,9 @@ def latest_prediction(asset_id: str | None = None) -> dict | None:
 
     long_lookup, short_lookup = _load_rank_lookups()
     if "long_prediction" in df.columns:
-        df["long_prediction"] = _apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
+        df["long_prediction"] = utils.apply_rank_percentile(df["long_prediction"], long_lookup)  # type: ignore[arg-type]
     if "short_prediction" in df.columns:
-        df["short_prediction"] = _apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
+        df["short_prediction"] = utils.apply_rank_percentile(df["short_prediction"], short_lookup)  # type: ignore[arg-type]
 
     row = df.sort_values("open_time").iloc[-1].to_dict()
     return {key: _json_safe(value) for key, value in row.items()}
@@ -235,6 +243,7 @@ def active_position(asset_id: str | None = None) -> dict | None:
         trading_cfg = utils.load_trading_config()
         db_path     = utils._resolve_path(trading_cfg["db_path"])
     except Exception:
+        logger.exception("active_position: failed to load trading config or db_path")
         return None
     if not Path(db_path).exists():
         return None
@@ -264,13 +273,35 @@ def active_position(asset_id: str | None = None) -> dict | None:
         conn.close()
 
     if df.empty:
+        # Fallback: check Binance API for an open futures position
+        try:
+            from ui import binance_data as _bd
+            binance_pos = _bd.current_position(asset_id=asset_id)
+            if binance_pos:
+                return binance_pos
+        except Exception:
+            logger.debug("active_position: Binance fallback failed", exc_info=True)
         return None
     return {key: _json_safe(value) for key, value in df.iloc[0].to_dict().items()}
 
 
 def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame:
-    # Primary source: strat."<session_id>__trades" in the lab DB (t316 output).
-    session_id = _active_strategy_session_id()
+    # Primary source: strat."<session_id>__trades" from both long and short sessions.
+    long_id  = _active_long_session_id()
+    short_id = _active_short_session_id()
+    frames = []
+    for sid in dict.fromkeys([long_id, short_id]):  # deduplicate while preserving order
+        if sid:
+            df = _load_strat_table(sid, "trades", asset_id=asset_id)
+            if not df.empty:
+                frames.append(df)
+    if frames:
+        merged = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
+        order_col: str = "entry_time" if "entry_time" in merged.columns else str(merged.columns[0])
+        return merged.sort_values(order_col, ascending=False).head(int(limit)).reset_index(drop=True)
+
+    # Keep old single-session logic as fallback
+    session_id = _active_long_session_id()
     if session_id:
         df = _load_strat_table(session_id, "trades", asset_id=asset_id)
         if not df.empty:
@@ -285,6 +316,7 @@ def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame
     try:
         trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
     except Exception:
+        logger.exception("closed_trades: failed to load trading db path for fallback")
         trading_db = None
 
     if trading_db and Path(trading_db).exists():
@@ -315,8 +347,22 @@ def closed_trades(limit: int = 500, asset_id: str | None = None) -> pd.DataFrame
 
 
 def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
-    # Primary source: strat."<session_id>__equity" in the lab DB (t316 output).
-    session_id = _active_strategy_session_id()
+    # Merge equity from both long and short sessions, re-index chronologically.
+    long_id  = _active_long_session_id()
+    short_id = _active_short_session_id()
+    frames = []
+    for sid in dict.fromkeys([long_id, short_id]):
+        if sid:
+            df = _load_strat_table(sid, "equity", asset_id=asset_id)
+            if not df.empty:
+                frames.append(df)
+    if frames:
+        merged     = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
+        order_col  = "trade_index" if "trade_index" in merged.columns else str(merged.columns[0])
+        return merged.sort_values(order_col, ascending=True).reset_index(drop=True)
+
+    # Fallback: single session
+    session_id = _active_long_session_id()
     if session_id:
         df = _load_strat_table(session_id, "equity", asset_id=asset_id)
         if not df.empty:
@@ -327,6 +373,7 @@ def equity_curve(asset_id: str | None = None) -> pd.DataFrame:
     try:
         trading_db = utils._resolve_path(utils.load_trading_config()["db_path"])
     except Exception:
+        logger.exception("equity_curve: failed to load trading db path for fallback")
         trading_db = None
 
     if trading_db and Path(trading_db).exists():
@@ -361,6 +408,7 @@ def backtest_summary(asset_id: str | None = None) -> dict:
     try:
         artifact = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
+        logger.exception("backtest_summary: failed to parse strategy artifact")
         return {}
     return artifact.get("metrics", {})
 
@@ -373,6 +421,7 @@ def load_strategy_artifact() -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
+        logger.exception("load_strategy_artifact: failed to parse strategy artifact")
         return {}
 
 
@@ -480,17 +529,6 @@ def _coerce_prediction_frame(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _resolve_long_short_pred_cols(
-    models_cfg: dict,
-    asset_id: str | None,
-    available_columns: list[str],
-) -> tuple[str | None, str | None]:
-    # Stable schema: always look for long_pred / short_pred first.
-    long_col  = "long_pred"  if "long_pred"  in available_columns else None
-    short_col = "short_pred" if "short_pred" in available_columns else None
-    return long_col, short_col
-
-
 def _read_sql(
     query: str,
     params: tuple = (),
@@ -530,25 +568,51 @@ def _db_path(asset_id: str | None = None) -> str | None:
         cfg = utils.load_trading_config()
         return utils._resolve_path(cfg["db_path"])
     except Exception:
+        logger.exception("_db_path: failed to load trading config db_path")
         return None
 
 
-def _session_artifact_path(filename: str) -> Path | None:
+def _active_long_session_id() -> str | None:
     try:
-        session_id = utils.load_trading_config().get("strategy_session_id", "")
+        cfg = utils.load_trading_config()
+        return cfg.get("strategy_session_long_id") or cfg.get("strategy_session_id") or None
     except Exception:
+        logger.exception("_active_long_session_id: failed to load trading config")
         return None
-    if not session_id:
+
+
+def _active_short_session_id() -> str | None:
+    try:
+        cfg = utils.load_trading_config()
+        return cfg.get("strategy_session_short_id") or cfg.get("strategy_session_id") or None
+    except Exception:
+        logger.exception("_active_short_session_id: failed to load trading config")
         return None
-    return _repo_path(f"artifacts/{session_id}/{filename}")
 
 
 def _active_strategy_session_id() -> str | None:
-    """Return the active strategy session_id from trading.json, or None if unavailable."""
+    """Return the active long strategy session_id (for backward compat)."""
+    return _active_long_session_id()
+
+
+def _load_session_artifact(session_id: str | None) -> dict:
+    if not session_id:
+        return {}
+    path = _repo_path(f"artifacts/{session_id}/strategy_artifact.json")
+    if not path.exists():
+        return {}
     try:
-        return utils.load_trading_config().get("strategy_session_id") or None
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
+        logger.exception("_load_session_artifact: failed to parse %s", session_id)
+        return {}
+
+
+def _session_artifact_path(filename: str) -> Path | None:
+    session_id = _active_long_session_id()
+    if not session_id:
         return None
+    return _repo_path(f"artifacts/{session_id}/{filename}")
 
 
 def _load_strat_table(
@@ -570,6 +634,7 @@ def _load_strat_table(
     try:
         conn = utils.open_lab_connection(asset_id)
     except Exception:
+        logger.exception("_load_strat_table: failed to open lab connection")
         return pd.DataFrame()
     try:
         row = conn.execute(
@@ -581,6 +646,7 @@ def _load_strat_table(
             return pd.DataFrame()
         return conn.execute(f"SELECT * FROM {fqn}").df()
     except Exception:
+        logger.exception("_load_strat_table: failed to query %s", fqn)
         return pd.DataFrame()
     finally:
         conn.close()
@@ -598,52 +664,27 @@ def _load_rank_lookups() -> tuple[
     tuple[np.ndarray, np.ndarray] | None,
     tuple[np.ndarray, np.ndarray] | None,
 ]:
-    try:
-        trading_cfg = utils.load_trading_config()
-        session_id  = trading_cfg.get("strategy_session_id", "")
-    except Exception:
-        return None, None
-    if not session_id:
-        return None, None
-
-    artifact_path = Path(utils._resolve_path(f"artifacts/{session_id}/strategy_artifact.json"))
-    if not artifact_path.exists():
-        return None, None
-    try:
-        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None, None
-
-    artifact_dir = artifact_path.parent
-
-    def _load_one(filename: str) -> tuple[np.ndarray, np.ndarray] | None:
+    def _load_one(session_id: str | None, key: str) -> tuple[np.ndarray, np.ndarray] | None:
+        if not session_id:
+            return None
+        artifact = _load_session_artifact(session_id)
+        filename = artifact.get(key, "")
         if not filename:
             return None
-        path = artifact_dir / filename
+        path = _repo_path(f"artifacts/{session_id}/{filename}")
         if not path.exists():
             return None
         try:
             df = pd.read_parquet(path)
             return df["score_raw"].to_numpy(dtype=float), df["score_pct"].to_numpy(dtype=float)
         except Exception:
+            logger.exception("_load_rank_lookups: failed to read %s", path)
             return None
 
     return (
-        _load_one(artifact.get("rank_lookup_long_path", "")),
-        _load_one(artifact.get("rank_lookup_short_path", "")),
+        _load_one(_active_long_session_id(),  "rank_lookup_long_path"),
+        _load_one(_active_short_session_id(), "rank_lookup_short_path"),
     )
-
-
-def _apply_rank_percentile(
-    series: pd.Series,
-    lookup: tuple[np.ndarray, np.ndarray] | None,
-) -> pd.Series:
-    if lookup is None:
-        return series
-    scores_raw, scores_pct = lookup
-    raw = series.to_numpy(dtype=float)
-    pct = np.interp(raw, scores_raw, scores_pct).clip(0.0, 1.0)
-    return pd.Series(pct, index=series.index, name=series.name)
 
 
 def _json_safe(value: Any) -> Any:

@@ -28,43 +28,49 @@ EXIT_SHORT  = "EXIT_SHORT"
 
 
 def evaluate(
-    state           : TradingState,
-    score_pct_long  : float,
-    score_pct_short : float,
-    decision_params : dict,
-    now             : datetime | None = None,
+    state                : TradingState,
+    score_pct_long       : float,
+    score_pct_short      : float,
+    decision_params      : dict,
+    now                  : datetime | None = None,
+    entry_cutoff_long    : float | None = None,
+    entry_cutoff_short   : float | None = None,
 ) -> tuple[str, str]:
     """Evaluate one closed bar without mutating state."""
     if now is None:
         now = datetime.now(UTC)
 
-    entry_cutoff    = float(decision_params["entry_cutoff"])
+    _base_cutoff     = float(decision_params["entry_cutoff"])
+    entry_cutoff_l   = entry_cutoff_long  if entry_cutoff_long  is not None else _base_cutoff
+    entry_cutoff_s   = entry_cutoff_short if entry_cutoff_short is not None else _base_cutoff
     max_hold_minutes = int(decision_params.get("max_hold_minutes", 60))
 
+    entry_cutoff = _base_cutoff  # kept for reason strings
+
     if state.status == FLAT:
-        long_signal  = score_pct_long >= entry_cutoff
-        short_signal = (1.0 - score_pct_short) >= entry_cutoff
+        long_signal  = score_pct_long >= entry_cutoff_l
+        short_signal = (1.0 - score_pct_short) >= entry_cutoff_s
 
         if long_signal and short_signal:
             # Long has priority when both trigger
             return ENTER_LONG, (
-                f"long_priority long_pct={score_pct_long:.3f}"
-                f" short_inv={(1.0 - score_pct_short):.3f} cutoff={entry_cutoff:.2f}"
+                f"long_priority long_pct={score_pct_long:.3f}>={entry_cutoff_l:.2f}"
+                f" short_inv={(1.0 - score_pct_short):.3f}>={entry_cutoff_s:.2f}"
             )
 
         if long_signal:
             return ENTER_LONG, (
-                f"long_entry pct={score_pct_long:.3f}>={entry_cutoff:.2f}"
+                f"long_entry pct={score_pct_long:.3f}>={entry_cutoff_l:.2f}"
             )
 
         if short_signal:
             return ENTER_SHORT, (
-                f"short_entry inv_pct={(1.0 - score_pct_short):.3f}>={entry_cutoff:.2f}"
+                f"short_entry inv_pct={(1.0 - score_pct_short):.3f}>={entry_cutoff_s:.2f}"
             )
 
         return HOLD, (
-            f"below_cutoff long={score_pct_long:.3f}"
-            f" short_inv={(1.0 - score_pct_short):.3f} cutoff={entry_cutoff:.2f}"
+            f"below_cutoff long={score_pct_long:.3f}<{entry_cutoff_l:.2f}"
+            f" short_inv={(1.0 - score_pct_short):.3f}<{entry_cutoff_s:.2f}"
         )
 
     if state.status == LONG:

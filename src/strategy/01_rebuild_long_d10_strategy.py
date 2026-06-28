@@ -22,6 +22,7 @@ import pandas as pd
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from strategy.strategy.artifacts import _artifact_dir
 from strategy.strategy.build_table import build_scored_table
 from strategy.strategy.calibrate import fit_calibration
 
@@ -30,10 +31,6 @@ SESSION_ID = "strat_solusdt_fw60_combo_2101_2605"
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
-
-
-def _artifact_dir(session_id: str) -> Path:
-    return _repo_root() / "artifacts" / session_id
 
 
 def _load_strategy_cfg(session_id: str) -> dict[str, Any]:
@@ -61,12 +58,12 @@ def _build_cutoffs(calibrated_df: pd.DataFrame) -> list[dict[str, Any]]:
         for bucket_id, grp in calibrated_df.groupby(bucket_col, observed=True):
             rows.append({
                 "direction": direction,
-                "bucket_id": int(bucket_id),
-                "score_raw_lower": float(grp[raw_col].min()),
-                "score_raw_upper": float(grp[raw_col].max()),
-                "score_pct_upper": float(grp[pct_col].max()),
-                "bucket_mean_mfe": float(grp[mean_col].iloc[0]),
-                "bucket_hit_rate": float(grp[hit_col].iloc[0]),
+                "bucket_id": int(bucket_id),  # type: ignore[arg-type]
+                "score_raw_lower": float(grp[raw_col].min().item()),
+                "score_raw_upper": float(grp[raw_col].max().item()),
+                "score_pct_upper": float(grp[pct_col].max().item()),
+                "bucket_mean_mfe": float(grp[mean_col].iloc[0].item()),
+                "bucket_hit_rate": float(grp[hit_col].iloc[0].item()),
             })
     return sorted(rows, key=lambda row: (row["direction"], row["bucket_id"]))
 
@@ -91,14 +88,14 @@ def _compute_metrics(trades_df: pd.DataFrame) -> dict[str, Any]:
     drawdown = cumulative - cumulative.cummax()
     return {
         "n_trades": int(len(trades_df)),
-        "avg_expected_log_return": round(float(trades_df["expected_log_return"].mean()), 6),
-        "avg_fact_log_return": round(float(fact_log.mean()), 6),
-        "avg_fact_1h_max_range_log_return": round(float(trades_df["fact_1h_max_range_log_return"].mean()), 6),
-        "total_fact_log_return": round(float(fact_log.sum()), 6),
-        "compounded_return_pct": round(float(math.exp(float(fact_log.sum())) - 1.0), 6),
-        "win_rate": round(float((fact_log > 0.0).mean()), 4),
-        "max_drawdown": round(float(drawdown.min()), 6),
-        "tp_hit_rate": round(float((trades_df["exit_reason"] == "take_profit").mean()), 4),
+        "avg_expected_log_return": round(float(trades_df["expected_log_return"].mean().item()), 6),
+        "avg_fact_log_return": round(float(fact_log.mean().item()), 6),
+        "avg_fact_1h_max_range_log_return": round(float(trades_df["fact_1h_max_range_log_return"].mean().item()), 6),
+        "total_fact_log_return": round(float(fact_log.sum().item()), 6),
+        "compounded_return_pct": round(float(math.exp(float(fact_log.sum().item())) - 1.0), 6),
+        "win_rate": round(float((fact_log > 0.0).mean().item()), 4),
+        "max_drawdown": round(float(drawdown.min().item()), 6),
+        "tp_hit_rate": round(float((trades_df["exit_reason"] == "take_profit").mean().item()), 4),
         "sufficient_sample": bool(len(trades_df) >= 30),
     }
 
@@ -243,16 +240,16 @@ def _summary_frame(trades_df: pd.DataFrame, metrics: dict[str, Any], tp_target_l
     total_row = pd.DataFrame([{
         "exit_reason": "ALL",
         "n_trades": int(len(trades_df)),
-        "avg_entry_price": float(trades_df["entry_price"].mean()),
-        "avg_exit_price": float(trades_df["exit_price"].mean()),
-        "avg_profit_pct": float(trades_df["profit_pct"].mean()),
-        "avg_expected_log_return": float(trades_df["expected_log_return"].mean()),
-        "avg_fact_log_return": float(trades_df["fact_log_return"].mean()),
-        "avg_fact_1h_max_range_log_return": float(trades_df["fact_1h_max_range_log_return"].mean()),
-        "total_fact_log_return": float(trades_df["fact_log_return"].sum()),
-        "compounded_return_pct": float(math.exp(float(trades_df["fact_log_return"].sum())) - 1.0),
-        "realized_directional_win_rate": float((trades_df["fact_log_return"] > 0.0).mean()),
-        "avg_hold_minutes": float(trades_df["hold_minutes"].mean()),
+        "avg_entry_price": float(trades_df["entry_price"].mean().item()),
+        "avg_exit_price": float(trades_df["exit_price"].mean().item()),
+        "avg_profit_pct": float(trades_df["profit_pct"].mean().item()),
+        "avg_expected_log_return": float(trades_df["expected_log_return"].mean().item()),
+        "avg_fact_log_return": float(trades_df["fact_log_return"].mean().item()),
+        "avg_fact_1h_max_range_log_return": float(trades_df["fact_1h_max_range_log_return"].mean().item()),
+        "total_fact_log_return": float(trades_df["fact_log_return"].sum().item()),
+        "compounded_return_pct": float(math.exp(float(trades_df["fact_log_return"].sum().item())) - 1.0),
+        "realized_directional_win_rate": float((trades_df["fact_log_return"] > 0.0).mean().item()),
+        "avg_hold_minutes": float(trades_df["hold_minutes"].mean().item()),
         "tp_target_log_return": tp_target_log_return,
     }])
     return pd.concat([grouped.loc[:, cols], total_row.loc[:, cols]], ignore_index=True)

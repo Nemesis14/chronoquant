@@ -59,7 +59,7 @@ title: "ChronoQuant Documentation"
 format:
   html:
     theme: cosmo
-    css: analyst/chronoquant_analysis.css
+    css: analyst/quarto/chronoquant_analysis.css
     toc: true
     toc-title: "Tartalom"
     toc-location: left

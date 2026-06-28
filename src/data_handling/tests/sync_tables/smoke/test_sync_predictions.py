@@ -7,6 +7,7 @@ is mocked — no real model artifacts required.
 
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -196,7 +197,7 @@ def test_sync_predictions_writes_long_and_short_columns(
         end_time   = None,
     )
 
-    df = query_range(str(db_path), "predictions")
+    df = cast(pd.DataFrame, query_range(str(db_path), "predictions"))
 
     assert "long_pred" in df.columns,  "long_pred column missing from predictions"
     assert "short_pred" in df.columns, "short_pred column missing from predictions"

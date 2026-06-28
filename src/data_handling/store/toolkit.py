@@ -4,6 +4,10 @@ Thin wrappers over store.duckdb_query and utils — returns row counts,
 column lists, and time ranges for any DuckDB dataset.
 """
 
+from typing import cast
+
+import pandas as pd
+
 import utils
 from data_handling.store.duckdb_query import dataset_columns, dataset_exists, query_range, row_count
 
@@ -42,7 +46,7 @@ def get_row_count(dataset: str, asset_id: str | None = None) -> int:
 def get_time_range(dataset: str, asset_id: str | None = None) -> tuple[str | None, str | None]:
     """Return (min_open_time, max_open_time) for a dataset."""
     db_path = resolve_db_path(asset_id)
-    df = query_range(db_path, dataset, columns=["open_time"])
+    df = cast(pd.DataFrame, query_range(db_path, dataset, columns=["open_time"]))
     if df.empty:
         return None, None
     return str(df["open_time"].min()), str(df["open_time"].max())

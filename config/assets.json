@@ -8,7 +8,8 @@
             "market": "futures",
             "db_path": "database/solusdt/solusdt.duckdb",
             "metadata_path": "database/solusdt/solusdt.json",
-            "features_profile": "solusdt_fw60"
+            "features_profile": "solusdt_fw60",
+            "qty_step": 0.1
         }
     }
 }

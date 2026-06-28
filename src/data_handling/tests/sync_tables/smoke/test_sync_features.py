@@ -6,7 +6,9 @@ uses the correct asset profile. Uses isolated tmp_path stores, not real data.
 
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 
+import pandas as pd
 import polars as pl
 import pytest
 
@@ -141,7 +143,7 @@ def test_sync_features_expanded_columns_and_idempotency(
         end_time   = "2024-01-01 06:00:00",
     )
 
-    df = query_range(str(data_dir), "feat_ohlcv_quant")
+    df = cast(pd.DataFrame, query_range(str(data_dir), "feat_ohlcv_quant"))
 
     expected_features = {
         "feat_rsi_14",
@@ -215,7 +217,7 @@ def test_sync_features_uses_sol_feature_profile(
         asset_id   = "solusdt_fw60",
     )
 
-    df = query_range(str(data_dir), "feat_ohlcv_quant")
+    df = cast(pd.DataFrame, query_range(str(data_dir), "feat_ohlcv_quant"))
 
     # Targets are written to the separate 'target' table by sync_targets, not here
     assert not any(c.startswith("trg_") for c in df.columns), \

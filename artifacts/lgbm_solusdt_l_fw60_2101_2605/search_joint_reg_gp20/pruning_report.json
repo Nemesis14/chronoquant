@@ -1,0 +1,35 @@
+{
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
+  "feature_key": "joint_reg",
+  "n_selected": 5,
+  "n_zero_split": 0,
+  "n_pruned_selected": 5,
+  "zero_split_features": [],
+  "all_feature_importance": [
+    {
+      "feature": "feat_pos_return_mean_60",
+      "split": 187,
+      "gain": 516.3652328271419
+    },
+    {
+      "feature": "feat_natr_14",
+      "split": 76,
+      "gain": 502.6599219292402
+    },
+    {
+      "feature": "feat_gk_vol_60",
+      "split": 124,
+      "gain": 410.3100970685482
+    },
+    {
+      "feature": "feat_gk_vol_10",
+      "split": 160,
+      "gain": 388.89222668949515
+    },
+    {
+      "feature": "feat_parkinson_vol_30",
+      "split": 111,
+      "gain": 80.11794280819595
+    }
+  ]
+}

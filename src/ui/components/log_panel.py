@@ -5,7 +5,11 @@ from html import escape
 
 import streamlit as st
 
-from ui.components.formatting import _BG, _GOLD, _MUTED, _RED, _TEXT
+from ui.components.formatting import BG as _BG
+from ui.components.formatting import GOLD as _GOLD
+from ui.components.formatting import MUTED as _MUTED
+from ui.components.formatting import RED as _RED
+from ui.components.formatting import TEXT as _TEXT
 from ui.dashboard_logging import clear_logs, read_recent_logs
 
 _LOG_HEADER_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}")

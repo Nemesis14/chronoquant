@@ -4,22 +4,21 @@
 
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from ui.components.formatting import BG as _BG
+from ui.components.formatting import GOLD as _GOLD
+from ui.components.formatting import GREEN as _GREEN
+from ui.components.formatting import GRID as _GRID
+from ui.components.formatting import MUTED as _MUTED
+from ui.components.formatting import PANEL as _PANEL
+from ui.components.formatting import RED as _RED
+from ui.components.formatting import TEXT as _TEXT
+
 CHART_LOAD_LOOKBACK_HOURS = 24
 CHART_INITIAL_FOCUS_HOURS = 24
-
-_BG    = "#0b0e11"
-_PANEL = "#111418"
-_GRID  = "#2b3139"
-_TEXT  = "#eaecef"
-_MUTED = "#848e9c"
-_GREEN = "#0ecb81"
-_RED   = "#f6465d"
-_GOLD  = "#f0b90b"
 
 
 def prediction_price_figure(
@@ -413,21 +412,3 @@ PLOTLY_CHART_CONFIG = {
         "scale": 2,
     },
 }
-
-
-def equity_figure(df: pd.DataFrame):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    if df.empty:
-        ax.text(0.5, 0.5, "No equity data", ha="center", va="center")
-        fig.tight_layout()
-        return fig
-
-    time_col   = "open_time" if "open_time" in df.columns else df.columns[0]
-    equity_col = "equity" if "equity" in df.columns else df.select_dtypes("number").columns[-1]
-    ax.plot(pd.to_datetime(df[time_col]), pd.to_numeric(df[equity_col], errors="coerce"), color="#0f766e")  # type: ignore[arg-type]
-    ax.set_title("Equity curve")
-    ax.set_ylabel("Equity")
-    ax.grid(alpha=0.25)
-    fig.autofmt_xdate(rotation=25, ha="right")
-    fig.tight_layout()
-    return fig

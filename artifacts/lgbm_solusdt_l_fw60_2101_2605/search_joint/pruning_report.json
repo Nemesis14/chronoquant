@@ -1,0 +1,295 @@
+{
+  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
+  "feature_key": "joint",
+  "n_selected": 57,
+  "n_zero_split": 0,
+  "n_pruned_selected": 57,
+  "zero_split_features": [],
+  "all_feature_importance": [
+    {
+      "feature": "feat_natr_14",
+      "split": 483,
+      "gain": 6143.48894405365
+    },
+    {
+      "feature": "feat_gk_vol_60",
+      "split": 398,
+      "gain": 3052.2669199481606
+    },
+    {
+      "feature": "feat_pos_return_mean_60",
+      "split": 351,
+      "gain": 1781.0517756026238
+    },
+    {
+      "feature": "feat_parkinson_vol_30",
+      "split": 196,
+      "gain": 1019.1923592835665
+    },
+    {
+      "feature": "feat_gk_vol_10",
+      "split": 249,
+      "gain": 679.2851530611515
+    },
+    {
+      "feature": "feat_prev_session_low_dist",
+      "split": 600,
+      "gain": 511.7334724664688
+    },
+    {
+      "feature": "feat_prev_session_high_dist",
+      "split": 592,
+      "gain": 436.29981773532927
+    },
+    {
+      "feature": "feat_day_open_return",
+      "split": 439,
+      "gain": 352.02304174005985
+    },
+    {
+      "feature": "feat_weekly_open_return",
+      "split": 444,
+      "gain": 351.64841340482235
+    },
+    {
+      "feature": "feat_pos_return_mean_30",
+      "split": 218,
+      "gain": 341.1424498409033
+    },
+    {
+      "feature": "feat_roc_140",
+      "split": 428,
+      "gain": 332.2132833302021
+    },
+    {
+      "feature": "feat_avg_trade_quote_30",
+      "split": 330,
+      "gain": 312.0615145713091
+    },
+    {
+      "feature": "feat_hml_range",
+      "split": 216,
+      "gain": 291.5515422038734
+    },
+    {
+      "feature": "feat_atr_14",
+      "split": 318,
+      "gain": 285.9656440168619
+    },
+    {
+      "feature": "feat_neg_return_mean_60",
+      "split": 153,
+      "gain": 277.6313212662935
+    },
+    {
+      "feature": "feat_bars_into_session_norm",
+      "split": 386,
+      "gain": 274.6238592900336
+    },
+    {
+      "feature": "feat_hour_sin",
+      "split": 358,
+      "gain": 256.3718751699198
+    },
+    {
+      "feature": "feat_body_ratio_sma_30",
+      "split": 368,
+      "gain": 240.7574807666242
+    },
+    {
+      "feature": "feat_natr_rank_60",
+      "split": 316,
+      "gain": 234.8422551508993
+    },
+    {
+      "feature": "feat_atr_dist_low_60",
+      "split": 300,
+      "gain": 214.36323209106922
+    },
+    {
+      "feature": "feat_bb_width_14",
+      "split": 202,
+      "gain": 207.867987729609
+    },
+    {
+      "feature": "feat_ema_ratio_140",
+      "split": 262,
+      "gain": 202.69044709205627
+    },
+    {
+      "feature": "feat_volume_sma_14",
+      "split": 304,
+      "gain": 198.73776964843273
+    },
+    {
+      "feature": "feat_dayofweek_sin",
+      "split": 278,
+      "gain": 186.14236959815025
+    },
+    {
+      "feature": "feat_volume_accel_10_30",
+      "split": 250,
+      "gain": 179.26887525618076
+    },
+    {
+      "feature": "feat_hour_cos",
+      "split": 238,
+      "gain": 178.25788529217243
+    },
+    {
+      "feature": "feat_ad_line",
+      "split": 292,
+      "gain": 178.15742851793766
+    },
+    {
+      "feature": "feat_bb_position_140",
+      "split": 227,
+      "gain": 175.3365593701601
+    },
+    {
+      "feature": "feat_wick_imbalance_sma_10",
+      "split": 272,
+      "gain": 174.50977934151888
+    },
+    {
+      "feature": "feat_efficiency_ratio_60",
+      "split": 270,
+      "gain": 174.19310872256756
+    },
+    {
+      "feature": "feat_donchian_width_10",
+      "split": 112,
+      "gain": 170.97375825047493
+    },
+    {
+      "feature": "feat_max_drawdown_30",
+      "split": 142,
+      "gain": 165.31453559547663
+    },
+    {
+      "feature": "feat_atr_dist_low_30",
+      "split": 229,
+      "gain": 164.71959061920643
+    },
+    {
+      "feature": "feat_returns_skew_14",
+      "split": 257,
+      "gain": 161.45033122599125
+    },
+    {
+      "feature": "feat_efficiency_ratio_10",
+      "split": 259,
+      "gain": 157.86508901789784
+    },
+    {
+      "feature": "feat_obv",
+      "split": 255,
+      "gain": 155.2664599493146
+    },
+    {
+      "feature": "feat_lower_wick_ratio",
+      "split": 264,
+      "gain": 155.17357090953737
+    },
+    {
+      "feature": "feat_returns_std_14",
+      "split": 111,
+      "gain": 155.06946997344494
+    },
+    {
+      "feature": "feat_lr_r2_60",
+      "split": 213,
+      "gain": 154.4561875909567
+    },
+    {
+      "feature": "feat_trade_count_ratio_10",
+      "split": 228,
+      "gain": 150.4516020156443
+    },
+    {
+      "feature": "feat_adx_neg_14",
+      "split": 214,
+      "gain": 147.79017454758286
+    },
+    {
+      "feature": "feat_macd_diff",
+      "split": 224,
+      "gain": 146.6694138236344
+    },
+    {
+      "feature": "feat_upper_wick_ratio",
+      "split": 216,
+      "gain": 146.49874278903008
+    },
+    {
+      "feature": "feat_efficiency_ratio_30",
+      "split": 241,
+      "gain": 142.4883923009038
+    },
+    {
+      "feature": "feat_macd_signal_12_26_9",
+      "split": 203,
+      "gain": 133.27859910577536
+    },
+    {
+      "feature": "feat_dist_rolling_high_60",
+      "split": 176,
+      "gain": 126.51186427474022
+    },
+    {
+      "feature": "feat_quote_volume_ratio_30",
+      "split": 164,
+      "gain": 121.04336404800415
+    },
+    {
+      "feature": "feat_time_since_high_60",
+      "split": 152,
+      "gain": 108.37944795563817
+    },
+    {
+      "feature": "feat_trade_count_ratio_60",
+      "split": 157,
+      "gain": 108.37632322311401
+    },
+    {
+      "feature": "feat_return_60",
+      "split": 153,
+      "gain": 105.09309228882194
+    },
+    {
+      "feature": "feat_quote_volume_ratio_60",
+      "split": 147,
+      "gain": 99.33268206566572
+    },
+    {
+      "feature": "feat_dist_rolling_high_10",
+      "split": 149,
+      "gain": 98.46612401306629
+    },
+    {
+      "feature": "feat_bb_width_140",
+      "split": 146,
+      "gain": 95.95149780064821
+    },
+    {
+      "feature": "feat_max_drawdown_10",
+      "split": 116,
+      "gain": 90.89508752524853
+    },
+    {
+      "feature": "feat_bull_bars_ratio_30",
+      "split": 143,
+      "gain": 90.2372566908598
+    },
+    {
+      "feature": "feat_hist_vol_20",
+      "split": 71,
+      "gain": 86.68811343610287
+    },
+    {
+      "feature": "feat_dist_rolling_high_30",
+      "split": 123,
+      "gain": 82.84545877575874
+    }
+  ]
+}

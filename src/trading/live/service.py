@@ -20,6 +20,7 @@ import traceback
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -40,10 +41,6 @@ from trading.live.exchange import BinanceFuturesClient
 from trading.live.state import FLAT, TradingState
 
 logger = logging.getLogger("chronoquant.trading")
-
-
-def _dash_log(msg: str, level: str = "info") -> None:
-    _ = (msg, level)
 
 
 # %% TradingService
@@ -67,16 +64,31 @@ class TradingService:
         self.state  : TradingState | None = None
         self.run_id : str | None          = None
 
-        # Load strategy artifact
-        session_id   = config["strategy_session_id"]
-        artifact     = read_strategy_artifact(session_id)
-        self.session_id      : str  = session_id
-        self.decision_params : dict = artifact["decision_params"]
+        # Load strategy artifacts — separate sessions for long and short
+        long_session_id  = (
+            config.get("strategy_session_long_id")
+            or config.get("strategy_session_id")
+        )
+        short_session_id = (
+            config.get("strategy_session_short_id")
+            or config.get("strategy_session_id")
+        )
+        if not long_session_id:
+            raise ValueError("trading.json must contain strategy_session_long_id")
 
-        # Load rank lookup arrays for np.interp
-        artifact_dir = Path(utils._resolve_path("artifacts")) / session_id
-        lookup_long  = pd.read_parquet(artifact_dir / artifact["rank_lookup_long_path"])
-        lookup_short = pd.read_parquet(artifact_dir / artifact["rank_lookup_short_path"])
+        artifact_long  = read_strategy_artifact(long_session_id)
+        artifact_short = read_strategy_artifact(short_session_id or long_session_id)
+
+        self.session_id            : str  = long_session_id  # backward compat (journal)
+        self.decision_params       : dict = artifact_long["decision_params"]
+        self.entry_cutoff_long     : float = float(artifact_long["decision_params"]["entry_cutoff"])
+        self.entry_cutoff_short    : float = float(artifact_short["decision_params"]["entry_cutoff"])
+
+        # Load rank lookup arrays: long from long session, short from short session
+        dir_long  = Path(utils._resolve_path("artifacts")) / long_session_id
+        dir_short = Path(utils._resolve_path("artifacts")) / (short_session_id or long_session_id)
+        lookup_long  = pd.read_parquet(dir_long  / artifact_long["rank_lookup_long_path"])
+        lookup_short = pd.read_parquet(dir_short / artifact_short["rank_lookup_short_path"])
         self._rank_scores_long  = lookup_long["score_raw"].to_numpy(dtype=float)
         self._rank_pct_long     = lookup_long["score_pct"].to_numpy(dtype=float)
         self._rank_scores_short = lookup_short["score_raw"].to_numpy(dtype=float)
@@ -188,17 +200,14 @@ class TradingService:
         decision, reason = strategy.evaluate(
             self.state, score_pct_long, score_pct_short,
             self.decision_params, now,
+            entry_cutoff_long  = self.entry_cutoff_long,
+            entry_cutoff_short = self.entry_cutoff_short,
         )
         state_before = self.state.status
         logger.info(
             "Bar %s | raw=%.4f/%.4f pct=%.3f/%.3f | state=%s -> %s (%s)",
             bar_open_time, pred_long, pred_short, score_pct_long, score_pct_short,
             state_before, decision, reason,
-        )
-        _dash_log(
-            f"[trading] {bar_open_time} raw={pred_long:.4f}/{pred_short:.4f}"
-            f" pct={score_pct_long:.3f}/{score_pct_short:.3f}"
-            f" {state_before} -> {decision} ({reason})"
         )
 
         # 6. Execute
@@ -301,10 +310,6 @@ class TradingService:
             "Opened %s | price=%.4f qty=%s reason=%s",
             side, avg_price, filled_qty, reason,
         )
-        _dash_log(
-            f"[trading] OPENED {side} price={avg_price:.4f} qty={filled_qty} reason={reason}",
-            level="warning",
-        )
 
     def _close_position(
         self,
@@ -357,10 +362,6 @@ class TradingService:
             "Closed %s | exit=%.4f pnl=%.4f USDT reason=%s",
             side, avg_price, pnl_usdt, reason,
         )
-        _dash_log(
-            f"[trading] CLOSED {side} exit={avg_price:.4f} pnl={pnl_usdt:+.4f} USDT reason={reason}",
-            level="warning",
-        )
 
     # --- data sync + prediction read ---
 
@@ -368,8 +369,8 @@ class TradingService:
         try:
             rows_before    = ohlcv_row_count(self.asset_db_path)
             last_open_time = ohlcv_latest_open_time(self.asset_db_path)
-            start_time     = _next_open_time(last_open_time) if last_open_time else _INITIAL_SYNC_START
-            start_ms       = _utc_str_to_ms(start_time)
+            start_time     = utils.next_open_time(last_open_time) if last_open_time else utils.INITIAL_SYNC_START
+            start_ms       = utils.utc_str_to_ms(start_time)
 
             sync_ohlcv(open_time_ms_from=start_ms, asset_id=self.asset_id)
 
@@ -400,12 +401,12 @@ class TradingService:
         end_str   = cutoff.strftime("%Y-%m-%d %H:%M:%S")
 
         try:
-            df = query_range(
+            df = cast(pd.DataFrame, query_range(
                 self.asset_db_path, "predictions",
                 start   = start_str,
                 end     = end_str,
                 columns = ["open_time", "close", self.long_pred_col, self.short_pred_col],
-            )
+            ))
         except Exception as exc:
             logger.error("Failed to read predictions from DuckDB: %s", exc)
             return None
@@ -483,14 +484,3 @@ class TradingService:
         self._thread = None
 
 
-_INITIAL_SYNC_START = "2017-01-01 00:00:00"
-
-
-def _next_open_time(open_time: str) -> str:
-    value = pd.to_datetime(open_time, errors="raise") + timedelta(minutes=1)
-    return value.strftime("%Y-%m-%d %H:%M:%S")
-
-
-def _utc_str_to_ms(value: str) -> int:
-    timestamp = datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
-    return int(timestamp.timestamp() * 1000)

@@ -30,6 +30,7 @@ import pandas as pd
 import utils
 from data_handling.store import registry
 from modeling.sampling.snapshot_sampler import pred_table_fqn, snapshot_table_fqn
+from utils import _resolve_snapshot_id, _snapshot_exists
 
 logger = logging.getLogger(__name__)
 
@@ -86,14 +87,11 @@ def predict_offline(model_id: str, verify_snapshot: bool = True) -> dict[str, An
 
         hash_before = _snapshot_content_sha256(conn, snapshot_id) if verify_snapshot else None
 
-        features_df = _read_snapshot_features(conn, snapshot_id, selected_features)
-        if features_df.empty:
+        n_rows = _score_snapshot_chunked(conn, model, model_id, snapshot_id, selected_features)
+        if n_rows == 0:
             raise ValueError(
                 f"Snapshot snap.\"{snapshot_id}\" has no rows to score for {model_id}."
             )
-
-        pred_df = _score(model, features_df, selected_features)
-        n_rows  = _write_pred_table(conn, model_id, pred_df)
 
         snapshot_immutable = True
         if verify_snapshot:
@@ -154,27 +152,73 @@ def _load_selected_features(artifact_dir: Path) -> list[str]:
 # %% Snapshot IO
 
 
-def _resolve_snapshot_id(conn: duckdb.DuckDBPyConnection, model_id: str, meta: dict) -> str:
-    """Resolve the model's snapshot_id from reg.models, falling back to config."""
-    row = registry.get(conn, "models", model_id)
-    if row is not None and row.get("snapshot_id"):
-        return str(row["snapshot_id"])
-    snapshot_id = meta.get("sampling", {}).get("snapshot_id")
-    if not snapshot_id:
-        raise ValueError(
-            f"No snapshot_id for {model_id} (reg.models nor sampling.snapshot_id)."
-        )
-    return str(snapshot_id)
+_PREDICT_CHUNK_SIZE = 250_000
 
 
-def _snapshot_exists(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> bool:
-    """Return True if the snap.\"<snapshot_id>\" table exists in the lab database."""
-    row = conn.execute(
-        "SELECT 1 FROM information_schema.tables"
-        " WHERE table_schema = 'snap' AND table_name = ?",
-        [snapshot_id],
-    ).fetchone()
-    return row is not None
+_PREDICT_CHUNK_SIZE = 250_000
+
+
+def _score_snapshot_chunked(
+    conn              : duckdb.DuckDBPyConnection,
+    model             : Any,
+    model_id          : str,
+    snapshot_id       : str,
+    selected_features : list[str],
+    chunk_size        : int = _PREDICT_CHUNK_SIZE,
+) -> int:
+    """Score the full snapshot in chunks, writing ``model."<id>__pred"`` incrementally.
+
+    Reads ``chunk_size`` rows at a time to avoid loading the entire snapshot into
+    memory.  Returns the total number of scored rows.
+    """
+    import numpy as np
+
+    feat_sql   = ", ".join(f'"{c}"' for c in selected_features)
+    snap_fqn   = snapshot_table_fqn(snapshot_id)
+    total_rows = conn.execute(f"SELECT COUNT(*) FROM {snap_fqn}").fetchone()[0]  # type: ignore[index]
+    fqn        = pred_table_fqn(model_id)
+
+    conn.execute("CREATE SCHEMA IF NOT EXISTS model")
+
+    offset    = 0
+    n_written = 0
+    created   = False
+
+    while offset < total_rows:
+        chunk: pd.DataFrame = conn.execute(
+            f"SELECT open_time, {feat_sql} FROM {snap_fqn} "
+            f"ORDER BY open_time LIMIT {chunk_size} OFFSET {offset}"
+        ).df()
+        if chunk.empty:
+            break
+
+        preds      = model.predict(chunk[selected_features].to_numpy(dtype=np.float32))
+        pred_chunk = pd.DataFrame({
+            "open_time": chunk["open_time"].to_numpy(),
+            "pred":      preds.astype(np.float64),
+        })
+
+        conn.register("_pred_chunk", pred_chunk)
+        try:
+            if not created:
+                conn.execute(
+                    f"CREATE OR REPLACE TABLE {fqn} AS "
+                    "SELECT open_time, CAST(pred AS DOUBLE) AS pred FROM _pred_chunk"
+                )
+                created = True
+            else:
+                conn.execute(
+                    f"INSERT INTO {fqn} "
+                    "SELECT open_time, CAST(pred AS DOUBLE) AS pred FROM _pred_chunk"
+                )
+        finally:
+            conn.unregister("_pred_chunk")
+
+        n_written += len(pred_chunk)
+        offset    += chunk_size
+        logger.info("predict chunked: %d / %d rows scored", n_written, total_rows)
+
+    return n_written
 
 
 def _read_snapshot_features(

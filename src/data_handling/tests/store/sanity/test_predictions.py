@@ -7,18 +7,12 @@ and alignment with the ohlcv table. Skips when absent.
 import duckdb
 import pytest
 
+from data_handling.store.duckdb_query import _tbl_exists
+
 pytestmark = pytest.mark.sanity
 
 
 # conn and db_path fixtures come from _tests/store/conftest.py
-
-
-def _tbl_exists(conn: duckdb.DuckDBPyConnection, table: str) -> bool:
-    row = conn.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
-        [table],
-    ).fetchone()
-    return bool(row and row[0] > 0)
 
 
 def test_predictions_table_exists(conn: duckdb.DuckDBPyConnection) -> None:

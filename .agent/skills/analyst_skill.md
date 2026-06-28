@@ -39,7 +39,9 @@ date: "<YYYY-MM-DD>"
 format:
   html:
     theme: cosmo
-    css: ../analyst/chronoquant_analysis.css
+    # CSS path: _doc_/models_doc/ → ../../analyst/quarto/...
+    #           artifacts/<id>/analysis/ → ../../../analyst/quarto/...
+    css: ../../analyst/quarto/chronoquant_analysis.css
     toc: true
     toc-title: "Tartalom"
     toc-location: left
@@ -110,6 +112,7 @@ Importok és teljes seaborn téma együtt, egyetlen cellában:
 
 ```python
 import sys
+from pathlib import Path
 import duckdb
 import pandas as pd
 import polars as pl
@@ -118,10 +121,16 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from IPython.display import display, Markdown
 
+# _root = repo gyökér; felfelé navigál amíg meg nem találja az `analyst/` mappát
+_root = Path.cwd()
+while not (_root / "analyst").exists() and _root != _root.parent:
+    _root = _root.parent
+
 sys.path.insert(0, str(_root))
-from analyst.table_formatting import format_analysis_table, display_analysis_table
-import analyst.plot_utils as pu
-import analyst.db_utils as dbu
+sys.path.insert(0, str(_root / "src"))
+from analyst.lib.table_formatting import format_analysis_table, display_analysis_table
+import analyst.lib.plot_utils as pu
+import analyst.lib.db_utils as dbu
 
 CQ_COLORS = {
     "blue":       "#1696d2",
@@ -388,14 +397,18 @@ Ha az eredmény a futtatástól függ, generáld programmatikusan.
 ## Futtatás és Renderelés
 
 ```bash
-quarto render _doc_\XXXX_<slug>.ipynb --execute
+# Modell/stratégia-specifikus notebook (artifacts/):
+quarto render artifacts\<model_id>\analysis\<slug>.ipynb --execute
+
+# Általános elemzési notebook (_doc_/models_doc/):
+quarto render _doc_\models_doc\XXXX_<slug>.ipynb --execute
 ```
 
 1. Írd meg az összes markdown és code cell-t
 2. Minden eredmény programmatikusan generált legyen
 3. Futtasd le a notebookot tiszta kernelből
 4. Rendereld Quarto-val
-5. Ellenőrizd, hogy a HTML létrejött
+5. Ellenőrizd, hogy a HTML létrejött (notebook mellé kerül)
 6. Olvasd vissza a fő outputokat
 7. Ha kell, javítsd a notebookot, futtasd újra, és csak utána add át
 
@@ -416,6 +429,6 @@ quarto render _doc_\XXXX_<slug>.ipynb --execute
 - [ ] Train-valid / in-sample-OOS / éves összehasonlítás vizuálisan jelölve, ha releváns
 - [ ] Nincs placeholder szöveg
 - [ ] Notebook tiszta kernelből lefuttatva
-- [ ] Quarto render sikeres, HTML létezik `_doc_/<slug>.html` helyen
+- [ ] Quarto render sikeres, HTML létezik a notebook mellé (artifact `analysis/` vagy `_doc_/models_doc/`)
 - [ ] Fő outputok visszaolvasva és ellenőrizve
 - [ ] Notebook végén decision-oriented értelmezés a futott eredmények alapján

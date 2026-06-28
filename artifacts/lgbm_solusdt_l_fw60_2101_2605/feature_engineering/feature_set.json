@@ -1,414 +1,1016 @@
 {
-  "run_id": "run_20260622_110246",
+  "run_id": "run_20260626_160628",
   "asset_id": "solusdt",
   "model_id": "lgbm_solusdt_l_fw60_2101_2605",
   "target_col": "long_mfe_fw60",
-  "created_at": "2026-06-22 11:06:13",
+  "created_at": "2026-06-26 16:06:28",
   "target_cols": [
     "long_mfe_fw60"
   ],
   "selected": [
-    "feat_rsi_14",
-    "feat_roc_14",
-    "feat_roc_140",
-    "feat_stoch_k_14",
-    "feat_stoch_d_14",
-    "feat_cci_20",
+    "feat_ad_line",
+    "feat_adx_neg_14",
     "feat_adx_pos_14",
-    "feat_adx_14",
-    "feat_macd_12_26",
-    "feat_macd_signal_12_26_9",
-    "feat_macd_diff",
-    "feat_sma_ratio_14",
-    "feat_sma_ratio_140",
-    "feat_ema_ratio_14",
-    "feat_ema_ratio_140",
-    "feat_wma_ratio_14",
-    "feat_kama_ratio_10_2_30",
+    "feat_atr_14",
+    "feat_atr_dist_low_30",
+    "feat_atr_dist_low_60",
+    "feat_avg_trade_quote_30",
+    "feat_bars_into_session_norm",
     "feat_bb_position_14",
     "feat_bb_position_140",
-    "feat_volume_ratio_14",
-    "feat_obv_roc_14",
-    "feat_mfi_14",
-    "feat_cmf_20",
-    "feat_returns_log",
-    "feat_returns_sma_14",
-    "feat_returns_kurt_14",
-    "feat_higher_low_count_5",
-    "feat_lower_high_count_5",
-    "feat_lower_low_count_5",
-    "feat_swing_high_5",
-    "feat_quote_volume_ratio_30",
-    "feat_quote_volume_ratio_60",
-    "feat_trade_count_ratio_30",
-    "feat_trade_count_ratio_60",
-    "feat_taker_buy_base_ratio_10",
-    "feat_taker_buy_base_ratio_30",
-    "feat_taker_buy_quote_ratio_30",
-    "feat_return_10",
-    "feat_return_30",
-    "feat_return_60",
+    "feat_bb_width_14",
+    "feat_bb_width_140",
+    "feat_bb_width_rank_20",
+    "feat_bb_width_rank_60",
+    "feat_body_ratio",
+    "feat_body_ratio_sma_30",
+    "feat_bull_bars_ratio_30",
+    "feat_bull_bars_ratio_60",
+    "feat_close_position",
+    "feat_day_open_return",
+    "feat_dayofweek_cos",
+    "feat_dayofweek_sin",
+    "feat_directional_agreement_10_30",
     "feat_dist_rolling_high_10",
     "feat_dist_rolling_high_30",
     "feat_dist_rolling_high_60",
     "feat_dist_rolling_low_10",
     "feat_dist_rolling_low_30",
     "feat_dist_rolling_low_60",
-    "feat_rolling_drawdown_10",
-    "feat_rolling_drawdown_30",
-    "feat_rolling_drawdown_60",
-    "feat_natr_rank_20",
-    "feat_natr_rank_60",
-    "feat_hist_vol_rank_20",
-    "feat_hist_vol_rank_60",
-    "feat_bb_width_rank_60",
-    "feat_range_expansion_10_30",
-    "feat_volume_rank_30",
-    "feat_quote_volume_rank_30",
-    "feat_trade_count_rank_30",
-    "feat_volume_accel_10_30",
-    "feat_trade_count_accel_10_30",
-    "feat_body_ratio",
-    "feat_upper_wick_ratio",
-    "feat_lower_wick_ratio",
-    "feat_body_ratio_sma_10",
-    "feat_signed_body_sma_10",
-    "feat_signed_body_sma_30",
-    "feat_ema_slope_10",
-    "feat_ema_slope_30",
-    "feat_rsi_delta_5",
-    "feat_taker_flow_confirmed_return_10",
-    "feat_hour_sin",
-    "feat_hour_cos",
-    "feat_dayofweek_sin",
-    "feat_dayofweek_cos",
-    "feat_weekend",
-    "feat_session_asia",
-    "feat_session_us",
-    "feat_return_autocorr_lag1_30",
-    "feat_return_autocorr_lag1_60",
-    "feat_variance_ratio_10_60",
-    "feat_recovery_ratio_10",
-    "feat_recovery_ratio_30",
-    "feat_max_drawdown_30",
-    "feat_recovery_ratio_60",
-    "feat_time_since_low_10",
-    "feat_time_since_high_30",
-    "feat_time_since_low_30",
-    "feat_time_since_low_60",
-    "feat_engulf_bear",
-    "feat_bull_bars_ratio_10",
-    "feat_bull_bars_ratio_30",
-    "feat_bull_bars_ratio_60",
-    "feat_gap_open",
-    "feat_efficiency_ratio_30",
-    "feat_efficiency_ratio_60",
-    "feat_atr_dist_high_10",
-    "feat_atr_dist_low_10",
-    "feat_atr_dist_high_30",
-    "feat_atr_dist_low_30",
-    "feat_atr_dist_low_60",
-    "feat_pos_return_mean_10",
-    "feat_return_asymmetry_10",
-    "feat_return_asymmetry_30",
-    "feat_return_asymmetry_60",
-    "feat_rsi_delta_30",
-    "feat_roc_delta_30",
-    "feat_tenkan_ratio",
-    "feat_kijun_ratio",
-    "feat_senkou_b_ratio",
-    "feat_tenkan_kijun_delta",
-    "feat_price_vs_tenkan",
-    "feat_price_vs_kijun",
-    "feat_ichimoku_cloud_thickness",
-    "feat_donchian_breakout_10",
+    "feat_donchian_position_10",
     "feat_donchian_position_30",
     "feat_donchian_position_60",
-    "feat_lr_slope_10",
-    "feat_lr_residual_10",
-    "feat_lr_slope_30",
-    "feat_lr_r2_30",
-    "feat_lr_residual_30",
-    "feat_lr_slope_60",
+    "feat_donchian_width_10",
+    "feat_donchian_width_30",
+    "feat_donchian_width_60",
+    "feat_efficiency_ratio_10",
+    "feat_efficiency_ratio_30",
+    "feat_efficiency_ratio_60",
+    "feat_ema_ratio_14",
+    "feat_ema_ratio_140",
+    "feat_ema_slope_10",
+    "feat_ema_slope_30",
+    "feat_gap_open",
+    "feat_gk_vol_10",
+    "feat_gk_vol_60",
+    "feat_higher_high_count_5",
+    "feat_hist_vol_20",
+    "feat_hist_vol_rank_20",
+    "feat_hist_vol_rank_60",
+    "feat_hml_range",
+    "feat_hour_cos",
+    "feat_hour_sin",
+    "feat_ichimoku_cloud_thickness",
+    "feat_inside_bar",
+    "feat_kama_ratio_10_2_30",
+    "feat_lower_wick_ratio",
     "feat_lr_r2_60",
-    "feat_lr_residual_60"
+    "feat_lr_residual_10",
+    "feat_lr_residual_30",
+    "feat_lr_residual_60",
+    "feat_lr_slope_10",
+    "feat_lr_slope_30",
+    "feat_lr_slope_60",
+    "feat_macd_12_26",
+    "feat_macd_diff",
+    "feat_macd_signal_12_26_9",
+    "feat_max_drawdown_10",
+    "feat_max_drawdown_30",
+    "feat_max_drawdown_60",
+    "feat_natr_14",
+    "feat_natr_rank_20",
+    "feat_natr_rank_60",
+    "feat_neg_return_mean_10",
+    "feat_neg_return_mean_30",
+    "feat_neg_return_mean_60",
+    "feat_obv",
+    "feat_parkinson_vol_30",
+    "feat_pos_return_mean_10",
+    "feat_pos_return_mean_30",
+    "feat_pos_return_mean_60",
+    "feat_prev_session_high_dist",
+    "feat_prev_session_low_dist",
+    "feat_price_vs_kijun",
+    "feat_price_vs_tenkan",
+    "feat_quote_volume_ratio_30",
+    "feat_quote_volume_ratio_60",
+    "feat_recovery_ratio_60",
+    "feat_return_10",
+    "feat_return_30",
+    "feat_return_60",
+    "feat_return_autocorr_lag1_30",
+    "feat_return_autocorr_lag1_60",
+    "feat_return_momentum_delta_10",
+    "feat_return_momentum_delta_30",
+    "feat_return_z_10",
+    "feat_returns_log",
+    "feat_returns_skew_14",
+    "feat_returns_sma_14",
+    "feat_returns_std_14",
+    "feat_roc_14",
+    "feat_roc_140",
+    "feat_roc_delta_10",
+    "feat_roc_delta_30",
+    "feat_roc_delta_5",
+    "feat_rolling_drawdown_10",
+    "feat_rsi_delta_30",
+    "feat_senkou_b_ratio",
+    "feat_signed_body_ratio",
+    "feat_signed_body_sma_10",
+    "feat_stoch_d_14",
+    "feat_taker_buy_base_ratio_10",
+    "feat_taker_buy_quote_ratio_30",
+    "feat_taker_flow_confirmed_return_10",
+    "feat_tenkan_kijun_delta",
+    "feat_time_since_high_30",
+    "feat_time_since_high_60",
+    "feat_trade_count_rank_10",
+    "feat_trade_count_rank_30",
+    "feat_trade_count_ratio_10",
+    "feat_trade_count_ratio_60",
+    "feat_upper_wick_ratio",
+    "feat_volume_accel_10_30",
+    "feat_volume_confirmed_return_10",
+    "feat_volume_confirmed_return_30",
+    "feat_volume_rank_30",
+    "feat_volume_ratio_14",
+    "feat_volume_sma_14",
+    "feat_weekend",
+    "feat_weekly_open_return",
+    "feat_wick_imbalance_sma_10",
+    "feat_wma_ratio_14"
+  ],
+  "top10": [
+    "feat_gk_vol_10",
+    "feat_gk_vol_60",
+    "feat_natr_14",
+    "feat_parkinson_vol_30",
+    "feat_neg_return_mean_60",
+    "feat_pos_return_mean_60",
+    "feat_donchian_width_30",
+    "feat_hml_range",
+    "feat_donchian_width_60",
+    "feat_max_drawdown_30"
+  ],
+  "top1_per_group": [
+    "feat_gk_vol_10",
+    "feat_neg_return_mean_60",
+    "feat_donchian_width_30",
+    "feat_hml_range",
+    "feat_max_drawdown_30",
+    "feat_roc_140",
+    "feat_senkou_b_ratio",
+    "feat_kama_ratio_10_2_30",
+    "feat_ema_slope_30",
+    "feat_roc_delta_30",
+    "feat_day_open_return",
+    "feat_taker_flow_confirmed_return_10",
+    "feat_ad_line",
+    "feat_gap_open",
+    "feat_body_ratio",
+    "feat_higher_high_count_5",
+    "feat_return_autocorr_lag1_30"
   ],
   "dropped": [
     {
-      "col": "feat_williams_r_14",
-      "reason": "redundancy: redundant in cluster_4; representative=feat_stoch_k_14"
-    },
-    {
-      "col": "feat_adx_neg_14",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_returns_skew_14",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_close_position",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_higher_high_count_5",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_swing_low_5",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_quote_volume_ratio_10",
-      "reason": "redundancy: redundant in cluster_45; representative=feat_volume_ratio_14"
-    },
-    {
-      "col": "feat_trade_count_ratio_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_taker_buy_quote_ratio_10",
-      "reason": "redundancy: redundant in cluster_53; representative=feat_taker_buy_base_ratio_10"
-    },
-    {
-      "col": "feat_return_z_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_return_z_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_return_z_60",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_bb_width_rank_20",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_volume_rank_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_quote_volume_rank_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_trade_count_rank_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_signed_body_ratio",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_wick_imbalance_sma_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_wick_imbalance_sma_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_directional_agreement_10_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_roc_delta_5",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_vol_adj_return_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_vol_adj_return_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_volume_confirmed_return_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_volume_confirmed_return_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_taker_flow_confirmed_return_30",
-      "reason": "redundancy: redundant in cluster_104; representative=feat_taker_flow_confirmed_return_10"
-    },
-    {
-      "col": "feat_session_europe",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_return_autocorr_lag5_30",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_return_autocorr_lag5_60",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_time_since_high_10",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_time_since_high_60",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_hammer",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_shooting_star",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_inside_bar",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_outside_bar",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
-      "col": "feat_engulf_bull",
-      "reason": "relation: weak signal across all targets"
-    },
-    {
       "col": "feat_gap_open_abs_sma_10",
-      "reason": "quality: variance=5.07e-09 < min=1e-08"
+      "reason": "quality: null/inf/variance"
     },
     {
       "col": "feat_gap_open_abs_sma_30",
-      "reason": "quality: variance=4.52e-09 < min=1e-08"
+      "reason": "quality: null/inf/variance"
     },
     {
-      "col": "feat_efficiency_ratio_10",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_return_z_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_atr_dist_high_60",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_return_z_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_prev_session_high_dist",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "col": "feat_returns_kurt_14",
+      "reason": "mi <= 0.001 (mi=0.00029)"
     },
     {
-      "col": "feat_prev_session_low_dist",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "col": "feat_vol_adj_return_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_rsi_delta_10",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_cmf_20",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_roc_delta_10",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_mfi_14",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_return_momentum_delta_10",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_obv_roc_14",
+      "reason": "mi <= 0.001 (mi=0.00072)"
     },
     {
-      "col": "feat_return_momentum_delta_30",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_volume_rank_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_donchian_position_10",
-      "reason": "redundancy: redundant in cluster_182; representative=feat_recovery_ratio_10"
+      "col": "feat_body_ratio_sma_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_donchian_breakout_30",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_bull_bars_ratio_10",
+      "reason": "mi <= 0.001 (mi=0.00062)"
     },
     {
-      "col": "feat_donchian_breakout_60",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_doji",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_lr_r2_10",
-      "reason": "relation: weak signal across all targets"
+      "col": "feat_engulf_bear",
+      "reason": "mi <= 0.001 (mi=0.00042)"
+    },
+    {
+      "col": "feat_engulf_bull",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_hammer",
+      "reason": "mi <= 0.001 (mi=0.00079)"
+    },
+    {
+      "col": "feat_outside_bar",
+      "reason": "mi <= 0.001 (mi=0.00056)"
+    },
+    {
+      "col": "feat_shooting_star",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_signed_body_sma_30",
+      "reason": "mi <= 0.001 (mi=0.00063)"
+    },
+    {
+      "col": "feat_wick_imbalance_sma_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
       "col": "feat_day_range_position",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "reason": "mi <= 0.001 (mi=0.00097)"
     },
     {
-      "col": "feat_day_open_return",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "col": "feat_session_asia",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_bars_into_session_norm",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "col": "feat_session_europe",
+      "reason": "mi <= 0.001 (mi=0.00000)"
     },
     {
-      "col": "feat_weekly_open_return",
-      "reason": "expert: time-of-day / session-anchored feature"
+      "col": "feat_session_us",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_quote_volume_rank_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_quote_volume_rank_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_quote_volume_ratio_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_taker_buy_base_ratio_30",
+      "reason": "mi <= 0.001 (mi=0.00094)"
+    },
+    {
+      "col": "feat_trade_count_accel_10_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_trade_count_ratio_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_cci_20",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_rsi_14",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_stoch_k_14",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_williams_r_14",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_adx_14",
+      "reason": "mi <= 0.001 (mi=0.00040)"
+    },
+    {
+      "col": "feat_return_autocorr_lag5_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_return_autocorr_lag5_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_variance_ratio_10_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_atr_dist_high_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_atr_dist_high_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_atr_dist_high_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_atr_dist_low_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_range_expansion_10_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_recovery_ratio_10",
+      "reason": "mi <= 0.001 (mi=0.00049)"
+    },
+    {
+      "col": "feat_recovery_ratio_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_time_since_high_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_time_since_low_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_time_since_low_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_time_since_low_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_higher_low_count_5",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_lower_high_count_5",
+      "reason": "mi <= 0.001 (mi=0.00097)"
+    },
+    {
+      "col": "feat_lower_low_count_5",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_swing_high_5",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_swing_low_5",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_return_asymmetry_10",
+      "reason": "mi <= 0.001 (mi=0.00007)"
+    },
+    {
+      "col": "feat_return_asymmetry_30",
+      "reason": "mi <= 0.001 (mi=0.00062)"
+    },
+    {
+      "col": "feat_return_asymmetry_60",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_donchian_breakout_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_donchian_breakout_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_donchian_breakout_60",
+      "reason": "mi <= 0.001 (mi=0.00013)"
+    },
+    {
+      "col": "feat_lr_r2_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_lr_r2_30",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_rsi_delta_10",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_rsi_delta_5",
+      "reason": "mi <= 0.001 (mi=0.00000)"
+    },
+    {
+      "col": "feat_ohlc_range",
+      "reason": "duplikatum -> feat_hml_range"
+    },
+    {
+      "col": "feat_vol_adj_return_10",
+      "reason": "duplikatum -> feat_return_z_10"
+    },
+    {
+      "col": "feat_gk_vol_30",
+      "reason": "duplikatum -> feat_parkinson_vol_30"
+    },
+    {
+      "col": "feat_parkinson_vol_10",
+      "reason": "duplikatum -> feat_gk_vol_10"
+    },
+    {
+      "col": "feat_parkinson_vol_60",
+      "reason": "duplikatum -> feat_gk_vol_60"
+    },
+    {
+      "col": "feat_taker_buy_quote_ratio_10",
+      "reason": "duplikatum -> feat_taker_buy_base_ratio_10"
+    },
+    {
+      "col": "feat_taker_flow_confirmed_return_30",
+      "reason": "duplikatum -> feat_taker_flow_confirmed_return_10"
+    },
+    {
+      "col": "feat_sma_ratio_14",
+      "reason": "duplikatum -> feat_ema_ratio_14"
+    },
+    {
+      "col": "feat_sma_ratio_140",
+      "reason": "duplikatum -> feat_ema_ratio_140"
+    },
+    {
+      "col": "feat_rolling_drawdown_30",
+      "reason": "duplikatum -> feat_dist_rolling_high_30"
+    },
+    {
+      "col": "feat_rolling_drawdown_60",
+      "reason": "duplikatum -> feat_dist_rolling_high_60"
+    },
+    {
+      "col": "feat_kijun_ratio",
+      "reason": "duplikatum -> feat_price_vs_kijun"
+    },
+    {
+      "col": "feat_tenkan_ratio",
+      "reason": "duplikatum -> feat_price_vs_tenkan"
     }
   ],
-  "review": [
-    "feat_bb_width_14",
-    "feat_bb_width_140",
-    "feat_atr_14",
-    "feat_natr_14",
-    "feat_hist_vol_20",
-    "feat_volume_sma_14",
-    "feat_obv",
-    "feat_ad_line",
-    "feat_returns_std_14",
-    "feat_hml_range",
-    "feat_ohlc_range",
-    "feat_avg_trade_quote_30",
-    "feat_body_ratio_sma_30",
-    "feat_parkinson_vol_10",
-    "feat_gk_vol_10",
-    "feat_parkinson_vol_30",
-    "feat_gk_vol_30",
-    "feat_parkinson_vol_60",
-    "feat_gk_vol_60",
-    "feat_max_drawdown_10",
-    "feat_max_drawdown_60",
-    "feat_doji",
-    "feat_neg_return_mean_10",
-    "feat_pos_return_mean_30",
-    "feat_neg_return_mean_30",
-    "feat_pos_return_mean_60",
-    "feat_neg_return_mean_60",
-    "feat_donchian_width_10",
-    "feat_donchian_width_30",
-    "feat_donchian_width_60"
-  ],
+  "review": [],
   "provenance": {
     "snapshot_id": "solusdt_fw60_2101_2605__21668185",
-    "sample_table": "model.\"lgbm_solusdt_l_fw60_2101_2605__sample\"",
-    "sample_rows": 47448,
-    "joined_rows": 47448,
-    "min_open_time": "2021-01-01 00:58:00",
-    "max_open_time": "2026-05-31 23:50:00",
-    "source_contract": "snap \u22c8 model.__sample"
+    "sample_rows": 37939,
+    "min_open_time": "2021-01-01 04:45:00",
+    "max_open_time": "2025-04-30 22:47:00",
+    "pruning": {
+      "n_selected": 131,
+      "n_zero_split": 0,
+      "n_pruned_selected": 131,
+      "best_params": {
+        "num_leaves": 24,
+        "max_depth": 6,
+        "min_child_samples": 1544,
+        "min_child_weight": 0.006841671828013818,
+        "min_split_gain": 0.008945150807271526,
+        "reg_alpha": 0.04768702722931377,
+        "reg_lambda": 3.1294064907273147,
+        "subsample": 0.6279863393256307,
+        "colsample_bytree": 0.8047076662786214,
+        "learning_rate": 0.00516848777011726,
+        "max_bin": 63,
+        "path_smooth": 0.0014551749476072258,
+        "extra_trees": false
+      }
+    },
+    "pruning_top10": {
+      "feature_key": "top10",
+      "n_selected": 10,
+      "n_zero_split": 0,
+      "n_pruned_selected": 10,
+      "best_params": {
+        "num_leaves": 8,
+        "max_depth": -1,
+        "min_child_samples": 7159,
+        "min_child_weight": 0.03142880890840111,
+        "min_split_gain": 1.2087541473056957e-05,
+        "reg_alpha": 0.0070689749506246055,
+        "reg_lambda": 2.310201887845293,
+        "subsample": 0.5417022549267169,
+        "colsample_bytree": 0.5325453457757225,
+        "learning_rate": 0.016738881542579662,
+        "max_bin": 63,
+        "path_smooth": 0.2801635158716261,
+        "extra_trees": true
+      }
+    },
+    "gain_rank": {
+      "source": "best_params",
+      "n_ranked": 131
+    },
+    "pruning_joint": {
+      "feature_key": "joint",
+      "n_selected": 57,
+      "n_zero_split": 0,
+      "n_pruned_selected": 57,
+      "best_params": {
+        "num_leaves": 13,
+        "max_depth": 4,
+        "min_child_samples": 299,
+        "min_child_weight": 0.00020470182925576237,
+        "min_split_gain": 0.0,
+        "reg_alpha": 0.17585335881631012,
+        "reg_lambda": 3.812652072160981,
+        "subsample": 0.7125964720820535,
+        "colsample_bytree": 0.7761535767545874,
+        "learning_rate": 0.00762282538064809,
+        "max_bin": 127,
+        "path_smooth": 0.003893196766079287,
+        "extra_trees": false
+      }
+    },
+    "pruning_joint_reg": {
+      "feature_key": "joint_reg",
+      "n_selected": 5,
+      "n_zero_split": 0,
+      "n_pruned_selected": 5,
+      "best_params": {
+        "num_leaves": 49,
+        "max_depth": 8,
+        "min_child_samples": 4893,
+        "min_child_weight": 0.0032074195468160204,
+        "min_split_gain": 0.0,
+        "reg_alpha": 0.00493360796653299,
+        "reg_lambda": 1.7929917333950849,
+        "subsample": 0.4939052007438376,
+        "colsample_bytree": 0.7375581550764154,
+        "learning_rate": 0.0319727526559114,
+        "max_bin": 127,
+        "path_smooth": 0.004789136425272747,
+        "extra_trees": false
+      }
+    },
+    "pruning_joint_reg_gp10": {
+      "feature_key": "selected",
+      "n_selected": 59,
+      "n_zero_split": 0,
+      "n_pruned_selected": 59,
+      "best_params": {
+        "num_leaves": 4,
+        "max_depth": 6,
+        "min_child_samples": 671,
+        "min_child_weight": 0.0001764458658320444,
+        "min_split_gain": 0.0,
+        "reg_alpha": 0.0023481655379678206,
+        "reg_lambda": 7.178371503022434,
+        "subsample": 0.46958533112172574,
+        "colsample_bytree": 0.8349612287161551,
+        "learning_rate": 0.032612745839500266,
+        "max_bin": 63,
+        "path_smooth": 0.3370584240668283,
+        "extra_trees": false
+      }
+    }
   },
   "thresholds": {
+    "mi_threshold": 0.001,
+    "corr_threshold": 0.98,
     "max_null_rate": 0.01,
     "max_inf_rate": 0.001,
-    "min_variance": 1e-08,
-    "max_outlier_ratio": 0.05,
-    "min_spearman_abs": 0.01,
-    "max_spearman_leakage": 0.95,
-    "pearson_cluster_thr": 0.95,
-    "redundancy_max_rows": 50000,
-    "stability_bucket_days": 90,
-    "max_drift_threshold": 0.3,
-    "expert_exclude_patterns": [
-      "prev_session",
-      "day_open_return",
-      "day_range_position",
-      "bars_into_session",
-      "weekly_open_return"
-    ]
-  }
+    "min_variance": 1e-08
+  },
+  "pruned_selected": [
+    "feat_ad_line",
+    "feat_adx_neg_14",
+    "feat_adx_pos_14",
+    "feat_atr_14",
+    "feat_atr_dist_low_30",
+    "feat_atr_dist_low_60",
+    "feat_avg_trade_quote_30",
+    "feat_bars_into_session_norm",
+    "feat_bb_position_14",
+    "feat_bb_position_140",
+    "feat_bb_width_14",
+    "feat_bb_width_140",
+    "feat_bb_width_rank_20",
+    "feat_bb_width_rank_60",
+    "feat_body_ratio",
+    "feat_body_ratio_sma_30",
+    "feat_bull_bars_ratio_30",
+    "feat_bull_bars_ratio_60",
+    "feat_close_position",
+    "feat_day_open_return",
+    "feat_dayofweek_cos",
+    "feat_dayofweek_sin",
+    "feat_directional_agreement_10_30",
+    "feat_dist_rolling_high_10",
+    "feat_dist_rolling_high_30",
+    "feat_dist_rolling_high_60",
+    "feat_dist_rolling_low_10",
+    "feat_dist_rolling_low_30",
+    "feat_dist_rolling_low_60",
+    "feat_donchian_position_10",
+    "feat_donchian_position_30",
+    "feat_donchian_position_60",
+    "feat_donchian_width_10",
+    "feat_donchian_width_30",
+    "feat_donchian_width_60",
+    "feat_efficiency_ratio_10",
+    "feat_efficiency_ratio_30",
+    "feat_efficiency_ratio_60",
+    "feat_ema_ratio_14",
+    "feat_ema_ratio_140",
+    "feat_ema_slope_10",
+    "feat_ema_slope_30",
+    "feat_gap_open",
+    "feat_gk_vol_10",
+    "feat_gk_vol_60",
+    "feat_higher_high_count_5",
+    "feat_hist_vol_20",
+    "feat_hist_vol_rank_20",
+    "feat_hist_vol_rank_60",
+    "feat_hml_range",
+    "feat_hour_cos",
+    "feat_hour_sin",
+    "feat_ichimoku_cloud_thickness",
+    "feat_inside_bar",
+    "feat_kama_ratio_10_2_30",
+    "feat_lower_wick_ratio",
+    "feat_lr_r2_60",
+    "feat_lr_residual_10",
+    "feat_lr_residual_30",
+    "feat_lr_residual_60",
+    "feat_lr_slope_10",
+    "feat_lr_slope_30",
+    "feat_lr_slope_60",
+    "feat_macd_12_26",
+    "feat_macd_diff",
+    "feat_macd_signal_12_26_9",
+    "feat_max_drawdown_10",
+    "feat_max_drawdown_30",
+    "feat_max_drawdown_60",
+    "feat_natr_14",
+    "feat_natr_rank_20",
+    "feat_natr_rank_60",
+    "feat_neg_return_mean_10",
+    "feat_neg_return_mean_30",
+    "feat_neg_return_mean_60",
+    "feat_obv",
+    "feat_parkinson_vol_30",
+    "feat_pos_return_mean_10",
+    "feat_pos_return_mean_30",
+    "feat_pos_return_mean_60",
+    "feat_prev_session_high_dist",
+    "feat_prev_session_low_dist",
+    "feat_price_vs_kijun",
+    "feat_price_vs_tenkan",
+    "feat_quote_volume_ratio_30",
+    "feat_quote_volume_ratio_60",
+    "feat_recovery_ratio_60",
+    "feat_return_10",
+    "feat_return_30",
+    "feat_return_60",
+    "feat_return_autocorr_lag1_30",
+    "feat_return_autocorr_lag1_60",
+    "feat_return_momentum_delta_10",
+    "feat_return_momentum_delta_30",
+    "feat_return_z_10",
+    "feat_returns_log",
+    "feat_returns_skew_14",
+    "feat_returns_sma_14",
+    "feat_returns_std_14",
+    "feat_roc_14",
+    "feat_roc_140",
+    "feat_roc_delta_10",
+    "feat_roc_delta_30",
+    "feat_roc_delta_5",
+    "feat_rolling_drawdown_10",
+    "feat_rsi_delta_30",
+    "feat_senkou_b_ratio",
+    "feat_signed_body_ratio",
+    "feat_signed_body_sma_10",
+    "feat_stoch_d_14",
+    "feat_taker_buy_base_ratio_10",
+    "feat_taker_buy_quote_ratio_30",
+    "feat_taker_flow_confirmed_return_10",
+    "feat_tenkan_kijun_delta",
+    "feat_time_since_high_30",
+    "feat_time_since_high_60",
+    "feat_trade_count_rank_10",
+    "feat_trade_count_rank_30",
+    "feat_trade_count_ratio_10",
+    "feat_trade_count_ratio_60",
+    "feat_upper_wick_ratio",
+    "feat_volume_accel_10_30",
+    "feat_volume_confirmed_return_10",
+    "feat_volume_confirmed_return_30",
+    "feat_volume_rank_30",
+    "feat_volume_ratio_14",
+    "feat_volume_sma_14",
+    "feat_weekend",
+    "feat_weekly_open_return",
+    "feat_wick_imbalance_sma_10",
+    "feat_wma_ratio_14"
+  ],
+  "zero_split_features": [],
+  "pruned_top10": [
+    "feat_gk_vol_10",
+    "feat_gk_vol_60",
+    "feat_natr_14",
+    "feat_parkinson_vol_30",
+    "feat_neg_return_mean_60",
+    "feat_pos_return_mean_60",
+    "feat_donchian_width_30",
+    "feat_hml_range",
+    "feat_donchian_width_60",
+    "feat_max_drawdown_30"
+  ],
+  "zero_split_top10": [],
+  "gain_ranked": [
+    "feat_natr_14",
+    "feat_pos_return_mean_60",
+    "feat_gk_vol_60",
+    "feat_gk_vol_10",
+    "feat_parkinson_vol_30",
+    "feat_pos_return_mean_30",
+    "feat_prev_session_low_dist",
+    "feat_hml_range",
+    "feat_weekly_open_return",
+    "feat_avg_trade_quote_30",
+    "feat_roc_140",
+    "feat_hour_sin",
+    "feat_ema_ratio_140",
+    "feat_natr_rank_60",
+    "feat_donchian_width_10",
+    "feat_returns_std_14",
+    "feat_prev_session_high_dist",
+    "feat_neg_return_mean_60",
+    "feat_body_ratio_sma_30",
+    "feat_day_open_return",
+    "feat_hour_cos",
+    "feat_ad_line",
+    "feat_dayofweek_sin",
+    "feat_bb_position_140",
+    "feat_volume_accel_10_30",
+    "feat_obv",
+    "feat_volume_sma_14",
+    "feat_bb_width_14",
+    "feat_bars_into_session_norm",
+    "feat_efficiency_ratio_60",
+    "feat_macd_diff",
+    "feat_wick_imbalance_sma_10",
+    "feat_atr_14",
+    "feat_atr_dist_low_60",
+    "feat_adx_neg_14",
+    "feat_hist_vol_20",
+    "feat_max_drawdown_30",
+    "feat_returns_skew_14",
+    "feat_efficiency_ratio_30",
+    "feat_trade_count_ratio_60",
+    "feat_upper_wick_ratio",
+    "feat_bull_bars_ratio_30",
+    "feat_max_drawdown_10",
+    "feat_quote_volume_ratio_30",
+    "feat_dist_rolling_high_10",
+    "feat_quote_volume_ratio_60",
+    "feat_efficiency_ratio_10",
+    "feat_macd_signal_12_26_9",
+    "feat_lower_wick_ratio",
+    "feat_dist_rolling_high_60",
+    "feat_bb_width_140",
+    "feat_trade_count_ratio_10",
+    "feat_time_since_high_60",
+    "feat_atr_dist_low_30",
+    "feat_lr_r2_60",
+    "feat_return_60",
+    "feat_dist_rolling_high_30",
+    "feat_dist_rolling_low_10",
+    "feat_dist_rolling_low_30",
+    "feat_taker_buy_base_ratio_10",
+    "feat_return_autocorr_lag1_60",
+    "feat_hist_vol_rank_60",
+    "feat_close_position",
+    "feat_volume_ratio_14",
+    "feat_lr_residual_10",
+    "feat_roc_delta_5",
+    "feat_tenkan_kijun_delta",
+    "feat_return_30",
+    "feat_donchian_width_30",
+    "feat_gap_open",
+    "feat_pos_return_mean_10",
+    "feat_macd_12_26",
+    "feat_kama_ratio_10_2_30",
+    "feat_price_vs_kijun",
+    "feat_return_autocorr_lag1_30",
+    "feat_max_drawdown_60",
+    "feat_natr_rank_20",
+    "feat_signed_body_sma_10",
+    "feat_bull_bars_ratio_60",
+    "feat_recovery_ratio_60",
+    "feat_adx_pos_14",
+    "feat_rolling_drawdown_10",
+    "feat_lr_residual_60",
+    "feat_return_momentum_delta_10",
+    "feat_neg_return_mean_10",
+    "feat_taker_buy_quote_ratio_30",
+    "feat_donchian_position_60",
+    "feat_body_ratio",
+    "feat_time_since_high_30",
+    "feat_stoch_d_14",
+    "feat_neg_return_mean_30",
+    "feat_dist_rolling_low_60",
+    "feat_bb_width_rank_60",
+    "feat_roc_delta_10",
+    "feat_senkou_b_ratio",
+    "feat_donchian_width_60",
+    "feat_ema_slope_30",
+    "feat_donchian_position_30",
+    "feat_dayofweek_cos",
+    "feat_volume_confirmed_return_30",
+    "feat_hist_vol_rank_20",
+    "feat_ichimoku_cloud_thickness",
+    "feat_taker_flow_confirmed_return_10",
+    "feat_return_momentum_delta_30",
+    "feat_lr_slope_30",
+    "feat_lr_slope_60",
+    "feat_rsi_delta_30",
+    "feat_weekend",
+    "feat_trade_count_rank_30",
+    "feat_donchian_position_10",
+    "feat_returns_sma_14",
+    "feat_bb_width_rank_20",
+    "feat_signed_body_ratio",
+    "feat_roc_delta_30",
+    "feat_volume_rank_30",
+    "feat_lr_slope_10",
+    "feat_return_10",
+    "feat_return_z_10",
+    "feat_higher_high_count_5",
+    "feat_lr_residual_30",
+    "feat_price_vs_tenkan",
+    "feat_volume_confirmed_return_10",
+    "feat_roc_14",
+    "feat_ema_slope_10",
+    "feat_bb_position_14",
+    "feat_returns_log",
+    "feat_directional_agreement_10_30",
+    "feat_wma_ratio_14",
+    "feat_trade_count_rank_10",
+    "feat_ema_ratio_14",
+    "feat_inside_bar"
+  ],
+  "pruned_joint": [
+    "feat_natr_14",
+    "feat_pos_return_mean_60",
+    "feat_gk_vol_60",
+    "feat_gk_vol_10",
+    "feat_parkinson_vol_30",
+    "feat_pos_return_mean_30",
+    "feat_prev_session_low_dist",
+    "feat_hml_range",
+    "feat_weekly_open_return",
+    "feat_avg_trade_quote_30",
+    "feat_roc_140",
+    "feat_hour_sin",
+    "feat_ema_ratio_140",
+    "feat_natr_rank_60",
+    "feat_donchian_width_10",
+    "feat_returns_std_14",
+    "feat_prev_session_high_dist",
+    "feat_neg_return_mean_60",
+    "feat_body_ratio_sma_30",
+    "feat_day_open_return",
+    "feat_hour_cos",
+    "feat_ad_line",
+    "feat_dayofweek_sin",
+    "feat_bb_position_140",
+    "feat_volume_accel_10_30",
+    "feat_obv",
+    "feat_volume_sma_14",
+    "feat_bb_width_14",
+    "feat_bars_into_session_norm",
+    "feat_efficiency_ratio_60",
+    "feat_macd_diff",
+    "feat_wick_imbalance_sma_10",
+    "feat_atr_14",
+    "feat_atr_dist_low_60",
+    "feat_adx_neg_14",
+    "feat_hist_vol_20",
+    "feat_max_drawdown_30",
+    "feat_returns_skew_14",
+    "feat_efficiency_ratio_30",
+    "feat_trade_count_ratio_60",
+    "feat_upper_wick_ratio",
+    "feat_bull_bars_ratio_30",
+    "feat_max_drawdown_10",
+    "feat_quote_volume_ratio_30",
+    "feat_dist_rolling_high_10",
+    "feat_quote_volume_ratio_60",
+    "feat_efficiency_ratio_10",
+    "feat_macd_signal_12_26_9",
+    "feat_lower_wick_ratio",
+    "feat_dist_rolling_high_60",
+    "feat_bb_width_140",
+    "feat_trade_count_ratio_10",
+    "feat_time_since_high_60",
+    "feat_atr_dist_low_30",
+    "feat_lr_r2_60",
+    "feat_return_60",
+    "feat_dist_rolling_high_30"
+  ],
+  "zero_split_joint": [],
+  "pruned_joint_reg": [
+    "feat_natr_14",
+    "feat_pos_return_mean_60",
+    "feat_gk_vol_60",
+    "feat_gk_vol_10",
+    "feat_parkinson_vol_30"
+  ],
+  "zero_split_joint_reg": [],
+  "pruned_joint_reg_gp10": [
+    "feat_natr_14",
+    "feat_pos_return_mean_60",
+    "feat_gk_vol_60",
+    "feat_gk_vol_10",
+    "feat_parkinson_vol_30",
+    "feat_pos_return_mean_30",
+    "feat_prev_session_low_dist",
+    "feat_hml_range",
+    "feat_weekly_open_return",
+    "feat_avg_trade_quote_30",
+    "feat_roc_140",
+    "feat_hour_sin",
+    "feat_ema_ratio_140",
+    "feat_natr_rank_60",
+    "feat_donchian_width_10",
+    "feat_returns_std_14",
+    "feat_prev_session_high_dist",
+    "feat_neg_return_mean_60",
+    "feat_body_ratio_sma_30",
+    "feat_day_open_return",
+    "feat_hour_cos",
+    "feat_ad_line",
+    "feat_dayofweek_sin",
+    "feat_bb_position_140",
+    "feat_volume_accel_10_30",
+    "feat_obv",
+    "feat_volume_sma_14",
+    "feat_bb_width_14",
+    "feat_bars_into_session_norm",
+    "feat_efficiency_ratio_60",
+    "feat_macd_diff",
+    "feat_wick_imbalance_sma_10",
+    "feat_atr_14",
+    "feat_atr_dist_low_60",
+    "feat_adx_neg_14",
+    "feat_hist_vol_20",
+    "feat_max_drawdown_30",
+    "feat_returns_skew_14",
+    "feat_efficiency_ratio_30",
+    "feat_trade_count_ratio_60",
+    "feat_upper_wick_ratio",
+    "feat_bull_bars_ratio_30",
+    "feat_max_drawdown_10",
+    "feat_quote_volume_ratio_30",
+    "feat_dist_rolling_high_10",
+    "feat_quote_volume_ratio_60",
+    "feat_efficiency_ratio_10",
+    "feat_macd_signal_12_26_9",
+    "feat_lower_wick_ratio",
+    "feat_dist_rolling_high_60",
+    "feat_bb_width_140",
+    "feat_trade_count_ratio_10",
+    "feat_time_since_high_60",
+    "feat_atr_dist_low_30",
+    "feat_lr_r2_60",
+    "feat_return_60",
+    "feat_dist_rolling_high_30",
+    "feat_dist_rolling_low_10",
+    "feat_dist_rolling_low_30"
+  ],
+  "zero_split_joint_reg_gp10": []
 }

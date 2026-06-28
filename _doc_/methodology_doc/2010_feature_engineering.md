@@ -1,170 +1,177 @@
-﻿# Feature Engineering — Moduláris analízis layer
+# 2010 - Feature Engineering Analysis
 
-**Script:** `src/modeling/01_feature_engineering.ipynb`
-**Library:** `src/modeling/feature_engineering/`
-**Output:** `database/<asset_id>/feature_engineering/<run_id>/`
+A feature engineering analysis réteg célja nem új feature-ök gyártása, hanem annak eldöntése, hogy a már előállított jelöltek közül melyek maradhatnak bent a modell-specifikus tanítási szerződésben. A kimenet egy reprodukálható feature-lista, amelyet ugyanaz a snapshot- és sample-scope köt meg, mint a későbbi search és training lépést.
 
----
+## Overview
 
-## Célja
+```mermaid
+flowchart TD
+  SNAP[Immutable snapshot]
+  SAMPLE[Model-specifikus sample scope]
+  WORK[Lokális elemzési munkahalmaz]
+  Q[Quality]
+  MI[MI szűrés]
+  RED[Redundancy / dedup]
+  SET[Feature set szerződés]
 
-Egy modellhez tartozó, sample-scope-os `quant_train` munkatáblán vizsgálja a
-`feat_*` oszlopokat négy egymástól független dimenzió mentén. Az input nem a
-teljes időablakra vágott upstream `quant_train`, hanem a kiválasztott
-`snap."<snapshot_id>" ⋈ model."<model_id>__sample"` join lokális materializációja.
-Az eredmény egy determinisztikusan generált `feature_set.json`, amelyet a
-`02_hyper_param_search.py` és a training lépés fogyaszt.
-
----
-
-## Input
-
-| Forrás | Tartalom |
-|--------|----------|
-| sample-scope `quant_train` temp tábla | `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`; `feat_*` oszlopok + `long_mfe_fw60`, `short_mfe_fw60` target oszlopok |
-| `FeatureEngineeringConfig` | Küszöbértékek minden analízis lépéshez |
-
-A lokális `quant_train` csak az adott modell mintájának sorait tartalmazza. Az
-első ~1441 sor `feat_*` értékei NULL-ok lehetnek (t-1 lag warmup), de a sampling
-lookback offset kizárja ezeket a tanítási ablakból.
-
----
-
-## Négy analízis lépés
-
-### 1. Quality — `analyze_quality()`
-
-Univariáns minőségi ellenőrzés minden `feat_*` oszlopra.
-
-| Metrika | Döntés | Feltétel |
-|---------|--------|----------|
-| `null_rate` | drop | > `max_null_rate` (0.01) |
-| `inf_rate` | drop | > `max_inf_rate` (0.001) |
-| `variance` | drop | < `min_variance` (1e-8) |
-| `outlier_ratio` | review | > `max_outlier_ratio` (0.05) |
-| — | keep | minden más |
-
-Output schema: `feature, null_rate, inf_rate, variance, outlier_ratio, decision, drop_reason`
-
-### 2. Target Relation — `analyze_target_relation()`
-
-Pearson (`CORR`) és Spearman (RANK-alapú) korreláció minden `feat_*` × target párra.
-`signal_proxy = |ρ_spearman|`
-
-| Döntés | Feltétel |
-|--------|----------|
-| `leakage` | `|ρ| > 0.95` — jövőbeli adat szivárgás gyanú |
-| `weak` | `|ρ| < 0.01` — nincs érdemi szignál |
-| `keep` | minden más |
-
-Egy feature csak akkor kerül ki, ha **mindkét** targetre `weak` (vagy `leakage`).
-
-Output schema: `feature, target, pearson_r, spearman_rho, signal_proxy, leakage_flag, decision`
-
-### 3. Redundancy — `analyze_redundancy()`
-
-Pearson korrelációs mátrix alapján klaszterezés (union-find algoritmus).
-Ha két feature `|Pearson r| ≥ pearson_cluster_thr` (0.95), egy klaszterbe kerülnek.
-Klaszterenként a legkisebb indexű feature a reprezentatív (`keep`), a többi `drop`.
-
-A korrelációs mátrix max `redundancy_max_rows` (500 000) véletlenszerű sorból számolódik
-RAM-hatékonyság érdekében.
-
-Output schema: `feature, cluster_id, is_representative, max_pearson, decision, drop_reason`
-
-### 4. Stability — `analyze_stability()`
-
-Az adatot `stability_bucket_days` (90) napos, nem-átfedő időablakokra osztja.
-Minden (feature, bucket) párra Spearman korreláció mindkét targettel.
-`drift = |ρ_bucket − ρ_baseline|`
-
-| Flag | Feltétel | Hatás a végeredményre |
-|------|----------|-----------------------|
-| `stable` | drift ≤ 0.15 | selected |
-| `review` | 0.15 < drift ≤ 0.30 | review lista |
-| `unstable` | drift > 0.30, nem az utolsó 2 bucket | review lista |
-| `decayed` | drift > 0.30 **és** az utolsó 2 bucket | **drop** |
-
-Output schema: `feature, bucket_idx, bucket_start, bucket_end, n, null_rate, mean, std, spearman_long, spearman_short, drift_long, drift_short, stability_flag`
-
----
-
-## Output — notebook inline logika
-
-A `feature_set.json` generálása **kizárólag** a `01_feature_engineering.ipynb`
-utolsó output celláiban történik — nincs külön reporting modul.
-
-Egy feature a **selected** listába kerül, ha mind a négy feltétel teljesül:
-1. quality → `keep`
-2. target_relation → legalább egy targetre `keep`
-3. redundancy → `keep` (reprezentatív)
-4. stability → nincs `decayed` bucket
-
-### `feature_set.json` séma
-
-```json
-{
-  "run_id": "run_20240601_120000",
-  "asset_id": "solusdt",
-  "model_id": "lgbm_solusdt_l_fw60_2101_2605",
-  "created_at": "2024-06-01 12:00:00",
-  "target_cols": ["long_mfe_fw60", "short_mfe_fw60"],
-  "selected": ["feat_rsi_14", "feat_roc_10", ...],
-  "dropped": [
-    {"col": "feat_foo", "reason": "quality: null_rate=0.05 > max=0.01"}
-  ],
-  "review": ["feat_bar"],
-  "provenance": {
-    "snapshot_id": "solusdt_fw60_2101_2605__21668185",
-    "sample_table": "model.\"lgbm_solusdt_l_fw60_2101_2605__sample\"",
-    "sample_rows": 12345,
-    "joined_rows": 12345,
-    "source_contract": "snap ⋈ model.__sample"
-  },
-  "thresholds": {
-    "max_null_rate": 0.01,
-    "max_inf_rate": 0.001,
-    "min_variance": 1e-8,
-    "max_outlier_ratio": 0.05,
-    "min_spearman_abs": 0.01,
-    "max_spearman_leakage": 0.95,
-    "pearson_cluster_thr": 0.95,
-    "redundancy_max_rows": 500000,
-    "stability_bucket_days": 90,
-    "max_drift_threshold": 0.3
-  }
-}
+  SNAP --> SAMPLE --> WORK
+  WORK --> Q --> MI --> RED --> SET
 ```
 
-### `analyst_report.md`
-
-Human-readable összefoglaló: selected / dropped / review listák, drop okok, paraméterek.
-
----
-
-## Futtatás
-
-```bash
-# Jupyter notebook interaktívan
-uv run jupyter notebook src/modeling/01_feature_engineering.ipynb
+```mermaid
+flowchart LR
+  D[Feature-válogatási stratégia]
+  D --> A[MI + quality + dedup ugyanazon sample scope-on]
+  D --> B[Teljes quant_train időablak elemzése]
+  D --> C[Kézi feature-lista fenntartása]
 ```
 
-A notebook automatikusan generál `run_id`-t (`run_YYYYMMDD_HHMMSS` formátumban).
-Az output path kiíródik a konzolra futás végén.
+A módszertani cél itt az, hogy a feature-válogatás ne egy absztrakt, teljes historikus táblán történjen, hanem pontosan azon a sorhalmazon, amelyen a modell később tanulni és validálódni fog.
+
+## Üzleti és módszertani háttér
+
+### Miért kritikus ez a lépés?
+
+Ez a lépés dönti el, hogy a modell mennyi zajt, mennyi redundanciát és mennyi időben széteső mintázatot visz tovább a search és a final fit felé. Ha a feature-szűrés túl laza, a modell instabil és nehezen auditálható lesz. Ha túl agresszív, akkor értékes prediktív jel tűnik el még a search előtt.
+
+Különösen fontos, hogy az elemzés ugyanazon sample-scope-on fusson, mint a downstream pipeline. Ha a feature-döntés más sorhalmazon születik, mint amin a modell később ténylegesen tanul, akkor a feature-set nem ugyanarra a valószínűségi környezetre optimalizál.
+
+### Miért ezt a megközelítést?
+
+| Megközelítés | Előny | Hátrány | Státusz |
+|--------------|-------|---------|---------|
+| Háromdimenziós szűrés: quality + MI + korrelációs dedup | Nem-lineáris kapcsolatot is kap el (MI); nincs false negative a volatilitás-feature-öknél; egy notebookba koncentrálva | Stabilitás-drift nincs külön mérve | ✅ Választott |
+| Korábban: quality + Spearman + Pearson-redundancy + stability | Stabilitás-drift is mérve | Stability false negative: az összes volatilitás feature REVIEW-ba kerül (vol clustering miatt) | ❌ Elvetett — szisztematikus false negative |
+| Teljes historikus időablakra futtatott általános feature-audit | Egyszerűbb, nagyobb elemszám | Nem ugyanazon scope-on dönt, mint amin a modell tanul | Elvetett |
+| Kézi, statikus feature-whitelist | Könnyen kommunikálható | Nem reagál adatdriftre és új feature-csoportokra | Elvetett |
+| Csak modellalapú fontosság szerinti utólagos szelekció | Közelebb van a végső objective-hez | A zajos vagy szivárgó feature már a searchöt is torzíthatja | Fontolóra vehető kiegészítő lépésként |
+
+```mermaid
+flowchart LR
+  FULL[Teljes historikus tábla]
+  SCOPE[Sample-scope munkahalmaz]
+  SEARCH[Search és training input]
+
+  FULL --> X[Nem ugyanaz az eloszlás]
+  SCOPE --> SEARCH
+```
+
+### Négydimenziós feature-döntés: miért kell és hogyan működik?
+
+A feature bent maradása nem egyetlen mérőszámon múlik. Más kérdés, hogy egy oszlop technikailag használható-e, más, hogy hordoz-e jelet, más, hogy csak egy másik oszlop másolata-e, és megint más, hogy időben stabil marad-e.
+
+```mermaid
+flowchart TD
+  F[Feature jelölt]
+  Q{Minőségi hibás?}
+  T{Van értelmes target-kapcsolat?}
+  R{Redundáns klaszter-tag?}
+  S{Időben szétesik?}
+  KEEP[Selected]
+  DROP[Drop vagy review]
+
+  F --> Q
+  Q -- igen --> DROP
+  Q -- nem --> T
+  T -- nem --> DROP
+  T -- igen --> R
+  R -- igen --> DROP
+  R -- nem --> S
+  S -- igen --> DROP
+  S -- nem --> KEEP
+```
+
+**Szabály:** feature csak akkor maradhat a végső listában, ha mind a négy nézőpontból átmegy a minimális minőségi küszöbön.
+
+### Sample-scope konzisztencia: miért kell és hogyan működik?
+
+A feature engineering nem pusztán a snapshotból olvas, hanem a snapshot és a modellhez tartozó sample metszetén dolgozik. Ez biztosítja, hogy a feature-döntések ugyanarra a fejlesztési scope-ra érvényesek, amelyet a sampling már kijelölt.
+
+```mermaid
+graph TD
+  SNAP[Snapshot]
+  SAMPLE[Model sample]
+  FE[Feature analysis]
+  SEARCH[Hyperparameter search]
+  TRAIN[Final training]
+
+  SNAP --> FE
+  SAMPLE --> FE
+  FE --> SEARCH --> TRAIN
+```
+
+**Szabály:** a feature-lista nem általános domain-lista, hanem modell-scope szerződés.
+
+### Paraméter alapértékek és indoklásuk
+
+| Paraméter | Alapérték | Indoklás |
+|-----------|-----------|----------|
+| `max_null_rate` | `0.01` | Egy feature ne maradjon bent, ha a minta érzékelhető részén hiányos; 1% fölött már könnyen műtermékké válik a jel |
+| `max_inf_rate` | `0.001` | A végtelen érték tipikusan számítási vagy normalizációs hiba jele; ennek toleranciája a null-rate-nél is szigorúbb |
+| `min_variance` | `1e-8` | Közel konstans feature ne foglaljon helyet a modellben és ne terhelje a searchöt |
+| `MI_THRESHOLD` | `0.001` | Ez alatt a feature statisztikailag független a targettől; LightGBM számára zaj, nem jel. Az MI k-NN alapú, nemlineáris összefüggéseket is kap el — false negative-ek száma sokkal kisebb, mint Spearman-nál |
+| `CORR_THRESHOLD` | `0.98` | E fölötti Pearson-korreláció esetén a két feature csoporton belül szinte azonos információt hordoz; a kisebb MI-jű tagot eltávolítjuk |
+
+### Miért nem kell stabilitás lépés?
+
+A korábban alkalmazott per-90-napos-bucket Spearman-drift elemzés szisztematikusan false negative-eket produkált:
+
+- **Vol clustering:** A volatilitás-feature-ök (`returns_std_14`, `hml_range`, `bb_width_*` stb.) rezsimfüggők — de ez nem hiba, hanem szándékos. Nagy múltbeli volatilitás → nagy jövőbeli volatilitás → nagyobb MFE. Ez a mintázat rezsimváltásoknál driftként jelent meg, holott valójában az info tartalma érvényes maradt.
+- **MI-ötszöröse:** A stability szűrés REVIEW-ba tette az MI-ben legjobb feature-öket (MI ≈ 0.09–0.10), miközben valóban gyenge feature-ök (MI ≈ 0) SELECTED-ben maradtak.
+- **Stabilitásra a search/fit megfelel:** A cross-validation foldok időben szét vannak választva — a hyperparameter search automatikusan büntet instabil feature-t. Külön stabilitási pre-szűrő ezért redundáns.
+
+### Ismert kockázatok és korlátok
+
+| Kockázat | Tünet | Mitigáció |
+|----------|-------|-----------|
+| Túl agresszív szűrés | A search gyenge eredményeket ad, kevés feature marad | MI_THRESHOLD csökkentése (0.0005-re) és notebook újrafuttatás |
+| Túl laza szűrés | Instabil fold-metrikák, redundáns feature-csomagok | CORR_THRESHOLD csökkentése; post-hoc SHAP-alapú pruning |
+| Scope-eltérés a samplinghez képest | A feature-set más sorhalmazon születik, mint amin a modell tanul | Sample-scope materializáció kötelező |
+| Rejtett leakage | Extrém IV/MI vagy túl jó validációs eredmény | IV-spike keresés + upstream feature audit |
+| Rezsimváltás elveszti a best feature-t | Live deploy-on a volatilitás-feature-ök veszítenek MI-ből | Periodikus re-run; ha MI < 0.01, újraértékelés |
+
+### Validációs checklist
+
+- [ ] A feature analysis ugyanazon snapshot- és sample-scope-on futott, mint a későbbi search.
+- [ ] A végső lista nem tartalmaz olyan oszlopot, amely quality okból drop státuszt kapott.
+- [ ] A bent maradó feature-ek között nincs 0.98 feletti csoporton belüli Pearson-korreláció.
+- [ ] Nincs 0 MI-jű feature a selected listában.
+- [ ] A feature-lista reprodukálható ugyanazzal a snapshot-, sample- és threshold-konfigurációval.
+- [ ] `run_gain_rank()` lefutott és `feature_set.json["gain_ranked"]` friss (a selected lista alapján).
 
 ---
 
-## Kapcsolódó fájlok
+## Gain rank: search input feature-sorrend
 
-| Fájl | Tartalom |
-|------|----------|
-| `src/modeling/feature_engineering/__init__.py` | Publikus API |
-| `src/modeling/feature_engineering/config.py` | `FeatureEngineeringConfig` |
-| `src/modeling/feature_engineering/quality.py` | Quality analízis |
-| `src/modeling/feature_engineering/target_relation.py` | Target relation analízis |
-| `src/modeling/feature_engineering/redundancy.py` | Redundancia klaszterezés |
-| `src/modeling/feature_engineering/stability.py` | Időbeli stabilitás |
-| `src/modeling/feature_engineering/reporting.py` | Output generálás |
-| `src/modeling/feature_engineering/tests/smoke/test_package.py` | Smoke tesztek |
-| `_doc_/2000_features.md` | Feature layer metodológia (lookahead, t-1 lag, csoportok) |
-| `_doc_/5000_modelling.md` | Modeling pipeline áttekintés |
+A feature engineering kimenete (`selected` lista) a joint search bemenete, de a
+joint search-hez egy **gain fontossági sorrend** is szükséges, amelyet a `run_gain_rank()`
+állít elő.
+
+```mermaid
+flowchart LR
+  SEL[feature_set.json: selected]
+  GAIN[run_gain_rank\ncolsample_bytree=1.0 fit]
+  RANKED[gain_ranked — gain fontosság szerint\ncsökkenő sorrend]
+  SEARCH[joint search\nfeature_k[:k] per trial]
+
+  SEL --> GAIN --> RANKED --> SEARCH
+```
+
+**Miért kell a gain rank a search előtt?**
+
+A joint search `feature_k` Optuna paraméterként keresi az optimális feature-számot.
+A rangsor biztosítja, hogy kis `feature_k`-nál az optimizer mindig a legfontosabbnak
+ítélt feature-öket kapja — ez jobb prior, mint a véletlen sorrend.
+
+**Mikor kell újrafuttatni?**
+
+- Ha a `selected` lista megváltozik (MI/quality re-run után).
+- Ha a snapshot vagy a sample scope megváltozik.
+- Új modell esetén mindig a saját scope-jával futtatandó.
+
+A gain rank eredménye a `feature_set.json["gain_ranked"]` kulcsban tárolódik.
+A `run_prune()` lépés utólag eltávolítja a keresett K-n belüli nulla-split
+feature-öket, és az eredmény `pruned_joint` (vagy `pruned_<search_tag>`) kulcson
+kerül tárolásra — ez az aktív modell tényleges feature listája.
+
+Részletes leírás: → `_doc_/methodology_doc/5500_hyper_param_search.md`

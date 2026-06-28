@@ -1,6 +1,50 @@
-"""Sampling config dataclasses — yearly random-hour and walk-forward CV."""
+"""Sampling config dataclasses — yearly random-hour, walk-forward CV, and train/valid split."""
 
 from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class TrainValidSplitConfig:
+    """Immutable configuration for simple train/valid split sampling.
+
+    A single chronological split: all rows before ``valid_start`` are train,
+    all rows from ``valid_start`` onward are valid.  Two embargo windows are
+    applied on the train side only:
+
+    - **Feature lookback embargo** (``feature_lookback_embargo_minutes``): the
+      first N minutes of the train set are excluded to ensure every kept row has
+      a full feature lookback window behind it.
+    - **Target purge** (``target_purge_minutes``): the last N minutes of the
+      train set (i.e. those closest to ``train_end``) are excluded because their
+      target values are computed from price data that falls inside the valid
+      period — this would be a data leak.
+
+    No embargo is applied at the start of the valid period: valid feature
+    computation looks back into train history, which is correct and expected.
+
+    Args:
+        sample_id                       : Unique identifier.
+        asset_id                        : Asset key from config/assets.json.
+        train_start                     : First day of train window (inclusive), YYYY-MM-DD.
+        train_end                       : Last day of train window (inclusive), YYYY-MM-DD.
+        valid_start                     : First day of valid window (inclusive), YYYY-MM-DD.
+        valid_end                       : Last day of valid window (inclusive), YYYY-MM-DD.
+        seed                            : Fixed random seed for per-hour row selection.
+        feature_lookback_embargo_minutes: Minutes excluded from the start of train.
+        target_purge_minutes            : Minutes excluded from the end of train.
+        target_cols                     : Target columns to carry into the sample.
+    """
+
+    sample_id                       : str
+    asset_id                        : str
+    train_start                     : str
+    train_end                       : str
+    valid_start                     : str
+    valid_end                       : str
+    seed                            : int        = 42
+    feature_lookback_embargo_minutes: int        = 240
+    target_purge_minutes            : int        = 60
+    target_cols                     : tuple[str, ...] = ("long_mfe_fw60", "short_mfe_fw60")
 
 
 @dataclass(frozen=True)

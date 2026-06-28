@@ -14,30 +14,17 @@ remain (the live service loads them).
 
 import logging
 import pickle
-from pathlib import Path
 from typing import cast
 
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 
-import utils
+from strategy.strategy.artifacts import _artifact_dir
 
 logger = logging.getLogger(__name__)
 
 # %% Internal helpers
-
-
-def _artifact_dir(session_id: str) -> Path:
-    """Return the artifact directory path for a session.
-
-    Args:
-        session_id: Strategy session identifier.
-
-    Returns:
-        Path to artifacts/{session_id}/.
-    """
-    return Path(utils._resolve_path("artifacts")) / session_id
 
 
 def _build_rank_lookup(

@@ -37,7 +37,11 @@ _FIXED_PARAMS: dict = {
 }
 
 
-def fit_lightgbm_from_search(model_id: str) -> dict:
+def fit_lightgbm_from_search(
+    model_id:    str,
+    search_tag:  str | None = None,
+    feature_key: str        = "selected",
+) -> dict:
     """Fit a LightGBM model from search artifacts.
 
     Training data is loaded via the snap ⋈ model.__sample JOIN (DuckDB-native,
@@ -45,7 +49,12 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
     scoring of the full snapshot range is the separate predict step.
 
     Args:
-        model_id: Key from config/models.json.
+        model_id:    Key from config/models.json.
+        search_tag:  If given, reads params from ``search_{search_tag}/``
+                     instead of the default ``search/`` directory.
+                     ``feature_k`` in best_params is stripped (joint search).
+        feature_key: Key in feature_set.json to use as input features
+                     (default ``"selected"``; use e.g. ``"pruned_joint"``).
 
     Returns:
         Dict with model_id, n_estimators, n_features, selected_features,
@@ -59,19 +68,34 @@ def fit_lightgbm_from_search(model_id: str) -> dict:
     artifact_dir = Path(utils._resolve_path(meta["artifact_dir"]))
     target_name  = meta["target_name"]
 
+    search_dir_name = f"search_{search_tag}" if search_tag else "search"
+    search_dir      = artifact_dir / search_dir_name
+
     best_params: dict = json.loads(
-        (artifact_dir / "search" / "best_params.json").read_text(encoding="utf-8")
+        (search_dir / "best_params.json").read_text(encoding="utf-8")
     )
     search_best: dict = json.loads(
-        (artifact_dir / "search" / "search_best.json").read_text(encoding="utf-8")
+        (search_dir / "search_best.json").read_text(encoding="utf-8")
     )
+    # feature_k is a joint-search meta-param, not a LightGBM hyperparameter
+    best_params.pop("feature_k", None)
+
     feature_set: dict = json.loads(
         (artifact_dir / "feature_engineering" / "feature_set.json").read_text(encoding="utf-8")
     )
-    selected_features: list[str] = feature_set["selected"]
+    selected_features: list[str] = feature_set[feature_key]
+    if not selected_features:
+        raise ValueError(
+            f"feature_set.json['{feature_key}'] is empty for {model_id}"
+        )
 
-    best_iterations = [int(fold["best_iteration"]) for fold in search_best["fold_summary"]]
-    n_estimators    = round(sum(best_iterations) / len(best_iterations) * 1.1)
+    if "fold_summary" in search_best:
+        # legacy format: list of per-fold dicts with best_iteration
+        best_iterations = [int(fold["best_iteration"]) for fold in search_best["fold_summary"]]
+        n_estimators = round(sum(best_iterations) / len(best_iterations) * 1.1)
+    else:
+        # new flat format (t4 refactor): single best_iteration at top level
+        n_estimators = round(int(search_best["best_iteration"]) * 1.1)
 
     final_params: dict = {**_FIXED_PARAMS, **best_params, "n_estimators": n_estimators, "random_state": 42}
 

@@ -346,7 +346,6 @@ def _render_signal_trigger_card(asset_id: str | None) -> None:
         state_color = (
             _GREEN if state_str == "LONG"
             else _RED if state_str == "SHORT"
-            else _GOLD if state_str == "COOLDOWN"
             else _MUTED
         )
         signal_html = (

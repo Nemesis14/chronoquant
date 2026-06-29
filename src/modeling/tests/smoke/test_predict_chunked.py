@@ -8,8 +8,6 @@ Covers:
 
 from __future__ import annotations
 
-import json
-import pickle
 
 import duckdb
 import lightgbm as lgb

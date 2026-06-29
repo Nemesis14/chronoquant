@@ -52,10 +52,15 @@ For non-trivial implementation work:
 
 ### Model selection for spawned agents
 
-- **Search / exploration tasks** → always use `Explore` agent with `model: "haiku"`.
-  Never use `general-purpose` for file searches, symbol lookups, or read-only
-  codebase exploration. `general-purpose` is a Sonnet-class agent and is
-  disproportionately expensive for these tasks.
-- **Implementation / analysis tasks** → use the appropriate named agent
-  (database_agent, ui_agent, etc.) without model override (inherits Sonnet).
-- Rule: if the agent will not write or edit any file, it should run on Haiku.
+⚠️ **`general-purpose` agent TILOS ebben a projektben.** Drága (Sonnet-class) és helyettesíthető. Minden esetben van jobb alternatíva.
+
+| Ha a task... | Akkor |
+|---|---|
+| Fájlt keres, szimbólumot lokalizál, kódot olvas | `Explore` + `model: "haiku"` |
+| 1-2 fájl izolált implementáció | névvel ellátott agent + `model: "haiku"` |
+| Cross-file, komplex implementáció | névvel ellátott agent (Sonnet default) |
+| Validáció, tesztelés | `validator_agent` (Sonnet default) |
+
+**Ökölszabály: ha az agent nem fog fájlt írni vagy szerkeszteni → Haiku.**
+
+Ha valaha `general-purpose`-t akarsz hívni: állj meg, és döntsd el melyik sorba esik a fenti táblából. Az esetek 100%-ában van jobb opció.

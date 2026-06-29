@@ -45,8 +45,6 @@ def evaluate(
     entry_cutoff_s   = entry_cutoff_short if entry_cutoff_short is not None else _base_cutoff
     max_hold_minutes = int(decision_params.get("max_hold_minutes", 60))
 
-    entry_cutoff = _base_cutoff  # kept for reason strings
-
     if state.status == FLAT:
         long_signal  = score_pct_long >= entry_cutoff_l
         short_signal = (1.0 - score_pct_short) >= entry_cutoff_s

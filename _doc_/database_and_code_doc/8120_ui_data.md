@@ -18,7 +18,9 @@ flowchart TD
   CFG["config/*.json"] --> DATA["ui/data.py"]
   DB["DuckDB predictions/ohlcv"] --> DATA
   TDB["trading.db"] --> DATA
-  ART["artifacts/<session>/summary/trades/equity"] --> DATA
+  ART_L["artifacts/<long_session>/strategy_artifact.json"] --> DATA
+  ART_S["artifacts/<short_session>/strategy_artifact.json"] --> DATA
+  BIN["Binance API (current_position)"] --> DATA
   DATA --> UI["main.py + components/*"]
 ```
 
@@ -40,9 +42,39 @@ Returns: `tuple[str | None, dict]`
 
 ### `load_long_short_strategies(asset_id=None)`
 
-A current `strategy_artifact.json` decision paramétereiből long/short threshold párost ad vissza.
+A long és short session külön-külön betöltött `strategy_artifact.json` fájljaiból
+állítja össze a threshold-párokat. Mindkét dict tartalmaz: `entry_cutoff`, `n_trades`,
+`win_rate`, `total_lr`, `compounded`, `session_id` mezőket.
 
-Returns: `tuple[dict, dict]`
+- Long artifact: `_active_long_session_id()` által meghatározott session
+- Short artifact: `_active_short_session_id()` által meghatározott session
+
+Returns: `tuple[dict, dict]` — `(long_cfg, short_cfg)`
+
+### `_active_long_session_id()`
+
+A `trading.json`-ból olvassa a `strategy_session_long_id` kulcsot.
+Visszaesési (fallback) sorrend: `strategy_session_long_id` → `strategy_session_id` → `None`.
+
+Returns: `str | None`
+
+### `_active_short_session_id()`
+
+A `trading.json`-ból olvassa a `strategy_session_short_id` kulcsot.
+Visszaesési (fallback) sorrend: `strategy_session_short_id` → `strategy_session_id` → `None`.
+
+Returns: `str | None`
+
+### `_load_session_artifact(session_id)`
+
+A megadott `session_id`-hoz tartozó `artifacts/<session_id>/strategy_artifact.json`
+fájlt olvassa be. Hiba esetén üres dict-et ad vissza.
+
+| Paraméter | Típus | Leírás |
+|-----------|-------|--------|
+| `session_id` | `str \| None` | strategy session azonosító |
+
+Returns: `dict`
 
 ## DB utility függvények
 
@@ -74,7 +106,12 @@ Returns: `dict | None`
 
 ### `active_position(asset_id=None)`
 
-Az utolsó nyitott pozíció trading DB-ből.
+Az utolsó nyitott pozíciót adja vissza. Elsődleges forrás a `trading.db`
+`trading_positions` táblája (státusz: `OPEN`, `LONG`, `LONG_OPEN`, `SHORT`, `SHORT_OPEN`).
+
+Ha a tábla üres (nem fut service, vagy nincs helyi rekord), **fallback**: a
+`binance_data.current_position()` hívás lekérdezi a Binance Futures nyitott pozícióját.
+A Binance-tól kapott dict `_source == "binance"` mezőt tartalmaz.
 
 Returns: `dict | None`
 
@@ -110,13 +147,19 @@ Returns: `pd.DataFrame`
 
 ## Alacsony szintű helper réteg
 
+### `_load_rank_lookups()`
+
+Session-specifikus rank lookup párokat tölt be:
+- **long lookup**: `_active_long_session_id()` sessionjéből a `rank_lookup_long_path` artifact
+- **short lookup**: `_active_short_session_id()` sessionjéből a `rank_lookup_short_path` artifact
+
+Mindkét lookup egy `(score_raw, score_pct)` numpy array-párból áll.
+
+Returns: `tuple[tuple[np.ndarray, np.ndarray] | None, tuple[np.ndarray, np.ndarray] | None]`
+
 ### `_coerce_prediction_frame(df)`
 
 Predikciós DataFrame tipizálása és normalizálása.
-
-### `_resolve_long_short_pred_cols(...)`
-
-Long/short predikció oszlopnevek feloldása.
 
 ### `_read_sql(...)`, `_scalar(...)`, `_db_path(...)`, `_session_artifact_path(...)`, `_repo_path(...)`, `_quote_identifier(...)`, `_json_safe(...)`
 

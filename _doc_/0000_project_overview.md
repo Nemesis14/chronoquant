@@ -121,11 +121,10 @@ ui/  ◀──  predictions + strat.* táblák (lab.duckdb ATTACH) + trade journ
 | Strategy tables (trades/equity/cutoffs) | `lab.duckdb` strat séma (`strat."<session>__*"`) | UI és validáció közvetlen query-vel éri el |
 | Registry (provenance lánc) | `registry.duckdb` reg séma | Normalizált igazságforrás; assets → snapshots → models → strategies → deployments |
 | Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output; feature_set.json → reg.feature_sets |
-| Model-specifikus elemzések | `artifacts/<model_id>/analysis/` (`.ipynb`, `.html`) | analyst_agent output; konkrét modellhez kötött (train/valid, sweep review stb.) |
-| Stratégia-specifikus elemzések | `artifacts/<session_id>/analysis/` (`.ipynb`, `.html`) | analyst_agent output; konkrét strategy session-höz kötött |
+| Model-specifikus elemzések | `artifacts/<model_id>/analysis/` (`.ipynb`, `.html`) — számozott: `01_sampling`, `02_feature_engineering`, `03_hyperparameter_search`, `04_strategy` | analyst_agent output; konkrét modellhez kötött |
 | Általános adatelemzések | `_doc_/models_doc/XXXX_<slug>.ipynb` + `.html` | analyst_agent output; nem kötött model/session ID-hoz (target, feature, sampling) |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
-| Strategy artifacts | `artifacts/<session_id>/` — `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `sweep_results.csv` | Runtime use by live trading loop; útvonalak a reg.artifacts-ban |
+| Strategy artifacts | `artifacts/<model_id>/strategy/` — `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `grid_results.csv` | Runtime use by live trading loop; útvonalak a reg.artifacts-ban. Külön `strat_*` top-level mappa nem létezik — strategy a modell almappájában él. |
 
 **Rule:** strukturált, queryolható adat → DuckDB (séma + tábla). Blob és ember-report → fájl.
 Mindent a registry köt össze. Részletek: → `_doc_/database_and_code_doc/0002_data_architecture.md`
@@ -150,6 +149,7 @@ src/
     search/             Hyperparameter search (LightGBM + Optuna)
     feature_engineering/  Feature quality, target-relation, redundancy, stability library
     text/               Future placeholder
+    pipeline.py         Unified pipeline orchestrator (setup|sample|FE|search|train|predict)
     00_create_sample.py
     01_feature_engineering.ipynb
     02_hyper_param_search.py
@@ -186,15 +186,25 @@ artifacts/          Model and strategy artifacts
     metadata.json / audit.json      Sample metadata (written by sample step)
     sample_train_valid.parquet      Hourly sample: own target + pred_{dir} + all feat_* + fold_id
     model.pkl / features.json / params.json
-    search/                         Hyperparameter search results
-    feature_engineering/            01_feature_engineering.ipynb + .html + feature_set.json
-  <session_id>/                     Strategy session — naming: strat_solusdt_fw60_combo_{start}_{end}
-    isotonic_long.pkl               Fitted sklearn IsotonicRegression (long direction)
-    isotonic_short.pkl              Fitted sklearn IsotonicRegression (short direction)
-    rank_lookup_long.parquet        Rank percentile lookup — score_raw|score_pct|bucket_id|bucket_mean/median/p75_mfe
-    rank_lookup_short.parquet       Rank percentile lookup (short direction)
-    strategy_artifact.json          Grid search best setup + decision_params + search_info + strat table refs
-    sweep_results_grid.csv          Grid search results: all (direction, entry_cutoff, tp_spec, sl_spec) combinations
+    01_sampling.html                Rendered analysis reports (root-level HTML)
+    02_feature_engineering.html
+    03_hyperparameter_search.html
+    04_strategy.html
+    search/                         Hyperparameter search results (active)
+    _experimental/                  Kísérleti search variánsok (search_joint, search_top10, gp, stb.)
+    feature_engineering/            feature_set.json
+    analysis/                       Numbered Quarto notebooks
+      01_sampling.ipynb             Train/valid sampling analysis
+      02_feature_engineering.ipynb  Feature MI + correlation analysis
+      03_hyperparameter_search.ipynb  Optuna search review
+      04_strategy.ipynb             Strategy signal validation (validation period day charts)
+    strategy/                       Strategy artifacts — strategy session outputjai
+      strategy_artifact.json        Grid search best setup + decision_params + strat table refs
+      rank_lookup_long.parquet      Rank percentile lookup — score_raw|score_pct|bucket_id|bucket_mean/median/p75_mfe
+      rank_lookup_short.parquet     Rank percentile lookup (short direction)
+      isotonic_long.pkl             Fitted sklearn IsotonicRegression (long direction)
+      isotonic_short.pkl            Fitted sklearn IsotonicRegression (short direction)
+      grid_results.csv              Grid search results: all (direction, entry_cutoff, tp_spec, sl_spec)
 database/           DuckDB files (3-fájlos topológia — részletek: _doc_/database_and_code_doc/0002_data_architecture.md)
   solusdt/
     solusdt.duckdb         <- LIVE (main séma)
@@ -277,8 +287,9 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step s
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step predict
 
-# Deploy trigger:
-uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_combo_2101_2605
+# Deploy trigger (dual-session — long és short külön):
+uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_long_2101_2605
+uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_short_2101_2605
 ```
 
 | Lépés | Input | Output |
@@ -383,10 +394,10 @@ Strategy calibration is performed offline by `src/strategy/`, then the artifact 
 
 **Live state machine (`src/trading/live/`) — epic_036 után:**
 - **States:** FLAT → LONG / SHORT → FLAT (COOLDOWN state eltávolítva)
-- Entry: `score_pct_long >= entry_cutoff` (long); `(1 - score_pct_short) >= entry_cutoff` (short — invertált ranking, mert `short_mfe_fw60 < 0`)
+- Entry: `score_pct_long >= entry_cutoff_long` (long); `(1 - score_pct_short) >= entry_cutoff_short` (short — invertált ranking, mert `short_mfe_fw60 < 0`)
 - Exit: `hold_minutes >= max_hold_minutes` (timeout-only; intrabar TP/SL a live service-ben külön epicben)
-- Service loads `strategy_artifact.json` + rank lookup parquets; converts raw predictions to percentiles via `np.interp` at each bar
-- `config/trading.json`: `strategy_session_id`
+- Service loads two `strategy_artifact.json` files (long + short session) + two rank lookup parquet pairs; converts raw predictions to percentiles via `np.interp` at each bar
+- `config/trading.json`: `strategy_session_long_id` + `strategy_session_short_id` — path-like string az `artifacts/` alá: `"lgbm_solusdt_l_fw60_2101_2605/strategy"` (külön cutoff: long=0.98, short=0.94)
 - ⚠️ Intrabar TP/SL monitoring (bracket order) a live service-ben még nem implementált — külön epic szükséges
 
 ---

@@ -6,7 +6,7 @@
 Ez a két fájl a live runtime döntési magja: az egyik a mutable állapotot tartja,
 a másik egyetlen bar alapján visszaadja a következő akciót.
 
-> Módszertani háttér (state machine design, entry/exit logika, cooldown rationale):
+> Módszertani háttér (state machine design, entry/exit logika, timeout logika):
 > → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
 
 ---
@@ -31,7 +31,7 @@ flowchart TD
 Mutable dataclass egy service run idejére.
 
 Fő mezők:
-- lifecycle: `status`, `armed`, `cooldown_until`;
+- lifecycle: `status` (`FLAT` | `LONG` | `SHORT`);
 - open position: `position_id`, `side`, `entry_time`, `entry_price`, `quantity`;
 - risk counters: `daily_trade_count`, `daily_loss_usdt`, `consecutive_errors`, `last_trade_date`.
 
@@ -51,7 +51,7 @@ Returns: `None` - napi trade számláló és veszteség limit alapját frissíti
 
 Returns: `TradingState` - journalból restore-olt vagy üres állapot.
 
-## `evaluate(state, score_pct_long, score_pct_short, decision_params, now=None)`
+## `evaluate(state, score_pct_long, score_pct_short, decision_params, now=None, entry_cutoff_long=None, entry_cutoff_short=None)`
 
 Egyetlen closed bar döntését adja vissza állapotmódosítás nélkül.
 
@@ -60,47 +60,52 @@ Egyetlen closed bar döntését adja vissza állapotmódosítás nélkül.
 | `state` | `TradingState` | aktuális runtime állapot |
 | `score_pct_long` | `float` | long percentile |
 | `score_pct_short` | `float` | short percentile |
-| `decision_params` | `dict` | strategy artifact decision contract |
-| `now` | `datetime | None` | opcionális idő a tesztelhetőséghez |
+| `decision_params` | `dict` | strategy artifact decision contract (alap `entry_cutoff` forrása) |
+| `now` | `datetime \| None` | opcionális idő a tesztelhetőséghez |
+| `entry_cutoff_long` | `float \| None` | opcionális long belépési cutoff; ha `None`, a `decision_params["entry_cutoff"]` az alap |
+| `entry_cutoff_short` | `float \| None` | opcionális short belépési cutoff; ha `None`, a `decision_params["entry_cutoff"]` az alap |
+
+A `TradingService` a long cutoffot a long session artifactból, a short cutoffot a short
+session artifactból tölti be, és mindkettőt átadja ennek a függvénynek. Így a két irány
+belépési küszöbe egymástól független.
 
 Returns: `tuple[str, str]` - `(decision, reason)`.
 
 ```mermaid
 flowchart TD
-  A["state.status"] --> B{"COOLDOWN?"}
-  B -->|igen| C["remaining / rearm check"]
-  B -->|nem| D{"FLAT?"}
-  D -->|igen| E["entry threshold + edge logic"]
-  D -->|nem| F{"LONG?"}
-  F -->|igen| G["max_hold / opposite_edge / signal_decay"]
-  F -->|nem| H["SHORT exit rules"]
+  A["state.status"] --> B{"FLAT?"}
+  B -->|igen| C["entry threshold check\nlong_pct >= cutoff_l\ninv_short_pct >= cutoff_s"]
+  C --> C1{"jel?"}
+  C1 -->|ENTER_LONG| D1["ENTER_LONG"]
+  C1 -->|ENTER_SHORT| D2["ENTER_SHORT"]
+  C1 -->|nincs| D3["HOLD"]
+  B -->|nem| E{"LONG?"}
+  E -->|igen| F["hold_min >= max_hold_min?"]
+  F -->|igen| G["EXIT_LONG"]
+  F -->|nem| H["HOLD"]
+  E -->|nem SHORT| I["hold_min >= max_hold_min?"]
+  I -->|igen| J["EXIT_SHORT"]
+  I -->|nem| K["HOLD"]
 ```
 
 ## Döntési szabályok
 
 ### FLAT
 
-- `armed == False` esetén mindig `HOLD`.
-- Long belépés: `score_pct_long >= long_entry_pct`.
-- Short belépés: `score_pct_short >= short_entry_pct`.
-- Kettős jel esetén `highest_edge` szabály dönt.
+- Long belépés: `score_pct_long >= entry_cutoff_long`.
+- Short belépés: `(1.0 - score_pct_short) >= entry_cutoff_short`.
+- Kettős jel esetén long prioritás: `ENTER_LONG` dönt.
+- Egyik feltétel sem teljesül: `HOLD`.
 
 ### LONG
 
-- `max_hold_minutes` túllépése -> `EXIT_LONG`
-- `short_entry_pct` elérése `min_hold_minutes` után -> `EXIT_LONG`
-- `score_pct_long < rearm_pct` `min_hold_minutes` után -> `EXIT_LONG`
+- `hold_minutes >= max_hold_minutes` -> `EXIT_LONG` (timeout-only exit).
+- Egyéb esetben: `HOLD`.
 
 ### SHORT
 
-- `max_hold_minutes` túllépése -> `EXIT_SHORT`
-- `long_entry_pct` elérése `min_hold_minutes` után -> `EXIT_SHORT`
-- `score_pct_short < rearm_pct` `min_hold_minutes` után -> `EXIT_SHORT`
-
-### COOLDOWN
-
-- cooldown alatt `HOLD`
-- lejárat után is addig `HOLD`, amíg mindkét percentile `<= rearm_pct`
+- `hold_minutes >= max_hold_minutes` -> `EXIT_SHORT` (timeout-only exit).
+- Egyéb esetben: `HOLD`.
 
 ## Tesztek
 

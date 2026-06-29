@@ -162,6 +162,31 @@ Mindkét esetben a ticket validálása (→ `done_`) a **validator_agent** felad
 
 ---
 
+## Agent + Model Routing — Kötelező
+
+⚠️ **`general-purpose` agent TILOS.** Minden keresési/lookup task `Explore + haiku`-val fut.
+
+| Task típus | Agent | Model |
+|---|---|---|
+| Fájl keresés, szimbólum lookup, read-only olvasás | `Explore` | `haiku` |
+| 1-2 fájl izolált implementáció | névvel ellátott agent | `haiku` |
+| Cross-file / architektúra-szintű implementáció | névvel ellátott agent | sonnet (default) |
+| Validáció, tesztelés | `validator_agent` | sonnet (default) |
+
+**Ökölszabály: ha az agent nem ír fájlt → Haiku.**
+
+---
+
+## Session Zárás
+
+Zárd le a sessiont, ha az adott fázis kész — ne tarts orchestrátort nyitva órákon át.
+
+- **Flow A:** session lezárul a `pr_` ticket és validálás után.
+- **Flow B Szegmentált:** session lezárul minden agent-típus váltásnál.
+- **Flow B Orchestrált:** session lezárul, miután az összes task `pr_` státuszban van és a validator futott.
+
+---
+
 ## Delegation Table
 
 | Domain | Agent |

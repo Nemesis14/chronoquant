@@ -89,7 +89,7 @@ def style_df(
     df: pd.DataFrame,
     max_rows: int = 30,
     precision: int = 4,
-) -> "pd.io.formats.style.Styler":
+) -> pd.io.formats.style.Styler:
     """Return a styled pandas DataFrame for Quarto notebook display.
 
     Auto-format rules:
@@ -139,10 +139,14 @@ def style_df(
         styler = styler.set_properties(subset=str_cols, **{"text-align": "left"})
 
     fmt: dict[str, str | object] = {}
-    for c in int_cols:      fmt[c] = "{:,}"
-    for c in int_val_cols:  fmt[c] = "{:,.0f}"
-    for c in pct_cols:      fmt[c] = "{:.2f}%"
-    for c in float_cols:    fmt[c] = f"{{:,.{precision}f}}"
+    for c in int_cols:
+        fmt[c] = "{:,}"
+    for c in int_val_cols:
+        fmt[c] = "{:,.0f}"
+    for c in pct_cols:
+        fmt[c] = "{:.2f}%"
+    for c in float_cols:
+        fmt[c] = f"{{:,.{precision}f}}"
 
     if fmt:
         styler = styler.format(fmt, na_rep="—")
@@ -167,6 +171,53 @@ def display_table(
             f'margin:0.8rem 0 0.3rem 0;">{caption}</p>'
         ))
     _ipy_display(style_df(df, max_rows=max_rows, precision=precision))
+
+
+# ── ChronoQuant notebook palette (analysis notebooks) ─────────────────────────
+CQ_COLORS = {
+    "blue":       "#1696d2",
+    "black":      "#000000",
+    "gray_dark":  "#353535",
+    "gray":       "#696969",
+    "gray_light": "#d2d2d2",
+    "yellow":     "#fdbf11",
+    "orange":     "#f15a24",
+    "red":        "#ec008b",
+}
+
+CQ_SEQUENCE = [
+    CQ_COLORS["blue"],
+    CQ_COLORS["yellow"],
+    CQ_COLORS["orange"],
+    CQ_COLORS["gray"],
+    CQ_COLORS["red"],
+]
+
+
+def setup_cq_theme() -> None:
+    """Set up the CQ notebook color theme (analysis notebooks).
+
+    Uses CQ_SEQUENCE palette + whitegrid style + ChronoQuant rc settings.
+    Call once in the Setup cell before any plotting.
+    """
+    sns.set_theme(
+        style="whitegrid",
+        rc={
+            "figure.figsize": (9, 5.5),
+            "figure.dpi": 120,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.edgecolor": CQ_COLORS["gray"],
+            "axes.labelcolor": CQ_COLORS["gray_dark"],
+            "xtick.color": CQ_COLORS["gray_dark"],
+            "ytick.color": CQ_COLORS["gray_dark"],
+            "grid.color": CQ_COLORS["gray_light"],
+            "grid.linewidth": 0.8,
+            "axes.axisbelow": True,
+            "legend.frameon": False,
+        },
+    )
+    sns.set_palette(CQ_SEQUENCE)
 
 
 # ── Plot Templates ─────────────────────────────────────────────────────────────

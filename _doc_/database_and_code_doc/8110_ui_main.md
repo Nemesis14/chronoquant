@@ -80,8 +80,18 @@ Leágazások:
 
 A fájl végén:
 - sidebar épül;
-- `active_asset_id = "solusdt_fw60"` és `asset_label = "SOL / 1m"` rögzül;
+- `active_asset_id` az `utils.load_asset_config(None)["database"]["asset_id"]`-ból jön, `asset_label = "SOL / 1m"` rögzül;
 - `st.columns([3, 1])` layoutban balra a chart és log, jobbra a trade panel kerül.
+
+## `_render_strategy_card()` — hívás eltávolítva
+
+A `main.py` tartalmaz egy `_render_strategy_card()` függvényt (régi egyoszlopos
+formátum), de annak **hívása eltávolításra került** a top-level layoutból —
+duplikáció volt a `trade_panel.py`-ban megvalósított kártyákkal.
+
+A strategy kártyák megjelenítése kizárólag a `trade_panel.py`-ban él:
+- `_render_strategy_card(cfg, direction)` — egy kártya HTML-je
+- `_render_signal_trigger_card(asset_id)` — hívja mindkét kártyát egymás mellett
 
 ---
 

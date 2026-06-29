@@ -60,7 +60,7 @@ def format_analysis_table(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _build_styler(df: pd.DataFrame) -> "pd.io.formats.style.Styler":
+def _build_styler(df: pd.DataFrame) -> pd.io.formats.style.Styler:
     formatted = format_analysis_table(df)
     numeric_cols = [
         col

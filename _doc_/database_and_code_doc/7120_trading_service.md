@@ -6,7 +6,7 @@ A `TradingService` a live trading runtime központi orchestratora. Egyetlen
 objektumba fogja a strategy artifact betöltését, az 1m szinkront, a percentile
 konverziót, a döntéshozást, a Binance végrehajtást és a journalinget.
 
-> Módszertani háttér (cycle design, cooldown logic, risk limits):
+> Módszertani háttér (cycle design, entry/exit logika, risk limits):
 > → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
 
 ---
@@ -20,7 +20,6 @@ flowchart TD
   LOOP --> SYNC["_sync_data"]
   LOOP --> READ["_read_latest_bar"]
   LOOP --> PCT["_to_percentiles"]
-  LOOP --> REARM["_apply_cooldown_rearm"]
   LOOP --> EVAL["strategy.evaluate"]
   LOOP --> EXEC["_execute"]
   LOOP --> SIG["journal.insert_signal"]
@@ -39,10 +38,22 @@ Inicializálja a runtime kontextust.
 | `config` | `dict` | `config/trading.json` feloldott tartalma |
 
 Lépések:
-- betölti a `strategy_session_id`-hoz tartozó artifactot;
-- beolvassa a rank lookup parqueteket;
+- betölti a **long és short session külön artifactját** (`strategy_session_long_id` + `strategy_session_short_id`);
+- `entry_cutoff_long`: a long session `decision_params["entry_cutoff"]`-ja;
+- `entry_cutoff_short`: a short session `decision_params["entry_cutoff"]`-ja;
+- beolvassa a **session-specifikus rank lookup parqueteket** (long lookup a long sessionből, short a shortból);
 - rögzíti a predikció oszlopneveket (`long_pred`, `short_pred`);
 - létrehozza a `BinanceFuturesClient` példányt.
+
+Dual session konfiguráció (trading.json):
+- `strategy_session_long_id` — long session azonosítója (kötelező)
+- `strategy_session_short_id` — short session azonosítója (fallback: `strategy_session_id`)
+
+Ha `strategy_session_long_id` nincs megadva, a service `ValueError`-t dob.
+
+Dual rank lookup tárolás:
+- `_rank_scores_long` / `_rank_pct_long` — long session `rank_lookup_long_path` parquetből
+- `_rank_scores_short` / `_rank_pct_short` — short session `rank_lookup_short_path` parquetből
 
 ## `start()` / `stop()` / `is_running()`
 
@@ -90,21 +101,26 @@ sequenceDiagram
   participant Cycle as _cycle()
   participant Sync as _sync_data()
   participant DB as predictions
+  participant PCT as _to_percentiles()
   participant Eval as strategy.evaluate()
   participant Exec as _execute()
   participant Journal as journal
 
   Cycle->>Sync: sync OHLCV/features/predictions
-  Cycle->>DB: latest closed bar
-  Cycle->>Cycle: raw -> percentile
-  Cycle->>Eval: decision(state, pct_long, pct_short)
+  Cycle->>DB: latest closed bar (pred_long, pred_short, close)
+  Cycle->>PCT: raw -> percentile (session-specifikus lookup)
+  PCT-->>Cycle: score_pct_long, score_pct_short
+  Cycle->>Eval: evaluate(state, pct_long, pct_short, decision_params, entry_cutoff_long, entry_cutoff_short)
+  Eval-->>Cycle: decision, reason
   Cycle->>Exec: execute decision
   Cycle->>Journal: insert_signal(...)
 ```
 
 ## `_to_percentiles(pred_long, pred_short)`
 
-`np.interp`-et használ a rank lookup görbéken.
+`np.interp`-et használ a session-specifikus rank lookup görbéken:
+- long percentile: `_rank_scores_long` / `_rank_pct_long` (long session lookupból)
+- short percentile: `_rank_scores_short` / `_rank_pct_short` (short session lookupból)
 
 | Paraméter | Típus | Leírás |
 |-----------|------|--------|
@@ -112,12 +128,6 @@ sequenceDiagram
 | `pred_short` | `float` | nyers short score |
 
 Returns: `tuple[float, float]` - `(pct_long, pct_short)` a `[0, 1]` tartományban.
-
-## `_apply_cooldown_rearm(score_pct_long, score_pct_short, now)`
-
-A `COOLDOWN` -> `FLAT` átmenet előfeltételeit érvényesíti.
-
-Returns: `None` - közvetlenül a `self.state`-et módosítja.
 
 ## `_execute(decision, reason, bar_open_time, bar_close, now)`
 
@@ -145,9 +155,16 @@ Fő műveletek:
 
 ## `_close_position(mark_price, reason, now)`
 
-Pozíció zárása, PnL számítás, cooldown beállítás.
+Pozíció zárása, PnL számítás és state visszaállítás `FLAT`-ra.
 
 Returns: `None`
+
+Fő műveletek:
+- `exchange.close_long/close_short`;
+- PnL számítás (entry-exit különbség × qty);
+- `journal.close_position` + `journal.insert_order`;
+- `state.record_trade_result(pnl_usdt)`;
+- `state.status = FLAT` + `state.clear_position()`.
 
 ## `_sync_data()`
 

@@ -345,8 +345,8 @@ def get_current_run_status(db_path: str) -> dict | None:
             last_decision = signal[0].get("decision", "")
             state_before  = signal[0].get("state_before", "FLAT")
             if "EXIT" in last_decision:
-                state = "COOLDOWN"
-            elif state_before in ("FLAT", "COOLDOWN"):
+                state = "FLAT"
+            elif state_before == "FLAT":
                 state = state_before
             else:
                 state = "FLAT"

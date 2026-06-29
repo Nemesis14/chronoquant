@@ -48,7 +48,7 @@ All artifacts land under `artifacts/{session_id}/` (created if absent):
 
 | File | Format | Description |
 |------|--------|-------------|
-| `rank_lookup_long.parquet` | Parquet (zstd) | Per-row lookup: score_raw, score_pct, bucket_id, bucket stats |
+| `rank_lookup_long.parquet` | Parquet (zstd) | Per-row lookup: score_raw, score_pct, bucket_id, bucket_mean_mfe, bucket_hit_rate, bucket_median_mfe, bucket_p75_mfe |
 | `rank_lookup_short.parquet` | Parquet (zstd) | Same structure for the short direction |
 | `isotonic_long.pkl` | Pickle | Fitted `sklearn.IsotonicRegression` for long |
 | `isotonic_short.pkl` | Pickle | Fitted `sklearn.IsotonicRegression` for short |
@@ -87,6 +87,10 @@ New columns added to `calibrated_df`:
 | `bucket_mean_mfe_short` | float | Bucket's mean realized short MFE |
 | `bucket_hit_rate_long` | float 0-1 | Fraction of calib-period rows with long MFE > 0 |
 | `bucket_hit_rate_short` | float 0-1 | Fraction of calib-period rows with short MFE > 0 |
+| `bucket_median_mfe_long` | float | Bucket's median realized long MFE — basis for `median` TP-spec |
+| `bucket_median_mfe_short` | float | Bucket's median realized short MFE |
+| `bucket_p75_mfe_long` | float | Bucket's 75th-percentile realized long MFE — basis for `p75` TP-spec |
+| `bucket_p75_mfe_short` | float | Bucket's 75th-percentile realized short MFE |
 | `pred_long_cal` | float | Isotonic regression predicted MFE for long |
 | `pred_short_cal` | float | Isotonic regression predicted MFE for short |
 
@@ -143,6 +147,10 @@ Returns: `pd.DataFrame` sorted by `score_raw` ascending, with columns:
 | `bucket_id` | int 1-10 | Decile bucket |
 | `bucket_mean_mfe` | float | Mean realized MFE for this bucket |
 | `bucket_hit_rate` | float | Fraction(mfe > 0) for this bucket |
+| `bucket_median_mfe` | float | Median realized MFE for this bucket |
+| `bucket_p75_mfe` | float | 75th-percentile realized MFE for this bucket |
+
+**TP-spec kapcsolat:** A `bucket_median_mfe` és `bucket_p75_mfe` oszlopok a strategy session TP (take-profit) célárának alapjai. A strategy calibration `p75` TP-spec-je a `bucket_p75_mfe`-t használja célárként, a `median` TP-spec a `bucket_median_mfe`-t. A lookup ezért tartalmazza mindkét percentilis értéket bucket-szinten denormalizálva, hogy a TradingService a teljes tábla minden sorához join nélkül elérhesse.
 
 ```mermaid
 flowchart TD

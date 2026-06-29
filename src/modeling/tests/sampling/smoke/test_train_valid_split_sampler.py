@@ -21,7 +21,6 @@ from modeling.sampling.snapshot_sampler import (
     build_train_valid_split_ctas_sql,
     build_train_valid_split_select_sql,
     sample_table_fqn,
-    snapshot_table_fqn,
 )
 
 pytestmark = pytest.mark.smoke

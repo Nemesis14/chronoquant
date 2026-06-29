@@ -99,10 +99,10 @@ def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     if df.empty:
         return _empty_frame()
-    realized_pnl = pd.to_numeric(df.get("realizedPnl", 0), errors="coerce").fillna(0.0)
+    realized_pnl = pd.to_numeric(df.get("realizedPnl", 0), errors="coerce").fillna(0.0)  # type: ignore[union-attr]
     # Keep only closing fills (realizedPnl != 0); entry fills have realizedPnl == 0
-    df = df[realized_pnl.abs() >= 0.001].copy()
-    realized_pnl = realized_pnl[df.index]
+    df = df[realized_pnl.abs() >= 0.001].copy()  # type: ignore[union-attr]
+    realized_pnl = realized_pnl[df.index]  # type: ignore[index]
     if df.empty:
         return _empty_frame()
     # BUY closes a SHORT position; SELL closes a LONG position

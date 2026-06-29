@@ -15,9 +15,9 @@ Metodológiai háttér: [5600_model_training.md](../methodology_doc/5600_model_t
 
 ```mermaid
 flowchart TD
-  ENTRY[train_model\ntrain.py] --> DISP{trainer\nconfig/models.json}
+  ENTRY["train_model(model_id, search_tag, feature_key)\ntrain.py"] --> DISP{trainer\nconfig/models.json}
   DISP --> LGBM[fit_lightgbm_from_search\nfit_lgbm.py]
-  LGBM --> SEARCH[search/best_params.json\nsearch/search_best.json\nfeature_engineering/feature_set.json]
+  LGBM --> SEARCH["search_{tag}/search_best.json\n(default: search/search_best.json)\nfeature_engineering/feature_set.json"]
   LGBM --> DATA[_load_train_data\nsnap x model.__sample JOIN]
   DATA --> FIT[lgb.LGBMRegressor.fit]
   FIT --> SAVE[_save_artifacts\nmodel.pkl, features.json, params.json]
@@ -37,14 +37,16 @@ flowchart LR
 
 ## `train.py` — Dispatcher
 
-### `train_model(model_id)`
+### `train_model(model_id, search_tag=None, feature_key="selected")`
 
 Betölti a `config/models.json`-ból a modell `trainer` mezőjét, és a megfelelő
 trainer implementációhoz delegál. Jelenleg csak `lightgbm_regression` támogatott.
 
-| Paraméter | Típus | Leírás |
-|-----------|-------|--------|
-| `model_id` | `str` | Modell kulcs a `config/models.json`-ból |
+| Paraméter | Típus | Default | Leírás |
+|-----------|-------|---------|--------|
+| `model_id` | `str` | — | Modell kulcs a `config/models.json`-ból |
+| `search_tag` | `str \| None` | `None` | Opcionális search könyvtár tag (pl. `"joint"`, `"joint_reg_gp20"`). Ha meg van adva, a `search_{tag}/search_best.json` fájlból olvassa a search resultsot `search/search_best.json` helyett. Használandó pl. `search_joint` módban, ahol a long és short modell közösen keresett paraméterei a `search_joint/` könyvtárban vannak. |
+| `feature_key` | `str` | `"selected"` | Feature set kulcs a `feature_set.json`-ban. Default: `"selected"` (az FE által kiválasztott feature-ök). Más értékkel (pl. `"top10"`) alternatív feature subset használható. |
 
 Returns: `dict` — legalább `model_id`, `n_estimators`, `n_features`,
 `selected_features`, `artifact_dir` mezőkkel.
@@ -60,7 +62,7 @@ sequenceDiagram
   P ->> T: model_id
   T ->> C: load_models_config()
   C -->> T: trainer = "lightgbm_regression"
-  T ->> L: model_id
+  T ->> L: model_id, search_tag, feature_key
   L -->> T: artifact dict
   T -->> P: artifact dict
 ```

@@ -14,16 +14,38 @@ _SRC = str(Path(__file__).resolve().parents[1])
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-import duckdb
-import pandas as pd
+import duckdb  # noqa: E402
+import pandas as pd  # noqa: E402
 
-import utils
-from data_handling.store.duckdb_query import (
+import utils  # noqa: E402
+from data_handling.store.duckdb_query import (  # noqa: E402
     dataset_columns,
     query_range,
     row_count,
 )
-from data_handling.store.duckdb_stats import collect_duckdb_stats_report
+from data_handling.store.duckdb_stats import collect_duckdb_stats_report  # noqa: E402
+
+
+def find_repo_root() -> Path:
+    """Find the project root by searching parent directories for pyproject.toml."""
+    for p in [Path(__file__).resolve(), *Path(__file__).resolve().parents]:
+        if (p / "pyproject.toml").exists():
+            return p
+    raise RuntimeError("Cannot find project root (no pyproject.toml found)")
+
+
+def lab_db_path() -> str:
+    """Return the path to the lab DuckDB file (solusdt_lab.duckdb)."""
+    cfg = utils.load_asset_config()
+    # lab db is next to the main db, with _lab suffix
+    main_path = Path(cfg["database"]["db_path"])
+    lab_path = main_path.with_name(main_path.stem + "_lab.duckdb")
+    return str(lab_path)
+
+
+def lab_connect(read_only: bool = True) -> duckdb.DuckDBPyConnection:
+    """Open a connection to the lab DuckDB (solusdt_lab.duckdb)."""
+    return duckdb.connect(lab_db_path(), read_only=read_only)
 
 
 def db_path() -> str:

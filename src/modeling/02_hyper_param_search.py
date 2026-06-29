@@ -131,7 +131,6 @@ def main() -> None:
         tag = args.search_tag or ("joint" if args.feature_selection == "joint" else args.feature_key)
         print(f"\n[3/3] run_prune({args.model}, search_tag={tag!r}) ...")
         prune_result = run_prune(args.model, search_tag=tag if tag != "selected" else None)
-        pruned_key = next((k for k in prune_result if k.startswith("n_pruned")), None)
         print(f"      {prune_result}")
     else:
         print("\n[3/3] Skipping prune (--skip-prune)")

@@ -913,7 +913,7 @@ def _check_patience(
     """Return True if patience stopping condition is met.
 
     Condition: the last `patience` completed trials contain no improvement
-    of at least `epsilon` over the best valid_ratio_p925 seen before them.
+    of at least `epsilon` over the best valid_top10_lift seen before them.
 
     Args:
         completed_trials : List of completed trial records (chronological order).
@@ -929,9 +929,8 @@ def _check_patience(
     recent = completed_trials[-patience:]
 
     def _score(t: dict) -> float:
-        v = t.get("objective_score")
-        # lower is better; negate for max-comparison
-        return -float(v) if v is not None else float("-inf")
+        v = t.get("valid_top10_lift")
+        return float(v) if v is not None else float("-inf")
 
     best_before = max((_score(t) for t in completed_trials[:-patience]), default=float("-inf"))
     best_recent = max((_score(t) for t in recent), default=float("-inf"))
@@ -942,12 +941,10 @@ def _check_patience(
 # Best trial selection — valid max + gap filter
 # =============================================================================
 def _select_best_trial(completed_trials: list[dict]) -> dict | None:
-    """Select the best trial by objective_score (lower = better), gap as tiebreaker.
+    """Select the best trial by valid_top10_lift (higher = better), gap as tiebreaker.
 
-    Uses objective_score as the primary sort key. For the default objective
-    (gap_penalty=0), objective_score = -valid_ratio_p925, so this is equivalent
-    to sorting by valid_ratio descending. For penalized objectives, the penalized
-    score is reflected in objective_score automatically.
+    Selects the top-5 trials by valid_top10_lift descending, then among those
+    picks the one with the smallest train_valid_gap.
 
     Args:
         completed_trials : List of completed trial records.
@@ -955,12 +952,12 @@ def _select_best_trial(completed_trials: list[dict]) -> dict | None:
     Returns:
         The best trial record, or None if no valid trials exist.
     """
-    valid = [t for t in completed_trials if t.get("objective_score") is not None]
+    valid = [t for t in completed_trials if t.get("valid_top10_lift") is not None]
     if not valid:
         return None
 
-    # Sort by objective_score ascending (lower = better)
-    valid.sort(key=lambda t: t.get("objective_score", float("inf")))
+    # Sort by valid_top10_lift descending (higher = better)
+    valid.sort(key=lambda t: t.get("valid_top10_lift", float("-inf")), reverse=True)
 
     # Top-5 candidates (or fewer if less available)
     top_n    = min(5, len(valid))

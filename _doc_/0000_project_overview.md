@@ -149,7 +149,7 @@ src/
     search/             Hyperparameter search (LightGBM + Optuna)
     feature_engineering/  Feature quality, target-relation, redundancy, stability library
     text/               Future placeholder
-    pipeline.py         Unified pipeline orchestrator (setup|sample|FE|search|train|predict)
+    pipeline.py         Unified pipeline orchestrator (setup|sample|FE|search|train|predict|analyze)
     00_create_sample.py
     01_feature_engineering.ipynb
     02_hyper_param_search.py
@@ -171,6 +171,7 @@ research/           Sandbox — explorations not yet production-ready
   elliott/            Elliott wave parser, validators, scanners, backtest
 
 analyst/            Analyst Python segédmodulok (table_formatting, plot_utils, db_utils, CSS, _quarto.yml, doc_renderer/)
+  notebooks/          4 Quarto template notebook (01_sampling, 02_feature_engineering, 03_hyperparameter_search, 04_strategy) — pipeline instantiálja nbformat+papermill-lel minden modellhez
 _doc_/              Dokumentáció — három zóna + globális gyökér
   0000_*, 0001_*      Globális (project overview, agentic rendszer)
   database_and_code_doc/   ZÓNA 1 — DB séma + kód-referencia (.md) — code_doc_agent
@@ -286,6 +287,7 @@ uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step f
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage smoke
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
 uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step predict
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step analyze
 
 # Deploy trigger (dual-session — long és short külön):
 uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_long_2101_2605

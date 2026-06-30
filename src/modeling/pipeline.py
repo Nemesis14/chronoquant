@@ -425,14 +425,17 @@ def step_analyze(model_id: str, artifact_dir: Path) -> None:
 
         print(f"[analyze] {nb_stem} — rendering HTML via Quarto...")
         result = subprocess.run(
-            ["uv", "run", "quarto", "render", f"{nb_stem}.ipynb", "--no-execute"],
+            ["uv", "run", "quarto", "render", f"{nb_stem}.ipynb", "--no-execute",
+             "--embed-resources"],
             capture_output=True, text=True, cwd=str(analysis_dir),
         )
         html_in_analysis = analysis_dir / f"{nb_stem}.html"
-        if result.returncode == 0 and html_in_analysis.exists():
+        if html_in_analysis.exists():
             import shutil
             shutil.move(str(html_in_analysis), str(output_html))
             print(f"[analyze] {nb_stem} — HTML rendered -> {output_html}")
+            if result.returncode != 0:
+                print(f"[analyze] NOTE: quarto returned non-zero but HTML produced:\n{result.stderr[:400]}")
         else:
             print(f"[analyze] WARNING: quarto render failed for {nb_stem}:\n{result.stderr[:400]}")
 

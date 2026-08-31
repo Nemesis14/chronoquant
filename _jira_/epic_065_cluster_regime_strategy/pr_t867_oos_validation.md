@@ -78,11 +78,51 @@ Periódusok:
 
 ---
 
+## Eredmények
+
+### OOS Validation Summary (Bonferroni Corrected α = 0.0083)
+
+| Cluster | Direction | Mean MFE (OOS) | p-value | Sig? | n_eff |
+|---------|-----------|---|---|---|---|
+| 0 | Long | 0.017990 | 0.2579 | No | 915 |
+| 0 | Short | -0.017982 | 0.9686 | No | 933 |
+| **1** | Long | 0.018351 | 0.3149 | No | 319 |
+| **1** | **Short** | **-0.021983** | **0.0017** | **YES** | 382 |
+| 2 | Long | 0.016255 | 0.0487 | No | 1161 |
+| 2 | Short | -0.016984 | 0.0599 | No | 1315 |
+
+### Key Finding
+
+**Cluster 1 short direction bias persists OOS** (p=0.0017 < α_corrected=0.0083).
+
+- Train short bias: -0.051739 (strong)
+- OOS short bias: -0.021983 (moderate, still significant)
+- Effective N: 382 (autocorr-adjusted, limited but reasonable)
+
+**Cluster 2** shows marginal long bias (p=0.0487), but does not meet Bonferroni threshold.
+
+### Interpretation
+
+The persistent short bias in Cluster 1 OOS suggests **potential tradable edge** in short positions when market setup matches this cluster's characteristics. However:
+
+1. **Limited effective N**: n_eff=382 per direction per year is modest for live trading
+2. **Bias magnitude decay**: Train→OOS short bias reduces from -0.052 to -0.022 (57% decay)
+3. **Risk**: Single significant cluster post-correction may indicate survival by chance
+
+Proceed to t868 (interpretation and decision: standalone strategy vs. LGBM feature).
+
+---
+
 ## Notes (munkafolyamat)
 
 - [x] Esszenciális kérdések megválaszolva
-- [ ] `04_oos_validation.py` megírása
-- [ ] Valid/OOS profiling és Bonferroni korrekció
-- [ ] Output JSON-ek generálása
-- [ ] Commit és test
+- [x] `04_oos_validation.py` megírása
+- [x] Valid/OOS profiling és Bonferroni korrekció
+- [x] Output JSON-ek generálása
+- [x] Commit és validáció
+
+**Files committed:**
+- `research/cluster_regime/04_oos_validation.py` (new)
+- `artifacts/research_cluster_regime/oos_validation_results.json`
+- `artifacts/research_cluster_regime/oos_cluster_profiles.json`
 

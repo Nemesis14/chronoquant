@@ -3,7 +3,7 @@ epic: epic_065
 id: t865
 title: Ablak-reprezentáció — normalizálás, ritkítás, összegző statisztikák
 assignee: modeling_agent
-status: todo
+status: pr
 blocks: [t866]
 blocked_by: [t863]
 ---
@@ -37,5 +37,27 @@ Módszertani háttér: [`_doc_/_plans_/plan.md`](../../_doc_/_plans_/plan.md) 3.
       ellenőrizve, hogy a különböző ár-szintű időszakok összemérhetők)
 - [ ] Összegző statisztikák számítva a t863-ban kiválasztott feature-készletre
 - [ ] Eredmény tábla dokumentálva, elérhető a t866 (klaszterezés) számára
+
+## Implementation
+
+1. **Adatbetöltés:** quant_train (3.12M sor, 14 feature t863-ból) + fw360 targets (t864).
+
+2. **Ritkítás:** 104K sor (30 percenkénti mintavételezés, 3120336 → 104011 sor).
+
+3. **Ablak-reprezentáció:** 360 bar lookback, 5 összegző statisztika per feature (mean/slope/std/min/max).
+
+4. **Normalizálás:** Ablakon belüli z-score per feature (alak-felismerés, ár-szint független).
+
+5. **Kódimplementáció:** research/cluster_regime/02_window_representation.py
+   - compute_window_features() — end-to-end pipeline
+   - validate_window_representation() — KS teszt normalizáció validálása
+
+6. **Output:** artifacts/research_cluster_regime/{asset}_window_repr.parquet
+   - Oszlopok: open_time, 70 feature-reprezentáció (14×5 stat), fw360 target, fw60 target
+
+7. **Validáció:**
+   - NaN/NULL kezelése per statisztika
+   - KS test: normalizált feature-ek ~ N(0,1)
+   - Window count distribution
 
 ## Notes

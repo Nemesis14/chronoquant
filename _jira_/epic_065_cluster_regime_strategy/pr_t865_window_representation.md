@@ -52,12 +52,28 @@ Módszertani háttér: [`_doc_/_plans_/plan.md`](../../_doc_/_plans_/plan.md) 3.
    - compute_window_features() — end-to-end pipeline
    - validate_window_representation() — KS teszt normalizáció validálása
 
-6. **Output:** artifacts/research_cluster_regime/{asset}_window_repr.parquet
-   - Oszlopok: open_time, 70 feature-reprezentáció (14×5 stat), fw360 target, fw60 target
+6. **Output:** `artifacts/research_cluster_regime/solusdt_window_repr.parquet` (36 MB)
+   - Rows: 104,011 (ritkított megfigyelések, 30 percenként)
+   - Cols: open_time + 70 feature stat (14×5) + fw360 targets + fw60 targets
+   - Ready for t866 (klaszterezés)
 
 7. **Validáció:**
    - NaN/NULL kezelése per statisztika
    - KS test: normalizált feature-ek ~ N(0,1)
    - Window count distribution
+
+## Validáció Rezultátum
+
+✓ Ablak-reprezentáció számítása sikeres (2026-08-31)
+
+- Shape: 104,011 rows × 75 columns
+- Columns: open_time + 70 summary stats (14 features × 5 stats) + 4 MFE targets
+- Data quality:
+  - First 360 rows have NaN (insufficient lookback window) — expected
+  - Row 5000+: normalized values (z-score ~N(0,1)) ✓
+  - Targets: 100% non-null (fw360 and fw60) ✓
+- Output: artifacts/research_cluster_regime/solusdt_window_repr.parquet (36 MB)
+
+Készítve a t866 (klaszterezés) számára.
 
 ## Notes

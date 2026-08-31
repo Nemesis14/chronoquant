@@ -29,7 +29,7 @@ import duckdb
 import polars as pl
 
 import utils
-from data_handling.store.duckdb_store import get_connection, ensure_tables
+from data_handling.store.duckdb_store import ensure_tables, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +129,6 @@ def compute_fw360_targets(
         if not ohlcv_count or ohlcv_count[0] == 0:
             logger.warning("Nincs OHLCV adat — fw360 target szamitas kihagyva")
             return None
-
-        stats_row = conn.execute(
-            "SELECT MIN(open_time), MAX(open_time) FROM ohlcv"
-        ).fetchone()
-        computed_from = str(stats_row[0]) if stats_row and stats_row[0] else None
-        computed_to   = str(stats_row[1]) if stats_row and stats_row[1] else None
 
         logger.info(
             "fw360 outcome szamitasa: horizon=%d, ohlcv_rows=%d",

@@ -156,7 +156,7 @@ def _split_by_date(
     oos_mask = (df["open_time"] >= OOS_START) & (df["open_time"] <= OOS_END)
     splits["oos"] = (df[oos_mask].reset_index(drop=True), X[oos_mask])
 
-    for split_name, (df_split, X_split) in splits.items():
+    for split_name, (df_split, _X_split) in splits.items():
         logger.info("%s: %d rows", split_name.upper(), len(df_split))
 
     return splits

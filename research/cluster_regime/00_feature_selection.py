@@ -17,8 +17,6 @@ from pathlib import Path
 
 import duckdb
 import numpy as np
-from scipy.cluster.hierarchy import linkage
-from scipy.spatial.distance import squareform
 
 # Configure logging
 logging.basicConfig(
@@ -214,9 +212,6 @@ def compute_correlation_matrix_sql(
 
     # Build Pearson correlation computation in SQL
     # For each pair of features, compute correlation coefficient
-    n = len(features)
-    corr_matrix = np.eye(n)
-
     # Sample data for correlation to avoid memory overload
     sample_query = f"""
     SELECT {', '.join(features)}
@@ -367,7 +362,7 @@ def main():
         selected_features = select_features_per_dimension(features, corr_matrix)
 
         # Compute correlation only for selected features
-        selected_indices = [features.index(f) for f in selected_features.keys()]
+        selected_indices = [features.index(f) for f in selected_features]
         corr_selected = corr_matrix[np.ix_(selected_indices, selected_indices)]
 
         # Generate report

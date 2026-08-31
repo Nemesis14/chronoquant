@@ -38,6 +38,9 @@ _LBL = f"color:{_MUTED}; font-size:13px;"
 _VAL = f"color:{_TEXT}; font-size:14px; font-weight:500;"
 _HDR = f"color:{_TEXT}; font-size:14px; font-weight:700; margin-bottom:10px;"
 
+# Number of closed trades (fills grouped by minute + side) shown in Recent Trades.
+_RECENT_TRADE_ROWS = 20
+
 
 def _fmt(val, digits: int = 4) -> str:
     if val is None:
@@ -211,7 +214,7 @@ def _render_recent_trades_panel(trades_df: pd.DataFrame, asset_id: str | None) -
         f'<span>Side</span><span>Price</span><span>Qty</span><span>PnL</span><span>Time</span>'
         f'</div>'
     )
-    grouped   = _group_trades_by_minute(trades_df)
+    grouped   = _group_trades_by_minute(trades_df).head(_RECENT_TRADE_ROWS)
     rows_html = "".join(_binance_trade_row_html(r.to_dict()) for _, r in grouped.iterrows())
     st.markdown(
         f'<div style="{_CARD}">'
@@ -411,7 +414,7 @@ def render_trade_panel(asset_id: str | None) -> None:
             st.session_state[cache_sync_fin] = finished_at
 
         if cache_trades not in st.session_state:
-            trades_df = binance_data.recent_trades(asset_id=asset_id, limit=50)
+            trades_df = binance_data.recent_trades(asset_id=asset_id)
             st.session_state[cache_trades] = trades_df
         else:
             trades_df = st.session_state[cache_trades]

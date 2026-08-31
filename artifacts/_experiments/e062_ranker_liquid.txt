@@ -1,0 +1,26 @@
+########## top-liquid=0, 72h
+  par-koltseg 18.8 bps oranként (a legszigorubb feltevés: teljes forgás minden órában)
+  EGYUTT 15,984 ora  brutto +35.14 bps  funding -3.72 bps  netto +12.62 bps
+  pozitiv honap: 15/22 (netto)   17/22 (brutto)
+  emelkedo  brutto +31.24  funding -1.47  netto +10.97 bps
+  eso       brutto +38.42  funding -5.61  netto +14.00 bps
+
+  fedezeti labankenti koltseg: 15.7 bps (1.7x a feltetelezett 9.4 bps-nek) -- ennyire kellene romlania a vegrehajtasnak, hogy nullara jojjon
+
+  Osszevetes: a legjobb naiv rangsorolo (reverzal 72h) +4,1 bps bruttot fogott meg,
+  a tokeletes elorelatas felso korlatja ~336 bps.
+########## top-liquid=20, 72h
+  par-koltseg 18.8 bps oranként (a legszigorubb feltevés: teljes forgás minden órában)
+  EGYUTT 15,984 ora  brutto +49.39 bps  funding -1.88 bps  netto +28.71 bps
+  pozitiv honap: 15/22 (netto)   17/22 (brutto)
+  emelkedo  brutto +36.27  funding -0.94  netto +16.53 bps
+  eso       brutto +60.41  funding -2.67  netto +38.94 bps
+
+  fedezeti labankenti koltseg: 23.8 bps (2.5x a feltetelezett 9.4 bps-nek) -- ennyire kellene romlania a vegrehajtasnak, hogy nullara jojjon
+
+  Osszevetes: a legjobb naiv rangsorolo (reverzal 72h) +4,1 bps bruttot fogott meg,
+  a tokeletes elorelatas felso korlatja ~336 bps.
+########## top-liquid=12, 72h
+INFO panel: 30 szimbolum, 102,729 funding sor
+INFO feature-ok: 26, hasznalhato sor: 654,503
+nincs eredmeny

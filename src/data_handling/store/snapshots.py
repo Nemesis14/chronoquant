@@ -120,15 +120,27 @@ def build_snapshot_id(asset_id: str, horizon: int, range_token: str, content_sha
 # %% Hashing
 
 
-def _ordered_feature_columns(conn: duckdb.DuckDBPyConnection) -> list[str]:
+def _ordered_feature_columns(
+    conn: duckdb.DuckDBPyConnection,
+    exclude_features: list[str] | None = None,
+) -> list[str]:
     """Return the source table's feature columns, sorted (excludes open_time/targets).
 
     The feature set the snapshot carries is the ``feat_*`` superset of
     ``live.quant_train``.  Ordering makes the feature_set_hash deterministic.
+
+    Args:
+        conn             : Open lab connection.
+        exclude_features : Feature columns to leave out of the snapshot. Used to
+                           build a control snapshot that deliberately withholds a
+                           feature group (epic_054: alt-data held back from the
+                           control model so treatment and control differ in the
+                           candidate pool and nothing else).
     """
     rows = conn.execute(f"SELECT * FROM {LIVE_SOURCE} LIMIT 0").description
     cols = [d[0] for d in rows]
-    return sorted(c for c in cols if c.startswith("feat_"))
+    drop = set(exclude_features or ())
+    return sorted(c for c in cols if c.startswith("feat_") and c not in drop)
 
 
 def _resolve_range(
@@ -166,6 +178,7 @@ def compute_content_sha256(
     conn        : duckdb.DuckDBPyConnection,
     range_start : str,
     range_end   : str,
+    column_set  : list[str] | None = None,
 ) -> tuple[str, int]:
     """Compute the content hash and row count for a range of the source table.
 
@@ -204,15 +217,24 @@ def compute_content_sha256(
         raise ValueError("No rows in the requested range of live.quant_train")
 
     n, time_hash_sum, min_t, max_t = row
-    # Build a deterministic fingerprint: row count + cumulative time hash + range bounds
+    # Build a deterministic fingerprint: row count + cumulative time hash + range
+    # bounds + the COLUMN SET. The column set matters: two snapshots over the
+    # same rows but different columns are different content, and without this
+    # the second would silently "reuse" the first (hit when the fw240 target
+    # columns were added -- the reused snapshot simply did not have them).
     fingerprint = f"n={n}|sum_hash={time_hash_sum}|min={min_t}|max={max_t}"
+    if column_set is not None:
+        fingerprint += "|cols=" + ",".join(column_set)
     content_sha256 = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
     return content_sha256, int(n)
 
 
-def compute_feature_set_hash(conn: duckdb.DuckDBPyConnection) -> str:
+def compute_feature_set_hash(
+    conn: duckdb.DuckDBPyConnection,
+    exclude_features: list[str] | None = None,
+) -> str:
     """Compute sha256 over the ordered feature column list of the source table."""
-    cols = _ordered_feature_columns(conn)
+    cols = _ordered_feature_columns(conn, exclude_features)
     joined = ",".join(cols)
     row = conn.execute("SELECT sha256(?)", [joined]).fetchone()
     assert row is not None
@@ -251,6 +273,7 @@ def create_snapshot(
     horizon    : int = 60,
     start_time : str | None = None,
     end_time   : str | None = None,
+    exclude_features : list[str] | None = None,
 ) -> SnapshotResult:
     """Freeze a range of ``live.quant_train`` into an immutable snap table + reg row.
 
@@ -279,8 +302,11 @@ def create_snapshot(
     ensure_snap_schema(conn)
 
     range_start, range_end = _resolve_range(conn, start_time, end_time)
-    content_sha256, row_count = compute_content_sha256(conn, range_start, range_end)
-    feature_set_hash = compute_feature_set_hash(conn)
+    kept_columns = _ordered_feature_columns(conn, exclude_features)
+    content_sha256, row_count = compute_content_sha256(
+        conn, range_start, range_end, column_set=kept_columns
+    )
+    feature_set_hash = compute_feature_set_hash(conn, exclude_features)
     range_token = format_range(range_start, range_end)
     snapshot_id = build_snapshot_id(asset_id, horizon, range_token, content_sha256)
 
@@ -307,10 +333,17 @@ def create_snapshot(
         )
 
     fqn = _snapshot_table_fqn(snapshot_id)
+    if exclude_features:
+        kept = _ordered_feature_columns(conn, exclude_features)
+        select_list = ", ".join(
+            ['open_time', *(f'"{c}"' for c in kept), 'long_mfe_fw60', 'short_mfe_fw60']
+        )
+    else:
+        select_list = "*"
     conn.execute(
         f"""
         CREATE TABLE IF NOT EXISTS {fqn} AS
-        SELECT *
+        SELECT {select_list}
         FROM {LIVE_SOURCE}
         WHERE open_time BETWEEN ? AND ?
         ORDER BY open_time

@@ -1,0 +1,100 @@
+INFO extrem barok: 286, ebbol izolalt (<=1 coin egyszerre): 54
+INFO [ 1/30] 1000BONKUSDT   k=0.1674  korlat med=100 bps (p10 63 / p90 182)  wick-capped=0  +1=48.4% -1=51.5% 0=0.0%  sorok=282936
+INFO [ 2/30] 1000PEPEUSDT   k=0.1828  korlat med=100 bps (p10 64 / p90 181)  wick-capped=0  +1=48.2% -1=51.8% 0=0.0%  sorok=340794
+INFO [ 3/30] 1000SHIBUSDT   k=0.2406  korlat med=100 bps (p10 57 / p90 208)  wick-capped=1  +1=47.4% -1=52.5% 0=0.1%  sorok=490752
+INFO [ 4/30] AAVEUSDT       k=0.2038  korlat med=100 bps (p10 59 / p90 181)  wick-capped=2  +1=48.5% -1=51.4% 0=0.1%  sorok=490752
+INFO [ 5/30] ADAUSDT        k=0.2378  korlat med=100 bps (p10 63 / p90 193)  wick-capped=2  +1=48.3% -1=51.6% 0=0.1%  sorok=490752
+INFO [ 6/30] ARBUSDT        k=0.2243  korlat med=100 bps (p10 65 / p90 160)  wick-capped=0  +1=48.6% -1=51.3% 0=0.1%  sorok=353195
+INFO [ 7/30] AVAXUSDT       k=0.2141  korlat med=100 bps (p10 58 / p90 204)  wick-capped=0  +1=48.4% -1=51.5% 0=0.1%  sorok=490752
+INFO [ 8/30] BCHUSDT        k=0.2583  korlat med=100 bps (p10 59 / p90 190)  wick-capped=3  +1=48.5% -1=51.3% 0=0.3%  sorok=490752
+INFO [ 9/30] BNBUSDT        k=0.3367  korlat med=100 bps (p10 51 / p90 205)  wick-capped=0  +1=49.1% -1=50.0% 0=0.8%  sorok=490752
+INFO [10/30] BTCUSDT        k=0.3910  korlat med=100 bps (p10 55 / p90 187)  wick-capped=1  +1=48.5% -1=47.6% 0=3.9%  sorok=490752
+INFO [11/30] DASHUSDT       k=0.2257  korlat med=100 bps (p10 63 / p90 188)  wick-capped=1  +1=48.4% -1=51.5% 0=0.1%  sorok=490752
+INFO [12/30] DOGEUSDT       k=0.2363  korlat med=100 bps (p10 57 / p90 212)  wick-capped=3  +1=48.5% -1=51.3% 0=0.2%  sorok=490752
+INFO [13/30] DOTUSDT        k=0.2286  korlat med=100 bps (p10 58 / p90 184)  wick-capped=2  +1=47.7% -1=52.1% 0=0.1%  sorok=490752
+INFO [14/30] ENAUSDT        k=0.1579  korlat med=100 bps (p10 68 / p90 160)  wick-capped=0  +1=48.2% -1=51.8% 0=0.0%  sorok=244938
+INFO [15/30] ETHUSDT        k=0.2988  korlat med=100 bps (p10 57 / p90 181)  wick-capped=2  +1=49.9% -1=49.5% 0=0.6%  sorok=490752
+INFO [16/30] FILUSDT        k=0.2123  korlat med=100 bps (p10 63 / p90 181)  wick-capped=3  +1=48.0% -1=51.9% 0=0.1%  sorok=489312
+INFO [17/30] LINKUSDT       k=0.2179  korlat med=100 bps (p10 59 / p90 183)  wick-capped=5  +1=48.7% -1=51.2% 0=0.1%  sorok=490752
+INFO [18/30] LTCUSDT        k=0.2602  korlat med=100 bps (p10 57 / p90 191)  wick-capped=4  +1=49.0% -1=50.7% 0=0.3%  sorok=489312
+INFO [19/30] NEARUSDT       k=0.1822  korlat med=100 bps (p10 65 / p90 179)  wick-capped=3  +1=48.6% -1=51.4% 0=0.1%  sorok=489312
+INFO [20/30] ONDOUSDT       k=0.1924  korlat med=100 bps (p10 65 / p90 187)  wick-capped=1  +1=48.5% -1=51.4% 0=0.1%  sorok=265956
+INFO [21/30] SOLUSDT        k=0.2132  korlat med=100 bps (p10 59 / p90 190)  wick-capped=3  +1=49.0% -1=51.0% 0=0.0%  sorok=489312
+INFO [22/30] SUIUSDT        k=0.2030  korlat med=100 bps (p10 61 / p90 165)  wick-capped=0  +1=48.8% -1=51.1% 0=0.1%  sorok=341376
+INFO [23/30] TAOUSDT        k=0.1799  korlat med=100 bps (p10 63 / p90 158)  wick-capped=0  +1=48.8% -1=51.1% 0=0.1%  sorok=242322
+INFO [24/30] TRXUSDT        k=0.4372  korlat med=100 bps (p10 46 / p90 275)  wick-capped=2  +1=50.1% -1=46.3% 0=3.6%  sorok=489312
+INFO [25/30] UNIUSDT        k=0.2070  korlat med=100 bps (p10 59 / p90 179)  wick-capped=2  +1=48.4% -1=51.6% 0=0.1%  sorok=490752
+INFO [26/30] WIFUSDT        k=0.1528  korlat med=100 bps (p10 63 / p90 176)  wick-capped=2  +1=49.2% -1=50.8% 0=0.0%  sorok=266517
+INFO [27/30] WLDUSDT        k=0.1724  korlat med=100 bps (p10 68 / p90 173)  wick-capped=2  +1=48.8% -1=51.2% 0=0.1%  sorok=317808
+INFO [28/30] XLMUSDT        k=0.2586  korlat med=100 bps (p10 56 / p90 205)  wick-capped=6  +1=48.4% -1=51.4% 0=0.2%  sorok=489312
+INFO [29/30] XRPUSDT        k=0.2696  korlat med=100 bps (p10 59 / p90 219)  wick-capped=3  +1=47.9% -1=51.6% 0=0.5%  sorok=489312
+INFO [30/30] ZECUSDT        k=0.1968  korlat med=100 bps (p10 61 / p90 181)  wick-capped=1  +1=48.9% -1=51.1% 0=0.0%  sorok=489312
+
+=== OSZTALYELOSZLAS COINONKENT ===
+  symbol                 n      +1      -1  timeout  korlat med
+  1000BONKUSDT     282,359   48.5%   51.5%     0.0%         100
+  1000PEPEUSDT     340,217   48.2%   51.8%     0.0%         100
+  1000SHIBUSDT     490,464   47.3%   52.6%     0.1%          95
+  AAVEUSDT         490,464   48.8%   51.1%     0.1%          93
+  ADAUSDT          490,464   48.3%   51.6%     0.1%          92
+  ARBUSDT          352,619   48.5%   51.4%     0.1%         100
+  AVAXUSDT         490,464   48.2%   51.7%     0.1%          90
+  BCHUSDT          490,464   48.0%   51.8%     0.2%          93
+  BNBUSDT          490,464   48.5%   50.6%     0.9%          86
+  BTCUSDT          490,464   48.1%   47.6%     4.3%          90
+  DASHUSDT         490,464   48.2%   51.7%     0.1%          94
+  DOGEUSDT         490,464   48.2%   51.5%     0.2%          93
+  DOTUSDT          490,464   47.5%   52.3%     0.1%          91
+  ENAUSDT          244,361   48.2%   51.7%     0.0%         100
+  ETHUSDT          490,464   49.6%   49.7%     0.7%          89
+  FILUSDT          489,024   47.6%   52.3%     0.1%          96
+  LINKUSDT         490,464   48.8%   51.1%     0.1%          88
+  LTCUSDT          489,024   48.7%   50.9%     0.4%          89
+  NEARUSDT         489,024   48.4%   51.5%     0.1%          92
+  ONDOUSDT         265,379   48.6%   51.4%     0.1%         100
+  SOLUSDT          489,024   49.0%   51.0%     0.0%          90
+  SUIUSDT          340,799   48.8%   51.1%     0.1%         100
+  TAOUSDT          241,745   48.8%   51.1%     0.1%         100
+  TRXUSDT          489,024   50.2%   46.8%     3.0%          76
+  UNIUSDT          490,464   48.4%   51.5%     0.1%          91
+  WIFUSDT          265,940   49.2%   50.8%     0.0%         100
+  WLDUSDT          317,231   48.7%   51.2%     0.1%         100
+  XLMUSDT          489,024   48.0%   51.8%     0.2%          88
+  XRPUSDT          489,024   47.2%   52.2%     0.6%          90
+  ZECUSDT          489,024   48.6%   51.3%     0.0%          96
+
+=== OSZTALYELOSZLAS EVENKENT (korszak-stabilitas) ===
+      ev           n      +1      -1  timeout  korlat med
+    2021     187,488   45.8%   53.7%     0.5%         126
+    2022   2,196,000   48.7%   50.9%     0.4%         106
+    2023   2,484,265   48.2%   51.1%     0.7%          78
+    2024   3,094,481   48.6%   51.0%     0.4%          98
+    2025   3,153,600   48.8%   50.8%     0.4%          95
+    2026   1,823,040   47.8%   52.0%     0.3%          82
+
+=== WICK AUDIT ===
+  extrem bar osszesen: 286   ebbol izolalt (kapva): 54
+
+  a 10 legnagyobb IZOLALT (kapott) kilenges:
+    ETHUSDT       2020-03-13 02:39:00   o=109          h=323          l=108.8        c=117.44       span=182%
+    DASHUSDT      2020-04-14 07:35:00   o=73.65        h=73.99        l=0.1          c=73.09        span=101%
+    DOTUSDT       2020-08-22 07:00:00   o=2.92         h=5.1          l=2.92         c=3.059        span=71%
+    ADAUSDT       2020-02-28 17:16:00   o=0.04806      h=0.04833      l=0.02286      c=0.04833      span=53%
+    SOLUSDT       2020-09-14 07:00:00   o=3.2002       h=4.91         l=3.2002       c=3.2745       span=52%
+    NEARUSDT      2021-12-15 04:00:00   o=9.2393       h=16.989       l=9.2368       c=15.9639      span=49%
+    ZECUSDT       2020-03-13 02:17:00   o=17.58        h=24.68        l=17.58        c=18.5         span=38%
+    BCHUSDT       2021-05-19 13:14:00   o=510.71       h=621.85       l=459          c=501.18       span=32%
+    FILUSDT       2021-05-19 13:08:00   o=61.017       h=62.479       l=44.389       c=56.838       span=32%
+    ETHUSDT       2021-05-19 13:10:00   o=1603.54      h=1870         l=1400.73      c=1508.99      span=31%
+
+  a 10 legnagyobb EGYUTTMOZGO (erintetlen) kilenges:
+    ENAUSDT       2025-10-10 21:19:00   l=0.1499       c=0.1517       span=85%  ekkor 20 coin volt extrem
+    SUIUSDT       2025-10-10 21:19:00   l=0.9439       c=0.9543       span=75%  ekkor 20 coin volt extrem
+    WLDUSDT       2025-10-10 21:19:00   l=0.2625       c=0.2683       span=70%  ekkor 20 coin volt extrem
+    1000BONKUSDT  2025-10-10 21:20:00   l=0.003937     c=0.004109     span=68%  ekkor 16 coin volt extrem
+    ENAUSDT       2025-10-10 21:22:00   l=0.2514       c=0.2646       span=63%  ekkor 11 coin volt extrem
+    ARBUSDT       2025-10-10 21:19:00   l=0.1239       c=0.1287       span=60%  ekkor 20 coin volt extrem
+    SUIUSDT       2025-10-10 21:21:00   l=0.5669       c=1.1109       span=58%  ekkor 10 coin volt extrem
+    DOTUSDT       2025-10-10 21:20:00   l=0.942        c=0.976        span=57%  ekkor 16 coin volt extrem
+    WLDUSDT       2025-10-10 21:18:00   l=0.4405       c=0.4487       span=55%  ekkor 16 coin volt extrem
+    TAOUSDT       2025-10-10 21:21:00   l=131.98       c=267.38       span=55%  ekkor 10 coin volt extrem

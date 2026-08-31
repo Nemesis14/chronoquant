@@ -1,0 +1,24 @@
+########## 48h
+  EGYUTT 16,008 ora  brutto +29.76 bps  netto +10.96 bps
+  pozitiv honap: 15/22 (netto)   17/22 (brutto)
+  emelkedo  brutto +21.31 bps   netto +2.51 bps
+  eso       brutto +36.84 bps   netto +18.04 bps
+
+  Osszevetes: a legjobb naiv rangsorolo (reverzal 72h) +4,1 bps bruttot fogott meg,
+  a tokeletes elorelatas felso korlatja ~336 bps.
+########## 72h
+  EGYUTT 15,984 ora  brutto +35.14 bps  netto +16.34 bps
+  pozitiv honap: 16/22 (netto)   17/22 (brutto)
+  emelkedo  brutto +31.24 bps   netto +12.44 bps
+  eso       brutto +38.42 bps   netto +19.62 bps
+
+  Osszevetes: a legjobb naiv rangsorolo (reverzal 72h) +4,1 bps bruttot fogott meg,
+  a tokeletes elorelatas felso korlatja ~336 bps.
+########## 120h
+  EGYUTT 15,936 ora  brutto +79.21 bps  netto +60.41 bps
+  pozitiv honap: 15/22 (netto)   16/22 (brutto)
+  emelkedo  brutto +88.99 bps   netto +70.19 bps
+  eso       brutto +70.95 bps   netto +52.15 bps
+
+  Osszevetes: a legjobb naiv rangsorolo (reverzal 72h) +4,1 bps bruttot fogott meg,
+  a tokeletes elorelatas felso korlatja ~336 bps.

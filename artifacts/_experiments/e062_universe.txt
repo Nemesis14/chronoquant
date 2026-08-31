@@ -1,0 +1,36 @@
+INFO USDT-pár az archivumban: 829
+INFO archivumbol hianyzik: 568 / 829 fajl
+INFO rangsorolas: 261 / 829 szimbolum letezett ekkor
+INFO kivalasztva 30 szimbolum, forgalom 431450 .. 6640 M USD (2024-01)
+INFO BTCUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO ETHUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO SOLUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO ORDIUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO ARBUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO SUIUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO TRBUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO PEOPLEUSDT      22632 ora, utolso: 2026-07-31 23:00:00
+INFO XRPUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO SEIUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO AVAXUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO OPUSDT          22632 ora, utolso: 2026-07-31 23:00:00
+INFO DOGEUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO BNBUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO TIAUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO UMAUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO ETCUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO LINKUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO archivumbol hianyzik: 22 / 31 fajl
+INFO MATICUSDT        6106 ora, utolso: 2024-09-11 09:00:00
+INFO FILUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO XAIUSDT         22426 ora, utolso: 2026-07-31 23:00:00
+INFO INJUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO MANTAUSDT       22210 ora, utolso: 2026-07-31 23:00:00
+INFO ADAUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO ENSUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO GMTUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO BLURUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO NEARUSDT        22632 ora, utolso: 2026-07-31 23:00:00
+INFO LTCUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO ICPUSDT         22632 ora, utolso: 2026-07-31 23:00:00
+INFO kesz: 30 szimbolum, 661,806 sor

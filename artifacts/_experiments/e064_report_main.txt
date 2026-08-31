@@ -1,0 +1,145 @@
+
+==============================================================================
+1. TABLAK
+==============================================================================
+  fajl: database\_universe\universe.duckdb   8.79 GB
+
+  tabla                    sor  oszlop   coin  elso .. utolso
+  ohlcv_1m          81,919,430      10     30  2020-01-01 00:00:00 .. 2026-07-31 23:59:00
+  ohlcv_5m          16,383,889      10     30  2020-01-01 00:00:00 .. 2026-07-31 23:55:00
+  metrics_5m        12,956,131       8     30  2021-12-01 00:00:00 .. 2026-07-31 23:55:00
+  premium_5m        16,338,392       6     30  2020-01-01 00:00:00 .. 2026-07-31 23:55:00
+  funding              247,600       3     46  2020-01-01 00:00:00 .. 2026-07-31 20:00:00.001000
+
+  oszlopok:
+    ohlcv_1m      symbol, open_time, open, high, low, close, volume, quote_volume, taker_buy_volume, n_trades
+    ohlcv_5m      symbol, open_time, open, high, low, close, volume, quote_volume, taker_buy_volume, n_trades
+    metrics_5m    symbol, open_time, oi_coin, oi_value, ls_count, ls_top_count, ls_top_sum, taker_vol_ratio
+    premium_5m    symbol, open_time, prem_open, prem_high, prem_low, prem_close
+    funding       symbol, funding_ts, funding_rate
+
+==============================================================================
+2. COINONKENTI LEFEDETTSEG
+==============================================================================
+  A metrics (OI + long/short) kesobb indul, mint az ar -- a
+  derivativa-feature-ok csak onnantol hasznalhatok.
+
+  symbol              ar-tol       ar-ig     1m sor  metrics-tol metrics sor
+  BCHUSDT         2020-01-01  2026-07-31  3,461,760   2021-12-01     490,575
+  BTCUSDT         2020-01-01  2026-07-31  3,461,760   2021-12-01     490,612
+  ETHUSDT         2020-01-01  2026-07-31  3,461,760   2021-12-01     490,612
+  XRPUSDT         2020-01-06  2026-07-31  3,446,859   2021-12-01     490,611
+  LTCUSDT         2020-01-09  2026-07-31  3,442,551   2021-12-01     490,568
+  TRXUSDT         2020-01-15  2026-07-31  3,433,915   2021-12-01     490,604
+  LINKUSDT        2020-01-17  2026-07-31  3,438,240   2021-12-01     490,612
+  XLMUSDT         2020-01-20  2026-07-31  3,426,717   2021-12-01     490,324
+  ADAUSDT         2020-01-31  2026-07-31  3,418,079   2021-12-01     490,612
+  DASHUSDT        2020-02-04  2026-07-31  3,412,314   2021-12-01     490,612
+  ZECUSDT         2020-02-05  2026-07-31  3,403,679   2021-12-01     490,323
+  BNBUSDT         2020-02-10  2026-07-31  3,403,679   2021-12-01     490,611
+  DOGEUSDT        2020-07-10  2026-07-31  3,186,180   2021-12-01     490,612
+  DOTUSDT         2020-08-22  2026-07-31  3,124,380   2021-12-01     490,612
+  SOLUSDT         2020-09-14  2026-07-31  3,084,060   2021-12-01     490,592
+  UNIUSDT         2020-09-18  2026-07-31  3,085,500   2021-12-01     490,603
+  AVAXUSDT        2020-09-23  2026-07-31  3,078,300   2021-12-01     490,553
+  NEARUSDT        2020-10-15  2026-07-31  3,039,360   2021-12-01     490,323
+  AAVEUSDT        2020-10-16  2026-07-31  3,045,180   2021-12-01     490,612
+  FILUSDT         2020-10-16  2026-07-31  3,038,040   2021-12-01     490,612
+  1000SHIBUSDT    2021-05-10  2026-07-31  2,747,903   2021-12-01     490,610
+  ARBUSDT         2023-03-23  2026-07-31  1,765,979   2023-03-23     353,060
+  SUIUSDT         2023-05-03  2026-07-31  1,706,880   2023-05-03     340,954
+  1000PEPEUSDT    2023-05-05  2026-07-31  1,703,970   2023-05-05     340,660
+  WLDUSDT         2023-07-24  2026-07-31  1,589,040   2023-07-24     317,386
+  1000BONKUSDT    2023-11-22  2026-07-31  1,414,680   2023-11-22     282,805
+  WIFUSDT         2024-01-18  2026-07-31  1,332,585   2024-01-18     266,386
+  ONDOUSDT        2024-01-20  2026-07-31  1,329,780   2024-01-20     265,825
+  ENAUSDT         2024-04-02  2026-07-31  1,224,690   2024-04-02     244,933
+  TAOUSDT         2024-04-11  2026-07-31  1,211,610   2024-04-11     242,317
+
+==============================================================================
+3. EVENKENTI OSSZESITES (az egesz panel)
+==============================================================================
+      ev  coin       1m sor   nap  napi forgalom (M USD)  atlag n_trades/perc
+    2020    20    7,255,513   366                  4,825                  181
+    2021    21   10,850,783   365                 37,310                  763
+    2022    21   10,980,000   365                 26,728                  586
+    2023    26   12,428,549   365                 23,491                  527
+    2024    30   15,478,185   366                 40,299                  862
+    2025    30   15,768,000   365                 47,719                  908
+    2026    30    9,158,400   212                 28,875                  706
+
+==============================================================================
+5. ADATMINOSEG
+==============================================================================
+
+  5a. Idobeli lyukak az 1m racson (coinonkent, > 1 perc ugras)
+      Tozsdei kieses miatt normalis, hogy van nehany. A kerdes a nagysagrend.
+      symbol           lyukak   hianyzo perc  legnagyobb
+      ZECUSDT               2          7,200       4,321
+      NEARUSDT              2          7,200       4,321
+      XRPUSDT               2          7,200       4,321
+      TRXUSDT               2          7,200       4,321
+      XLMUSDT               2          7,200       4,321
+      SOLUSDT               2          7,200       4,321
+      FILUSDT               2          7,200       4,321
+      LTCUSDT               2          7,200       4,321
+
+  5b. Duplikatumok (a PK miatt 0-nak kell lennie)
+      ohlcv_1m               0
+      ohlcv_5m               0
+      metrics_5m             0
+
+  5c. Gyanus arak (nem pozitiv, vagy high < low)
+      nem pozitiv ar: 0   high<low: 0   negativ volumen: 0
+
+  5d. Nulla forgalmu percek (arjegyzes van, kotes nincs)
+      DASHUSDT         0.98%
+      ZECUSDT          0.59%
+      DOGEUSDT         0.45%
+      XLMUSDT          0.32%
+      ADAUSDT          0.20%
+      TRXUSDT          0.14%
+      NEARUSDT         0.05%
+      FILUSDT          0.03%
+
+  5e. metrics NULL-arany (a derivativa-feature-ok hasznalhatosaga)
+      ETHUSDT        oi_coin NULL   0.00%   ls_count NULL   1.18%
+      1000PEPEUSDT   oi_coin NULL   0.00%   ls_count NULL   0.01%
+      WLDUSDT        oi_coin NULL   0.00%   ls_count NULL   0.01%
+      TAOUSDT        oi_coin NULL   0.00%   ls_count NULL   0.01%
+      FILUSDT        oi_coin NULL   0.00%   ls_count NULL   1.18%
+      AAVEUSDT       oi_coin NULL   0.00%   ls_count NULL   1.18%
+      ARBUSDT        oi_coin NULL   0.00%   ls_count NULL   0.01%
+      ENAUSDT        oi_coin NULL   0.00%   ls_count NULL   0.01%
+
+==============================================================================
+6. MINTASOROK — SOLUSDT
+==============================================================================
+
+  ohlcv_1m  (a 4 legutolso sor)
+              open_time  open  high   low  close  volume  quote_volume  n_trades
+    2026-07-31 23:59:00 72.83 72.84 72.82  72.83 1642.31   119608.6255       230
+    2026-07-31 23:58:00 72.81 72.83 72.81  72.83 1559.58   113565.7914       184
+    2026-07-31 23:57:00 72.82 72.83 72.81  72.82 1002.02    72968.9806       123
+    2026-07-31 23:56:00 72.81 72.84 72.81  72.83 2918.58   212563.1476       240
+
+  metrics_5m  (a 4 legutolso sor)
+              open_time    oi_coin     oi_value  ls_count  ls_top_count  taker_vol_ratio
+    2026-07-31 23:55:00 8420952.78 6.133822e+08  2.779198      3.129588         0.797581
+    2026-07-31 23:50:00 8417692.09 6.128314e+08  2.774844      3.128139         0.821297
+    2026-07-31 23:45:00 8425132.52 6.134541e+08  2.775796      3.127957         0.956046
+    2026-07-31 23:40:00 8422401.44 6.135719e+08  2.770541      3.127346         0.800383
+
+  premium_5m  (a 4 legutolso sor)
+              open_time  prem_open  prem_close
+    2026-07-31 23:55:00  -0.000539   -0.000422
+    2026-07-31 23:50:00  -0.000428   -0.000493
+    2026-07-31 23:45:00  -0.000470   -0.000407
+    2026-07-31 23:40:00  -0.000395   -0.000519
+
+  funding  (a 4 legutolso sor)
+                 funding_ts  funding_rate
+    2026-07-31 16:00:00.000      0.000037
+    2026-07-31 08:00:00.000      0.000046
+    2026-07-31 00:00:00.003      0.000098
+    2026-07-30 16:00:00.000      0.000058

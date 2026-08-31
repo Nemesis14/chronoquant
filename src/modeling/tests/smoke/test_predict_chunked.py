@@ -8,7 +8,6 @@ Covers:
 
 from __future__ import annotations
 
-
 import duckdb
 import lightgbm as lgb
 import numpy as np

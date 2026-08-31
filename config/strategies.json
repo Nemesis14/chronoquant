@@ -1,17 +1,28 @@
 {
-    "schema_version": 3,
-    "strategies": {
-        "strat_solusdt_fw60_combo_2101_2605": {
-            "description": "Rebuilt SOLUSDT fw60 strategy: long-only, enter on D10, take profit at average D10 1h target log return, otherwise exit after 60 minutes at close.",
-            "asset_id": "solusdt",
-            "model_id_long": "lgbm_solusdt_l_fw60_2101_2605",
-            "model_id_short": "lgbm_solusdt_s_fw60_2101_2605",
-            "signal_mode": "rank_first",
-            "fit_period": {
-                "start": "2025-12-01",
-                "end": "2026-05-31"
-            },
-            "artifact_dir": "artifacts/strat_solusdt_fw60_combo_2101_2605"
-        }
+  "schema_version": 3,
+  "strategies": {
+    "strat_solusdt_fw60_combo_2101_2605": {
+      "description": "Rebuilt SOLUSDT fw60 strategy: long-only, enter on D10, take profit at average D10 1h target log return, otherwise exit after 60 minutes at close.",
+      "asset_id": "solusdt",
+      "model_id_long": "lgbm_solusdt_l_fw60_2101_2605",
+      "model_id_short": "lgbm_solusdt_s_fw60_2101_2605",
+      "signal_mode": "rank_first",
+      "fit_period": {
+        "start": "2025-12-01",
+        "end": "2026-05-31"
+      },
+      "artifact_dir": "artifacts/strat_solusdt_fw60_combo_2101_2605"
     }
+  },
+  "costs": {
+    "_comment": "Binance USDS-M futures VIP0, nincs ervenyes BNB-kedvezmeny (BNB egyenleg 0) - ellenorizve 2026-08-25",
+    "maker_bps": 2.0,
+    "taker_bps": 5.0,
+    "slippage_bps": 1.5,
+    "exit_order_type": {
+      "tp": "maker",
+      "sl": "taker",
+      "timeout": "taker"
+    }
+  }
 }

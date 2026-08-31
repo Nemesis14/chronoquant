@@ -235,12 +235,18 @@ def step_search(
     timeout_hours: float | None = None,
 ) -> None:
     from modeling.search.lgbm_search import run_search
-    print(f"[search] Starting hyperparameter search — stage={stage}, n_trials={n_trials}")
+    meta         = utils.load_models_config()["models"][model_id]
+    target_name  = meta["target_name"]
+    direction    = "long" if target_name.startswith("long") else "short"
+    print(f"[search] Starting hyperparameter search — stage={stage}, n_trials={n_trials}, direction={direction}")
     run_search(
-        model_id      = model_id,
-        stage         = stage,
-        n_trials      = n_trials,
-        timeout_hours = timeout_hours,
+        model_id          = model_id,
+        stage             = stage,
+        n_trials          = n_trials,
+        timeout_hours     = timeout_hours,
+        feature_selection = "fixed",
+        feature_key       = "selected",
+        direction         = direction,
     )
     _update_manifest_status(_artifact_dir_for(model_id), "search_done")
 

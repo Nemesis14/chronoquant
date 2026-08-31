@@ -19,7 +19,7 @@ _ROOT = next(
 )
 sys.path.insert(0, str(_ROOT / "src"))
 
-from modeling.search.lgbm_search import run_gain_rank, run_search, run_prune  # noqa: E402
+from modeling.search.lgbm_search import run_gain_rank, run_prune, run_search  # noqa: E402
 
 
 def main() -> None:

@@ -18,6 +18,10 @@ import utils
 
 _logger = logging.getLogger("chronoquant.streamlit")
 
+# Binance trade endpoints cap a single request at 1000 rows. We always fetch the
+# full window and slice the newest rows locally — see recent_trades() docs.
+_FETCH_LIMIT = 1000
+
 
 # =============================================================================
 # _make_client() -> Client
@@ -53,6 +57,13 @@ def _make_client():
 #  - Falls back to spot trade history when futures returns nothing or fails.
 #  - Returns empty DataFrame on any error so the UI degrades gracefully.
 #
+# Newest-first ordering:
+#  - /fapi/v1/userTrades returns its default (7-day) window in ASCENDING id
+#    order and truncates the OLDEST end with `limit`. Requesting `limit=50`
+#    therefore yields the 50 oldest fills of the window, not the newest ones.
+#    We fetch the full window with _FETCH_LIMIT and keep the newest `limit`
+#    rows after normalization.
+#
 # Returned columns (always present):
 #   time        : pd.Timestamp (UTC)
 #   side        : str  — "BUY" or "SELL"
@@ -63,7 +74,7 @@ def _make_client():
 #   commission  : float
 #   source      : str  — "futures" or "spot"
 # =============================================================================
-def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
+def recent_trades(asset_id: str | None = None, limit: int = 200) -> pd.DataFrame:
     try:
         cfg    = utils.load_asset_config(asset_id)
         symbol = cfg["database"]["symbol"]
@@ -74,17 +85,17 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
 
     # Try futures first
     try:
-        rows = client.futures_account_trades(symbol=symbol, limit=limit)
+        rows = client.futures_account_trades(symbol=symbol, limit=_FETCH_LIMIT)
         if rows:
-            return _normalize_futures(rows)  # type: ignore[arg-type]
+            return _normalize_futures(rows, limit)  # type: ignore[arg-type]
     except Exception as exc:
         _logger.debug("Futures trade fetch failed (%s), trying spot", exc)
 
     # Fall back to spot
     try:
-        rows = client.get_my_trades(symbol=symbol, limit=limit)
+        rows = client.get_my_trades(symbol=symbol, limit=_FETCH_LIMIT)
         if rows:
-            return _normalize_spot(rows)  # type: ignore[arg-type]
+            return _normalize_spot(rows, limit)  # type: ignore[arg-type]
     except Exception as exc:
         _logger.warning("Spot trade fetch also failed: %s", exc)
 
@@ -95,7 +106,7 @@ def recent_trades(asset_id: str | None = None, limit: int = 50) -> pd.DataFrame:
 # _normalize_futures / _normalize_spot
 # =============================================================================
 
-def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
+def _normalize_futures(rows: list[dict], limit: int) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     if df.empty:
         return _empty_frame()
@@ -117,10 +128,10 @@ def _normalize_futures(rows: list[dict]) -> pd.DataFrame:
     out["pnl"]        = realized_pnl
     out["commission"] = pd.to_numeric(df.get("commission"), errors="coerce")
     out["source"]     = "futures"
-    return out.sort_values("time", ascending=False).reset_index(drop=True)
+    return out.sort_values("time", ascending=False).head(limit).reset_index(drop=True)
 
 
-def _normalize_spot(rows: list[dict]) -> pd.DataFrame:
+def _normalize_spot(rows: list[dict], limit: int) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     out = _empty_frame()
     out["time"]       = pd.to_datetime(pd.to_numeric(df.get("time", pd.Series()), errors="coerce"), unit="ms", utc=True)  # type: ignore[arg-type]
@@ -134,7 +145,7 @@ def _normalize_spot(rows: list[dict]) -> pd.DataFrame:
     out["pnl"]        = None
     out["commission"] = pd.to_numeric(df.get("commission"),errors="coerce")
     out["source"]     = "spot"
-    return out.sort_values("time", ascending=False).reset_index(drop=True)
+    return out.sort_values("time", ascending=False).head(limit).reset_index(drop=True)
 
 
 def current_position(asset_id: str | None = None) -> dict | None:

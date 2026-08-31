@@ -56,6 +56,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--opt-start",   required=True, help="Optimization start YYYY-MM-DD")
     parser.add_argument("--opt-end",     required=True, help="Optimization end YYYY-MM-DD")
     parser.add_argument(
+        "--max-hold-minutes", type=int, default=60,
+        help="Bars (minutes) before a forced timeout exit. Must match the "
+             "model's target horizon: 60 for fw60, 240 for fw240.",
+    )
+    parser.add_argument(
         "--directions",
         default="long,short",
         help="Comma-separated directions to search (default: long,short)",
@@ -100,6 +105,7 @@ if __name__ == "__main__":
         end            = args.opt_end,
         directions     = directions,
         asset_id       = args.asset_id,
+        max_hold_bars  = args.max_hold_minutes,
     )
 
     best   = result["best_setup"]

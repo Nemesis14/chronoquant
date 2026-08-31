@@ -1,0 +1,35 @@
+INFO a feature-lista az MI-szuresbol: 165 valtozo
+INFO train 233,316 sor, valid 58,456 sor (purge 24h)
+
+==============================================================================
+LINEARIS ALAPMODELL — OLS, naponkenti klaszter-robusztus SE
+==============================================================================
+  ablak    2021-12-01 00:00:00  ..  2023-06-30 00:00:00
+  train       233,316 sor   465 nap-klaszter
+  valid        58,456 sor   (purge 24h a hataron)
+  jelolt          165 valtozo (MI-szures utan)
+
+  p < 0.01 klaszterelt SE-vel:    6 / 165   <-- ezek maradnak
+  p < 0.01 naiv SE-vel:          74 / 165   (ennyit tartana a hibas modszer)
+  p < 6.1e-05 (Bonferroni):     0 / 165
+
+=== A BENTMARADO 6 VALTOZO ===
+     # feature                             egyutthato       t          p
+     1 feat_returns_skew_16                  +0.18009    3.68   2.60e-04
+     2 feat_volume_confirmed_return_24       +0.17573    3.29   1.09e-03
+     3 feat_hist_vol_rank_24                 -0.30880   -3.01   2.77e-03
+     4 feat_roc_24                           -0.36222   -2.92   3.69e-03
+     5 feat_kama_ratio_24_2_24               -0.42774   -2.61   9.22e-03
+     6 feat_cmf_16                           -0.16558   -2.59   9.80e-03
+
+  * = Bonferroni-korrekcio utan is szignifikans
+
+=== A 6 VALTOZOS MODELL — TRAIN vs VALID ===
+  TRAIN    233,316 sor   R^2  0.00284   IC  0.0533
+          top    p99  n=  2334  talalat  43.1%   alap  39.2%   lift   +3.9pp
+          bottom p01  n=  2334  talalat  44.2%   alap  44.1%   lift   +0.0pp
+  VALID     58,456 sor   R^2 -0.00627   IC -0.0298
+          top    p99  n=   585  talalat  35.4%   alap  40.3%   lift   -4.9pp
+          bottom p01  n=   585  talalat  44.1%   alap  43.1%   lift   +1.0pp
+
+  mentve: e064_base_regression.json

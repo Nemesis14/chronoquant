@@ -1,0 +1,84 @@
+INFO kor-szures: letezett-e mar 2024-07-ban?
+INFO archivumbol hianyzik: 545 / 829 fajl
+INFO rangsorolas: 284 / 829 szimbolum letezett ekkor
+INFO 284 / 829 szimbolum eleg regi
+INFO archivumbol hianyzik: 7 / 284 fajl
+INFO rangsorolas: 277 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 6 / 284 fajl
+INFO rangsorolas: 278 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO archivumbol hianyzik: 5 / 284 fajl
+INFO rangsorolas: 279 / 284 szimbolum letezett ekkor
+INFO [1/30] ETHUSDT
+INFO archivumbol hianyzik: 4 / 83 fajl
+INFO archivumbol hianyzik: 4 / 83 fajl
+INFO ETHUSDT        1m=3,461,760 5m=692,352 metrics=490,612 prem=690,015 fund=7,212  2020-01-01 .. 2026-07-31
+INFO [2/30] BTCUSDT
+INFO archivumbol hianyzik: 4 / 83 fajl
+INFO archivumbol hianyzik: 4 / 83 fajl
+INFO BTCUSDT        1m=3,461,760 5m=692,352 metrics=490,612 prem=690,014 fund=7,212  2020-01-01 .. 2026-07-31
+INFO [3/30] SOLUSDT
+INFO archivumbol hianyzik: 12 / 83 fajl
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "D:\repos\chronoquant\src\data_handling\collectors\universe\download_panel.py", line 291, in <module>
+    main()
+  File "D:\repos\chronoquant\src\data_handling\collectors\universe\download_panel.py", line 274, in main
+    download_symbol(conn, symbol)
+  File "D:\repos\chronoquant\src\data_handling\collectors\universe\download_panel.py", line 156, in download_symbol
+    k1 = load_klines(symbol, "1m", HISTORY_START, HISTORY_END)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\src\data_handling\collectors\universe\download_panel.py", line 76, in load_klines
+    frames = [_read_zip_csv(raw, KLINE_COLS) for raw in blobs.values()]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\src\data_handling\collectors\derivatives\vision.py", line 153, in _read_zip_csv
+    return pl.read_csv(
+           ^^^^^^^^^^^^
+  File "D:\repos\chronoquant\.venv\Lib\site-packages\polars\_utils\deprecation.py", line 128, in wrapper
+    return function(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\.venv\Lib\site-packages\polars\_utils\deprecation.py", line 128, in wrapper
+    return function(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\.venv\Lib\site-packages\polars\_utils\deprecation.py", line 128, in wrapper
+    return function(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\.venv\Lib\site-packages\polars\io\csv\functions.py", line 578, in read_csv
+    df = _read_csv_impl(
+         ^^^^^^^^^^^^^^^
+  File "D:\repos\chronoquant\.venv\Lib\site-packages\polars\io\csv\functions.py", line 730, in _read_csv_impl
+    pydf = PyDataFrame.read_csv(
+           ^^^^^^^^^^^^^^^^^^^^^
+polars.exceptions.ComputeError: could not parse `6701.80` as dtype `i64` at column 'column_6' (column number 6)
+
+The current offset in the file is 61571 bytes.
+
+You might want to try:
+- increasing `infer_schema_length` (e.g. `infer_schema_length=10000`),
+- specifying correct dtype with the `schema_overrides` argument
+- setting `ignore_errors` to `True`,
+- adding `6701.80` to the `null_values` list.
+
+Original error: ```invalid primitive value found during CSV parsing```
+
+kivalasztva 30 el-o perp (2026-07 forgalom):
+  ETHUSDT, BTCUSDT, SOLUSDT, XRPUSDT, DOGEUSDT, ZECUSDT, BNBUSDT, 1000PEPEUSDT, SUIUSDT, ADAUSDT, ENAUSDT, LINKUSDT, AVAXUSDT, WLDUSDT, TAOUSDT, LTCUSDT, NEARUSDT, BCHUSDT, FILUSDT, AAVEUSDT, UNIUSDT, DOTUSDT, WIFUSDT, ARBUSDT, XLMUSDT, DASHUSDT, 1000BONKUSDT, ONDOUSDT, TRXUSDT, 1000SHIBUSDT
+

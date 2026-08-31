@@ -149,6 +149,19 @@ Kimerítő grid search kis zárt téren: entry_cutoff × tp_spec × sl_spec. Obj
 
 → `6300_strategy_grid_search.md`
 
+### 7000 — Validációs elvek és mérési fegyelem
+
+**Kérdés:** Hogyan mérünk úgy, hogy az eredmény éles tőkére is igaz legyen?
+
+Az in-sample szelekció nem eredmény; a kiválasztás és a mérés külön adaton
+történik. Gördülő újratanítás az élessel egyező gyakorisággal, előre rögzített
+döntési szabállyal, nettó (díjjal terhelt) célfüggvénnyel, legalább két
+ellentétes piaci rezsimen.
+
+Minden elv mögött egy konkrét, a projektben elkövetett hiba és egy szám áll.
+
+→ `7000_validacios_elvek.md`
+
 ---
 
 ## Keresztmetszetű elvek
@@ -192,6 +205,12 @@ Minden pipeline lépés determinisztikus, rögzített seed-del (`seed=42`). Az a
 | Short entry cutoff | 0.94 (top 6%) |
 | Long teljesítmény | 78 trade, 79.5% win rate, +50.1% compounded |
 | Short teljesítmény | 260 trade, 62.3% win rate, +22.7% compounded |
+
+⚠️ **A fenti teljesítmény-számok BRUTTÓK** — a strategy réteg akkor még nem
+számolt díjjal, csúszással és fundinggal. A költség-modell bevezetése után
+(`epic_055`) kiderült, hogy a díj a bruttó nyereség nagyságrendjében mozog,
+és a rácskeresés emiatt szisztematikusan a túlkereskedő beállításokat
+választotta. A nettó számokért lásd `_doc_/research/strategy_cost_impact.md`.
 
 ### Kód-dokumentáció és specifikáció szétválasztása
 

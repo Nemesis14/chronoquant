@@ -30,6 +30,11 @@ from strategy.strategy.artifacts import (
     write_realized_outputs,
     write_strategy_artifact,
 )
+from strategy.strategy.costs import (
+    apply_costs,
+    load_cost_config,
+    load_funding_schedule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -437,12 +442,14 @@ def search_strategy(
     end            : str,
     directions     : list[str] | None = None,
     asset_id       : str | None = None,
+    max_hold_bars  : int = _MAX_HOLD_BARS,
 ) -> dict[str, Any]:
     """Run an execution-aware grid search over entry/TP/SL parameters.
 
     Filters the calibrated scored table to [start, end], then iterates over
     all combinations of ENTRY_CUTOFFS × TP_SPECS × SL_SPECS × directions.
-    Selects the best setup by total_fact_log_return.  Writes strat.* DuckDB
+    Selects the best setup by NET return (gross minus fees, slippage
+    and funding -- see strategy.costs).  Writes strat.* DuckDB
     tables, strategy_artifact.json, grid_results.csv, and registers the
     session in reg.strategies + reg.artifacts.
 
@@ -507,6 +514,18 @@ def search_strategy(
     logger.info("Search period rows: %d", len(eval_df))
 
     # --- Grid search (arrays extracted once per direction) ---
+    # Cost model (epic_055). Loaded once: the funding schedule is a few
+    # thousand rows and gets scanned per trade, so it must not be re-read
+    # inside the 200-setup grid.
+    _cost_cfg = load_cost_config()
+    _funding_schedule = load_funding_schedule(asset_id)
+    logger.info(
+        "search_strategy: koltseg-modell aktiv — maker=%.2f taker=%.2f slip=%.2f bps, "
+        "%d funding elszamolas",
+        _cost_cfg["maker_bps"], _cost_cfg["taker_bps"], _cost_cfg["slippage_bps"],
+        len(_funding_schedule),
+    )
+
     all_results: list[dict[str, Any]] = []
     N = len(eval_df)
 
@@ -535,9 +554,17 @@ def search_strategy(
                         direction, entry_cutoff, tp_spec, sl_spec,
                         N, score_pct, close_arr, high_arr, low_arr, open_time,
                         mean_arr, tp_lr, sl_lr, has_ohlcv,
+                        max_hold_bars = max_hold_bars,
                     )
-                    total_lr = sum(t["fact_log_return"] for t in trades)
                     n_trades = len(trades)
+                    # Net objective (epic_055): gross return minus fees,
+                    # slippage and the funding actually crossed. Optimising on
+                    # gross made the search prefer over-trading setups that a
+                    # real fee schedule would have made deeply unprofitable.
+                    total_lr, cost_lr, fund_lr = apply_costs(
+                        trades, direction, _funding_schedule, _cost_cfg
+                    )
+                    net_lr = total_lr - cost_lr - fund_lr
                     all_results.append({
                         "direction"             : direction,
                         "entry_cutoff"          : entry_cutoff,
@@ -545,6 +572,9 @@ def search_strategy(
                         "sl_spec"               : sl_spec,
                         "n_trades"              : n_trades,
                         "total_fact_log_return" : total_lr,
+                        "total_cost"            : cost_lr,
+                        "total_funding"         : fund_lr,
+                        "net_log_return"        : net_lr,
                         "avg_fact_log_return"   : total_lr / n_trades if n_trades else 0.0,
                         "compounded_return_pct" : (math.exp(total_lr) - 1) * 100,
                         "win_rate"              : (
@@ -563,13 +593,14 @@ def search_strategy(
     )
 
     # --- Best setup ---
-    best_setup  = max(all_results, key=lambda r: r["total_fact_log_return"])
+    best_setup  = max(all_results, key=lambda r: r["net_log_return"])
     best_trades = _simulate_direction(
         eval_df,
         best_setup["direction"],
         best_setup["entry_cutoff"],
         best_setup["tp_spec"],
         best_setup["sl_spec"],
+        max_hold_bars = max_hold_bars,
     )
     logger.info(
         "Best setup: direction=%s cutoff=%.2f tp_spec=%s sl_spec=%s "
@@ -615,14 +646,14 @@ def search_strategy(
         "tp_spec"                : best_setup["tp_spec"],
         "sl_spec"                : best_setup["sl_spec"],
         "directions"             : list(directions),
-        "max_hold_minutes"       : 60,
+        "max_hold_minutes"       : max_hold_bars,
         "same_bar_conflict_rule" : "sl_first",
     }
     search_info = {
         "search_type"        : "grid",
         "n_setups_evaluated" : len(all_results),
-        "best_objective"     : "total_fact_log_return",
-        "best_value"         : round(best_setup["total_fact_log_return"], 6),
+        "best_objective"     : "net_log_return",
+        "best_value"         : round(best_setup["net_log_return"], 6),
     }
 
     artifact_path = write_strategy_artifact(

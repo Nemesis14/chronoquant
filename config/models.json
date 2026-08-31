@@ -1,25 +1,25 @@
 {
   "schema_version": 4,
   "models": {
-    "lgbm_solusdt_l_fw60_2101_2605": {
-      "display_name": "SOL Long LightGBM Champion 2101-2605",
-      "description": "Champion long model — train/valid split, train 2021-01 to 2025-04, valid 2025-05 to 2026-05.",
+    "lgbm_solusdt_l_fw60_2101_2607": {
+      "display_name": "SOL Long LightGBM Champion 2101-2607",
+      "description": "Champion long model — train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (monthly refresh cycle, rolling 6-month calibration window).",
       "asset_id": "solusdt",
       "target_name": "long_mfe_fw60",
       "family": "lightgbm",
       "trainer": "lightgbm_regression",
-      "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2605",
+      "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2607",
       "oos_year": null,
       "sampling": {
-        "sample_id": "solusdt_fw60_2101_2605",
-        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2605",
-        "snapshot_id": "solusdt_fw60_2101_2605__21668185",
+        "sample_id": "solusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2607",
+        "snapshot_id": "solusdt_fw60_2101_2607__49466cd2",
         "sampling_mode": "train_valid_split",
         "seed": 42,
         "train_start": "2021-01-01",
-        "train_end": "2025-04-30",
-        "valid_start": "2025-05-01",
-        "valid_end": "2026-05-31",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
         "feature_lookback_embargo_minutes": 240,
         "target_purge_minutes": 60
       },
@@ -28,25 +28,25 @@
       },
       "active": true
     },
-    "lgbm_solusdt_s_fw60_2101_2605": {
-      "display_name": "SOL Short LightGBM Champion 2101-2605",
-      "description": "Champion short model — train/valid split, train 2021-01 to 2025-04, valid 2025-05 to 2026-05.",
+    "lgbm_solusdt_s_fw60_2101_2607": {
+      "display_name": "SOL Short LightGBM Champion 2101-2607",
+      "description": "Champion short model — train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (monthly refresh cycle, rolling 6-month calibration window).",
       "asset_id": "solusdt",
       "target_name": "short_mfe_fw60",
       "family": "lightgbm",
       "trainer": "lightgbm_regression",
-      "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2605",
+      "artifact_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2607",
       "oos_year": null,
       "sampling": {
-        "sample_id": "solusdt_fw60_2101_2605",
-        "sample_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2605",
-        "snapshot_id": "solusdt_fw60_2101_2605__21668185",
+        "sample_id": "solusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_s_fw60_2101_2607",
+        "snapshot_id": "solusdt_fw60_2101_2607__49466cd2",
         "sampling_mode": "train_valid_split",
         "seed": 42,
         "train_start": "2021-01-01",
-        "train_end": "2025-04-30",
-        "valid_start": "2025-05-01",
-        "valid_end": "2026-05-31",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
         "feature_lookback_embargo_minutes": 240,
         "target_purge_minutes": 60
       },
@@ -54,6 +54,141 @@
         "method": "predict"
       },
       "active": true
+    },
+    "lgbm_solusdt_l_fw60_ctrl_2301_2607": {
+      "display_name": "SOL Long CONTROL 2301-2607 (208 feature)",
+      "description": "epic_054 kontroll: csak a meglevo 208 feature. A kezelt modell parja; kettejuk kozott egyedul a 22 alt-data valtozo kulonbozik.",
+      "asset_id": "solusdt",
+      "target_name": "long_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_ctrl_2301_2607",
+      "oos_year": null,
+      "sampling": {
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60,
+        "sample_id": "solusdt_fw60_ctrl_2301_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_ctrl_2301_2607",
+        "snapshot_id": "solusdt_fw60_2301_2607__948cc228"
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": false
+    },
+    "lgbm_solusdt_l_fw60_alt_2301_2607": {
+      "display_name": "SOL Long TREATMENT 2301-2607 (208+22 feature)",
+      "description": "epic_054 kezeles: 208 meglevo + 22 Binance derivativa feature (OI, long/short, premium index, bazis).",
+      "asset_id": "solusdt",
+      "target_name": "long_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_solusdt_l_fw60_alt_2301_2607",
+      "oos_year": null,
+      "sampling": {
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60,
+        "sample_id": "solusdt_fw60_alt_2301_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_alt_2301_2607",
+        "snapshot_id": "solusdt_fw60_2301_2607__de542d6b"
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": false
+    },
+    "lgbm_solusdt_l_fw240_alt_2301_2607": {
+      "display_name": "SOL Long 4h horizon (fw240), 208+22 alt feature",
+      "description": "epic_058: ugyanaz a feature-keszlet mint a fw60 kezelt modell, csak a target 4 oras (long_mfe_fw240). A horizont az EGYETLEN kulonbseg, hogy a dij/el arany javulasa merheto legyen.",
+      "asset_id": "solusdt",
+      "target_name": "long_mfe_fw240",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_solusdt_l_fw240_alt_2301_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "solusdt_fw240_2301_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw240_alt_2301_2607",
+        "snapshot_id": "solusdt_fw60_2301_2607__ef31ba96",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 240
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": false
+    },
+    "lgbm_solusdt_l_fw240_alt_2301_2507": {
+      "display_name": "lgbm_solusdt_l_fw240_alt_2301_2507",
+      "description": "epic_057 t601: eves out-of-sample validacio. Train 2023-01..2025-07, valid 12 honap.",
+      "asset_id": "solusdt",
+      "target_name": "long_mfe_fw240",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_solusdt_l_fw240_alt_2301_2507",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "solusdt_l_fw240_alt_2301_2507",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw240_alt_2301_2507",
+        "snapshot_id": "solusdt_fw60_2301_2607__ef31ba96",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2025-07-31",
+        "valid_start": "2025-08-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 240
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": false
+    },
+    "lgbm_solusdt_s_fw240_alt_2301_2607": {
+      "display_name": "lgbm_solusdt_s_fw240_alt_2301_2607",
+      "description": "epic_057 t602: SHORT irany, 4 oras horizont. Ugyanaz a config mint a long production jelolt.",
+      "asset_id": "solusdt",
+      "target_name": "short_mfe_fw240",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_solusdt_s_fw240_alt_2301_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "solusdt_s_fw240_alt_2301_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_s_fw240_alt_2301_2607",
+        "snapshot_id": "solusdt_fw60_2301_2607__ef31ba96",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 240
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": false
     }
   }
 }

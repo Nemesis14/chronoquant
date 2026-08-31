@@ -27,6 +27,7 @@ dependencies = [
     "optuna>=4.0.0",
     "papermill>=2.7.0",
     "tabulate>=0.10.0",
+    "zstandard>=0.25.0",
 ]
 
 [tool.setuptools.packages.find]

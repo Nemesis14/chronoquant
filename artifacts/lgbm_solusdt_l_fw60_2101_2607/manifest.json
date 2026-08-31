@@ -1,0 +1,30 @@
+{
+    "model_id": "lgbm_solusdt_l_fw60_2101_2607",
+    "display_name": "SOL Long LightGBM Champion 2101-2607",
+    "description": "Champion long model \u2014 train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (monthly refresh cycle, rolling 6-month calibration window).",
+    "asset_id": "solusdt",
+    "target_name": "long_mfe_fw60",
+    "family": "lightgbm",
+    "trainer": "lightgbm_regression",
+    "sampling": {
+        "sample_id": "solusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_l_fw60_2101_2607",
+        "snapshot_id": "solusdt_fw60_2101_2607__49466cd2",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+    },
+    "created_at": "2026-08-12T10:09:24.668463+00:00",
+    "pipeline_status": "analyze_done",
+    "provenance": {
+        "snapshot_id": "solusdt_fw60_2101_2607__49466cd2",
+        "content_sha256": "49466cd2fe993186ef170b183c3b4481456668ea3f1a5638d311a64453fb167b",
+        "feature_set_id": "fs_solusdt_fw60_l__c5aad14d"
+    },
+    "updated_at": "2026-08-12T14:35:27.519056+00:00"
+}

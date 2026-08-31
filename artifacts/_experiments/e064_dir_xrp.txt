@@ -1,0 +1,465 @@
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:132: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  return (tr[["open_time", "y"]].reset_index(drop=True).assign(**a),
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+D:\repos\chronoquant\src\modeling\experiments\direction_models.py:133: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  va[["open_time", "y"]].reset_index(drop=True).assign(**b), kept)
+
+============================================================================================
+IRANY-MODELLEK — XRPUSDT
+============================================================================================
+  TRAIN  32,540 sor    VALID   8,142 sor    4 purge-olt CV fold
+  irany-jellegu ar-feature :  191  (a magnitudo/volatilitas valtozok kiszurve)
+  pozicionaltsagi feature  :   21
+  WoE binning: 212 -> 206 valtozo
+
+  draft                         valtozo     CV IC   IC valid   szelek
+  A  OLS, csak ar                     4   +0.0787    -0.0006   p95 -13.7pp  p05 +11.4pp
+  B  OLS, ar + pozicio                3   +0.0921    -0.0070   p95  -5.1pp  p05  +3.1pp
+  C  WoE+Lasso, ar+pozicio          149   +0.1576    -0.0153   p95  -2.6pp  p05  -3.3pp
+  D  WoE+Lasso, csak pozicio         19   +0.1397    -0.0468   p95  -1.2pp  p05  -3.8pp
+
+  CV IC alapjan a legjobb: C  WoE+Lasso, ar+pozicio   (CV +0.1576, valid -0.0153)
+
+  a Lasso 149 nem-nulla egyutthatoja kozul a 12 legnagyobb:
+      1. feat_swing_high_24                |coef| 0.8258
+      2. feat_dir_funding_flip_24          |coef| 0.5750 [pozicio]
+      3. feat_swing_low_8                  |coef| 0.4988
+      4. feat_taker_buy_base_ratio_24      |coef| 0.4150
+      5. feat_swing_high_16                |coef| 0.4076
+      6. feat_dir_prem_z_168               |coef| 0.3935 [pozicio]
+      7. feat_efficiency_ratio_10          |coef| 0.3859
+      8. feat_returns_skew_24              |coef| 0.3671
+      9. feat_dir_oi_z_168                 |coef| 0.3641 [pozicio]
+     10. feat_swing_low_4                  |coef| 0.3543
+     11. feat_lr_r2_10                     |coef| 0.3356
+     12. feat_upper_wick_ratio             |coef| 0.3241
+
+  blokk-bootstrap a valasztott draft valid IC-jere:
+    IC -0.0153   szoras 0.0237   t = -0.64   P(IC>0) = 29.8%

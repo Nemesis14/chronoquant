@@ -1,0 +1,92 @@
+########## target=y_ret LightGBM
+  4 purge-olt CV fold a trainen belul, foldonkent ~6,515 teszt sor
+  jelolt: 270 valtozo, MI szerint rendezve; koronkent az elso 30-t probaljuk
+  elfogadas: a CV IC-t legalabb 0.002 -tel javitsa
+
+   korvaltozo                                    CV IC   javulas
+     1feat_max_drawdown_10                     +0.0526   +0.0526
+     2feat_atr_16                              +0.0613   +0.0087
+     3feat_natr_16                             +0.0671   +0.0058
+     -(nincs tobb javito valtozo)              +0.0681   +0.0011
+
+  vegleges keszlet: 3 valtozo   CV IC +0.0671
+
+=== TRAIN vs VALID ===
+  TRAIN    32,576 sor   IC +0.1241
+          top  p95  n= 1629  atlagos kimenet    +138.2   osszes atlag      +8.1   tobblet    +130.0
+          also p05  n= 1629  atlagos kimenet     -61.9   osszes atlag      +8.1   tobblet     +70.0
+  VALID     8,151 sor   IC -0.0405
+          top  p95  n=  408  atlagos kimenet    -107.0   osszes atlag     -29.4   tobblet     -77.5
+          also p05  n=  408  atlagos kimenet     -19.6   osszes atlag     -29.4   tobblet      -9.8
+
+  blokk-bootstrap a valid IC-re (30 napos blokkok):
+    IC -0.0405   szoras 0.0263   t = -1.54   P(IC>0) = 6.7%
+########## target=y_ret OLS
+==================================================================================
+  TRAIN  32,576 sor    VALID   8,151 sor
+  4 purge-olt CV fold a trainen belul, foldonkent ~6,515 teszt sor
+  jelolt: 270 valtozo, MI szerint rendezve; koronkent az elso 30-t probaljuk
+  elfogadas: a CV IC-t legalabb 0.002 -tel javitsa
+
+   korvaltozo                                    CV IC   javulas
+     1feat_volume_sma_8                        +0.0782   +0.0782
+     -(nincs tobb javito valtozo)              +0.0692   -0.0090
+
+  vegleges keszlet: 1 valtozo   CV IC +0.0782
+
+=== TRAIN vs VALID ===
+  TRAIN    32,576 sor   IC +0.0634
+          top  p95  n= 1649  atlagos kimenet     +46.2   osszes atlag      +8.1   tobblet     +38.1
+          also p05  n= 1631  atlagos kimenet     -47.0   osszes atlag      +8.1   tobblet     +55.1
+  VALID     8,151 sor   IC -0.0472
+          top  p95  n=  414  atlagos kimenet     -56.0   osszes atlag     -29.4   tobblet     -26.5
+          also p05  n=  410  atlagos kimenet     -18.9   osszes atlag     -29.4   tobblet     -10.5
+
+  blokk-bootstrap a valid IC-re (30 napos blokkok):
+    IC -0.0472   szoras 0.0281   t = -1.68   P(IC>0) = 3.3%
+########## target=y_ret_norm LightGBM
+  TRAIN  32,576 sor    VALID   8,151 sor
+  4 purge-olt CV fold a trainen belul, foldonkent ~6,515 teszt sor
+  jelolt: 270 valtozo, MI szerint rendezve; koronkent az elso 30-t probaljuk
+  elfogadas: a CV IC-t legalabb 0.002 -tel javitsa
+
+   korvaltozo                                    CV IC   javulas
+     1feat_max_drawdown_10                     +0.0455   +0.0455
+     2feat_avg_trade_quote_24                  +0.0536   +0.0081
+     -(nincs tobb javito valtozo)              +0.0522   -0.0014
+
+  vegleges keszlet: 2 valtozo   CV IC +0.0536
+
+=== TRAIN vs VALID ===
+  TRAIN    32,576 sor   IC +0.1135
+          top  p95  n= 1644  atlagos kimenet      +0.4   osszes atlag      +0.0   tobblet      +0.4
+          also p05  n= 1636  atlagos kimenet      -0.6   osszes atlag      +0.0   tobblet      +0.6
+  VALID     8,151 sor   IC -0.0352
+          top  p95  n=  415  atlagos kimenet      -0.3   osszes atlag      -0.1   tobblet      -0.1
+          also p05  n=  410  atlagos kimenet      +0.1   osszes atlag      -0.1   tobblet      -0.2
+
+  blokk-bootstrap a valid IC-re (30 napos blokkok):
+    IC -0.0352   szoras 0.0355   t = -0.99   P(IC>0) = 22.3%
+########## target=y_ret_norm OLS
+==================================================================================
+  TRAIN  32,576 sor    VALID   8,151 sor
+  4 purge-olt CV fold a trainen belul, foldonkent ~6,515 teszt sor
+  jelolt: 270 valtozo, MI szerint rendezve; koronkent az elso 30-t probaljuk
+  elfogadas: a CV IC-t legalabb 0.002 -tel javitsa
+
+   korvaltozo                                    CV IC   javulas
+     1feat_volume_sma_24                       +0.0706   +0.0706
+     -(nincs tobb javito valtozo)              +0.0705   -0.0001
+
+  vegleges keszlet: 1 valtozo   CV IC +0.0706
+
+=== TRAIN vs VALID ===
+  TRAIN    32,576 sor   IC +0.0472
+          top  p95  n= 1640  atlagos kimenet      +0.1   osszes atlag      +0.0   tobblet      +0.1
+          also p05  n= 1638  atlagos kimenet      -0.5   osszes atlag      +0.0   tobblet      +0.5
+  VALID     8,151 sor   IC -0.0481
+          top  p95  n=  415  atlagos kimenet      -0.3   osszes atlag      -0.1   tobblet      -0.2
+          also p05  n=  419  atlagos kimenet      -0.2   osszes atlag      -0.1   tobblet      +0.1
+
+  blokk-bootstrap a valid IC-re (30 napos blokkok):
+    IC -0.0481   szoras 0.0407   t = -1.18   P(IC>0) = 8.1%

@@ -1,0 +1,157 @@
+[
+  {
+    "id": 23508945,
+    "uuid": "rDMEWTXx",
+    "chart_url": "/chart/XAUUSD/rDMEWTXx-Three-Wars-One-Asset-Is-Gold-s-Bullish-Structure-Still-Intact/",
+    "is_script": false,
+    "name": "Three Wars, One Asset: Is Gold's Bullish Structure Still Intact",
+    "description": "Gold has consistently been one of the world's most trusted safe-haven assets 🏆, especially during periods of geopolitical uncertainty. This chart highlights three major global conflicts—the 🇷🇺 Russia–Ukraine War, 🇺🇸 US–Iran Military Tensions, and the 🇮🇱 Israel–Iran Conflict—all of which coincided wi  …[TRUNCATED FOR SAMPLE]",
+    "interval": "240",
+    "direction": 0,
+    "webp_url": "https://s3.tradingview.com/r/rDMEWTXx_mid.webp",
+    "user": {
+      "username": "XAUApex",
+      "uri": "/u/XAUApex/",
+      "is_broker": false,
+      "avatars": {
+        "small": "https://s3.tradingview.com/userpics/128728795-r5o6.png",
+        "mid": "https://s3.tradingview.com/userpics/128728795-r5o6_mid.png",
+        "big": "https://s3.tradingview.com/userpics/128728795-r5o6_big.png",
+        "orig": "https://s3.tradingview.com/userpics/128728795-r5o6_orig.png"
+      },
+      "broker_name": null,
+      "rating_details": null,
+      "badges": [
+        {
+          "name": "pro:pro_premium",
+          "verbose_name": "Premium"
+        }
+      ]
+    },
+    "symbol": {
+      "pro_symbol": "OANDA:XAUUSD",
+      "short_name": "XAUUSD",
+      "exchange": "OANDA",
+      "type": "commodity",
+      "typespecs": [
+        "cfd"
+      ],
+      "tv_symbol_page_url_force_exchange": [
+        "/symbols/XAUUSD/",
+        "?exchange=OANDA"
+      ],
+      "ticker_title": "Gold Spot / U.S. Dollar",
+      "instrument_name": "Gold Spot / U.S. Dollar",
+      "medium_logo_urls": [
+        "https://s3-symbol-logo.tradingview.com/metal/gold.svg"
+      ],
+      "logo": {
+        "style": "single",
+        "logoid": "metal/gold"
+      },
+      "logo_id": "metal/gold",
+      "base_currency_logo_id": null,
+      "currency_logo_id": "country/US",
+      "country": "",
+      "data_frequency": null
+    },
+    "video": {
+      "video_cam": null,
+      "video_duration": null,
+      "video_filename": null
+    },
+    "flags": {
+      "is_education": false,
+      "is_public": true,
+      "is_visible": true,
+      "is_suggested": true,
+      "is_reviewed": true,
+      "is_picked": false,
+      "is_favored": false,
+      "is_voted": false,
+      "is_author_followed": false
+    },
+    "created_at": "2026-08-06T07:01:36.307328+00:00",
+    "updated_at": "2026-08-07T04:58:11.498879+00:00",
+    "likes_count": 4,
+    "comments_count": 2
+  },
+  {
+    "id": 23515176,
+    "uuid": "f2KOEyxH",
+    "chart_url": "/chart/BTCUSD/f2KOEyxH-BTCUSD-Pullback-Into-Demand-Zone-Price-Action-Market-Structure/",
+    "is_script": false,
+    "name": "BTCUSD Pullback Into Demand Zone Price Action & Market Structure",
+    "description": "🔹 BTCUSD is currently trading within a corrective phase after a strong bullish expansion, with recent price action showing a loss of short-term momentum beneath a marked resistance zone. The chart highlights a previous Break of Structure (BOS) followed by multiple Change of Character (CHoCH) points,  …[TRUNCATED FOR SAMPLE]",
+    "interval": "60",
+    "direction": 1,
+    "webp_url": "https://s3.tradingview.com/f/f2KOEyxH_mid.webp",
+    "user": {
+      "username": "XAUApex",
+      "uri": "/u/XAUApex/",
+      "is_broker": false,
+      "avatars": {
+        "small": "https://s3.tradingview.com/userpics/128728795-r5o6.png",
+        "mid": "https://s3.tradingview.com/userpics/128728795-r5o6_mid.png",
+        "big": "https://s3.tradingview.com/userpics/128728795-r5o6_big.png",
+        "orig": "https://s3.tradingview.com/userpics/128728795-r5o6_orig.png"
+      },
+      "broker_name": null,
+      "rating_details": null,
+      "badges": [
+        {
+          "name": "pro:pro_premium",
+          "verbose_name": "Premium"
+        }
+      ]
+    },
+    "symbol": {
+      "pro_symbol": "BITSTAMP:BTCUSD",
+      "short_name": "BTCUSD",
+      "exchange": "BITSTAMP",
+      "type": "spot",
+      "typespecs": [
+        "defi",
+        "crypto"
+      ],
+      "tv_symbol_page_url_force_exchange": [
+        "/symbols/BTCUSD/",
+        "?exchange=BITSTAMP"
+      ],
+      "ticker_title": "Bitcoin",
+      "instrument_name": "Bitcoin",
+      "medium_logo_urls": [
+        "https://s3-symbol-logo.tradingview.com/crypto/XTVCBTC.svg"
+      ],
+      "logo": {
+        "style": "single",
+        "logoid": "crypto/XTVCBTC"
+      },
+      "logo_id": null,
+      "base_currency_logo_id": "crypto/XTVCBTC",
+      "currency_logo_id": "country/US",
+      "country": "",
+      "data_frequency": null
+    },
+    "video": {
+      "video_cam": null,
+      "video_duration": null,
+      "video_filename": null
+    },
+    "flags": {
+      "is_education": false,
+      "is_public": true,
+      "is_visible": true,
+      "is_suggested": true,
+      "is_reviewed": true,
+      "is_picked": false,
+      "is_favored": false,
+      "is_voted": false,
+      "is_author_followed": false
+    },
+    "created_at": "2026-08-07T05:56:38.741107+00:00",
+    "updated_at": "2026-08-08T10:20:23.260727+00:00",
+    "likes_count": 26,
+    "comments_count": 10
+  }
+]

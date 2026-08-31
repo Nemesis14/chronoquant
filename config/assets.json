@@ -10,6 +10,13 @@
             "metadata_path": "database/solusdt/solusdt.json",
             "features_profile": "solusdt_fw60",
             "qty_step": 0.1
+        },
+        "btcusdt": {
+            "symbol": "BTCUSDT",
+            "interval": "1m",
+            "market": "spot",
+            "db_path": "database/btcusdt/btcusdt.duckdb",
+            "metadata_path": "database/btcusdt/btcusdt.json"
         }
     }
 }

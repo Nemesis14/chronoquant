@@ -233,6 +233,11 @@ def _grid_results_dataframe(grid_results: list[dict[str, Any]] | None) -> pd.Dat
             "sl_spec"               : [r["sl_spec"]               for r in grid_results],
             "n_trades"              : pd.Series([r["n_trades"]     for r in grid_results], dtype="int64"),
             "total_fact_log_return" : pd.Series([r["total_fact_log_return"] for r in grid_results], dtype="float64"),
+            # Cost breakdown (epic_055): both gross and net are kept so the
+            # distortion from the old gross-only objective stays measurable.
+            "total_cost"            : pd.Series([r.get("total_cost", 0.0)     for r in grid_results], dtype="float64"),
+            "total_funding"         : pd.Series([r.get("total_funding", 0.0)  for r in grid_results], dtype="float64"),
+            "net_log_return"        : pd.Series([r.get("net_log_return", 0.0) for r in grid_results], dtype="float64"),
             "avg_fact_log_return"   : pd.Series([r["avg_fact_log_return"]   for r in grid_results], dtype="float64"),
             "compounded_return_pct" : pd.Series([r["compounded_return_pct"] for r in grid_results], dtype="float64"),
             "win_rate"              : pd.Series([r["win_rate"]              for r in grid_results], dtype="float64"),
@@ -245,6 +250,9 @@ def _grid_results_dataframe(grid_results: list[dict[str, Any]] | None) -> pd.Dat
         "sl_spec"               : pd.Series([], dtype="object"),
         "n_trades"              : pd.Series([], dtype="int64"),
         "total_fact_log_return" : pd.Series([], dtype="float64"),
+        "total_cost"            : pd.Series([], dtype="float64"),
+        "total_funding"         : pd.Series([], dtype="float64"),
+        "net_log_return"        : pd.Series([], dtype="float64"),
         "avg_fact_log_return"   : pd.Series([], dtype="float64"),
         "compounded_return_pct" : pd.Series([], dtype="float64"),
         "win_rate"              : pd.Series([], dtype="float64"),

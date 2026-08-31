@@ -1,0 +1,30 @@
+{
+    "model_id": "lgbm_solusdt_s_fw240_alt_2301_2607",
+    "display_name": "lgbm_solusdt_s_fw240_alt_2301_2607",
+    "description": "epic_057 t602: SHORT irany, 4 oras horizont. Ugyanaz a config mint a long production jelolt.",
+    "asset_id": "solusdt",
+    "target_name": "short_mfe_fw240",
+    "family": "lightgbm",
+    "trainer": "lightgbm_regression",
+    "sampling": {
+        "sample_id": "solusdt_s_fw240_alt_2301_2607",
+        "sample_dir": "artifacts/lgbm_solusdt_s_fw240_alt_2301_2607",
+        "snapshot_id": "solusdt_fw60_2301_2607__ef31ba96",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2023-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 240
+    },
+    "created_at": "2026-08-25T20:09:30.745154+00:00",
+    "pipeline_status": "feature_engineering_done",
+    "provenance": {
+        "snapshot_id": "solusdt_fw60_2301_2607__ef31ba96",
+        "content_sha256": "ef31ba963a92ecfc913e185d2267c0b0641abbc3f8512243848fa7152f884db7",
+        "feature_set_id": "fs_solusdt_fw240_s__cad64457"
+    },
+    "updated_at": "2026-08-25T20:14:56.478224+00:00"
+}

@@ -1,0 +1,80 @@
+2026-08-26 12:42:33,800 INFO betoltve: 31369 sor, 235 feature
+2026-08-26 12:42:33,879 INFO hiperparameter kereses indul (100 trial)...
+2026-08-26 12:42:33,903 INFO kereses: train=10496  belso valid=2624
+2026-08-26 12:49:36,669 INFO legjobb lift a belso validon: 0.1104
+2026-08-26 12:49:36,673 INFO parameterek mentve: ..\artifacts\_experiments\e059_tb240.json
+2026-08-26 12:49:36,673 INFO gorduló mérés indul (havi ujratanitas)...
+belepes: TAKER (market) -> 6.5 bps
+  nyero +91.5 bps   vesztes -113.0 bps   fedezeti 55.3%
+cimke: tb_label_240_100  (fuggoleges korlat 240 perc)
+
+legjobb parameterek:
+  colsample_bytree     0.38639464758384123
+  learning_rate        0.03021337744949653
+  min_child_samples    58
+  n_estimators         3000
+  num_leaves           14
+  reg_alpha            3.9161689370776207
+  reg_lambda           0.3691574249706199
+  subsample            0.7884107299850958
+  subsample_freq       1
+
+=== HAVI EREDMENY (kuszob = train p95) ===
+     ho irany  n  jel  talalat_%  netto_bps  bps_per_kotes
+2024-07  LONG 62   62       43.5     -984.7         -15.88
+2024-07 SHORT 34   34       58.8      381.9          11.23
+2024-08  LONG 59   59       59.3      484.7           8.21
+2024-08 SHORT 33   33       42.4     -765.3         -23.19
+2024-09  LONG 30   30       40.0     -500.0         -16.67
+2024-09 SHORT 44   44       47.7     -625.4         -14.21
+2024-10  LONG 37   37       48.6     -122.2          -3.30
+2024-10 SHORT 39   39       51.3     -104.9          -2.69
+2024-11  LONG 51   51       64.7     1252.8          24.56
+2024-11 SHORT 64   64       43.8    -1336.1         -20.88
+2024-12  LONG 60   60       40.0    -1885.6         -31.43
+2024-12 SHORT 43   43       51.2     -206.1          -4.79
+2025-01  LONG 48   48       39.6     -993.1         -20.69
+2025-01 SHORT 36   36       47.2     -588.8         -16.36
+2025-02  LONG 51   51       62.7      788.3          15.46
+2025-02 SHORT 20   20       75.0      804.6          40.23
+2025-03  LONG 40   40       47.5     -630.3         -15.76
+2025-03 SHORT 35   35       57.1      186.1           5.32
+2025-04  LONG 38   38       65.8      917.9          24.16
+2025-04 SHORT 32   32       46.9     -372.0         -11.62
+2025-05  LONG 29   29       51.7       74.2           2.56
+2025-05 SHORT 47   47       36.2    -1049.8         -22.34
+2025-06  LONG 38   38       44.7     -191.9          -5.05
+2025-06 SHORT 38   38       42.1     -837.3         -22.03
+2025-07  LONG 39   39       53.8      -91.3          -2.34
+2025-07 SHORT 58   58       56.9      254.5           4.39
+2025-08  LONG 38   38       39.5     -902.5         -23.75
+2025-08 SHORT 34   34       58.8      256.1           7.53
+2025-09  LONG 27   27       44.4      -77.1          -2.85
+2025-09 SHORT 37   37       48.6      110.3           2.98
+2025-10  LONG 60   60       40.0    -1729.1         -28.82
+2025-10 SHORT 37   37       43.2     -874.7         -23.64
+2025-11  LONG 46   46       50.0     -493.0         -10.72
+2025-11 SHORT 35   35       62.9      542.9          15.51
+2025-12  LONG 13   13       30.8     -652.7         -50.21
+2025-12 SHORT 25   25       56.0       41.3           1.65
+2026-01  LONG 46   46       47.8        8.2           0.18
+2026-01 SHORT 36   36       47.2     -233.1          -6.48
+2026-02  LONG 88   88       44.3    -1724.0         -19.59
+2026-02 SHORT 32   32       56.2      218.8           6.84
+2026-03  LONG 12   12       58.3      185.7          15.47
+2026-03 SHORT 44   44       27.3    -2110.1         -47.96
+2026-04  LONG 28   28       35.7     -660.4         -23.58
+2026-04 SHORT 18   18       33.3     -439.3         -24.40
+2026-05  LONG 41   41       46.3     -126.4          -3.08
+2026-05 SHORT 34   34       38.2     -337.5          -9.93
+2026-06  LONG 80   80       42.5    -2069.9         -25.87
+2026-06 SHORT 74   74       48.6     -489.2          -6.61
+2026-07  LONG  2    2        0.0     -226.2        -113.10
+2026-07 SHORT 26   26       26.9    -1007.6         -38.75
+
+=== OSSZESITES IRANYONKENT ===
+  LONG   n= 1063  talalat  47.6%  netto  -10348.6 bps  (-9.74 bps/kotes)  pozitiv honap: 7/25  telesules 100.0%
+  SHORT  n=  955  talalat  47.8%  netto   -8580.7 bps  (-8.99 bps/kotes)  pozitiv honap: 9/25  telesules 100.0%
+
+  EGYUTT n=2018  netto -18929.3 bps  (-9.38 bps/kotes)
+  1000 USD notionalon, kotesenkent ujranyitva: -189 USD

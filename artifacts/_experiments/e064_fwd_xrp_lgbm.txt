@@ -1,0 +1,26 @@
+
+==================================================================================
+FORWARD SELECTION — XRPUSDT, LightGBM
+==================================================================================
+  TRAIN  32,576 sor    VALID   8,151 sor
+  4 purge-olt CV fold a trainen belul, foldonkent ~6,515 teszt sor
+  jelolt: 270 valtozo, MI szerint rendezve; koronkent az elso 30-t probaljuk
+  elfogadas: a CV IC-t legalabb 0.002 -tel javitsa
+
+   korvaltozo                                    CV IC   javulas
+     1feat_dist_rolling_low_24                 +0.0609   +0.0609
+     2feat_lower_low_count_16                  +0.0669   +0.0061
+     -(nincs tobb javito valtozo)              +0.0681   +0.0012
+
+  vegleges keszlet: 2 valtozo   CV IC +0.0669
+
+=== TRAIN vs VALID ===
+  TRAIN    32,576 sor   IC +0.1084
+          top  p95  n= 1641  talalat  44.1%   alap  36.9%   lift   +7.2pp
+          also p05  n= 1658  talalat  57.4%   alap  42.6%   lift  +14.8pp
+  VALID     8,151 sor   IC +0.0167
+          top  p95  n=  419  talalat  37.9%   alap  38.6%   lift   -0.7pp
+          also p05  n=  413  talalat  50.8%   alap  45.0%   lift   +5.8pp
+
+  blokk-bootstrap a valid IC-re (30 napos blokkok):
+    IC +0.0167   szoras 0.0186   t = 0.90   P(IC>0) = 69.2%

@@ -1,0 +1,28 @@
+All checks passed!
+    median spread      258.4 bps
+    p25 / p75          188.3 / 364.5 bps
+    par-koltseg         18.8 bps
+    fedezet (median/koltseg)  13.7x
+
+  ⚠️ A fenti a lehetoseget meri, nem az elt: a decilisek a KIMENET
+     szerint vannak sorbarendezve, tehat ez a tokeletes elorelatas
+     felso korlatja. Az alabbi azt meri, mennyi ebbol elerheto.
+
+=== NAIV RANGSOROLOK — mennyit fognak meg belole ===
+          jel  orak  atlag_bps  median_bps  netto_bps  pozitiv_%
+ reverzal 72h 22556        4.1         9.2      -14.7       53.1
+  reverzal 1h 22627        3.4         8.4      -15.4       53.0
+  reverzal 4h 22624        2.1         8.3      -16.7       53.0
+ reverzal 24h 22604        1.5         8.3      -17.3       53.0
+ reverzal 12h 22616        1.0         7.3      -17.8       52.6
+reverzal 168h 22460        0.8         6.1      -18.0       52.1
+momentum 168h 22460       -0.8        -6.1      -19.6       47.9
+ momentum 12h 22616       -1.0        -7.3      -19.8       47.4
+ momentum 24h 22604       -1.5        -8.3      -20.3       47.0
+  momentum 4h 22624       -2.1        -8.3      -20.9       47.0
+  momentum 1h 22627       -3.4        -8.4      -22.2       47.1
+ momentum 72h 22556       -4.1        -9.2      -22.9       46.9
+
+  par-koltseg: 18.8 bps  (a netto_bps oszlop ezt mar levonta)
+
+[exited with code 0]

@@ -1,14 +1,14 @@
-# K=10 Clustering Validation: Realistic Backtest Results (DEFINITIVE — Corrected Classification)
+# K=10 Clustering Validation: Realistic Backtest Results (DEFINITIVE — Corrected Classification + Calibrated TP)
 
 **Task:** t871 — K=10 clustering full training (2021-06) + OOS validation (2025-07—2026-06)
 
 **Date:** 2026-09-01
 
-**STATUS: DEFINITIVE.** This document supersedes all prior versions of this analysis. It corrects a mathematical error in cluster direction classification discovered during review, and reports the final, statistically valid backtest for the Epic 065 Phase 3 decision.
+**STATUS: DEFINITIVE.** This document supersedes all prior versions of this analysis. It corrects a mathematical error in cluster direction classification discovered during review, tests whether cluster-specific TP/SL calibration recovers a profitable edge, and reports the final, statistically valid backtest for the Epic 065 Phase 3 decision.
 
 **Executive Summary**
 
-This document validates the K=10 clustering regime strategy under realistic market conditions using a corrected, statistically rigorous cluster classification (paired t-test with Bonferroni correction). The final result: **36.85% win rate and -$3,060.13 net P&L** over the 1-year OOS period (2025-07-01 — 2026-06-30), trading the 7 clusters that show a statistically significant directional bias in the training period. **No real trading edge exists** — this holds across every version of the analysis, idealized or realistic, correctly or incorrectly classified.
+This document validates the K=10 clustering regime strategy under realistic market conditions using a corrected, statistically rigorous cluster classification (paired t-test with Bonferroni correction). The corrected-classification result: **36.85% win rate and -$3,060.13 net P&L** over the 1-year OOS period (2025-07-01 — 2026-06-30), trading the 7 clusters that show a statistically significant directional bias in the training period. A follow-up test then asked whether the fixed +2%/-1% TP/SL — mismatched to each cluster's actual MFE magnitude — was suppressing a real signal; calibrating TP/SL per cluster from training-period MFE **made results worse, not better** (35.58% win rate, -$4,231.64 net P&L). **No real trading edge exists at any TP/SL scale tested** — this holds across every version of the analysis: idealized or realistic, correctly or incorrectly classified, fixed or calibrated targets.
 
 ---
 
@@ -174,22 +174,88 @@ Both cases illustrate the same underlying problem: statistically significant *tr
 
 ---
 
-## Section 6: Phase 3 Decision & Recommendation
+## Section 6: Calibrated TP/SL Test — Does Target Mismatch Explain the Loss?
+
+### Motivation
+
+The fixed TP/SL (+2%/-1%) used in every prior backtest was **not calibrated** to each cluster's actual MFE magnitude. For example, cluster 1's OOS short MFE mean is only -1.50% (per `cluster_profile_train_vs_oos_all_clusters.json`), well short of the fixed -2% TP — meaning the take-profit target was structurally close to unreachable for that cluster's typical excursion, forcing most trades toward SL or timeout regardless of underlying signal quality. This raised a legitimate question: is the strategy's poor performance an artifact of badly-sized targets, or a genuine absence of edge?
+
+### Calibration Method
+
+```
+TP_cluster[i] = |train_mfe_mean[i]| x 0.7    (70% safety margin below the training-period average excursion)
+SL_cluster[i] = TP_cluster[i] x 0.5           (fixed 2:1 risk/reward ratio, same as the fixed-TP backtest)
+```
+
+| Cluster | Direction | Train MFE Mean | Calibrated TP | Calibrated SL |
+|---------|-----------|-----------------|----------------|----------------|
+| 3 | LONG | +2.227% | 1.559% | 0.779% |
+| 9 | LONG | +2.987% | 2.091% | 1.046% |
+| 1 | SHORT | -2.342% | 1.640% | 0.820% |
+| 5 | SHORT | -2.042% | 1.429% | 0.715% |
+| 6 | SHORT | -3.095% | 2.167% | 1.083% |
+| 7 | SHORT | -2.911% | 2.037% | 1.019% |
+| 8 | SHORT | -2.293% | 1.605% | 0.803% |
+
+All other parameters (24h timeout, 0.3% costs, 0.4% round-trip slippage, $1,000 position size) unchanged from the definitive fixed-TP backtest.
+
+### Result: Calibration Made Performance WORSE
+
+| Metric | Fixed TP (+2%/-1%) | Calibrated TP (per-cluster) | Delta |
+|--------|---------------------|-------------------------------|-------|
+| Total Trades | 863 | 1,082 | +219 (more entries reach the smaller TP) |
+| Win Rate | 36.85% | **35.58%** | -1.27 pp |
+| Net P&L | -$3,060.13 | **-$4,231.64** | -$1,171.51 (39% worse) |
+| Gross P&L | -$471.13 | -$985.64 | -$514.51 |
+| Sharpe Ratio | -4.541 | -6.364 | -1.823 |
+
+Per-cluster (calibrated run):
+
+| Cluster | Direction | TP | SL | Trades | Win Rate | Net P&L |
+|---------|-----------|-----|-----|--------|----------|---------|
+| 3 | LONG | 1.559% | 0.779% | 224 | 35.71% | -$873.32 |
+| 9 | LONG | 2.091% | 1.046% | 0 | N/A | $0.00 |
+| 1 | SHORT | 1.640% | 0.820% | 361 | 35.18% | -$1,430.67 |
+| 5 | SHORT | 1.429% | 0.715% | 174 | 35.06% | -$706.55 |
+| 6 | SHORT | 2.167% | 1.083% | 84 | 36.90% | -$303.02 |
+| 7 | SHORT | 2.037% | 1.019% | 3 | 33.33% | -$13.01 |
+| 8 | SHORT | 1.605% | 0.803% | 236 | 36.02% | -$905.07 |
+
+Per-direction: LONG n=224, WR=35.71%, net=-$873.32; SHORT n=858, WR=35.55%, net=-$3,358.32 — direction symmetry persists.
+
+### Interpretation: The Signal Is Too Weak at Any Target Scale
+
+Shrinking TP proportionally shrinks SL (fixed 2:1 ratio), so a "more reachable" take-profit comes paired with a *more noise-sensitive* stop-loss. The calibrated run shows exactly this trade-off resolving unfavorably: trade count rose 25% (more entries technically reach TP) but win rate **fell**, because the tighter SL is clipped by ordinary intrabar price noise more often than the tighter TP is reached by genuine directional signal. Net result: more trades, lower win rate, larger loss.
+
+This is the decisive test for the "badly-calibrated targets" hypothesis. If the underlying cluster signal were real but simply mis-targeted, calibrating TP/SL to the cluster's own historical MFE should have improved — or at minimum not worsened — the outcome. Instead it got **worse at every level** (trades, win rate, net P&L, gross P&L, Sharpe). This rules out target miscalibration as the explanation and confirms: **the directional signal itself, not the TP/SL sizing, is the limiting factor.**
+
+### Key Question Answered
+
+> Does the signal become profitable with properly calibrated (smaller, cluster-matched) TP targets, or is the edge still too small to overcome costs even with realistic targets?
+
+**Answer: The edge remains absent (and the outcome is materially worse) even with cluster-matched, training-derived TP/SL targets.** This closes off target-calibration as a viable remediation path for Epic 065.
+
+Output files: `k10_calibrated_tp_backtest_2025_07_2026_06.csv` (1,082-row trade log with per-trade TP/SL columns), `k10_calibrated_tp_backtest_summary.json` (overall + per-cluster + per-direction metrics, plus the calibration table itself).
+
+---
+
+## Section 7: Phase 3 Decision & Recommendation
 
 ### Final Recommendation: **Do NOT Proceed with Clustering-Based Strategy**
 
-This conclusion is now supported by **five independent backtest configurations** (t870 idealized, and four realistic t871 variants spanning multiple cluster-selection methodologies, including the statistically corrected one), all converging on the same result: no exploitable edge survives realistic execution costs.
+This conclusion is now supported by **six independent backtest configurations** (t870 idealized, four realistic t871 classification variants including the statistically corrected one, and the calibrated-TP follow-up), all converging on the same result: no exploitable edge survives realistic execution costs, at any TP/SL scale.
 
 **Rationale (definitive):**
 
-1. **Statistically correct classification changes which clusters trade, not whether the strategy is profitable.** Win rate remains in the 36–38% band across every methodology tried.
+1. **Statistically correct classification changes which clusters trade, not whether the strategy is profitable.** Win rate remains in the 35–38% band across every methodology tried.
 2. **Both directions fail equally.** There is no LONG-vs-SHORT asymmetry to exploit — ruling out "we traded the wrong direction" as an explanation for poor performance.
-3. **Required win rate (>67%) vs. achieved (36.85%) is a 30-point gap** — far too large to close via parameter tuning, position sizing, or further cluster refinement.
-4. **Signal instability across train→OOS** (documented in the companion cluster profile analysis) shows 35–100% degradation in MFE magnitude and up to complete disappearance of cluster assignments, indicating the K-means partition does not generalize.
+3. **Target calibration does not help — it hurts.** Sizing TP/SL to each cluster's own training-period MFE made the loss 39% larger, ruling out "badly-sized targets" as the explanation.
+4. **Required win rate (>67%) vs. achieved (35–37%) is a 30+ point gap** — far too large to close via parameter tuning, position sizing, further cluster refinement, or target calibration.
+5. **Signal instability across train→OOS** (documented in the companion cluster profile analysis) shows 35–100% degradation in MFE magnitude and up to complete disappearance of cluster assignments, indicating the K-means partition does not generalize.
 
 ### Epic 065 Closure
 
-- **Phase 3 Conclusion:** Cluster regime strategy (K=3 and K=10 variants) is **NOT production-ready**, under any classification methodology tested.
+- **Phase 3 Conclusion:** Cluster regime strategy (K=3 and K=10 variants) is **NOT production-ready**, under any classification methodology or TP/SL calibration tested. Every remediation hypothesis tried (fix the direction bug, restrict to significant clusters, calibrate targets to actual MFE) either left the result unchanged or made it worse.
 - **Recommended next step:** Return to the LightGBM-based directional modeling approach (`src/modeling/`), with explicit focus on transaction cost optimization in the strategy calibration layer (`src/strategy/`), where isotonic calibration and Optuna threshold search can directly account for realistic cost structures — something the clustering approach has no mechanism to do.
 
 ---
@@ -235,8 +301,10 @@ TRADEABLE_SETUPS = {
 
 ## Output Files
 
-- `k10_final_corrected_backtest_2025_07_2026_06.csv` — Definitive trade log (863 rows, 7 clusters, LONG+SHORT)
-- `k10_final_corrected_backtest_summary.json` — Definitive summary (overall + per-cluster + per-direction)
+- `k10_final_corrected_backtest_2025_07_2026_06.csv` — Definitive fixed-TP trade log (863 rows, 7 clusters, LONG+SHORT)
+- `k10_final_corrected_backtest_summary.json` — Definitive fixed-TP summary (overall + per-cluster + per-direction)
+- `k10_calibrated_tp_backtest_2025_07_2026_06.csv` — Calibrated-TP trade log (1,082 rows, per-trade TP/SL columns)
+- `k10_calibrated_tp_backtest_summary.json` — Calibrated-TP summary (overall + per-cluster calibration + per-direction)
 - `kmeans_k10_trained_2021_2025_06.pkl` — Trained model (archived)
 - `paired_ttest_cluster_classification.json` — Corrected classification methodology results
 - `cluster_profile_train_vs_oos_all_clusters.json` — Train-vs-OOS MFE degradation analysis (all 10 clusters)

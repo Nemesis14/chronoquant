@@ -3,7 +3,7 @@ epic: epic_065
 id: t866
 title: Klaszterezés implementálása és profilozás
 assignee: modeling_agent
-status: pr
+status: done
 blocks: [t867]
 blocked_by: [t864, t865]
 ---
@@ -82,3 +82,5 @@ c4549a7 t866: Implement K-means clustering on window representation
 - `artifacts/research_cluster_regime/cluster_labels.csv`: Cluster assignments + targets
 - `artifacts/research_cluster_regime/cluster_profiles.json`: Per-cluster profiling statistics
 - `artifacts/research_cluster_regime/clustering_metadata.json`: Algorithm metadata + metrics
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

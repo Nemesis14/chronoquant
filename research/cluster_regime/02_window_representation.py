@@ -29,7 +29,7 @@ import polars as pl
 from scipy import stats
 
 import utils
-from data_handling.store.duckdb_store import get_connection, ensure_tables
+from data_handling.store.duckdb_store import ensure_tables, get_connection
 
 logger = logging.getLogger(__name__)
 

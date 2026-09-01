@@ -3,7 +3,7 @@ epic: epic_065
 id: t863
 title: Feature-redundancia analízis és dimenziónkénti kiválasztás
 assignee: modeling_agent
-status: pr
+status: done
 blocks: [t865]
 blocked_by: []
 ---
@@ -60,3 +60,5 @@ Módszertani háttér: [`_doc_/_plans_/plan.md`](../../_doc_/_plans_/plan.md) 3.
    lépés felhasználhatja a feature-pair korrelációkat.
 
 ## Notes
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

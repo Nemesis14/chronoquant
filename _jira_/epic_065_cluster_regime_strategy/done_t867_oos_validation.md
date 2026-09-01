@@ -4,7 +4,7 @@
 
 **Epic**: epic_065_cluster_regime_strategy
 
-**Status**: `pr_` — Implementation in progress
+**Status**: `done` — Validated 2026-08-31
 
 **Assignee**: automated (orchestrator delegation → direct implementation)
 
@@ -126,3 +126,5 @@ Proceed to t868 (interpretation and decision: standalone strategy vs. LGBM featu
 - `artifacts/research_cluster_regime/oos_validation_results.json`
 - `artifacts/research_cluster_regime/oos_cluster_profiles.json`
 
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

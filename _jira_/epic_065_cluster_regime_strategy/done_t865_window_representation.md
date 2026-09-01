@@ -3,7 +3,7 @@ epic: epic_065
 id: t865
 title: Ablak-reprezentáció — normalizálás, ritkítás, összegző statisztikák
 assignee: modeling_agent
-status: pr
+status: done
 blocks: [t866]
 blocked_by: [t863]
 ---
@@ -77,3 +77,5 @@ Módszertani háttér: [`_doc_/_plans_/plan.md`](../../_doc_/_plans_/plan.md) 3.
 Készítve a t866 (klaszterezés) számára.
 
 ## Notes
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

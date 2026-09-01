@@ -3,7 +3,7 @@ epic: epic_065
 id: t864
 title: fw360 long/short MFE célváltozó számítása
 assignee: modeling_agent
-status: todo
+status: done
 blocks: [t866]
 blocked_by: []
 ---
@@ -59,3 +59,5 @@ Módszertani háttér: [`_doc_/_plans_/plan.md`](../../_doc_/_plans_/plan.md) 3.
    - Logikus: 6 óra alatt ~3x nagyobb mozgás, mint 1 órában
 
 5. Status: Ready for t866 (klaszterezés)
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

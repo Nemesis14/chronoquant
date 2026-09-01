@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "description": "Realistic OOS backtest with K=10 clustering (t871)",
+    "date": "2026-09-01T13:40:27.409578",
+    "train_period": [
+      "2021-01-01",
+      "2025-06-30"
+    ],
+    "oos_period": [
+      "2025-07-01",
+      "2026-06-30"
+    ],
+    "k_clusters": 10,
+    "random_state": 42,
+    "position_size_usd": 1000.0,
+    "tp_pct": 0.02,
+    "sl_pct": -0.01,
+    "timeout_hours": 24.0,
+    "costs_pct": 0.003,
+    "slippage_entry_pct": 0.002,
+    "slippage_exit_pct": 0.002
+  },
+  "backtest_results": {
+    "total_trades": 1262,
+    "win_count": 460,
+    "win_rate_pct": 36.450079239302696,
+    "avg_pnl": -3.68159463553381,
+    "net_pnl": -4646.172430043668,
+    "gross_pnl": -860.1724300436681,
+    "max_drawdown": -4646.160453995722,
+    "sharpe_ratio": -4.753754394123902
+  },
+  "output_files": {
+    "trades_csv": "artifacts\\research_cluster_regime\\k10_oos_backtest_2025_07_2026_06_realistic.csv"
+  }
+}

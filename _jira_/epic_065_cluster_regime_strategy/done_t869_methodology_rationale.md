@@ -3,7 +3,7 @@ epic: epic_065
 id: t869
 title: Módszertani rationale dokumentáció és döntési javaslat
 assignee: methodology_agent
-status: todo
+status: done
 blocks: []
 blocked_by: [t867]
 ---
@@ -35,3 +35,12 @@ zónában, kód-mentes, üzleti/módszertani nyelven.
       pozitív eredmény lenne
 
 ## Notes
+
+**[2026-08-31 11:15] COMPLETED**
+- Módszertani dokumentum írva: `_doc_/methodology_doc/6500_cluster_regime_methodology.md`
+- Szekciók: Hipotézis, Módszertani döntések, Adatok, OOS validáció eredmények, Értelmezés, Overfitting-rizikó, Fázis 3 döntési javaslat
+- Kulcs megállapítás: Cluster 1 short-bias szignifikáns OOS-ben (p=0.0017, Bonferroni-korrigálva), de hold-out teszt szükséges
+- Döntési javaslat: Fázis 3 bevezetés feltételesen — short-regime szűrő az LGBM mellett, ha hold-out + stabilitás tesztek pass
+- Átjelölve: `pr_t869_methodology_rationale`
+
+Validálva: ruff check pass, pyright type hints OK (non-blocking), pytest N/A. Dátum: 2026-08-31

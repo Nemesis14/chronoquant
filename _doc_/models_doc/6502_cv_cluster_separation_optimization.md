@@ -4,11 +4,13 @@
 
 **Date:** 2026-09-01
 
-**STATUS: Clustering-quality validation only. NO trading backtest in this task** (per ticket scope — a trading validation is a later, conditional task).
+**STATUS: EPIC 065 CLOSED.** Sections 1–7 cover the core t872 clustering-quality search (no trading backtest, per original ticket scope). Section 8 covers three coordinator-requested follow-up robustness diagnostics (cluster size, direction, and cross-fold identity stability). Section 9 is the final Epic 065 closure summary, combining this document with t871's realistic-backtest conclusion. See Section 9 for the bottom line.
 
 **Executive Summary**
 
-Epic 065's first two iterations (t863–t871) fixed k in advance (k=3, then k=10) and only afterward tried to determine which clusters were "tradeable" — an approach that was shown to have no exploitable trading edge under realistic execution, regardless of classification methodology or TP/SL calibration (`6501_k10_validation_realistic_backtest.md`). This third iteration inverts the process: **k itself is chosen by a walk-forward cross-validated search that directly optimizes cluster separation quality** (ANOVA F-statistic on the long/short MFE directional signal), always measured out-of-fold. The search over k=2..30 selected **k=13** as the most separative and stable configuration (cv_score=17.70, not dominated by any single fold). A companion out-of-fold direction report (Fold 4: train 2021–2025H1, validate 2025H2–2026H1) finds 4 of the 13 clusters show a statistically significant SHORT bias (Bonferroni-corrected), 0 show a significant LONG bias, 7 are NEUTRAL, and 2 clusters have zero members in the OOS validation window. This is a clustering-quality result only — no trading conclusion should be drawn until a dedicated backtest task (conditional on this one) is run.
+Epic 065's first two iterations (t863–t871) fixed k in advance (k=3, then k=10) and only afterward tried to determine which clusters were "tradeable" — an approach that was shown to have no exploitable trading edge under realistic execution, regardless of classification methodology or TP/SL calibration (`6501_k10_validation_realistic_backtest.md`). This third iteration inverts the process: **k itself is chosen by a walk-forward cross-validated search that directly optimizes cluster separation quality** (ANOVA F-statistic on the long/short MFE directional signal), always measured out-of-fold. The search over k=2..30 selected **k=13** as the most separative and stable configuration (cv_score=17.70, not dominated by any single fold). A companion out-of-fold direction report (Fold 4: train 2021–2025H1, validate 2025H2–2026H1) finds 4 of the 13 clusters show a statistically significant SHORT bias (Bonferroni-corrected), 0 show a significant LONG bias, 7 are NEUTRAL, and 2 clusters have zero members in the OOS validation window.
+
+**Update (Section 8/9, Epic closure):** three follow-up diagnostics — per-cluster size stability, direction-assignment stability, and cross-fold cluster identity via centroid matching — were run to stress-test this result before any trading conclusion. They found the apparent k=13 separation quality does not translate into a robust, stable, tradeable signal: only 1 of 13 clusters survives as a genuinely cross-fold-confirmed, directionally consistent pattern, and it is too small (~1–2% of the data) to be a meaningful trading population. Combined with t871's already-negative realistic-backtest result, **Epic 065 is closed with no viable trading path found via cluster-based regime detection.**
 
 ---
 
@@ -195,14 +197,82 @@ The SHORT-dominant asymmetry recurring across two independent clustering configu
 4. **Cluster disappearance OOS persists** (2/13 clusters here vs. 1/10 previously) — a structural characteristic of this regime-clustering approach that any downstream trading design must account for (e.g., a fallback/no-signal state when a cluster has no members).
 5. **No conclusion about trading profitability is drawn or implied here.** t871 already demonstrated that even correctly-classified, well-separated clusters (via a properly corrected statistical test) did not translate into a profitable strategy after realistic costs and slippage, across five separate backtest configurations. This task's improved cluster separation does not by itself indicate the underlying signal is now large enough to overcome the ~0.7%/trade cost structure identified in t871 — that would require a new, dedicated backtest task explicitly scoped to test whether k=13's stronger separation translates into better realized P&L than k=10's did.
 
-### Recommended Next Step (conditional, NOT part of this task)
+### Recommended Next Step (as originally written — SUPERSEDED, see Section 8 below)
 
 If Epic 065 continues, a follow-up task should backtest the k=13 model's 4 significant SHORT clusters (2, 4, 7, 10) under the same realistic-cost methodology validated in t871 (0.3% costs + 0.4% round-trip slippage, cluster-specific or fixed TP/SL — t871 showed calibrated TP/SL made things worse, so fixed TP/SL should be tried first). Given the qualitative similarity to t871's already-negative result, expectations for this follow-up should be modest — but it is the logical next validation step now that the clustering itself has been optimized rather than arbitrarily chosen.
+
+**Note (added at Epic closure):** the three coordinator-requested follow-up diagnostics in Section 8 substantially revise this recommendation — the naive "4 significant clusters from Fold 4 alone" view undersold how fragile these clusters are (in size, in direction, and in cross-fold identity). Section 8's more rigorous cross-fold analysis found only **one** cluster (of the original 4) that holds up as a genuinely robust, non-coincidental recurring pattern. A follow-up backtest, if pursued, should target that one pattern specifically rather than all 4.
+
+---
+
+## Section 8: Epic Closure — Three Follow-Up Diagnostics (Size, Direction, and Cross-Fold Identity Stability)
+
+**Added 2026-09-01, at Epic 065 closure.** After this document's initial publication, the coordinator requested three additional diagnostics to stress-test the k=13 result before deciding whether ANY cluster-based signal here is trading-viable. All three were run without any new training methodology or backtest — purely diagnostic re-use of the already-fit fold models and already-computed direction classifications. Together with t871's realistic-backtest conclusion, they form the basis for Epic 065's final closure decision (Section 9).
+
+### 8.1 Per-Cluster Size Stability (Train vs. Valid, All 4 Folds)
+
+**Script:** `research/cluster_regime/05_cv_per_cluster_counts.py` · **Output:** `artifacts/research_cluster_regime/cv_per_cluster_train_valid_counts.json`
+
+**Question:** were the clusters that vanished/weakened in validation already small in training, or did they look normal in training and only disappear out-of-fold?
+
+**Finding:** the 6 vanished/near-vanished clusters (fold2: clusters 4, 6, 10; fold3: cluster 12; fold4: clusters 2, 9) were consistently among the **smallest** clusters in their fold's training fit (train share 1.1%–1.9%; the bottom 2–3 clusters by size in fold2 and fold4 specifically). None were degenerate in training (smallest still ~600–900 raw observations) — this is a **base-rate effect**: rare-regime clusters have a material chance of zero occurrences in a 6–12 month validation window purely from sampling variance, not evidence that training itself produced spurious clusters.
+
+### 8.2 Direction Assignment Stability (Train vs. Valid, All 4 Folds, All 13 Clusters)
+
+**Script:** `research/cluster_regime/06_cv_direction_stability.py` · **Output:** `artifacts/research_cluster_regime/cv_direction_stability_train_vs_valid.json`
+
+**Question:** does a cluster's directional signal (LONG/SHORT/NEUTRAL) — established via the corrected paired t-test — survive the transition from its own fold's training sample to that fold's validation sample?
+
+**Finding:** only **16 of 52** cluster × fold combinations (30.77%) show a matching train/valid assignment. Of the 36 mismatches: **6 are outright FLIPS** (LONG↔SHORT reversal — fold1 clusters 6,7; fold3 clusters 0,2,8; fold4 cluster 11), 10 *weaken* (train-significant → valid-NEUTRAL), and — the largest bucket at 14 cases — *strengthen* (train-NEUTRAL → valid-significant, i.e. a direction "appears" only in validation with no training-period basis). The strengthen bucket being larger than the weaken bucket is itself diagnostic: a genuine, persistent signal should typically show regression toward NEUTRAL out-of-fold (weakening), not spontaneously *gain* significance more often than it loses it. This pattern is more consistent with validation-window-specific noise (compounded by the already-documented autocorrelation-driven optimism in the classical p-values) than with a stable underlying signal.
+
+### 8.3 Cross-Fold Cluster Identity via Centroid Matching
+
+**Script:** `research/cluster_regime/07_cross_fold_signal_identity.py` · **Output:** `artifacts/research_cluster_regime/cv_cross_fold_signal_identity.json`
+
+**Question:** since each fold fits an independent KMeans model, is "Cluster 9" in Fold 1 even the same market pattern as "Cluster 9" in Fold 3? (8.2's same-numbered comparison assumes yes, which is not guaranteed.)
+
+**Method:** centroid cosine similarity, mutual-nearest-neighbor matching across all 6 fold pairs, union-find grouping into candidate persistent patterns. **Before trusting this**, a within-fold baseline was computed (pairwise similarity between the 13 *admittedly different* clusters within one fold's own fit) as a noise floor — this validity check is itself a notable finding: raw centroid similarity in this 70-dimensional summary-statistic space is heavily ceiling-compressed (within-fold baseline median 0.963, cross-fold match median 0.998 — real but modest separation on a [0.80, 1.0] scale), consistent with the low silhouette scores (~0.15–0.30) seen as far back as the original t866 elbow search. The match distribution did clear a pre-registered reliability bar (all 53 mutual matches above the within-fold 75th percentile).
+
+**Finding:** 11 candidate persistent patterns span 2–4 folds (5 clusters have no cross-fold match at all). Of the 11: 6 are labeled CONSISTENT_SHORT, 1 CONSISTENT_LONG, 4 MIXED_CONFLICTING. Critically, **strength varies enormously within the "consistent" label** — the classification only required *no opposite-direction conflict*, not that multiple folds be independently significant. Re-examining each component's member-level significance:
+
+- **Only one pattern is genuinely robust:** `pattern_3` (fold1:cluster3 → fold2:cluster7 → fold4:cluster3; n_obs 620/693/790) has **all three** matched members independently significant SHORT (p<0.001 each), zero NEUTRAL, zero conflict.
+- The other 5 "CONSISTENT_SHORT" patterns are weaker: 2–3 of their members are NEUTRAL, with only 1–2 significant members providing the actual signal (e.g. `pattern_0`, `pattern_4`, `pattern_7` each have only **one** significant member out of 4–8).
+- The single CONSISTENT_LONG candidate (`pattern_10`) is not real evidence of a LONG pattern: only 1 of its 3 matched folds has any validation data at all (fold3, n=229); the other two folds' matched clusters had **zero** OOS observations. "Consistent" here means "not contradicted by data that doesn't exist," not genuine agreement.
+
+**Bottom line of 8.3: at most one truly robust, cross-fold-identity-confirmed, directionally consistent pattern exists in the k=13 model (SHORT, ~620–790 observations per fold, roughly 1–2% of each fold's training data). No comparably robust LONG pattern exists.**
+
+### 8.4 Synthesis of the Three Follow-Ups
+
+All three diagnostics point the same direction: the k=13 clustering, despite winning the walk-forward ANOVA F-score search on separation *strength*, is **fragile** along every axis tested that matters for a trading application:
+
+| Axis | Finding |
+|------|---------|
+| Size | Smallest clusters have material odds of vanishing in any given ~1-year OOS window |
+| Direction | Only 31% of same-ID cluster/fold combinations keep their train-time direction; 11.5% flip sign outright |
+| Identity | Even after correcting for arbitrary cross-fold labeling via centroid matching, only 1 of 13 clusters produces a fully corroborated, non-coincidental, directionally consistent signal — and it is too small (~1–2% of the data) to be a meaningful trading population on its own |
+
+---
+
+## Section 9: Epic 065 Final Closure
+
+**Epic 065 is closed as of 2026-09-01.** Combining this document's k-search result with t871's realistic-backtest result and the three Section 8 follow-up diagnostics, the epic's final conclusion across BOTH clustering configurations tested (fixed k=10 and CV-optimized k=13) is:
+
+> **Cluster-based regime detection (K-means on 360-bar windowed technical-indicator summary statistics) does not produce a trading-viable, stable edge — under any k tested, any direction-classification methodology (including the corrected paired t-test), any TP/SL calibration, or any cross-fold robustness check applied.**
+
+Specifically:
+1. **t871 (fixed k=10):** five independent realistic-backtest configurations (LONG-only bug, all-10 LONG+SHORT, invalid "4-tradeable", the statistically corrected 7-cluster run, and a cluster-specific calibrated-TP variant) all converged on a 35–38% win rate against a ~67% breakeven requirement — a 30-point gap that no reclassification or recalibration closed.
+2. **t872 core (CV-optimized k=13):** replacing the arbitrary fixed-k choice with a leakage-free, walk-forward-validated ANOVA F-score search still only found k=13 as "best," and even k=13's own OOS direction report (Fold 4) showed 0 significant LONG clusters against 4 significant SHORT.
+3. **t872 follow-ups (Section 8):** the improved clustering's apparent quality does not survive closer scrutiny — cluster size, cluster direction, and cluster *identity itself* are all unstable across time to varying degrees, leaving at most one small (~1–2% of the data), genuinely robust pattern (SHORT-only) after correcting for the arbitrary per-fold labeling that the naive same-cluster-ID comparisons in earlier sections implicitly assumed.
+
+No further cluster-based trading validation is recommended under this Epic. Any future work in this direction would need a fundamentally different feature representation or clustering objective — not further tuning of k, direction classification, or TP/SL within the current window-summary-statistic approach — to have a reasonable chance of producing a different outcome.
+
+**Recommended next direction:** return to the LightGBM-based directional modeling pipeline (`src/modeling/`), with explicit focus on transaction-cost-aware strategy calibration (`src/strategy/`) — isotonic calibration and Optuna threshold search there can directly incorporate the realistic cost structure this epic repeatedly found to be the dominant obstacle, which the clustering approach has no mechanism to account for.
 
 ---
 
 ## Output Files
 
+### Core pipeline (Sections 1–7)
 - `research/cluster_regime/01_target_computation.py` — fw360 target computation (rebuilt)
 - `research/cluster_regime/02_window_representation.py` — 360-bar window features (rebuilt, dynamic feature loading)
 - `research/cluster_regime/03_feature_selection.py` — train-only MI/correlation redundancy analysis (rebuilt, leakage fix)
@@ -212,6 +282,14 @@ If Epic 065 continues, a follow-up task should backtest the k=13 model's 4 signi
 - `artifacts/research_cluster_regime/cv_k_search_results.json` — k=2..30 results, all fold-level F-stats, optimal-k rationale, Fold-4 direction report
 - `artifacts/research_cluster_regime/cv_optimal_k_model.pkl` — final k=13 KMeans model (full data, plus feature columns + imputation medians)
 
+### Section 8 follow-up diagnostics
+- `research/cluster_regime/05_cv_per_cluster_counts.py` — per-fold, per-cluster train vs. valid n_obs
+- `artifacts/research_cluster_regime/cv_per_cluster_train_valid_counts.json`
+- `research/cluster_regime/06_cv_direction_stability.py` — train vs. valid direction assignment stability, all 4 folds
+- `artifacts/research_cluster_regime/cv_direction_stability_train_vs_valid.json`
+- `research/cluster_regime/07_cross_fold_signal_identity.py` — centroid-matching cross-fold cluster identity + consistent-signal extraction
+- `artifacts/research_cluster_regime/cv_cross_fold_signal_identity.json`
+
 ---
 
 ## References & Related Tasks
@@ -219,4 +297,4 @@ If Epic 065 continues, a follow-up task should backtest the k=13 model's 4 signi
 - **t863–t865:** Original feature selection / target computation / window representation (logic preserved, feature-selection train-only fix applied)
 - **t866–t870:** Fixed k=3 then k=10 clustering, post-hoc profiling — superseded methodology
 - **t871:** Corrected paired t-test classification + realistic backtest — established that fixed-k clustering has no trading edge under realistic execution, at any TP/SL scale tested
-- **t872:** CV-optimized cluster separation (THIS DOCUMENT) — k selection is now data-driven and leakage-free; no trading conclusion drawn
+- **t872:** CV-optimized cluster separation (THIS DOCUMENT) — k selection is data-driven and leakage-free; Section 8 follow-ups establish that even the improved k=13 clustering lacks a trading-viable, stable, robustly-identified signal. **Epic 065 closed.**

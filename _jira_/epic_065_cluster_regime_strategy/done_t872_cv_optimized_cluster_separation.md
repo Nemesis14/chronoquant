@@ -2,8 +2,8 @@
 epic: epic_065
 id: t872
 title: CV-optimalizált klaszter-szeparáció — ANOVA F-score alapú k keresés
-assignee: validator_agent
-status: pr
+assignee: user
+status: done
 blocks: []
 blocked_by: [t871]
 ---
@@ -146,4 +146,49 @@ típusa).
 
 **Git commit:** `016fc99` — 37 fájl (törölt régi t871 artifactok + új t872 pipeline/kimenetek).
 
-Ready for validator_agent review.
+---
+
+## Lezárás (2026-09-01) — user által validálva, validator_agent session nélkül
+
+A user a fenti "Ready for validator_agent review" állapot után három további follow-up
+vizsgálatot kért közvetlenül, majd ezek eredménye alapján maga hagyta jóvá a végleges lezárást
+(explicit kérésére validator_agent session lefuttatása nélkül).
+
+**Follow-up #1 — Per-cluster n_obs (train + valid, mind a 4 fold):**
+`research/cluster_regime/05_cv_per_cluster_counts.py` →
+`artifacts/research_cluster_regime/cv_per_cluster_train_valid_counts.json`.
+Eredmény: az OOS-ben eltűnő/gyenge klaszterek már a train mintán is a legkisebbek közé
+tartoztak (1.1-1.9% train share) — base-rate jelenség, nem váratlan összeomlás.
+
+**Follow-up #2 — Irány-stabilitás (train vs. valid, foldonként, mind a 13 klaszterre):**
+`research/cluster_regime/06_cv_direction_stability.py` →
+`artifacts/research_cluster_regime/cv_direction_stability_train_vs_valid.json`.
+Eredmény: 52 cluster×fold kombinációból csak 16 (30.77%) egyezik train↔valid között. 6 valódi
+FLIP eset (LONG↔SHORT megfordulás), 10 gyengülés, és 14 "megjelenő" jel (NEUTRAL→szignifikáns
+validation-ön) — az utóbbi a legnagyobb kategória, ami inkább zajra, mint valódi perzisztens
+jelre utal.
+
+**Follow-up #3 — Cross-fold cluster identity (centroid matching):**
+`research/cluster_regime/07_cross_fold_signal_identity.py` →
+`artifacts/research_cluster_regime/cv_cross_fold_signal_identity.json`.
+Mivel minden fold külön K-means fit, a cluster ID-k nem garantáltan azonosak fold-ok között.
+Centroid cosine similarity + mutual-nearest-neighbor matching + union-find grouping, egy
+formális validity check-kel (within-fold baseline vs. cross-fold match distribúció —
+RELIABLE, de szerény szeparációval egy erősen 1.0-hoz komprimált skálán). Eredmény: 11
+komponens (2-4 fold-ot lefedő jelölt-mintázat), ebből csak **1 (`pattern_3`) valóban
+robusztus** (mindhárom matched tagja független szignifikáns SHORT, n≈620-790/fold, ~1-2% az
+adatból). Az egyetlen LONG jelölt (`pattern_10`) nem valódi — a 3 fold-ból 2-ben a matched
+klaszter üres volt validation-ön, tehát a "konzisztencia" hiányzó adatból, nem egyetértésből
+fakad.
+
+**Végső konklúzió:** A CV-optimalizált k=13 klaszterezés objektíven jobb szeparációt ad, mint
+a fix k=10, de ez a javulás nem stabil sem méretben, sem irányban, sem cross-fold
+azonosságban. Legfeljebb egyetlen kicsi (~1-2% az adatból), valóban megbízható SHORT jel
+azonosítható; LONG oldalon nincs hasonló. Ez, a t871 realisztikus backtest eredményével
+(nincs edge semmilyen konfigurációban) együtt, **elégséges alap az Epic 065 végleges
+lezárásához, további klaszter-alapú trading backtest nélkül.**
+
+Teljes dokumentáció: `_doc_/models_doc/6502_cv_cluster_separation_optimization.md` (Section 8-9).
+Epic összefoglaló: `_jira_/epic_065_cluster_regime_strategy/epic.md`.
+
+**Ticket lezárva: `pr_` → `done_` (user explicit kérésére, validator_agent session nélkül).**

@@ -1,0 +1,131 @@
+{
+  "metadata": {
+    "description": "FINAL CORRECTED realistic OOS backtest with K=10 clustering (t871). Tradeable set derived from PAIRED t-test classification (diff_i = long_mfe_i + short_mfe_i), Bonferroni alpha=0.005. Supersedes all prior t871 backtest runs (which used an invalid independent-sample t-test that always classified clusters as LONG).",
+    "date": "2026-09-01T14:29:21.401406",
+    "train_period": [
+      "2021-01-01",
+      "2025-06-30"
+    ],
+    "oos_period": [
+      "2025-07-01",
+      "2026-06-30"
+    ],
+    "k_clusters": 10,
+    "random_state": 42,
+    "tradeable_setups": {
+      "3": "long",
+      "9": "long",
+      "1": "short",
+      "5": "short",
+      "6": "short",
+      "7": "short",
+      "8": "short"
+    },
+    "excluded_neutral_clusters": [
+      0,
+      2,
+      4
+    ],
+    "position_size_usd": 1000.0,
+    "tp_pct": 0.02,
+    "sl_pct": -0.01,
+    "timeout_hours": 24.0,
+    "costs_pct": 0.003,
+    "slippage_entry_pct": 0.002,
+    "slippage_exit_pct": 0.002
+  },
+  "backtest_results": {
+    "total_trades": 863,
+    "win_count": 318,
+    "win_rate_pct": 36.848203939745076,
+    "avg_pnl": -3.545924676677166,
+    "net_pnl": -3060.1329959723944,
+    "gross_pnl": -471.1329959723944,
+    "max_drawdown": -3047.1129558922503,
+    "sharpe_ratio": -4.541361725144662
+  },
+  "per_cluster_breakdown": {
+    "1": {
+      "direction": "short",
+      "total_trades": 288,
+      "win_count": 105,
+      "win_rate_pct": 36.45833333333333,
+      "net_pnl": -1058.2123321531333,
+      "avg_pnl": -3.6743483755317126,
+      "note": null
+    },
+    "3": {
+      "direction": "long",
+      "total_trades": 172,
+      "win_count": 64,
+      "win_rate_pct": 37.2093023255814,
+      "net_pnl": -574.4654590286669,
+      "avg_pnl": -3.339915459468993,
+      "note": null
+    },
+    "5": {
+      "direction": "short",
+      "total_trades": 115,
+      "win_count": 42,
+      "win_rate_pct": 36.52173913043478,
+      "net_pnl": -411.8077677924897,
+      "avg_pnl": -3.5809371112390407,
+      "note": null
+    },
+    "6": {
+      "direction": "short",
+      "total_trades": 101,
+      "win_count": 37,
+      "win_rate_pct": 36.633663366336634,
+      "net_pnl": -369.7693133004388,
+      "avg_pnl": -3.661082309905335,
+      "note": null
+    },
+    "7": {
+      "direction": "short",
+      "total_trades": 2,
+      "win_count": 0,
+      "win_rate_pct": 0.0,
+      "net_pnl": -26.04008016032078,
+      "avg_pnl": -13.02004008016039,
+      "note": "Very few OOS signals (rare event cluster) -- results have wide uncertainty at this sample size."
+    },
+    "8": {
+      "direction": "short",
+      "total_trades": 185,
+      "win_count": 70,
+      "win_rate_pct": 37.83783783783784,
+      "net_pnl": -619.8380435373449,
+      "avg_pnl": -3.350475911012676,
+      "note": null
+    },
+    "9": {
+      "direction": "long",
+      "total_trades": 0,
+      "win_count": 0,
+      "win_rate_pct": null,
+      "net_pnl": 0.0,
+      "avg_pnl": null,
+      "note": "No OOS observations for this cluster (train n>0, OOS n=0) -- zero trades expected, kept in tradeable set per training-period significance."
+    }
+  },
+  "per_direction_breakdown": {
+    "long": {
+      "total_trades": 172,
+      "win_count": 64,
+      "win_rate_pct": 37.2093023255814,
+      "net_pnl": -574.4654590286669,
+      "avg_pnl": -3.339915459468993
+    },
+    "short": {
+      "total_trades": 691,
+      "win_count": 254,
+      "win_rate_pct": 36.75832127351664,
+      "net_pnl": -2485.6675369437276,
+      "avg_pnl": -3.597203381973556
+    }
+  },
+  "output_files": {
+    "trades_csv": "artifacts\\research_cluster_regime\\k10_final_corrected_backtest_2025_07_2026_06.csv"
+  }
+}

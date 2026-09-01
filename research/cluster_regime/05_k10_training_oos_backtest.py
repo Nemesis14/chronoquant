@@ -60,13 +60,18 @@ MAX_ITER = 200
 N_INIT = 3
 
 # Tradeable setups (only statistically significant clusters from training period)
-# Based on t870 profiling with Bonferroni-corrected significance (p<0.0083)
+# CORRECTED: based on PAIRED t-test (diff_i = long_mfe_i + short_mfe_i), Bonferroni
+# alpha=0.005 (see 08_paired_ttest_classification.py). The earlier independent-sample
+# t-test was mathematically invalid (always yielded positive t_stat -> always "long").
 TRADEABLE_SETUPS = {
-    0: "long",    # n=4,488, long_mfe=+1.25%, p<0.0001
-    2: "short",   # n=103, short_mfe=-3.18%, p<0.0001
-    3: "short",   # n=2,921, short_mfe=-1.37%, p<0.0001
-    9: "long",    # n=2,740, long_mfe=+1.22%, p<0.0001
-    # Clusters 1, 4, 5, 6, 7, 8 are non-significant and excluded
+    3: "long",    # train n=9,409,  t=+2.966, p=0.0030   (paired t-test)
+    9: "long",    # train n=1,475,  t=+2.906, p=0.0037   (OOS n=0 -- disappeared, kept per user instruction)
+    1: "short",   # train n=16,597, t=-4.309, p=0.0000165
+    5: "short",   # train n=10,441, t=-5.987, p<0.0001
+    6: "short",   # train n=4,200,  t=-8.505, p<0.0001
+    7: "short",   # train n=3,599,  t=-5.662, p<0.0001   (OOS n=5 -- rare signal, kept per user instruction)
+    8: "short",   # train n=17,083, t=-4.525, p=0.0000061
+    # Clusters 0, 2, 4 are NEUTRAL (not significant) and excluded
 }
 
 
@@ -215,60 +220,15 @@ def _fit_kmeans(X_train: np.ndarray) -> KMeans:
     return kmeans
 
 
-def _profile_clusters_for_direction(
-    df_train: pd.DataFrame,
-    X_train: np.ndarray,
-    kmeans: KMeans,
-) -> dict[int, str]:
-    """Determine direction (LONG/SHORT) for each cluster based on training MFE.
-
-    Args:
-        df_train : Training DataFrame with long_mfe_fw360, short_mfe_fw360.
-        X_train  : Training feature matrix.
-        kmeans   : Fitted KMeans model.
-
-    Returns:
-        Dictionary: {cluster_id: "long" | "short"}
-    """
-    labels_train = kmeans.predict(X_train)
-    cluster_directions = {}
-
-    for cluster_id in range(K_CLUSTERS):
-        mask = labels_train == cluster_id
-        if not np.any(mask):
-            cluster_directions[cluster_id] = "long"  # Default
-            continue
-
-        long_mfe = df_train.loc[mask, "long_mfe_fw360"].dropna()
-        short_mfe = df_train.loc[mask, "short_mfe_fw360"].dropna()
-
-        long_mean = long_mfe.mean() if len(long_mfe) > 0 else 0.0
-        short_mean = short_mfe.mean() if len(short_mfe) > 0 else 0.0
-
-        # Direction: compare actual MFE profit potential
-        # LONG: positive long_mfe is good
-        # SHORT: negative short_mfe is good (closer to 0 or less negative is better)
-        # So we compare: long_mean vs. -short_mean (negate short to get profit direction)
-        short_profit_potential = -short_mean  # Convert short_mfe to positive profit metric
-        direction = "short" if short_profit_potential > long_mean else "long"
-        cluster_directions[cluster_id] = direction
-
-        logger.info(
-            "Cluster %d: long_mfe=%.6f, short_mfe=%.6f → %s",
-            cluster_id, long_mean, short_mean, direction
-        )
-
-    return cluster_directions
-
-
 def _simulate_trades(
     df_ohlcv: pd.DataFrame,
     cluster_ids: np.ndarray,
-    cluster_directions: dict[int, str],
 ) -> list[Trade]:
     """Simulate trades based on cluster IDs and realistic market conditions.
 
-    Entry: Every new cluster ID triggers a $1,000 position (long or short).
+    Entry: Every new cluster ID in TRADEABLE_SETUPS triggers a $1,000 position
+    (long or short, per the module-level TRADEABLE_SETUPS mapping derived from
+    the corrected paired t-test classification).
     Exit: TP/SL or 24h timeout at MFE.
     Costs: 0.3% per trade.
     Slippage: 0.1-0.5% (2% average per entry/exit).
@@ -279,7 +239,6 @@ def _simulate_trades(
     Args:
         df_ohlcv             : DataFrame with open_time, high, low, close.
         cluster_ids          : Cluster label for each observation.
-        cluster_directions   : Dict of cluster direction (long/short).
 
     Returns:
         List of Trade objects.
@@ -442,9 +401,9 @@ def perform_k10_training_oos_backtest(
     logger.info("Step 3: Fitting K-means...")
     kmeans = _fit_kmeans(X_train)
 
-    # Step 4: Determine cluster directions (LONG vs SHORT) based on training MFE
-    logger.info("Step 4: Profiling cluster directions...")
-    cluster_directions = _profile_clusters_for_direction(df_train, X_train, kmeans)
+    # Step 4: Cluster directions are fixed via module-level TRADEABLE_SETUPS,
+    # derived from the corrected paired t-test classification (08_paired_ttest_classification.py).
+    logger.info("Step 4: Using corrected TRADEABLE_SETUPS: %s", TRADEABLE_SETUPS)
 
     # Step 5: Predict OOS cluster assignments
     logger.info("Step 5: Predicting OOS clusters...")
@@ -479,7 +438,6 @@ def perform_k10_training_oos_backtest(
     trades = _simulate_trades(
         df_merged[["open_time", "open", "high", "low", "close"]],
         cluster_ids_aligned,
-        cluster_directions
     )
 
     # Step 7: Save outputs
@@ -502,7 +460,7 @@ def perform_k10_training_oos_backtest(
         })
 
     df_trades = pd.DataFrame(trades_data)
-    trades_csv_path = output_dir / "k10_oos_backtest_2025_07_2026_06_realistic.csv"
+    trades_csv_path = output_dir / "k10_final_corrected_backtest_2025_07_2026_06.csv"
     df_trades.to_csv(trades_csv_path, index=False)
     logger.info("Trade log saved to %s (%d trades)", trades_csv_path, len(trades))
 
@@ -534,14 +492,61 @@ def perform_k10_training_oos_backtest(
     else:
         sharpe_ratio = 0.0
 
+    # Per-cluster breakdown
+    per_cluster_stats = {}
+    for cluster_id in sorted(TRADEABLE_SETUPS.keys()):
+        cluster_trades = [t for t in trades if t.cluster == cluster_id]
+        c_n = len(cluster_trades)
+        c_wins = sum(1 for t in cluster_trades if t.win)
+        c_pnls = [t.realized_pnl for t in cluster_trades]
+        per_cluster_stats[str(cluster_id)] = {
+            "direction": TRADEABLE_SETUPS[cluster_id],
+            "total_trades": c_n,
+            "win_count": c_wins,
+            "win_rate_pct": (c_wins / c_n * 100.0) if c_n > 0 else None,
+            "net_pnl": float(sum(c_pnls)) if c_pnls else 0.0,
+            "avg_pnl": float(np.mean(c_pnls)) if c_pnls else None,
+            "note": (
+                "No OOS observations for this cluster (train n>0, OOS n=0) -- "
+                "zero trades expected, kept in tradeable set per training-period significance."
+                if c_n == 0 and cluster_id == 9 else
+                "Very few OOS signals (rare event cluster) -- results have wide uncertainty at this sample size."
+                if 0 < c_n <= 10 else
+                None
+            ),
+        }
+
+    # Per-direction breakdown
+    per_direction_stats = {}
+    for direction in ("long", "short"):
+        dir_trades = [t for t in trades if t.direction == direction]
+        d_n = len(dir_trades)
+        d_wins = sum(1 for t in dir_trades if t.win)
+        d_pnls = [t.realized_pnl for t in dir_trades]
+        per_direction_stats[direction] = {
+            "total_trades": d_n,
+            "win_count": d_wins,
+            "win_rate_pct": (d_wins / d_n * 100.0) if d_n > 0 else None,
+            "net_pnl": float(sum(d_pnls)) if d_pnls else 0.0,
+            "avg_pnl": float(np.mean(d_pnls)) if d_pnls else None,
+        }
+
     summary = {
         "metadata": {
-            "description": "Realistic OOS backtest with K=10 clustering (t871)",
+            "description": (
+                "FINAL CORRECTED realistic OOS backtest with K=10 clustering (t871). "
+                "Tradeable set derived from PAIRED t-test classification "
+                "(diff_i = long_mfe_i + short_mfe_i), Bonferroni alpha=0.005. "
+                "Supersedes all prior t871 backtest runs (which used an invalid "
+                "independent-sample t-test that always classified clusters as LONG)."
+            ),
             "date": datetime.now().isoformat(),
             "train_period": [TRAIN_START, TRAIN_END],
             "oos_period": [OOS_START, OOS_END],
             "k_clusters": K_CLUSTERS,
             "random_state": RANDOM_STATE,
+            "tradeable_setups": TRADEABLE_SETUPS,
+            "excluded_neutral_clusters": [0, 2, 4],
             "position_size_usd": POSITION_SIZE_USD,
             "tp_pct": TP_PCT,
             "sl_pct": SL_PCT,
@@ -560,13 +565,15 @@ def perform_k10_training_oos_backtest(
             "max_drawdown": float(max_drawdown),
             "sharpe_ratio": float(sharpe_ratio),
         },
+        "per_cluster_breakdown": per_cluster_stats,
+        "per_direction_breakdown": per_direction_stats,
         "output_files": {
             "trades_csv": str(trades_csv_path),
         },
     }
 
     # Save summary as JSON
-    summary_json_path = output_dir / "k10_oos_backtest_2025_07_2026_06_summary.json"
+    summary_json_path = output_dir / "k10_final_corrected_backtest_summary.json"
     with open(summary_json_path, "w") as f:
         json.dump(summary, f, indent=2)
     logger.info("Summary saved to %s", summary_json_path)
@@ -586,13 +593,14 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    logger.info("Starting K=10 training and OOS backtest...")
+    logger.info("Starting FINAL CORRECTED K=10 training and OOS backtest...")
     results = perform_k10_training_oos_backtest()
     logger.info("Backtest complete.")
 
     # Print summary
     print("\n" + "=" * 80)
-    print("K=10 REALISTIC BACKTEST SUMMARY (2025-07 to 2026-06)")
+    print("K=10 FINAL CORRECTED BACKTEST SUMMARY (2025-07 to 2026-06)")
+    print("Tradeable set (paired t-test, Bonferroni): LONG={3,9} SHORT={1,5,6,7,8}")
     print("=" * 80)
     bt = results["backtest_results"]
     print(f"Total Trades:      {bt['total_trades']}")
@@ -603,4 +611,17 @@ if __name__ == "__main__":
     print(f"Gross P&L:         ${bt['gross_pnl']:.2f}")
     print(f"Max Drawdown:      ${bt['max_drawdown']:.2f}")
     print(f"Sharpe Ratio:      {bt['sharpe_ratio']:.3f}")
+    print("-" * 80)
+    print("PER-CLUSTER BREAKDOWN:")
+    for cluster_id, stats in results["per_cluster_breakdown"].items():
+        wr = f"{stats['win_rate_pct']:.2f}%" if stats["win_rate_pct"] is not None else "N/A"
+        print(f"  Cluster {cluster_id} ({stats['direction']}): "
+              f"n={stats['total_trades']}, win_rate={wr}, net_pnl=${stats['net_pnl']:.2f}")
+        if stats["note"]:
+            print(f"    NOTE: {stats['note']}")
+    print("-" * 80)
+    print("PER-DIRECTION BREAKDOWN:")
+    for direction, stats in results["per_direction_breakdown"].items():
+        wr = f"{stats['win_rate_pct']:.2f}%" if stats["win_rate_pct"] is not None else "N/A"
+        print(f"  {direction.upper()}: n={stats['total_trades']}, win_rate={wr}, net_pnl=${stats['net_pnl']:.2f}")
     print("=" * 80)

@@ -1,0 +1,529 @@
+{
+  "metadata": {
+    "description": "Per-fold, per-cluster train vs. validation observation counts (t872 follow-up)",
+    "k": 13,
+    "note": "Refit per fold using the same MiniBatchKMeans settings/random_state as 04_cv_cluster_optimization.py's search grid."
+  },
+  "rows": [
+    {
+      "fold": "fold1",
+      "cluster": 0,
+      "train_n_obs": 1365,
+      "valid_n_obs": 1336,
+      "train_pct": 3.9008,
+      "valid_pct": 7.6461,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 1,
+      "train_n_obs": 2795,
+      "valid_n_obs": 1109,
+      "train_pct": 7.9873,
+      "valid_pct": 6.3469,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 2,
+      "train_n_obs": 2405,
+      "valid_n_obs": 2817,
+      "train_pct": 6.8728,
+      "valid_pct": 16.122,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 3,
+      "train_n_obs": 822,
+      "valid_n_obs": 620,
+      "train_pct": 2.349,
+      "valid_pct": 3.5483,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 4,
+      "train_n_obs": 393,
+      "valid_n_obs": 1154,
+      "train_pct": 1.1231,
+      "valid_pct": 6.6045,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 5,
+      "train_n_obs": 7626,
+      "valid_n_obs": 1531,
+      "train_pct": 21.7929,
+      "valid_pct": 8.7621,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 6,
+      "train_n_obs": 2640,
+      "valid_n_obs": 3044,
+      "train_pct": 7.5444,
+      "valid_pct": 17.4212,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 7,
+      "train_n_obs": 564,
+      "valid_n_obs": 1056,
+      "train_pct": 1.6118,
+      "valid_pct": 6.0436,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 8,
+      "train_n_obs": 2220,
+      "valid_n_obs": 885,
+      "train_pct": 6.3441,
+      "valid_pct": 5.065,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 9,
+      "train_n_obs": 3107,
+      "valid_n_obs": 1014,
+      "train_pct": 8.8789,
+      "valid_pct": 5.8032,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 10,
+      "train_n_obs": 3028,
+      "valid_n_obs": 436,
+      "train_pct": 8.6532,
+      "valid_pct": 2.4953,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 11,
+      "train_n_obs": 1472,
+      "valid_n_obs": 1823,
+      "train_pct": 4.2066,
+      "valid_pct": 10.4332,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold1",
+      "cluster": 12,
+      "train_n_obs": 6556,
+      "valid_n_obs": 648,
+      "train_pct": 18.7352,
+      "valid_pct": 3.7086,
+      "train_total": 34993,
+      "valid_total": 17473
+    },
+    {
+      "fold": "fold2",
+      "cluster": 0,
+      "train_n_obs": 7646,
+      "valid_n_obs": 2771,
+      "train_pct": 14.5602,
+      "valid_pct": 15.8153,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 1,
+      "train_n_obs": 5636,
+      "valid_n_obs": 1743,
+      "train_pct": 10.7326,
+      "valid_pct": 9.9481,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 2,
+      "train_n_obs": 1504,
+      "valid_n_obs": 470,
+      "train_pct": 2.8641,
+      "valid_pct": 2.6825,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 3,
+      "train_n_obs": 5864,
+      "valid_n_obs": 1200,
+      "train_pct": 11.1668,
+      "valid_pct": 6.8489,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 4,
+      "train_n_obs": 764,
+      "valid_n_obs": 0,
+      "train_pct": 1.4549,
+      "valid_pct": 0.0,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 5,
+      "train_n_obs": 14055,
+      "valid_n_obs": 5736,
+      "train_pct": 26.7648,
+      "valid_pct": 32.7379,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 6,
+      "train_n_obs": 648,
+      "valid_n_obs": 0,
+      "train_pct": 1.234,
+      "valid_pct": 0.0,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 7,
+      "train_n_obs": 1918,
+      "valid_n_obs": 693,
+      "train_pct": 3.6524,
+      "valid_pct": 3.9553,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 8,
+      "train_n_obs": 1394,
+      "valid_n_obs": 660,
+      "train_pct": 2.6546,
+      "valid_pct": 3.7669,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 9,
+      "train_n_obs": 3782,
+      "valid_n_obs": 1016,
+      "train_pct": 7.202,
+      "valid_pct": 5.7988,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 10,
+      "train_n_obs": 614,
+      "valid_n_obs": 0,
+      "train_pct": 1.1692,
+      "valid_pct": 0.0,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 11,
+      "train_n_obs": 4039,
+      "valid_n_obs": 1933,
+      "train_pct": 7.6914,
+      "valid_pct": 11.0325,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold2",
+      "cluster": 12,
+      "train_n_obs": 4649,
+      "valid_n_obs": 1299,
+      "train_pct": 8.853,
+      "valid_pct": 7.414,
+      "train_total": 52513,
+      "valid_total": 17521
+    },
+    {
+      "fold": "fold3",
+      "cluster": 0,
+      "train_n_obs": 4580,
+      "valid_n_obs": 284,
+      "train_pct": 6.5353,
+      "valid_pct": 3.2867,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 1,
+      "train_n_obs": 9043,
+      "valid_n_obs": 1083,
+      "train_pct": 12.9036,
+      "valid_pct": 12.5333,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 2,
+      "train_n_obs": 3926,
+      "valid_n_obs": 555,
+      "train_pct": 5.6021,
+      "valid_pct": 6.4229,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 3,
+      "train_n_obs": 3593,
+      "valid_n_obs": 227,
+      "train_pct": 5.1269,
+      "valid_pct": 2.627,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 4,
+      "train_n_obs": 4126,
+      "valid_n_obs": 87,
+      "train_pct": 5.8875,
+      "valid_pct": 1.0068,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 5,
+      "train_n_obs": 11595,
+      "valid_n_obs": 1172,
+      "train_pct": 16.5451,
+      "valid_pct": 13.5632,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 6,
+      "train_n_obs": 6880,
+      "valid_n_obs": 1148,
+      "train_pct": 9.8172,
+      "valid_pct": 13.2855,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 7,
+      "train_n_obs": 664,
+      "valid_n_obs": 229,
+      "train_pct": 0.9475,
+      "valid_pct": 2.6502,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 8,
+      "train_n_obs": 2257,
+      "valid_n_obs": 132,
+      "train_pct": 3.2206,
+      "valid_pct": 1.5276,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 9,
+      "train_n_obs": 8012,
+      "valid_n_obs": 502,
+      "train_pct": 11.4325,
+      "valid_pct": 5.8095,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 10,
+      "train_n_obs": 8186,
+      "valid_n_obs": 1469,
+      "train_pct": 11.6808,
+      "valid_pct": 17.0003,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 11,
+      "train_n_obs": 5864,
+      "valid_n_obs": 1753,
+      "train_pct": 8.3675,
+      "valid_pct": 20.287,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold3",
+      "cluster": 12,
+      "train_n_obs": 1355,
+      "valid_n_obs": 0,
+      "train_pct": 1.9335,
+      "valid_pct": 0.0,
+      "train_total": 70081,
+      "valid_total": 8641
+    },
+    {
+      "fold": "fold4",
+      "cluster": 0,
+      "train_n_obs": 4646,
+      "valid_n_obs": 1472,
+      "train_pct": 5.8983,
+      "valid_pct": 8.4249,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 1,
+      "train_n_obs": 11298,
+      "valid_n_obs": 2460,
+      "train_pct": 14.3432,
+      "valid_pct": 14.0797,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 2,
+      "train_n_obs": 1063,
+      "valid_n_obs": 1,
+      "train_pct": 1.3495,
+      "valid_pct": 0.0057,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 3,
+      "train_n_obs": 3088,
+      "valid_n_obs": 790,
+      "train_pct": 3.9203,
+      "valid_pct": 4.5215,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 4,
+      "train_n_obs": 15957,
+      "valid_n_obs": 2972,
+      "train_pct": 20.258,
+      "valid_pct": 17.0101,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 5,
+      "train_n_obs": 8544,
+      "valid_n_obs": 960,
+      "train_pct": 10.8469,
+      "valid_pct": 5.4945,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 6,
+      "train_n_obs": 2875,
+      "valid_n_obs": 843,
+      "train_pct": 3.6499,
+      "valid_pct": 4.8249,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 7,
+      "train_n_obs": 3679,
+      "valid_n_obs": 214,
+      "train_pct": 4.6706,
+      "valid_pct": 1.2248,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 8,
+      "train_n_obs": 8730,
+      "valid_n_obs": 1021,
+      "train_pct": 11.083,
+      "valid_pct": 5.8436,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 9,
+      "train_n_obs": 895,
+      "valid_n_obs": 0,
+      "train_pct": 1.1362,
+      "valid_pct": 0.0,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 10,
+      "train_n_obs": 8031,
+      "valid_n_obs": 3278,
+      "train_pct": 10.1956,
+      "valid_pct": 18.7614,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 11,
+      "train_n_obs": 2404,
+      "valid_n_obs": 698,
+      "train_pct": 3.052,
+      "valid_pct": 3.995,
+      "train_total": 78769,
+      "valid_total": 17472
+    },
+    {
+      "fold": "fold4",
+      "cluster": 12,
+      "train_n_obs": 7559,
+      "valid_n_obs": 2763,
+      "train_pct": 9.5964,
+      "valid_pct": 15.8139,
+      "train_total": 78769,
+      "valid_total": 17472
+    }
+  ]
+}

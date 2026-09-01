@@ -1,20 +1,77 @@
-# K=10 Clustering Validation: Realistic Backtest Results (Final — Tradeable Clusters Only)
+# K=10 Clustering Validation: Realistic Backtest Results (DEFINITIVE — Corrected Classification)
 
 **Task:** t871 — K=10 clustering full training (2021-06) + OOS validation (2025-07—2026-06)
 
 **Date:** 2026-09-01
 
-**CRITICAL FIXES APPLIED:**
-1. Added SHORT trade simulation with symmetric TP/SL logic
-2. Filtered to only statistically significant (tradeable) clusters from training period
+**STATUS: DEFINITIVE.** This document supersedes all prior versions of this analysis. It corrects a mathematical error in cluster direction classification discovered during review, and reports the final, statistically valid backtest for the Epic 065 Phase 3 decision.
 
 **Executive Summary**
 
-This document reports the FINAL validated results for K=10 clustering strategy under realistic market conditions, restricted to the 4 statistically significant clusters identified in t870 training analysis. Results show **marginal edge remains negative**: 38.05% win rate and -$1,659.11 net P&L over 1-year OOS period. Even the 'best' clusters (p<0.0083 Bonferroni-corrected) fail to generate profit under realistic execution. In contrast, t870's idealized backtest reported 98.3% win rate, exposing the fundamental gap between theoretical edge and market realities.
+This document validates the K=10 clustering regime strategy under realistic market conditions using a corrected, statistically rigorous cluster classification (paired t-test with Bonferroni correction). The final result: **36.85% win rate and -$3,060.13 net P&L** over the 1-year OOS period (2025-07-01 — 2026-06-30), trading the 7 clusters that show a statistically significant directional bias in the training period. **No real trading edge exists** — this holds across every version of the analysis, idealized or realistic, correctly or incorrectly classified.
 
 ---
 
-## Section 1: Setup Definition
+## Section 1: Corrected Classification Methodology
+
+### The Bug That Was Found
+
+All prior classification attempts in this epic (t870's original k=3 profiling, and t871's first two classification passes) used an **independent-sample comparison** to decide cluster direction:
+
+```
+t_stat = (mean(long_mfe) - mean(short_mfe)) / SE
+```
+
+This is mathematically broken for this data. `long_mfe` (typically positive, e.g. +0.02) and `short_mfe` (typically negative, e.g. -0.02) are subtracted, which **always adds their magnitudes** (`0.02 − (−0.02) = 0.04`). The result is a large positive `t_stat` for essentially every cluster — which is exactly what happened when this formula was applied to all 10 K=10 clusters: **all 10 came back "LONG"** with p<0.0001, an obviously invalid result.
+
+### The Correct Test: Paired T-Test
+
+`long_mfe` and `short_mfe` are computed from the **same observation window** (same 360-bar lookback, same timestamp) — they are paired, correlated measurements, not independent samples. The valid test is a **paired t-test** on the per-observation difference:
+
+```
+diff_i = long_mfe_i + short_mfe_i        (since short_mfe_i < 0, this equals |long_mfe_i| - |short_mfe_i|)
+
+H0: E[diff] = 0   (no directional bias — long and short MFE are symmetric)
+H1: E[diff] != 0
+
+t_stat  = mean(diff) / (std(diff) / sqrt(n))
+p_value = 2 * (1 - t.cdf(|t_stat|, df=n-1))
+```
+
+**Bonferroni correction:** `alpha = 0.05 / 10 clusters = 0.005` (two-tailed), `t_critical ≈ 2.807` for large df.
+
+**Assignment rule:**
+```
+IF t_stat > t_critical AND mean(diff) > 0  -> LONG   (|long_mfe| significantly exceeds |short_mfe|)
+IF t_stat < -t_critical AND mean(diff) < 0 -> SHORT  (|short_mfe| significantly exceeds |long_mfe|)
+ELSE                                        -> NEUTRAL
+```
+
+### Corrected Classification Results (Training Period 2021-01-01 — 2025-06-30)
+
+| Cluster | n_obs | long_mfe_mean | short_mfe_mean | diff_mean | t_stat | p_value | Assignment |
+|---------|-------|---------------|-----------------|-----------|--------|---------|------------|
+| 0 | 11,029 | +0.020170 | -0.020534 | -0.000364 | -1.121 | 0.2622 | **NEUTRAL** |
+| 1 | 16,597 | +0.022341 | -0.023647 | -0.001306 | -4.309 | 0.0000165 | **SHORT** |
+| 2 | 4,292 | +0.024026 | -0.024033 | -0.000007 | -0.011 | 0.9915 | **NEUTRAL** |
+| 3 | 9,409 | +0.022616 | -0.021403 | +0.001213 | +2.966 | 0.0030 | **LONG** |
+| 4 | 5,862 | +0.026589 | -0.026989 | -0.000399 | -0.696 | 0.4865 | **NEUTRAL** |
+| 5 | 10,441 | +0.019384 | -0.021544 | -0.002160 | -5.987 | <0.0001 | **SHORT** |
+| 6 | 4,200 | +0.023775 | -0.030898 | -0.007123 | -8.505 | <0.0001 | **SHORT** |
+| 7 | 3,599 | +0.024004 | -0.029106 | -0.005103 | -5.662 | <0.0001 | **SHORT** |
+| 8 | 17,083 | +0.022318 | -0.023762 | -0.001444 | -4.525 | 0.0000061 | **SHORT** |
+| 9 | 1,475 | +0.029873 | -0.025960 | +0.003913 | +2.906 | 0.0037 | **LONG** |
+
+**Final tradeable set (7 of 10 clusters significant):**
+- **LONG:** clusters 3, 9
+- **SHORT:** clusters 1, 5, 6, 7, 8
+- **EXCLUDED (NEUTRAL, no significant directional bias):** clusters 0, 2, 4
+
+Note that **cluster 3 flips direction** relative to every prior version of this analysis (previously traded as SHORT; correctly LONG), and **clusters 0 and 2** — previously traded as LONG and SHORT respectively — have **no statistical basis for trading at all**.
+
+---
+
+## Section 2: Definitive Backtest Setup
 
 ### K=10 Clustering Model
 
@@ -24,195 +81,147 @@ This document reports the FINAL validated results for K=10 clustering strategy u
 - **Algorithm:** K-means with k=10, random_state=42, deterministic
 - **Artifact:** `artifacts/research_cluster_regime/kmeans_k10_trained_2021_2025_06.pkl`
 
-### Tradeable Setup Filters
-
-Based on t870 training period analysis, only 4 clusters met statistical significance (Bonferroni-corrected α=0.0083):
-
-| Cluster | Direction | Train n | MFE | t-stat | p-value | Tradeable |
-|---------|-----------|---------|-----|--------|---------|-----------|
-| 0 | LONG | 4,488 | +1.25% | >5.0 | <0.0001 | ✅ YES |
-| 1 | SHORT | 6,410 | -2.20% | 3.16 | 0.0017 | ❌ NO (below 0.0083 after Bonferroni) |
-| 2 | SHORT | 103 | -3.18% | >5.0 | <0.0001 | ✅ YES |
-| 3 | SHORT | 2,921 | -1.37% | >5.0 | <0.0001 | ✅ YES |
-| 4-8 | — | — | — | — | >0.05 | ❌ NO (insignificant) |
-| 9 | LONG | 2,740 | +1.22% | >5.0 | <0.0001 | ✅ YES |
-
-**OOS Backtest Scope:** Only clusters 0, 2, 3, 9 execute trades.
-
 ### Realistic Trading Rules
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
 | Position Size | $1,000 per signal | Fixed capital allocation |
-| LONG Entry/Exit | close[t], TP +2%, SL -1% | Standard directional signal |
-| SHORT Entry/Exit | close[t], TP -2% (down), SL +1% (up) | Symmetric inverse logic |
+| LONG Entry/Exit (clusters 3, 9) | close[t], TP +2%, SL -1% | Standard directional signal |
+| SHORT Entry/Exit (clusters 1,5,6,7,8) | close[t], TP -2% (down), SL +1% (up) | Symmetric inverse logic |
 | Timeout | 24 hours (hold at MFE) | Empirical max hold before signal decay |
 | Total Costs | 0.3% per trade | Spread 0.05%×2 + Commission 0.1% (realistic Binance futures) |
 | Entry Slippage | 0.2% average | Market impact from $1k position |
 | Exit Slippage | 0.2% average | Execution friction on close |
 
----
-
-## Section 2: Realistic Backtest Results (Tradeable Clusters Only)
-
-### Trade Log Summary
-
-- **Total Trades:** 502 over 1 year (from 4 tradeable clusters only)
-- **LONG Trades:** ~241 (clusters 0, 9)
-- **SHORT Trades:** ~261 (clusters 2, 3)
-- **Trade Frequency:** ~1.4 trades/day from 4 strategically selected clusters
-- **Average Hold Time:** varies, but 24h timeout appears in ~30% of trades
-
-### Performance Metrics (Final Version)
-
-| Metric | Value | T870 (Idealized) | All 10 Clusters | Delta from All-10 |
-|--------|-------|------------------|-----------------|-------------------|
-| **Win Count** | 191 / 502 | ~1,241 / 1,262 (98.3%) | 476 / 1,301 (36.59%) | -48.5% |
-| **Win Rate %** | 38.05% | 98.3% | 36.59% | +1.46 pp |
-| **Avg P&L/Trade** | -$3.31 | ~$15–20 | -$3.61 | +$0.30 |
-| **Net P&L** | -$1,659.11 | +$18,564–24,752 | -$4,698.83 | +$3,039.72 (65% loss reduction) |
-| **Gross P&L** (before costs) | -$153.11 | N/A | -$795.83 | +$642.72 |
-| **Max Drawdown** | -$1,711.18 | N/A | -$4,737.93 | +$3,026.75 (64% reduction) |
-| **Sharpe Ratio** | -4.247 | N/A | -4.634 | +0.387 (improved) |
-
-**Interpretation:**
-- Win rate improves to 38.05% by excluding noisy non-tradeable clusters
-- Net loss reduces dramatically to -$1,659 (65% reduction vs. all-10 strategy)
-- Gross P&L approaches breakeven (-$153), suggesting edge is VERY weak
-- Sharpe improves but remains deeply negative
-
-### Per-Direction Performance
-
-**LONG Trades (Clusters 0, 9):**
-- Count: ~241 trades
-- Win rate: ~39%
-- Avg P&L: -$3.20/trade
-
-**SHORT Trades (Clusters 2, 3):**
-- Count: ~261 trades
-- Win rate: ~37%
-- Avg P&L: -$3.41/trade
-
-**Observation:** LONG clusters slightly outperform SHORT, but difference is minor. Both directions show weak negative edge.
+Per explicit user instruction, clusters 9 (OOS n=0) and 7 (OOS n=2) were **kept** in the tradeable set despite very low/zero OOS sample size — they carry documented small-sample caveats rather than being silently dropped.
 
 ---
 
-## Section 3: Key Findings
+## Section 3: Definitive Backtest Results
 
-### 1. **Weak Edge Persists Even in Best Setups**
+### Overall Performance
 
-- **Training Period Signal (t870):** Only 4 clusters showed statistical significance (p<0.0083)
-  - These 4 clusters represent the "cream of the crop" from MFE profiling
-  - High t-statistics (|t| > 5.0 for clusters 0, 2, 3, 9) suggested edge
-  
-- **OOS Realistic Results:** Edge completely erased even in best clusters
-  - Win rate: 38.05% (still below 50% breakeven)
-  - Net P&L: -$1,659 (loss, not profit)
-  - Gross P&L: -$153 (almost no profit before costs)
+| Metric | Value |
+|--------|-------|
+| **Total Trades** | 863 |
+| **Win Count** | 318 |
+| **Win Rate** | 36.85% |
+| **Avg P&L/Trade** | -$3.55 |
+| **Net P&L** | -$3,060.13 |
+| **Gross P&L** (before costs) | -$471.13 |
+| **Max Drawdown** | -$3,047.11 |
+| **Sharpe Ratio** | -4.541 |
 
-**Conclusion:** Training period signal was weak and did not persist OOS. The 4 'significant' clusters fail to generate edge under realistic execution. Excluding noisy clusters (1,4,5,6,7,8) improves results, confirming they had no value, but fundamental issue remains.
+### Per-Cluster Breakdown
 
-### 2. **Market Microstructure Costs are Binding**
+| Cluster | Direction | Trades | Win Rate | Net P&L | Note |
+|---------|-----------|--------|----------|---------|------|
+| 1 | SHORT | 288 | 36.46% | -$1,058.21 | |
+| 3 | LONG | 172 | 37.21% | -$574.47 | |
+| 5 | SHORT | 115 | 36.52% | -$411.81 | |
+| 6 | SHORT | 101 | 36.63% | -$369.77 | |
+| 7 | SHORT | 2 | 0.00% | -$26.04 | **Rare-event cluster** — only 2 OOS signals; result has wide statistical uncertainty, not representative of the training-period edge magnitude |
+| 8 | SHORT | 185 | 37.84% | -$619.84 | |
+| 9 | LONG | 0 | N/A | $0.00 | **Cluster disappeared OOS** — train n=1,475 but zero observations assigned to this cluster in 2025-07—2026-06; kept in tradeable set per training significance, but produced no trades |
 
-Breakdown of $1,659 annual loss for 502 trades:
-- 502 trades × $3.31 average loss/trade ≈ $1,659 loss
-- Execution costs breakdown:
-  - Bid-ask spread (0.05% × 2): $2.00/trade × 502 = **$1,004**
-  - Commission (0.1%): $1.00/trade × 502 = **$502**
-  - Slippage (0.4% round-trip): $4.00/trade × 502 = **$2,008**
-  - **Total: ~$3,514 annually in costs alone**
+### Per-Direction Breakdown
 
-For a strategy with -$153 gross P&L (after signal), costs are the dominant loss factor.
-**Required win rate to break even: ≥67% (vs. actual 38%)** — a gap of 29 percentage points.
+| Direction | Trades | Win Rate | Net P&L |
+|-----------|--------|----------|---------|
+| LONG | 172 | 37.21% | -$574.47 |
+| SHORT | 691 | 36.76% | -$2,485.67 |
 
-### 3. **Non-Tradeable Clusters Add No Value**
-
-Comparison of all-10 vs. tradeable-only:
-
-| Metric | All 10 | Tradeable 4 | Improvement |
-|--------|--------|-----------|-------------|
-| Total trades | 1,301 | 502 | -61% |
-| Win rate | 36.59% | 38.05% | +1.46 pp |
-| Net P&L | -$4,698.83 | -$1,659.11 | +$3,039.72 (65%) |
-
-**Insight:** Clusters 1, 4, 5, 6, 7, 8 (non-significant in training) were pure noise in OOS period. Removing them improves results substantially. This suggests the clustering model identified 4 weak signals amid 6 spurious clusters.
-
-### 4. **Gross P&L (-$153) Indicates Near-Zero Raw Signal**
-
-With -$153 gross P&L and $3,514 total costs:
-```
-realized_pnl = gross_pnl - costs
--1,659 = -153 - 3,514 (approximately)
-```
-
-This means the raw price movement after clustering was essentially neutral, THEN costs killed the strategy. The signal is not just weak — it's virtually non-existent.
+**Observation:** LONG and SHORT perform almost identically (win rate within 0.5pp of each other), both far below the ~67% breakeven threshold implied by the 0.7%/trade cost structure. Direction is not the differentiator — the underlying signal is simply too weak in both directions.
 
 ---
 
-## Section 4: Phase 3 Decision & Recommendation
+## Section 4: Full History Comparison (t870 → t871 v1/v2 → Definitive)
+
+| Version | Method | Clusters Traded | Classification Basis | Trades | Win Rate | Net P&L |
+|---------|--------|------------------|----------------------|--------|----------|---------|
+| **t870** | K=3, idealized MFE (no costs/slippage) | 2 LONG, 1 SHORT (k=3 model) | Independent-sample profiling | ~2,235 | 98.3% | +$18.5k–24.8k (idealized) |
+| **t871 v1** | K=10, realistic, LONG-only bug | All 10 (LONG-only, no SHORT logic) | N/A (bug) | 1,262 | 36.45% | -$4,646 |
+| **t871 v2** | K=10, realistic, all clusters LONG+SHORT | All 10 | Ad hoc (long_mean vs -short_mean heuristic) | 1,301 | 36.59% | -$4,698.83 |
+| **t871 v3** | K=10, realistic, "4 tradeable" | 0, 2, 3, 9 | **Invalid independent-sample t-test** (always → LONG; direction assumed via heuristic) | 502 | 38.05% | -$1,659.11 |
+| **t871 DEFINITIVE** | K=10, realistic, 7 tradeable clusters | 1, 3, 5, 6, 7, 8, 9 | **Correct paired t-test**, Bonferroni α=0.005 | 863 | 36.85% | -$3,060.13 |
+
+**Key correction vs. v3:** v3 traded cluster 3 as SHORT and clusters 0/2 as LONG/SHORT respectively, none of which had valid statistical support. The definitive run correctly identifies cluster 3 as LONG and excludes clusters 0, 2, 4 entirely, while adding clusters 1, 5, 6, 7, 8 (correctly SHORT) that v3 had wrongly excluded as "non-significant" (they were significant — just under the broken test they didn't reach the always-LONG threshold in the SHORT direction).
+
+**Every version reaches the same qualitative conclusion:** win rate stays in the 36–38% band regardless of which cluster subset or classification method is used, and net P&L is negative in every realistic (non-idealized) run. The classification bug changed *which* clusters were traded and the exact P&L figure, but did **not** change the fundamental verdict.
+
+---
+
+## Section 5: Key Findings
+
+### 1. Classification Bug Did Not Change the Outcome, Only the Path
+
+Despite trading a different (and now statistically correct) set of clusters, the definitive win rate (36.85%) is nearly identical to every prior realistic run (36.45%, 36.59%, 38.05%). This convergence across differently-constructed cluster subsets is itself evidence that **the signal is not concentrated in any particular cluster subset** — it is uniformly weak (or absent) across the K=10 partition.
+
+### 2. No Directional Edge, Corrected or Not
+
+LONG (37.21% WR) and SHORT (36.76% WR) perform statistically indistinguishably in the definitive run. This rules out the hypothesis that the earlier misclassification (trading cluster 3 as SHORT instead of LONG) was responsible for the poor realistic performance — even trading the *correct* direction for every cluster still yields a losing strategy.
+
+### 3. Market Microstructure Remains the Dominant Cost
+
+Per-trade costs (spread 0.1% + commission 0.1% + slippage 0.4% = ~0.7% round-trip) require a >67% win rate to break even given the 2%/1% TP/SL structure. The definitive backtest achieves 36.85% — a **30-point gap** that no amount of cluster-selection correctness closes.
+
+### 4. Small-Sample Clusters Confirm Fragility, Not Opportunity
+
+- Cluster 9 (LONG, train n=1,475, one of only two LONG-significant clusters) produced **zero OOS trades** — the training-period pattern did not recur at all in the OOS window.
+- Cluster 7 (SHORT, train n=3,599) produced only **2 OOS trades**, both losses. Per user instruction this was kept rather than dropped, but the result should not be read as evidence for or against the cluster's edge — n=2 carries no statistical weight.
+
+Both cases illustrate the same underlying problem: statistically significant *training-period* patterns did not persist with any reliability into the OOS period, whether measured by MFE degradation (documented separately in `cluster_profile_train_vs_oos_all_clusters.json`) or by trade frequency collapse.
+
+---
+
+## Section 6: Phase 3 Decision & Recommendation
 
 ### Final Recommendation: **Do NOT Proceed with Clustering-Based Strategy**
 
-**Rationale (Definitive):**
+This conclusion is now supported by **five independent backtest configurations** (t870 idealized, and four realistic t871 variants spanning multiple cluster-selection methodologies, including the statistically corrected one), all converging on the same result: no exploitable edge survives realistic execution costs.
 
-1. **Even Best Clusters Fail:**
-   - After filtering to 4 statistically significant clusters (p<0.0083), win rate is still only 38.05%
-   - This is below the 67% threshold required to overcome costs
-   - The 'signal' was overstated in training; real edge is near-zero
+**Rationale (definitive):**
 
-2. **Gross P&L Near Zero Indicates Overfitting:**
-   - Gross P&L: -$153.11 on 502 trades = -0.3 basis points average
-   - Price movement barely favored clustering at all
-   - Training period signal did not generalize to 2025-07—2026-06 market regimes
+1. **Statistically correct classification changes which clusters trade, not whether the strategy is profitable.** Win rate remains in the 36–38% band across every methodology tried.
+2. **Both directions fail equally.** There is no LONG-vs-SHORT asymmetry to exploit — ruling out "we traded the wrong direction" as an explanation for poor performance.
+3. **Required win rate (>67%) vs. achieved (36.85%) is a 30-point gap** — far too large to close via parameter tuning, position sizing, or further cluster refinement.
+4. **Signal instability across train→OOS** (documented in the companion cluster profile analysis) shows 35–100% degradation in MFE magnitude and up to complete disappearance of cluster assignments, indicating the K-means partition does not generalize.
 
-3. **Non-Tradeable Clusters Prove Overfitting:**
-   - Clusters 1, 4, 5, 6, 7, 8 were statistical noise in training (p>0.05)
-   - OOS confirmed: removing them improves results by 65%
-   - Suggests K-means fit 4 weak signals + 6 spurious clusters to training noise
+### Epic 065 Closure
 
-4. **Cost Structure is Insurmountable:**
-   - Required win rate: >67% (to break even after costs)
-   - Actual win rate (best case): 38%
-   - Gap: -29 percentage points — unrealistic to close with tuning
-
-### Historical Comparison
-
-| Phase | Strategy | Win Rate | Net P&L | Verdict |
-|-------|----------|----------|---------|---------|
-| t870 | K=3 MFE-ideal | 98.3% | +$20k | Overfitted (idealized execution) |
-| t871 (v1) | K=10 all clusters | 36.59% | -$4,698 | Unprofitable (noise included) |
-| t871 (v2) | K=10 tradeable only | 38.05% | -$1,659 | Unprofitable (weak signal) |
-| Baseline | Random | 50% | ~-$1,751 | Comparable to strategy |
-
-**Conclusion:** K=10 clustering strategy performs only marginally better than random and far worse than required for profitability.
+- **Phase 3 Conclusion:** Cluster regime strategy (K=3 and K=10 variants) is **NOT production-ready**, under any classification methodology tested.
+- **Recommended next step:** Return to the LightGBM-based directional modeling approach (`src/modeling/`), with explicit focus on transaction cost optimization in the strategy calibration layer (`src/strategy/`), where isotonic calibration and Optuna threshold search can directly account for realistic cost structures — something the clustering approach has no mechanism to do.
 
 ---
 
-## Technical Appendix: Final Backtest Configuration
+## Technical Appendix: Definitive Backtest Configuration
 
-### Tradeable Setups (Frozen)
+### Tradeable Setups (Corrected, Frozen)
 
 ```python
 TRADEABLE_SETUPS = {
-    0: "long",    # long_mfe=+1.25%, p<0.0001
-    2: "short",   # short_mfe=-3.18%, p<0.0001
-    3: "short",   # short_mfe=-1.37%, p<0.0001
-    9: "long",    # long_mfe=+1.22%, p<0.0001
+    3: "long",    # train n=9,409,  t=+2.966, p=0.0030
+    9: "long",    # train n=1,475,  t=+2.906, p=0.0037  (OOS n=0)
+    1: "short",   # train n=16,597, t=-4.309, p=0.0000165
+    5: "short",   # train n=10,441, t=-5.987, p<0.0001
+    6: "short",   # train n=4,200,  t=-8.505, p<0.0001
+    7: "short",   # train n=3,599,  t=-5.662, p<0.0001  (OOS n=2)
+    8: "short",   # train n=17,083, t=-4.525, p=0.0000061
 }
 ```
 
 ### Entry/Exit Logic
 
-**LONG (Clusters 0, 9):**
+**LONG (clusters 3, 9):**
 - Entry: close[t] + 0.2% slippage
-- TP: close >= entry × 1.02 → exit at 1.018
-- SL: low <= entry × 0.99 → exit at 0.992
+- TP: close >= entry × 1.02 → exit at entry × 1.018
+- SL: low <= entry × 0.99 → exit at entry × 0.992
 - Timeout: 24h → exit at max(high) × 0.998
 
-**SHORT (Clusters 2, 3):**
+**SHORT (clusters 1, 5, 6, 7, 8):**
 - Entry: close[t] - 0.2% slippage
-- TP: close <= entry × 0.98 → exit at 0.982
-- SL: high >= entry × 1.01 → exit at 1.008
+- TP: close <= entry × 0.98 → exit at entry × 0.982
+- SL: high >= entry × 1.01 → exit at entry × 1.008
 - Timeout: 24h → exit at min(low) × 1.002
 
 ### Cost Allocation
@@ -226,19 +235,21 @@ TRADEABLE_SETUPS = {
 
 ## Output Files
 
-- `k10_oos_backtest_2025_07_2026_06_realistic.csv` — Trade log (502 rows, tradeable clusters only)
-- `k10_oos_backtest_2025_07_2026_06_summary.json` — Final summary metrics
+- `k10_final_corrected_backtest_2025_07_2026_06.csv` — Definitive trade log (863 rows, 7 clusters, LONG+SHORT)
+- `k10_final_corrected_backtest_summary.json` — Definitive summary (overall + per-cluster + per-direction)
 - `kmeans_k10_trained_2021_2025_06.pkl` — Trained model (archived)
+- `paired_ttest_cluster_classification.json` — Corrected classification methodology results
+- `cluster_profile_train_vs_oos_all_clusters.json` — Train-vs-OOS MFE degradation analysis (all 10 clusters)
+- `apriori_cluster_classification.json` — **Superseded/invalid** independent-sample t-test (kept for audit trail; do not use)
+- `k10_oos_backtest_2025_07_2026_06_realistic.csv` / `_summary.json` — **Superseded** v1/v2 (LONG-only, then all-10 LONG+SHORT) runs, kept for audit trail
 
 ---
 
 ## References & Related Tasks
 
 - **t863:** Feature redundancy selection (MI-based)
-- **t865:** Window representation (360-bar rolling)
-- **t866:** K-means clustering (t870 identified k=3 as optimal, but t871 explores k=10)
-- **t867:** OOS validation (Bonferroni-corrected t-tests identified 4 significant clusters)
-- **t870:** K=3 idealized backtest (98.3% win rate, but zero-cost execution)
-- **t871:** K=10 realistic backtest (THIS DOCUMENT) — final validation shows NO EDGE
-- **t872 (Future):** Investigate root cause of 98.3% ideal win rate (likely measurement artifact)
-- **Phase 3 Closure:** Return to LightGBM-based modeling with focus on transaction cost optimization
+- **t865:** Window representation (360-bar rolling, z-score normalization)
+- **t866:** K-means clustering (k=3..8 elbow method)
+- **t867:** OOS validation (original Bonferroni-corrected t-tests on k=3 model)
+- **t870:** K=3 idealized backtest (98.3% win rate, zero-cost execution — predecessor baseline)
+- **t871:** K=10 realistic backtest — **THIS DOCUMENT**, definitive result after classification bug fix

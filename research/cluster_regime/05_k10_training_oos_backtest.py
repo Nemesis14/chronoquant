@@ -59,6 +59,16 @@ INIT_METHOD = "k-means++"
 MAX_ITER = 200
 N_INIT = 3
 
+# Tradeable setups (only statistically significant clusters from training period)
+# Based on t870 profiling with Bonferroni-corrected significance (p<0.0083)
+TRADEABLE_SETUPS = {
+    0: "long",    # n=4,488, long_mfe=+1.25%, p<0.0001
+    2: "short",   # n=103, short_mfe=-3.18%, p<0.0001
+    3: "short",   # n=2,921, short_mfe=-1.37%, p<0.0001
+    9: "long",    # n=2,740, long_mfe=+1.22%, p<0.0001
+    # Clusters 1, 4, 5, 6, 7, 8 are non-significant and excluded
+}
+
 
 @dataclass
 class Trade:
@@ -288,7 +298,12 @@ def _simulate_trades(
 
     for _, row in df.iterrows():
         cluster_id = int(row["cluster"])
-        direction = cluster_directions.get(cluster_id, "long")
+
+        # Skip non-tradeable clusters
+        if cluster_id not in TRADEABLE_SETUPS:
+            continue
+
+        direction = TRADEABLE_SETUPS[cluster_id]
 
         # Open a new position if no position
         if current_position is None:

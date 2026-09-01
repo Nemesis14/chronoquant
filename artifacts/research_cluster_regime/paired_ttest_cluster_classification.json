@@ -1,0 +1,143 @@
+{
+  "metadata": {
+    "method": "PAIRED t-test with Bonferroni correction (CORRECTED)",
+    "formula": "diff_i = long_mfe_i + short_mfe_i; t_stat = mean(diff) / (std(diff) / sqrt(n))",
+    "alpha_base": 0.05,
+    "n_tests": 10,
+    "alpha_corrected": 0.005,
+    "period": "Training (2021-01-01 -- 2025-06-30)",
+    "note": "Fixes bug in previous independent-sample t-test which always yielded positive t_stat"
+  },
+  "classifications": {
+    "0": {
+      "n_obs": 11029,
+      "long_mfe_mean": 0.020170167528450113,
+      "short_mfe_mean": -0.020533683142169242,
+      "diff_mean": -0.0003635156137191369,
+      "diff_std": 0.0340477485838628,
+      "t_stat": -1.1212507289720826,
+      "p_value": 0.2622055663578753,
+      "t_critical": 2.807598910386545,
+      "df": 11028,
+      "significant_bonferroni": false,
+      "assignment": "NEUTRAL"
+    },
+    "1": {
+      "n_obs": 16597,
+      "long_mfe_mean": 0.02234145938476384,
+      "short_mfe_mean": -0.02364742872906499,
+      "diff_mean": -0.0013059693443011524,
+      "diff_std": 0.039044836828254714,
+      "t_stat": -4.309076134232099,
+      "p_value": 1.648813842525243e-05,
+      "t_critical": 2.8074092802378634,
+      "df": 16596,
+      "significant_bonferroni": true,
+      "assignment": "SHORT"
+    },
+    "2": {
+      "n_obs": 4292,
+      "long_mfe_mean": 0.024026463331082146,
+      "short_mfe_mean": -0.024033264092656614,
+      "diff_mean": -6.800761574466721e-06,
+      "diff_std": 0.04176828226984836,
+      "t_stat": -0.01066696305236843,
+      "p_value": 0.9914896521474414,
+      "t_critical": 2.8084866271026026,
+      "df": 4291,
+      "significant_bonferroni": false,
+      "assignment": "NEUTRAL"
+    },
+    "3": {
+      "n_obs": 9409,
+      "long_mfe_mean": 0.02261643932532914,
+      "short_mfe_mean": -0.021403318774869548,
+      "diff_mean": 0.0012131205504595914,
+      "diff_std": 0.039679502675319396,
+      "t_stat": 2.9655788369487963,
+      "p_value": 0.0030287253342458076,
+      "t_critical": 2.8076962457212336,
+      "df": 9408,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "4": {
+      "n_obs": 5862,
+      "long_mfe_mean": 0.026589390027935957,
+      "short_mfe_mean": -0.026988845952580186,
+      "diff_mean": -0.0003994559246442252,
+      "diff_std": 0.04394276691035153,
+      "t_stat": -0.6959922034204068,
+      "p_value": 0.4864613095317627,
+      "t_critical": 2.808097309409458,
+      "df": 5861,
+      "significant_bonferroni": false,
+      "assignment": "NEUTRAL"
+    },
+    "5": {
+      "n_obs": 10441,
+      "long_mfe_mean": 0.0193836138925101,
+      "short_mfe_mean": -0.021543762321210143,
+      "diff_mean": -0.002160148428700043,
+      "diff_std": 0.036868333765917,
+      "t_stat": -5.986887962962736,
+      "p_value": 2.2093500362529994e-09,
+      "t_critical": 2.807630746514146,
+      "df": 10440,
+      "significant_bonferroni": true,
+      "assignment": "SHORT"
+    },
+    "6": {
+      "n_obs": 4200,
+      "long_mfe_mean": 0.023775248015842458,
+      "short_mfe_mean": -0.030898198451568215,
+      "diff_mean": -0.00712295043572576,
+      "diff_std": 0.054275912153415144,
+      "t_stat": -8.505061075909587,
+      "p_value": 0.0,
+      "t_critical": 2.808518474845315,
+      "df": 4199,
+      "significant_bonferroni": true,
+      "assignment": "SHORT"
+    },
+    "7": {
+      "n_obs": 3599,
+      "long_mfe_mean": 0.024003613374077453,
+      "short_mfe_mean": -0.029106411428018137,
+      "diff_mean": -0.005102798053940682,
+      "diff_std": 0.05406632099460396,
+      "t_stat": -5.6620341708928,
+      "p_value": 1.6129932056685448e-08,
+      "t_critical": 2.8087666183237134,
+      "df": 3598,
+      "significant_bonferroni": true,
+      "assignment": "SHORT"
+    },
+    "8": {
+      "n_obs": 17083,
+      "long_mfe_mean": 0.022317714531328497,
+      "short_mfe_mean": -0.023761646049854396,
+      "diff_mean": -0.001443931518525895,
+      "diff_std": 0.04170728363529049,
+      "t_stat": -4.524981014311779,
+      "p_value": 6.080815088571612e-06,
+      "t_critical": 2.8073985952586265,
+      "df": 17082,
+      "significant_bonferroni": true,
+      "assignment": "SHORT"
+    },
+    "9": {
+      "n_obs": 1475,
+      "long_mfe_mean": 0.029872823606656156,
+      "short_mfe_mean": -0.025960131636178777,
+      "diff_mean": 0.003912691970477385,
+      "diff_std": 0.05171179026978958,
+      "t_stat": 2.9059095744853534,
+      "p_value": 0.003716550573551025,
+      "t_critical": 2.811267112097006,
+      "df": 1474,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    }
+  }
+}

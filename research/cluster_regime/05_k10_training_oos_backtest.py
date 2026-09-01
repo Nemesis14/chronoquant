@@ -205,20 +205,71 @@ def _fit_kmeans(X_train: np.ndarray) -> KMeans:
     return kmeans
 
 
+def _profile_clusters_for_direction(
+    df_train: pd.DataFrame,
+    X_train: np.ndarray,
+    kmeans: KMeans,
+) -> dict[int, str]:
+    """Determine direction (LONG/SHORT) for each cluster based on training MFE.
+
+    Args:
+        df_train : Training DataFrame with long_mfe_fw360, short_mfe_fw360.
+        X_train  : Training feature matrix.
+        kmeans   : Fitted KMeans model.
+
+    Returns:
+        Dictionary: {cluster_id: "long" | "short"}
+    """
+    labels_train = kmeans.predict(X_train)
+    cluster_directions = {}
+
+    for cluster_id in range(K_CLUSTERS):
+        mask = labels_train == cluster_id
+        if not np.any(mask):
+            cluster_directions[cluster_id] = "long"  # Default
+            continue
+
+        long_mfe = df_train.loc[mask, "long_mfe_fw360"].dropna()
+        short_mfe = df_train.loc[mask, "short_mfe_fw360"].dropna()
+
+        long_mean = long_mfe.mean() if len(long_mfe) > 0 else 0.0
+        short_mean = short_mfe.mean() if len(short_mfe) > 0 else 0.0
+
+        # Direction: compare actual MFE profit potential
+        # LONG: positive long_mfe is good
+        # SHORT: negative short_mfe is good (closer to 0 or less negative is better)
+        # So we compare: long_mean vs. -short_mean (negate short to get profit direction)
+        short_profit_potential = -short_mean  # Convert short_mfe to positive profit metric
+        direction = "short" if short_profit_potential > long_mean else "long"
+        cluster_directions[cluster_id] = direction
+
+        logger.info(
+            "Cluster %d: long_mfe=%.6f, short_mfe=%.6f → %s",
+            cluster_id, long_mean, short_mean, direction
+        )
+
+    return cluster_directions
+
+
 def _simulate_trades(
     df_ohlcv: pd.DataFrame,
     cluster_ids: np.ndarray,
+    cluster_directions: dict[int, str],
 ) -> list[Trade]:
     """Simulate trades based on cluster IDs and realistic market conditions.
 
-    Entry: Every new cluster ID triggers a $1,000 position (long).
-    Exit: TP (+2%), SL (-1%), or 24h timeout at MFE.
+    Entry: Every new cluster ID triggers a $1,000 position (long or short).
+    Exit: TP/SL or 24h timeout at MFE.
     Costs: 0.3% per trade.
     Slippage: 0.1-0.5% (2% average per entry/exit).
 
+    LONG:  Entry at close, TP +2% (up), SL -1% (down), exit at MFE
+    SHORT: Entry at close, TP -2% (down), SL +1% (up), exit at MFE
+
     Args:
-        df_ohlcv    : DataFrame with open_time, high, low, close.
-        cluster_ids : Cluster label for each observation.
+        df_ohlcv             : DataFrame with open_time, high, low, close.
+        cluster_ids          : Cluster label for each observation.
+        cluster_directions   : Dict of cluster direction (long/short).
 
     Returns:
         List of Trade objects.
@@ -236,53 +287,82 @@ def _simulate_trades(
     current_position = None
 
     for _, row in df.iterrows():
-        cluster_id = row["cluster"]
+        cluster_id = int(row["cluster"])
+        direction = cluster_directions.get(cluster_id, "long")
 
-        # Open a new position if cluster changed or no position
+        # Open a new position if no position
         if current_position is None:
             current_position = {
                 "entry_time": row["open_time"],
                 "entry_price": row["close"],
                 "cluster": cluster_id,
-                "direction": "long",
+                "direction": direction,
                 "mfe": 0.0,
-                "max_price": row["high"],
+                "max_high": row["high"],
+                "min_low": row["low"],
             }
 
         else:
-            # Update MFE (max favorable excursion for long)
-            current_position["max_price"] = max(current_position["max_price"], row["high"])
-            mfe_return = (current_position["max_price"] / current_position["entry_price"]) - 1.0
-            current_position["mfe"] = mfe_return
-
-            # Check exit conditions
-            current_return = (row["close"] / current_position["entry_price"]) - 1.0
+            # Update MFE based on direction
+            if direction == "long":
+                current_position["max_high"] = max(current_position["max_high"], row["high"])
+                mfe_return = (current_position["max_high"] / current_position["entry_price"]) - 1.0
+                current_position["mfe"] = mfe_return
+            else:  # SHORT
+                current_position["min_low"] = min(current_position["min_low"], row["low"])
+                mfe_return = (current_position["entry_price"] / current_position["min_low"]) - 1.0
+                current_position["mfe"] = mfe_return
 
             exit_signal = None
             exit_price = row["close"]
 
-            # 1. Take Profit (+2%)
-            if current_return >= TP_PCT:
-                exit_signal = "tp"
-                # Adjust for slippage on exit
-                exit_price = current_position["entry_price"] * (1.0 + TP_PCT - SLIPPAGE_EXIT_PCT)
+            if current_position["direction"] == "long":
+                # LONG logic
+                current_return = (row["close"] / current_position["entry_price"]) - 1.0
 
-            # 2. Stop Loss (-1%)
-            elif row["low"] / current_position["entry_price"] - 1.0 <= SL_PCT:
-                exit_signal = "sl"
-                # Hit SL, use SL price with slippage
-                exit_price = current_position["entry_price"] * (1.0 + SL_PCT + SLIPPAGE_EXIT_PCT)
+                # 1. Take Profit (+2%)
+                if current_return >= TP_PCT:
+                    exit_signal = "tp"
+                    exit_price = current_position["entry_price"] * (1.0 + TP_PCT - SLIPPAGE_EXIT_PCT)
 
-            # 3. Timeout (24 hours)
-            elif (row["open_time"] - current_position["entry_time"]).total_seconds() >= TIMEOUT_HOURS * 3600:
-                exit_signal = "timeout"
-                # Exit at MFE price
-                exit_price = current_position["max_price"] * (1.0 - SLIPPAGE_EXIT_PCT)
+                # 2. Stop Loss (-1%)
+                elif row["low"] / current_position["entry_price"] - 1.0 <= SL_PCT:
+                    exit_signal = "sl"
+                    exit_price = current_position["entry_price"] * (1.0 + SL_PCT + SLIPPAGE_EXIT_PCT)
+
+                # 3. Timeout (24 hours)
+                elif (row["open_time"] - current_position["entry_time"]).total_seconds() >= TIMEOUT_HOURS * 3600:
+                    exit_signal = "timeout"
+                    exit_price = current_position["max_high"] * (1.0 - SLIPPAGE_EXIT_PCT)
+
+            else:  # SHORT
+                # SHORT logic (inverse)
+                current_return = (current_position["entry_price"] / row["close"]) - 1.0
+
+                # 1. Take Profit (-2%, price down)
+                if (row["close"] / current_position["entry_price"]) <= (1.0 - TP_PCT):
+                    exit_signal = "tp"
+                    exit_price = current_position["entry_price"] * (1.0 - TP_PCT + SLIPPAGE_EXIT_PCT)
+
+                # 2. Stop Loss (+1%, price up)
+                elif row["high"] / current_position["entry_price"] - 1.0 >= -SL_PCT:
+                    exit_signal = "sl"
+                    exit_price = current_position["entry_price"] * (1.0 - SL_PCT - SLIPPAGE_EXIT_PCT)
+
+                # 3. Timeout (24 hours)
+                elif (row["open_time"] - current_position["entry_time"]).total_seconds() >= TIMEOUT_HOURS * 3600:
+                    exit_signal = "timeout"
+                    exit_price = current_position["min_low"] * (1.0 + SLIPPAGE_EXIT_PCT)
 
             if exit_signal:
-                # Calculate P&L
-                entry_price_adjusted = current_position["entry_price"] * (1.0 + SLIPPAGE_ENTRY_PCT)
-                realized_return = (exit_price - entry_price_adjusted) / entry_price_adjusted
+                # Calculate P&L (same for LONG and SHORT after accounting for direction)
+                if current_position["direction"] == "long":
+                    entry_price_adjusted = current_position["entry_price"] * (1.0 + SLIPPAGE_ENTRY_PCT)
+                    realized_return = (exit_price - entry_price_adjusted) / entry_price_adjusted
+                else:  # SHORT
+                    entry_price_adjusted = current_position["entry_price"] * (1.0 - SLIPPAGE_ENTRY_PCT)
+                    realized_return = (entry_price_adjusted - exit_price) / entry_price_adjusted
+
                 realized_pnl = POSITION_SIZE_USD * realized_return - (POSITION_SIZE_USD * COSTS_PCT)
                 pnl_pct = (realized_pnl / POSITION_SIZE_USD) * 100.0
                 win = realized_pnl > 0
@@ -304,7 +384,7 @@ def _simulate_trades(
                 # Reset position
                 current_position = None
 
-    logger.info("Simulated %d trades", len(trades))
+    logger.info("Simulated %d trades (LONG+SHORT)", len(trades))
     return trades
 
 
@@ -347,12 +427,16 @@ def perform_k10_training_oos_backtest(
     logger.info("Step 3: Fitting K-means...")
     kmeans = _fit_kmeans(X_train)
 
-    # Step 4: Predict OOS cluster assignments
-    logger.info("Step 4: Predicting OOS clusters...")
+    # Step 4: Determine cluster directions (LONG vs SHORT) based on training MFE
+    logger.info("Step 4: Profiling cluster directions...")
+    cluster_directions = _profile_clusters_for_direction(df_train, X_train, kmeans)
+
+    # Step 5: Predict OOS cluster assignments
+    logger.info("Step 5: Predicting OOS clusters...")
     cluster_ids_oos = kmeans.predict(X_oos)
 
-    # Step 5: Load OHLCV for OOS period
-    logger.info("Step 5: Loading OHLCV data...")
+    # Step 6: Load OHLCV for OOS period
+    logger.info("Step 6: Loading OHLCV data...")
     df_ohlcv_oos = _load_ohlcv_data(OOS_START, OOS_END)
 
     # Align OHLCV with cluster assignments (should have same timestamps)
@@ -375,9 +459,13 @@ def perform_k10_training_oos_backtest(
     cluster_idx_map = {i: cluster_ids_oos[i] for i in range(len(cluster_ids_oos))}
     cluster_ids_aligned = df_merged["cluster_idx"].map(cluster_idx_map).values
 
-    # Step 6: Simulate trades
-    logger.info("Step 6: Simulating trades...")
-    trades = _simulate_trades(df_merged[["open_time", "open", "high", "low", "close"]], cluster_ids_aligned)
+    # Step 7: Simulate trades (LONG and SHORT)
+    logger.info("Step 7: Simulating trades (LONG + SHORT)...")
+    trades = _simulate_trades(
+        df_merged[["open_time", "open", "high", "low", "close"]],
+        cluster_ids_aligned,
+        cluster_directions
+    )
 
     # Step 7: Save outputs
     logger.info("Step 7: Saving outputs...")

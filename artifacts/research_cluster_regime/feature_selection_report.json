@@ -1,7 +1,11 @@
 {
   "metadata": {
-    "description": "Feature redundancy analysis (F\u00e1zis 0) for cluster regime research",
-    "date": "2026-08-31",
+    "description": "Feature redundancy analysis (t872) for CV-optimized cluster regime research",
+    "train_only_window": [
+      "2021-01-01",
+      "2022-12-31"
+    ],
+    "leakage_note": "Correlation matrix computed ONLY on the Fold-1 training window, which is never a validation period in the downstream 4-fold walk-forward CV -- guarantees zero information leakage from any CV validation window into feature selection.",
     "dimensions_targeted": [
       "candle_shape",
       "market_structure",
@@ -11,17 +15,19 @@
       "volatility",
       "volume_liquidity"
     ],
-    "method": "Hierarchical clustering on Pearson correlation matrix",
-    "data_source": "quant_train (50K sample)"
+    "method": "Per-dimension greedy selection on Pearson |correlation|, redundancy cutoff > 0.6",
+    "corr_threshold": 0.6,
+    "max_per_dimension": 2,
+    "data_source": "quant_train (train-only window sample)"
   },
   "selected_features": {
+    "feat_doji": {
+      "dimension": "candle_shape",
+      "mean_abs_corr": 0.03375640981054789
+    },
     "feat_body_ratio": {
       "dimension": "candle_shape",
-      "mean_abs_corr": 0.05336895457536673
-    },
-    "feat_body_ratio_sma_10": {
-      "dimension": "candle_shape",
-      "mean_abs_corr": NaN
+      "mean_abs_corr": 0.05336895457536672
     },
     "feat_lr_r2_30": {
       "dimension": "market_structure",
@@ -29,7 +35,7 @@
     },
     "feat_efficiency_ratio_10": {
       "dimension": "market_structure",
-      "mean_abs_corr": 0.07977697498421318
+      "mean_abs_corr": 0.07977697498421317
     },
     "feat_adx_14": {
       "dimension": "momentum",
@@ -37,11 +43,11 @@
     },
     "feat_return_momentum_delta_10": {
       "dimension": "momentum",
-      "mean_abs_corr": 0.1629305798260118
+      "mean_abs_corr": 0.16293057982601178
     },
     "feat_return_autocorr_lag1_30": {
       "dimension": "price_action",
-      "mean_abs_corr": 0.07065328763813167
+      "mean_abs_corr": 0.07065328763813165
     },
     "feat_returns_skew_14": {
       "dimension": "price_action",
@@ -53,7 +59,7 @@
     },
     "feat_lr_slope_60": {
       "dimension": "trend",
-      "mean_abs_corr": 0.22424514374979296
+      "mean_abs_corr": 0.22424514374979299
     },
     "feat_bb_width_rank_20": {
       "dimension": "volatility",
@@ -61,7 +67,7 @@
     },
     "feat_hist_vol_rank_60": {
       "dimension": "volatility",
-      "mean_abs_corr": 0.10261311542297546
+      "mean_abs_corr": 0.10261311542297545
     },
     "feat_ad_line": {
       "dimension": "volume_liquidity",
@@ -76,8 +82,8 @@
   "n_total_candidates": 133,
   "selected_correlation_matrix": {
     "features": [
+      "feat_doji",
       "feat_body_ratio",
-      "feat_body_ratio_sma_10",
       "feat_lr_r2_30",
       "feat_efficiency_ratio_10",
       "feat_adx_14",
@@ -94,7 +100,23 @@
     "matrix": [
       [
         1.0,
-        NaN,
+        -0.5236627229886953,
+        0.012018945140874945,
+        0.040877862060898,
+        -0.0002818505451826998,
+        0.004004026152079929,
+        -0.01339125838282789,
+        0.007358443871081585,
+        0.011426533759254969,
+        -0.00418577306707767,
+        -0.010898996968502883,
+        -0.045950806451188056,
+        0.0030737956811274503,
+        -0.050513891842617786
+      ],
+      [
+        -0.5236627229886954,
+        1.0,
         -0.042452128825345645,
         -0.08307770227919074,
         -0.010948626931230396,
@@ -109,24 +131,8 @@
         0.09101152387331392
       ],
       [
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN,
-        NaN
-      ],
-      [
+        0.012018945140874945,
         -0.04245212882534565,
-        NaN,
         1.0,
         0.08474796851186044,
         0.53660419572143,
@@ -141,8 +147,8 @@
         -0.03530571363778919
       ],
       [
+        0.040877862060898,
         -0.08307770227919076,
-        NaN,
         0.08474796851186044,
         1.0,
         0.2369107197826876,
@@ -157,8 +163,8 @@
         0.18050165221501174
       ],
       [
+        -0.0002818505451826998,
         -0.010948626931230396,
-        NaN,
         0.53660419572143,
         0.2369107197826876,
         1.0,
@@ -173,8 +179,8 @@
         -0.014268834816988719
       ],
       [
+        0.0040040261520799285,
         -0.0037620346039114743,
-        NaN,
         -0.007444175831514847,
         0.033859458083701256,
         0.013280159307366701,
@@ -189,8 +195,8 @@
         -0.03112042444502218
       ],
       [
+        -0.013391258382827887,
         0.021063237112135348,
-        NaN,
         -0.10398656102357082,
         0.17115377734739784,
         0.06514922745836109,
@@ -205,8 +211,8 @@
         0.0360849391049095
       ],
       [
+        0.0073584438710815854,
         -0.01367892120086321,
-        NaN,
         -0.008477903731123379,
         0.020567757492358743,
         -0.0014667727125303063,
@@ -221,8 +227,8 @@
         -0.015159218637457398
       ],
       [
+        0.011426533759254969,
         -0.029386319093464737,
-        NaN,
         0.16317201669471576,
         0.260387589836617,
         0.11045058123790465,
@@ -237,8 +243,8 @@
         0.11051899731794076
       ],
       [
+        -0.004185773067077669,
         0.0014712708394521,
-        NaN,
         0.041330295529709626,
         0.016987678116416875,
         -0.031583302361063444,
@@ -253,8 +259,8 @@
         0.012019724255994247
       ],
       [
+        -0.010898996968502883,
         0.02449962743299152,
-        NaN,
         -0.14050863455027454,
         0.46019800891635876,
         0.06596090982571413,
@@ -269,8 +275,8 @@
         0.16429177926826968
       ],
       [
+        -0.045950806451188056,
         0.12299163068968244,
-        NaN,
         -0.030491095919243,
         -0.05380249396589667,
         0.21764716643355697,
@@ -285,8 +291,8 @@
         0.01118826390231138
       ],
       [
+        0.0030737956811274507,
         -0.02931001875149189,
-        NaN,
         0.0050089454389327095,
         0.009531728591393725,
         0.024558828838365635,
@@ -301,8 +307,8 @@
         0.0004339988263614255
       ],
       [
+        -0.050513891842617786,
         0.09101152387331392,
-        NaN,
         -0.03530571363778919,
         0.18050165221501172,
         -0.014268834816988719,
@@ -320,8 +326,8 @@
   },
   "dimension_summary": {
     "candle_shape": [
-      "feat_body_ratio",
-      "feat_body_ratio_sma_10"
+      "feat_doji",
+      "feat_body_ratio"
     ],
     "market_structure": [
       "feat_lr_r2_30",

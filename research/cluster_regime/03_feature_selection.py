@@ -1,15 +1,28 @@
-"""
-Feature Redundancy Analysis and Selection for Cluster Regime Research (Fázis 0).
+"""Feature redundancy analysis and selection for cluster regime research (t872).
 
-Simplified approach:
-- Use the 135 features already selected in lgbm_solusdt_l_fw60_2101_2607 model
-- Compute pairwise Spearman correlation efficiently in SQL
-- Hierarchical clustering to select representatives per dimension
-- Output: feature_selection_report.json with selected features and correlations
+Selects ~14 low-redundancy indicator features (one representative per
+dimension: trend, momentum, volatility, volume/liquidity, price action,
+market structure, candle shape) from the champion model's 135-feature pool,
+using pairwise Pearson correlation to avoid picking near-duplicate signals.
 
-Author: modeling_agent (direct execution, Fázis 0)
-Date: 2026-08-31
+TRAIN-ONLY CONSTRAINT (t872 fix vs. the original t863 version): correlation
+is computed using ONLY the 2021-01-01 -- 2022-12-31 window. This is Fold 1's
+training period in the walk-forward CV scheme used downstream by
+04_cv_cluster_optimization.py, and critically it is the ONLY date range that
+is a training period in every fold and never a validation period in any
+fold. Selecting features on this window guarantees the feature set itself
+carries zero information from any CV validation window, at the cost of a
+smaller (but still ample, ~35K-row) sample.
+
+Pipeline (t872 rebuild)
+------------------------
+03_feature_selection (THIS SCRIPT, train-only)
+    -> 02_window_representation (consumes this script's selected feature list)
+    -> 01_target_computation (independent, fw360 targets)
+    -> 04_cv_cluster_optimization (walk-forward ANOVA F-score k-search)
 """
+
+from __future__ import annotations
 
 import json
 import logging
@@ -18,20 +31,25 @@ from pathlib import Path
 import duckdb
 import numpy as np
 
-# Configure logging
+import utils
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Paths
-DB_PATH = Path(__file__).parent.parent.parent / "database" / "solusdt" / "solusdt.duckdb"
-MODEL_FEATURES_PATH = (
-    Path(__file__).parent.parent.parent / "artifacts" / "lgbm_solusdt_l_fw60_2101_2607" / "features.json"
-)
-RESEARCH_DIR = Path(__file__).parent
-OUTPUT_REPORT = RESEARCH_DIR / "feature_selection_report.json"
+# TRAIN-ONLY window: Fold 1's training period (never a validation period in
+# any of the 4 walk-forward folds -- see 04_cv_cluster_optimization.py).
+FEATURE_SELECTION_TRAIN_START = "2021-01-01"
+FEATURE_SELECTION_TRAIN_END = "2022-12-31"
+
+MODEL_FEATURES_PATH = Path("artifacts") / "lgbm_solusdt_l_fw60_2101_2607" / "features.json"
+OUTPUT_REPORT = Path("artifacts") / "research_cluster_regime" / "feature_selection_report.json"
+
+CORR_THRESHOLD = 0.6  # redundancy cutoff: don't add a feature correlated > this with an already-selected one
+MAX_PER_DIMENSION = 2
+SAMPLE_LIMIT = 50_000  # cap on rows pulled for the correlation matrix (train window is ~35K rows anyway)
 
 # ============================================================================
 # Feature Dimension Mapping
@@ -159,7 +177,7 @@ FEATURE_DIMENSIONS = {
     "feat_ichimoku_cloud_thickness": "market_structure",
     "feat_hml_range": "market_structure",
     "feat_close_position": "market_structure",
-    # Time/Session (temporal, exclude from clustering)
+    # Time/Session (temporal, excluded from clustering)
     "feat_bars_into_session_norm": "time_session",
     "feat_hour_sin": "time_session",
     "feat_hour_cos": "time_session",
@@ -181,7 +199,7 @@ FEATURE_DIMENSIONS = {
     "feat_time_since_high_60": "risk",
 }
 
-# Core dimensions to extract (excluding time_session and risk for Fázis 0)
+# Core dimensions to extract (excluding time_session and risk, as before)
 CORE_DIMENSIONS = {
     "trend",
     "momentum",
@@ -194,112 +212,114 @@ CORE_DIMENSIONS = {
 
 
 def load_model_features() -> list[str]:
-    """Load feature list from trained model artifact."""
-    logger.info(f"Loading feature list from {MODEL_FEATURES_PATH}")
+    """Load candidate feature list from the champion model artifact."""
+    logger.info("Loading candidate feature list from %s", MODEL_FEATURES_PATH)
     with open(MODEL_FEATURES_PATH) as f:
         data = json.load(f)
     return data["features"]
 
 
 def compute_correlation_matrix_sql(
-    conn: duckdb.DuckDBPyConnection, features: list[str]
+    conn: duckdb.DuckDBPyConnection,
+    features: list[str],
 ) -> np.ndarray:
-    """
-    Compute correlation matrix using SQL window functions.
-    Returns Pearson correlation (efficient for large datasets).
-    """
-    logger.info(f"Computing correlation matrix for {len(features)} features using SQL...")
+    """Compute a Pearson correlation matrix over the TRAIN-ONLY window.
 
-    # Build Pearson correlation computation in SQL
-    # For each pair of features, compute correlation coefficient
-    # Sample data for correlation to avoid memory overload
+    Args:
+        conn     : Open read-only DuckDB connection.
+        features : Candidate feature column names.
+
+    Returns:
+        (len(features), len(features)) Pearson correlation matrix.
+    """
+    logger.info(
+        "Computing correlation matrix for %d features on TRAIN-ONLY window [%s, %s]...",
+        len(features), FEATURE_SELECTION_TRAIN_START, FEATURE_SELECTION_TRAIN_END,
+    )
+
+    not_null_clause = " AND ".join(f"{f} IS NOT NULL" for f in features[:5])
     sample_query = f"""
-    SELECT {', '.join(features)}
+    SELECT {", ".join(features)}
     FROM main.quant_train
-    WHERE {' AND '.join([f'{f} IS NOT NULL' for f in features[:5]])}
-    LIMIT 50000
+    WHERE open_time >= '{FEATURE_SELECTION_TRAIN_START}'
+      AND open_time <= '{FEATURE_SELECTION_TRAIN_END}'
+      AND {not_null_clause}
+    LIMIT {SAMPLE_LIMIT}
     """
 
-    logger.info("Sampling data for correlation...")
     result = conn.execute(sample_query).fetchall()
     X = np.array(result, dtype=np.float64)
-    logger.info(f"Sampled {X.shape[0]} rows")
+    logger.info("Sampled %d rows (train-only window)", X.shape[0])
 
-    # Compute Pearson correlation on sample
-    corr_matrix_computed = np.corrcoef(X.T)
-
-    return corr_matrix_computed
+    return np.corrcoef(X.T)
 
 
 def select_features_per_dimension(
     features: list[str],
     corr_matrix: np.ndarray,
 ) -> dict[str, dict]:
-    """
-    Select 1-2 representative features per dimension based on:
-    1. Low mean absolute correlation (less noisy)
-    2. Absence of high inter-correlations (< 0.6)
+    """Select up to MAX_PER_DIMENSION representative features per dimension.
 
-    Returns dict of selected features with metadata.
+    Selection prefers features with low mean absolute correlation to all
+    other candidates (less redundant / noisier signal), then greedily adds
+    features to each dimension's selection only if they are not highly
+    correlated (> CORR_THRESHOLD) with an already-selected feature in that
+    dimension.
+
+    Args:
+        features    : Candidate feature names (order matches corr_matrix rows/cols).
+        corr_matrix : Pearson correlation matrix for `features`.
+
+    Returns:
+        Dict of {feature_name: {"dimension": ..., "mean_abs_corr": ...}}.
     """
     logger.info("Selecting representatives per dimension...")
 
-    # Group features by dimension
-    dimension_features = {}
+    dimension_features: dict[str, list[str]] = {}
     for feat in features:
         dim = FEATURE_DIMENSIONS.get(feat, "other")
         if dim in CORE_DIMENSIONS:
-            if dim not in dimension_features:
-                dimension_features[dim] = []
-            dimension_features[dim].append(feat)
+            dimension_features.setdefault(dim, []).append(feat)
 
-    selected = {}
+    selected: dict[str, dict] = {}
     feature_to_idx = {feat: i for i, feat in enumerate(features)}
 
     for dim in sorted(CORE_DIMENSIONS):
-        if dim not in dimension_features:
-            logger.warning(f"  No features found for dimension '{dim}'")
+        feats_in_dim = dimension_features.get(dim, [])
+        if not feats_in_dim:
+            logger.warning("  No candidate features found for dimension '%s'", dim)
             continue
 
-        feats_in_dim = dimension_features[dim]
-        logger.info(f"  Dimension '{dim}': {len(feats_in_dim)} candidates")
+        logger.info("  Dimension '%s': %d candidates", dim, len(feats_in_dim))
 
-        # Score features: mean abs correlation (lower is better for redundancy)
         scores = {}
         for feat in feats_in_dim:
             if feat not in feature_to_idx:
                 continue
             idx = feature_to_idx[feat]
-            # Mean absolute correlation across all features
-            mean_abs_corr = np.nanmean(np.abs(corr_matrix[idx, :]))
-            # Variance of feature itself (higher is better for informativeness)
-            scores[feat] = mean_abs_corr
+            row = np.abs(corr_matrix[idx, :])
+            row_valid = row[~np.isnan(row)]
+            if len(row_valid) == 0:
+                logger.warning("    Feature '%s' has an all-NaN correlation row (constant/degenerate on train window) -- skipping", feat)
+                continue
+            scores[feat] = float(np.mean(row_valid))
 
-        # Sort by mean abs correlation (ascending — lower is less noisy)
         sorted_feats = sorted(scores.items(), key=lambda x: x[1])
-        selected_for_dim = []
+        selected_for_dim: list[str] = []
 
         for feat, score in sorted_feats:
             idx = feature_to_idx[feat]
-            # Check if low-corr with already selected
-            can_add = True
-            for prev_feat in selected_for_dim:
-                prev_idx = feature_to_idx[prev_feat]
-                corr_val = abs(corr_matrix[idx, prev_idx])
-                if corr_val > 0.6:  # threshold for redundancy
-                    can_add = False
-                    break
-
+            can_add = all(
+                abs(corr_matrix[idx, feature_to_idx[prev]]) <= CORR_THRESHOLD
+                for prev in selected_for_dim
+            )
             if can_add:
                 selected_for_dim.append(feat)
-                selected[feat] = {
-                    "dimension": dim,
-                    "mean_abs_corr": float(score),
-                }
-                if len(selected_for_dim) >= 2:  # max 2 per dimension
+                selected[feat] = {"dimension": dim, "mean_abs_corr": float(score)}
+                if len(selected_for_dim) >= MAX_PER_DIMENSION:
                     break
 
-        logger.info(f"    Selected: {selected_for_dim}")
+        logger.info("    Selected: %s", selected_for_dim)
 
     return selected
 
@@ -309,16 +329,24 @@ def generate_report(
     corr_matrix_selected: np.ndarray,
     all_features: list[str],
 ) -> dict:
-    """Generate final report."""
+    """Assemble the final feature-selection report dict."""
     selected_cols = list(selected_features.keys())
 
     report = {
         "metadata": {
-            "description": "Feature redundancy analysis (Fázis 0) for cluster regime research",
-            "date": "2026-08-31",
+            "description": "Feature redundancy analysis (t872) for CV-optimized cluster regime research",
+            "train_only_window": [FEATURE_SELECTION_TRAIN_START, FEATURE_SELECTION_TRAIN_END],
+            "leakage_note": (
+                "Correlation matrix computed ONLY on the Fold-1 training window, which is "
+                "never a validation period in the downstream 4-fold walk-forward CV -- "
+                "guarantees zero information leakage from any CV validation window into "
+                "feature selection."
+            ),
             "dimensions_targeted": sorted(CORE_DIMENSIONS),
-            "method": "Hierarchical clustering on Pearson correlation matrix",
-            "data_source": "quant_train (50K sample)",
+            "method": "Per-dimension greedy selection on Pearson |correlation|, redundancy cutoff > 0.6",
+            "corr_threshold": CORR_THRESHOLD,
+            "max_per_dimension": MAX_PER_DIMENSION,
+            "data_source": "quant_train (train-only window sample)",
         },
         "selected_features": selected_features,
         "n_selected": len(selected_features),
@@ -330,56 +358,46 @@ def generate_report(
         "dimension_summary": {},
     }
 
-    # Summarize by dimension
     for feat, meta in selected_features.items():
-        dim = meta["dimension"]
-        if dim not in report["dimension_summary"]:
-            report["dimension_summary"][dim] = []
-        report["dimension_summary"][dim].append(feat)
+        report["dimension_summary"].setdefault(meta["dimension"], []).append(feat)
 
     return report
 
 
-def main():
-    """Main orchestration."""
-    logger.info("=== Feature Redundancy Analysis (Fázis 0) ===")
+def main() -> dict:
+    """Run the train-only feature selection pipeline end to end."""
+    logger.info("=== Feature Redundancy Analysis (t872, train-only) ===")
 
-    # Ensure output directory exists
-    RESEARCH_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_REPORT.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load model features
     features = load_model_features()
-    logger.info(f"Loaded {len(features)} features from model artifact")
+    logger.info("Loaded %d candidate features from model artifact", len(features))
 
-    # Connect to database
-    conn = duckdb.connect(str(DB_PATH), read_only=True)
+    db_cfg = utils.load_asset_config()
+    db_path = db_cfg["database"]["db_path"]
+    conn = duckdb.connect(db_path, read_only=True)
 
     try:
-        # Compute correlation matrix
         corr_matrix = compute_correlation_matrix_sql(conn, features)
-
-        # Select features per dimension
         selected_features = select_features_per_dimension(features, corr_matrix)
 
-        # Compute correlation only for selected features
         selected_indices = [features.index(f) for f in selected_features]
         corr_selected = corr_matrix[np.ix_(selected_indices, selected_indices)]
 
-        # Generate report
         report = generate_report(selected_features, corr_selected, features)
 
-        # Save report
-        logger.info(f"Saving report to {OUTPUT_REPORT}")
+        logger.info("Saving report to %s", OUTPUT_REPORT)
         with open(OUTPUT_REPORT, "w") as f:
             json.dump(report, f, indent=2)
 
-        logger.info(f"✓ Selected {len(selected_features)} features across dimensions:")
+        logger.info("Selected %d features across dimensions:", len(selected_features))
         for dim in sorted(CORE_DIMENSIONS):
             dims_selected = [f for f, m in selected_features.items() if m["dimension"] == dim]
             if dims_selected:
-                logger.info(f"  {dim}: {dims_selected}")
+                logger.info("  %s: %s", dim, dims_selected)
 
         logger.info("=== Feature Redundancy Analysis Complete ===")
+        return report
 
     finally:
         conn.close()

@@ -2,22 +2,31 @@
 
 Reads OHLCV from the DuckDB ohlcv table, computes forward window outcomes
 for a 360-bar horizon using DuckDB SQL window functions (t+1..t+360,
-bar t excluded), and writes the results to a persistent table or parquet file.
+bar t excluded — no future leaking into the observation itself), and
+writes the results to a persistent table or parquet file.
 
 Unlike fw60 (which uses close-to-close), fw360 uses high/low to capture
 the idealized directional excursion over a 6-hour forward window:
   long_mfe_fw360  = log(max(high[t+1:t+360]) / close[t])
   short_mfe_fw360 = log(min(low[t+1:t+360]) / close[t])
 
-Pipeline
---------
-sync_ohlcv  →  sync_targets (fw60)  →  01_target_computation (fw360)
+Pipeline (t872 rebuild)
+------------------------
+01_target_computation (fw360, THIS SCRIPT)
+    -> 02_window_representation (needs 03's selected features)
+    -> 03_feature_selection (train-only, no CV leakage)
+    -> 04_cv_cluster_optimization (walk-forward ANOVA F-score k-search)
+
+Note on numbering: 03_feature_selection.py must be RUN before
+02_window_representation.py (window building needs the selected feature
+list) even though the file numbers follow the Epic 065 ticket's listed
+deliverable order. See 02_window_representation.py docstring.
 
 Data flow
 ---------
-DuckDB (ohlcv)  →  DuckDB SQL window functions (in-process)
-                →  target DataFrame (fw360 MFE outcome columns)
-                →  DuckDB target_fw360 table or Parquet output
+DuckDB (ohlcv)  ->  DuckDB SQL window functions (in-process)
+                ->  target DataFrame (fw360 MFE outcome columns)
+                ->  DuckDB target_fw360 table or Parquet output
 """
 
 from __future__ import annotations
@@ -80,8 +89,8 @@ ORDER BY open_time
 
 
 def _compute_outcome_df(
-    conn    : duckdb.DuckDBPyConnection,
-    horizon : int = _HORIZON,
+    conn: duckdb.DuckDBPyConnection,
+    horizon: int = _HORIZON,
 ) -> pl.DataFrame:
     """Compute all fw360 outcome columns using DuckDB window functions.
 
@@ -102,8 +111,8 @@ def _compute_outcome_df(
 
 def compute_fw360_targets(
     asset_id: str | None = None,
-    output_format: str = "duckdb"
-) -> str | pl.DataFrame:
+    output_format: str = "duckdb",
+) -> str | pl.DataFrame | None:
     """Compute fw360 (360-bar forward MFE) targets from OHLCV.
 
     Computes fw360 forward outcome columns for a 360-bar horizon (t+1..t+360,
@@ -112,13 +121,14 @@ def compute_fw360_targets(
     Args:
         asset_id      : Asset key from config/assets.json; uses default if None.
         output_format : "duckdb" (writes to table, returns path),
-                       "parquet" (writes to file, returns path),
-                       "dataframe" (returns Polars DataFrame).
+                        "parquet" (writes to file, returns path),
+                        "dataframe" (returns Polars DataFrame).
 
     Returns:
-        Path to output (DuckDB or Parquet) or DataFrame if output_format="dataframe".
+        Path to output (DuckDB or Parquet), DataFrame if output_format="dataframe",
+        or None if no OHLCV data is available.
     """
-    db_cfg  = utils.load_asset_config(asset_id)
+    db_cfg = utils.load_asset_config(asset_id)
     db_path = db_cfg["database"]["db_path"]
 
     conn = get_connection(db_path)
@@ -127,12 +137,12 @@ def compute_fw360_targets(
     try:
         ohlcv_count = conn.execute("SELECT COUNT(*) FROM ohlcv").fetchone()
         if not ohlcv_count or ohlcv_count[0] == 0:
-            logger.warning("Nincs OHLCV adat — fw360 target szamitas kihagyva")
+            logger.warning("Nincs OHLCV adat -- fw360 target szamitas kihagyva")
             return None
 
         logger.info(
             "fw360 outcome szamitasa: horizon=%d, ohlcv_rows=%d",
-            _HORIZON, ohlcv_count[0]
+            _HORIZON, ohlcv_count[0],
         )
         df = _compute_outcome_df(conn)
         if df.is_empty():
@@ -141,19 +151,16 @@ def compute_fw360_targets(
 
         logger.info("fw360 target szamitva: rows=%d", len(df))
 
-        # Output handling
         if output_format == "dataframe":
             return df
 
-        elif output_format == "duckdb":
-            # Write to DuckDB table: target_fw360
+        if output_format == "duckdb":
             table_name = "target_fw360"
             conn.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df")
             logger.info("fw360 targets DuckDB tablaba irva: %s", table_name)
             return db_path
 
-        elif output_format == "parquet":
-            # Write to Parquet file in artifacts/
+        if output_format == "parquet":
             artifacts_dir = Path("artifacts") / "fw360_targets"
             artifacts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -163,8 +170,7 @@ def compute_fw360_targets(
             logger.info("fw360 targets Parquetbe irva: %s", output_path)
             return str(output_path)
 
-        else:
-            raise ValueError(f"Unknown output_format: {output_format}")
+        raise ValueError(f"Unknown output_format: {output_format}")
 
     finally:
         conn.close()
@@ -178,7 +184,6 @@ def validate_fw360_distribution(
     Computes summary statistics for both fw60 and fw360 MFE targets:
       - NULL ratio (should be ~6x higher for fw360 due to longer horizon)
       - Mean, std, min, max, percentiles
-      - Correlation between fw60 and fw360 (where both are non-NULL)
 
     Args:
         asset_id : Asset key; uses default if None.
@@ -186,16 +191,14 @@ def validate_fw360_distribution(
     Returns:
         Dictionary with validation statistics.
     """
-    db_cfg  = utils.load_asset_config(asset_id)
+    db_cfg = utils.load_asset_config(asset_id)
     db_path = db_cfg["database"]["db_path"]
 
     conn = get_connection(db_path)
 
     try:
-        # First compute fw360 if not yet done
         df_fw360 = _compute_outcome_df(conn)
 
-        # Read fw60 from existing target table
         query_fw60 = """
         SELECT open_time, long_mfe_fw60, short_mfe_fw60
         FROM target
@@ -203,7 +206,6 @@ def validate_fw360_distribution(
         """
         df_fw60 = conn.execute(query_fw60).pl()
 
-        # Join on open_time to compute correlation
         validation = {
             "fw360_rows": len(df_fw360),
             "fw360_long_null_ratio": 1.0 - (df_fw360["long_mfe_fw360"].null_count() / len(df_fw360)),
@@ -213,7 +215,6 @@ def validate_fw360_distribution(
             "fw60_short_null_ratio": 1.0 - (df_fw60["short_mfe_fw60"].null_count() / len(df_fw60)),
         }
 
-        # Summary stats (non-NULL rows)
         for col in ["long_mfe_fw360", "short_mfe_fw360"]:
             valid = df_fw360[col].drop_nulls()
             if len(valid) > 0:
@@ -238,7 +239,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Example usage
     logger.info("fw360 target szamitas...")
     result = compute_fw360_targets(output_format="duckdb")
     logger.info("Eredmeny: %s", result)

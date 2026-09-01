@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "method": "Paired t-test with Bonferroni correction",
+    "alpha_base": 0.05,
+    "n_tests": 10,
+    "alpha_corrected": 0.005,
+    "period": "Training (2021-01-01 \u2014 2025-06-30)",
+    "note": "Classification based on statistical significance of long_mfe vs short_mfe direction bias"
+  },
+  "classifications": {
+    "0": {
+      "n_obs": 11029,
+      "long_mfe_mean": 0.020170167528450113,
+      "short_mfe_mean": -0.020533683142169242,
+      "long_mfe_std": 0.021156893335899374,
+      "short_mfe_std": 0.022164970542636917,
+      "t_stat": 139.50631992986317,
+      "p_value": 0.0,
+      "t_critical": 2.807598910386545,
+      "df": 11028,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "1": {
+      "n_obs": 16597,
+      "long_mfe_mean": 0.02234145938476384,
+      "short_mfe_mean": -0.02364742872906499,
+      "long_mfe_std": 0.023966290789603023,
+      "short_mfe_std": 0.02641248669976667,
+      "t_stat": 166.1206860587433,
+      "p_value": 0.0,
+      "t_critical": 2.8074092802378634,
+      "df": 16596,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "2": {
+      "n_obs": 4292,
+      "long_mfe_mean": 0.024026463331082146,
+      "short_mfe_mean": -0.024033264092656614,
+      "long_mfe_std": 0.028916180025325686,
+      "short_mfe_std": 0.02675303492785591,
+      "t_stat": 79.92514684424546,
+      "p_value": 0.0,
+      "t_critical": 2.8084866271026026,
+      "df": 4291,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "3": {
+      "n_obs": 9409,
+      "long_mfe_mean": 0.02261643932532914,
+      "short_mfe_mean": -0.021403318774869548,
+      "long_mfe_std": 0.029269654655784072,
+      "short_mfe_std": 0.022794975496392325,
+      "t_stat": 115.09570271493791,
+      "p_value": 0.0,
+      "t_critical": 2.8076962457212336,
+      "df": 9408,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "4": {
+      "n_obs": 5862,
+      "long_mfe_mean": 0.026589390027935957,
+      "short_mfe_mean": -0.026988845952580186,
+      "long_mfe_std": 0.02837148805150568,
+      "short_mfe_std": 0.027739009780245107,
+      "t_stat": 103.38430321721425,
+      "p_value": 0.0,
+      "t_critical": 2.808097309409458,
+      "df": 5861,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "5": {
+      "n_obs": 10441,
+      "long_mfe_mean": 0.0193836138925101,
+      "short_mfe_mean": -0.021543762321210143,
+      "long_mfe_std": 0.021977120220935613,
+      "short_mfe_std": 0.02629675394611961,
+      "t_stat": 122.02702473924415,
+      "p_value": 0.0,
+      "t_critical": 2.807630746514146,
+      "df": 10440,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "6": {
+      "n_obs": 4200,
+      "long_mfe_mean": 0.023775248015842458,
+      "short_mfe_mean": -0.030898198451568215,
+      "long_mfe_std": 0.03271109450189802,
+      "short_mfe_std": 0.04601307082513704,
+      "t_stat": 62.76177034496523,
+      "p_value": 0.0,
+      "t_critical": 2.808518474845315,
+      "df": 4199,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "7": {
+      "n_obs": 3599,
+      "long_mfe_mean": 0.024003613374077453,
+      "short_mfe_mean": -0.029106411428018137,
+      "long_mfe_std": 0.036226151771332656,
+      "short_mfe_std": 0.042001728260274755,
+      "t_stat": 57.44343904432512,
+      "p_value": 0.0,
+      "t_critical": 2.8087666183237134,
+      "df": 3598,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "8": {
+      "n_obs": 17083,
+      "long_mfe_mean": 0.022317714531328497,
+      "short_mfe_mean": -0.023761646049854396,
+      "long_mfe_std": 0.024415433358823874,
+      "short_mfe_std": 0.030855137575778856,
+      "t_stat": 153.0670065383204,
+      "p_value": 0.0,
+      "t_critical": 2.8073985952586265,
+      "df": 17082,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    },
+    "9": {
+      "n_obs": 1475,
+      "long_mfe_mean": 0.029872823606656156,
+      "short_mfe_mean": -0.025960131636178777,
+      "long_mfe_std": 0.03924047418631377,
+      "short_mfe_std": 0.026236486134701205,
+      "t_stat": 45.426853630102336,
+      "p_value": 0.0,
+      "t_critical": 2.811267112097006,
+      "df": 1474,
+      "significant_bonferroni": true,
+      "assignment": "LONG"
+    }
+  }
+}

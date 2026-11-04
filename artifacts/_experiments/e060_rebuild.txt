@@ -1,4 +1,0 @@
-2026-08-26 13:05:25 INFO __main__: quant_train build indul: asset_id=default mode=full rebuild start=None end=None
-2026-08-26 13:09:34 INFO data_handling.store.duckdb_store: rebuild_quant_train: rows=3120336 start=None end=None
-2026-08-26 13:09:39 INFO data_handling.sync_tables.sync_quant_train: sync_quant_train: 3120336 sor az eredmény táblában
-2026-08-26 13:09:39 INFO __main__: quant_train build kesz: rows=3120336 elapsed=254.1s

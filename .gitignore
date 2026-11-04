@@ -54,3 +54,14 @@ plan_files/
 
 # Local tooling binaries (aria2c, torrent metadata) — not part of the repo
 tools/
+
+# =============================================================================
+# Research outputs / generated docs (nem verziózott)
+# =============================================================================
+research/tv_report/
+research/ma_cross/
+research/rsi_divergence/
+_chronoquant_docs.ipynb
+_chronoquant_docs.html
+_chronoquant_docs_files/
+artifacts/_experiments/

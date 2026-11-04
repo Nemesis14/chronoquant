@@ -415,6 +415,7 @@ Strategy calibration is performed offline by `src/strategy/`, then the artifact 
 | `uv run pytest src/strategy/tests/ -v` | Strategy calibration changes |
 | `uv run pytest src/trading/tests/ -v` | Live trading service changes |
 | `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
+| `scripts/start_ui.ps1` / `stop_ui.ps1` | UI indítás/leállítás (rejtett, :8501, logok: `logs/ui.*.log`); Windows-belépéskor `scripts/install_autostart.ps1` task (`ChronoQuantUiAutostart`) indítja |
 
 Always run pyright and ruff for the affected module. Never skip for non-trivial changes.
 

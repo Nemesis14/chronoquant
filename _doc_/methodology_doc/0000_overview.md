@@ -40,7 +40,7 @@ flowchart TD
         GRID["Grid Search\nExecution-aware TP/SL\n→ 6300_strategy_grid_search.md"]
     end
 
-    LIVE["Live Trading\nStreamlit dashboard + Binance"]
+    LIVE["Live Trading\nDashboard UI + Binance"]
 
     OHLCV --> FEAT
     OHLCV --> TARGET

@@ -184,3 +184,9 @@ jelminőség:
 2. **Short irány** ugyanezzel a recepttel.
 3. **Második valid ablak** (pl. 2025-08 → 2026-01) a stabilitás ellenőrzésére.
 4. Tier 3 bookDepth.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/data_handling/collectors/derivatives/`, `sync_tables/sync_altdata_features.py`, `_altdata_features_polars.py`.

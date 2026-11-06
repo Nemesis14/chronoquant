@@ -9,9 +9,9 @@ Forrás:
 - [provenance.py](../../src/modeling/provenance.py)
 - [03_fit_model.py](../../src/modeling/03_fit_model.py) — vékony CLI wrapper a `train_model` köré
 
-Metodológiai háttér: [5600_model_training.md](../methodology_doc/5600_model_training.md) |
-[5700_offline_prediction.md](../methodology_doc/5700_offline_prediction.md) |
-[5000_modelling.md](../methodology_doc/5000_modelling.md)
+Metodológiai háttér: [5600_model_training.md](../methodology_doc/5100_training.md) |
+[5700_offline_prediction.md](5700_offline_prediction.md) |
+[5000_modelling.md](../methodology_doc/0000_overview.md)
 
 ---
 
@@ -21,10 +21,11 @@ Metodológiai háttér: [5600_model_training.md](../methodology_doc/5600_model_t
 flowchart TD
   CLI[pipeline.py\n--model --step] --> SETUP[setup\nartifact_dir + manifest.json]
   SETUP --> SAMPLE[sample\nmodel.__sample FROM snap]
-  SAMPLE --> FE[feature_engineering\n01_feature_engineering.ipynb via papermill]
+  SAMPLE --> FE[feature_engineering\nreports.builders.feature_engineering]
   FE --> SEARCH[search\nrun_search lgbm_search.py]
   SEARCH --> TRAIN[train\ntrain_model fit_lgbm]
   TRAIN --> PRED[predict\npredict_offline snap -> model.__pred]
+  PRED --> AN[analyze\nreports.builders.* -> reports/]
 ```
 
 ```mermaid
@@ -89,34 +90,20 @@ sequenceDiagram
   P ->> PR: update_manifest_provenance(snapshot_id, feature_set_id)
 ```
 
-### `step_feature_engineering(model_id, meta, artifact_dir)`
+### `step_feature_engineering(model_id, meta, artifact_dir, snapshot_id=None)`
 
-Futtatja a `01_feature_engineering.ipynb` notebookot papermill-lel, majd Quarto-val
-HTML-lé rendereli. A notebook a `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`
-joinból materializál egy lokális `quant_train` TEMP TABLE munkatáblát
-(`materialize_sample_scoped_quant_train` → `sample_scope.py`), így a feature-szelekció
-ugyanarra a modell-scope-ra épül, mint a search/train/predict.
+Hívja a `reports.builders.feature_engineering.build(model_id, artifact_dir, snapshot_id, write_selection=True)`-t
+(nincs notebook, papermill, Quarto). A builder a `snap."<snapshot_id>" ⋈ model."<model_id>__sample"` joinból
+tölti be a train adatot (`_load_train`), kiszámolja a feature-szelekciót (minőség / MI / redundancia / IV), kiírja a
+`feature_engineering/feature_set.json`-t (a search/train bemenete), és a `reports/02_feature_engineering/` riportot.
+Snapshot feloldás: explicit `--snapshot` > `manifest.json` > `config/models.json`.
 
-**I1 kikényszerítve:** `sample_scope.py` ellenőrzi, hogy
-`COUNT(TEMP quant_train) == COUNT(model.__sample)` — eltérés esetén `RuntimeError`.
+A `feature_set.json["provenance"]` blokk: `snapshot_id`, `sample_rows`, `min_open_time`, `max_open_time`.
 
-A notebook a `feature_set.json["provenance"]` blokkba írja:
+Provenance: `link_feature_set` + `fe_feature_set` és `fe_report` (`reports/02_feature_engineering/manifest.json`) artifact regisztráció.
+Manifest status: `feature_engineering_done`.
 
-| Mező | Értéke |
-|------|--------|
-| `snapshot_id` | A forrás snapshot azonosítója |
-| `sample_table` | `model."<model_id>__sample"` |
-| `sample_rows` | `model.__sample` rowcount |
-| `joined_rows` | `snap ⋈ model.__sample` rowcount (== `sample_rows`, I1) |
-| `min_open_time` | Input időtartam eleje |
-| `max_open_time` | Input időtartam vége |
-| `source_contract` | `"snap ⋈ model.__sample"` |
-
-Provenance: `link_feature_set` + notebook/html artifact regisztráció.
-
-Részletes invariáns összefoglaló: → [4100_quant_train.md](4100_quant_train.md#invariánsok--sample-scoped-pipeline)
-
-### `step_search(model_id, stage, n_trials, timeout_hours, fold_limit)`
+### `step_search(model_id, stage, n_trials, timeout_hours)`
 
 Hívja `run_search`-t a `modeling.search.lgbm_search` modulból. Manifest status:
 `search_done`.
@@ -130,6 +117,13 @@ Hívja `train_model`-t a `modeling.training.train` modulból. Manifest status:
 
 Hívja `predict_offline`-t a `modeling.predict` modulból. Manifest status:
 `predict_done`.
+
+### `step_analyze(model_id, artifact_dir)`
+
+Minden `_ANALYSIS_REPORTS` bejegyzésre (`01_sampling`, `02_feature_engineering`, `03_hyperparameter_search`, `04_strategy`) meghívja a
+`reports.builders.<builder>.build`-et, ha az előfeltétel-fájl létezik (`manifest.json`, `feature_engineering/feature_set.json`,
+`search/search_best.json`, `strategy/strategy_artifact.json`); hiányzót kihagy, hibás buildert jelez és folytat. A `02_feature_engineering`
+frissítése nem írja újra a `feature_set.json`-t (`write_selection=False`). Manifest status: `analyze_done`.
 
 ---
 
@@ -290,9 +284,9 @@ Output: `Model trained`, `n_estimators`, `n_features`, `Output` path a konzolra.
 
 | Fájl | Tartalom |
 |------|----------|
-| [5600_model_training.md](../methodology_doc/5600_model_training.md) | Training metodológia |
-| [5700_offline_prediction.md](../methodology_doc/5700_offline_prediction.md) | Offline predikció metodológia |
-| [5000_modelling.md](../methodology_doc/5000_modelling.md) | Modellezési pipeline módszertani háttér |
+| [5600_model_training.md](../methodology_doc/5100_training.md) | Training metodológia |
+| [5700_offline_prediction.md](5700_offline_prediction.md) | Offline predikció metodológia |
+| [5000_modelling.md](../methodology_doc/0000_overview.md) | Modellezési pipeline módszertani háttér |
 | [5510_training.md](5510_training.md) | Training submodule kód-ref |
 | [5520_search.md](5520_search.md) | Hyperparameter search kód-ref |
 | [4100_quant_train.md](4100_quant_train.md) | quant_train tábla + I1-I7 invariáns összefoglaló |

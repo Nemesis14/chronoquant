@@ -29,7 +29,7 @@ flowchart TD
   end
 
   subgraph FILES["FAJLOK — artifacts/ (blob + report)"]
-    F["model.pkl / strategy_artifact.json / rank_lookup*.parquet\nisotonic*.pkl / *.ipynb / *.html"]
+    F["model.pkl / strategy_artifact.json / rank_lookup*.parquet\nisotonic*.pkl / reports/*/ (manifest, md, chart/table JSON)"]
   end
 
   QT -->|"CTAS range + hash"| SNAP
@@ -46,7 +46,7 @@ flowchart TD
 
 A három fájl írás szerint szét van választva, de egyetlen connectionből olvasásra
 egyesíthető ATTACH-cal (lásd alább). Ez garantálja, hogy a modellezés és az élő
-trading egyszerre futhat anélkül, hogy ütköznének.
+az API egyszerre futhat anélkül, hogy ütköznének.
 
 ---
 
@@ -123,7 +123,7 @@ EXISTS` szemantikával jön létre; a tartalom soha nem íródik felül.
 A `snapshot_id` formátuma: `{asset}_fw{h}_{range}__{hash8}`
 (pl. `solusdt_fw60_2023__a37d2703`).
 
-Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
+Részletek: → [1400_snapshots.md](1400_snapshots.md)
 
 ### `model` séma — lab.duckdb
 
@@ -131,7 +131,7 @@ Egy-egy modellhez tartozó kicsi táblák:
 
 | Tábla minta | Tartalom |
 |-------------|---------|
-| `model."<id>__sample"` | Hourly sample + fold_id (walk-forward CV), ~tízezer sor |
+| `model."<id>__sample"` | Hourly sample + `split` (0=train, 1=valid), ~tízezer sor |
 | `model."<id>__pred"` | Teljes snapshot range offline predikciói `(open_time, pred)` |
 
 A predikció NEM fúzódik a snapshotba — a snapshot hash-e és reprodukálhatósága
@@ -152,7 +152,7 @@ Az UI és a deploy folyamat ezekből olvassa az élesítés előtti teljesítmé
 ### `reg` séma — registry.duckdb
 
 8 tábla, normalizált igazságforrás. A séma a `registry.duckdb` **default (main)**
-sémájában él (ATTACH alias = `reg`). Részletek: → [1500_registry.md](../methodology_doc/1500_registry.md)
+sémájában él (ATTACH alias = `reg`). Részletek: → [1500_registry.md](1500_registry.md)
 
 ---
 
@@ -171,20 +171,20 @@ stateDiagram-v2
 ```
 
 A `content_sha256` és `feature_set_hash` biztosítják a reuse-detektálást és a
-reprodukálhatóságot. Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
+reprodukálhatóságot. Részletek: → [1400_snapshots.md](1400_snapshots.md)
 
 ---
 
 ## Miért 3 fájl és nem 1?
 
-A single-writer korlát: ha az élő trading/sync folyamatosan írja a DB-t, a
+A single-writer korlát: ha az élő sync (worker job) folyamatosan írja a DB-t, a
 modellezés nem tud ugyanabba írni. A 3-fájlos szétválasztás garantálja:
 
 ```mermaid
 flowchart LR
   SYNC["sync folyamat\n(ír: live.duckdb)"]
   MODEL["modellezés\n(ír: lab.duckdb)"]
-  TRADING["trading service\n(olvas: live.duckdb predictions)"]
+  TRADING["API (src/api)\n(olvas RO: live.duckdb predictions)"]
 
   SYNC -->|"nem utkonik"| MODEL
   MODEL -->|"nem erinti"| TRADING
@@ -201,8 +201,8 @@ nem érinti. A két folyamat párhuzamosan futhat.
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Snapshot réteg — miért és hogyan | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
-| Registry séma + életciklus | [1500_registry.md](../methodology_doc/1500_registry.md) |
+| Snapshot réteg — miért és hogyan | [1400_snapshots.md](1400_snapshots.md) |
+| Registry séma + életciklus | [1500_registry.md](1500_registry.md) |
 | Éles folyamat (sync → predict → trade) | [0003_runtime_flow.md](0003_runtime_flow.md) |
 | Modell életciklus (snapshot → deploy) | [0004_model_lifecycle.md](0004_model_lifecycle.md) |
-| quant_train metodológia | [4000_quant_train.md](../methodology_doc/4000_quant_train.md) |
+| quant_train metodológia | [4000_quant_train.md](4100_quant_train.md) |

@@ -186,10 +186,10 @@ flowchart LR
 
   DB --> |owns| SRC1[src/data_handling/\nconfig/assets.json\nDuckDB schema]
   MOD --> |owns| SRC2[src/modeling/\nsrc/strategy/\nartifacts/]
-  UI --> |owns| SRC3[src/ui/\nsrc/trading/]
+  UI --> |owns| SRC3[src/api/ src/worker/\nsrc/cq_mcp/ src/sentiment/\nfrontend/ scripts/]
   DOC --> |owns| SRC4[.agent/\npyproject.toml\n_doc_/database_and_code_doc/]
   METH --> |owns| SRC5[_doc_/methodology_doc/\nmodszertani tartalom]
-  ANA --> |owns| SRC6[_doc_/models_doc/\nanalyst/]
+  ANA --> |owns| SRC6[src/reports/\n_doc_/models_doc/ research/ reports/]
   VAL --> |owns| SRC7[pr_ ticket\nvalidálás]
 ```
 
@@ -208,10 +208,10 @@ Minden manifest tartalmaz:
 |-------|----------|-------|----------|---------|
 | `database_agent` | `.agent/agents/database_agent.md` | `src/data_handling/`, DuckDB | coding, jira | lsp, ast-grep, uv |
 | `modeling_agent` | `.agent/agents/modeling_agent.md` | `src/modeling/`, `src/strategy/`, artifacts | coding, jira | lsp, ast-grep, uv |
-| `ui_agent` | `.agent/agents/ui_agent.md` | `src/ui/`, `src/trading/` | coding, jira | lsp |
+| `ui_agent` | `.agent/agents/ui_agent.md` | `src/api/`, `src/worker/`, `src/cq_mcp/`, `src/sentiment/`, `frontend/`, `scripts/` | coding, jira | lsp |
 | `code_doc_agent` | `.agent/agents/code_doc_agent.md` | `.agent/`, config, `_doc_/database_and_code_doc/` | jira, docs | uv, permissions |
 | `methodology_agent` | `.agent/agents/methodology_agent.md` | `_doc_/methodology_doc/` | jira, methodology_doc | — |
-| `analyst_agent` | `.agent/agents/analyst_agent.md` | `_doc_/models_doc/`, `analyst/` | analyst, quarto | — |
+| `analyst_agent` | `.agent/agents/analyst_agent.md` | `src/reports/`, `_doc_/models_doc/`, `_doc_/research/`, `_doc_/reports/` | analyst | — |
 | `validator_agent` | `.agent/agents/validator_agent.md` | `pr_` ticketek, `src/*/tests/` | jira | lsp, uv |
 
 ### 5.3 Agent betöltési sorrend
@@ -278,9 +278,9 @@ flowchart LR
 |-------|---------|--------------|
 | `coding_skill.md` | Type annotations, docstring stílus, naming, alignment, logging, modul-szerkezet | database, modeling, ui, validator |
 | `jira_skill.md` | `_jira_/` könyvtár-struktúra, ID-szabályok, task lifecycle, template-ek | minden agent |
-| `docs_skill.md` | `_doc_/` három-zónás séma (database_and_code_doc / methodology_doc / models_doc), számozás, Mermaid szabályok, doc típusok | code_doc, methodology |
+| `docs_skill.md` | `_doc_/` három-zónás séma (database_and_code_doc / methodology_doc / models_doc; + research/, reports/ az analyst zónái), számozás, Mermaid szabályok, doc típusok | code_doc, methodology |
 | `methodology_doc_skill.md` | X100 hat kötelező szekció template-jei, alternatíva-tábla formátum | methodology |
-| `analyst_skill.md` | Quarto frontmatter, notebook-struktúra, chart-szabályok, szekció-minta, `display_analysis_table()`, numeric formatting, paletta | analyst |
+| `analyst_skill.md` | Report-formátum (manifest/md/chart/table JSON), `ReportBuilder` használat, szekció-szabályok, md-összefoglalók (`research`, `models_doc`) | analyst |
 | `model_lifecycle_skill.md` | Új modell build + részleges-retrain döntési tábla; pipeline lépések sorrendben (snapshot → sample → FE → search → train → predict) | modeling |
 | `deploy_skill.md` | Élesítési checklist: validáció → pending → cutover → registry active → rollback | modeling, database |
 
@@ -297,7 +297,6 @@ flowchart LR
   T --> AST[ast_grep_tool.md\nstrukturális keresés]
   T --> UV[uv_tool.md\ncsomagkezelés]
   T --> PERM[permissions_tool.md\njogosultság profil]
-  T --> QUA[quarto_analysis_defaults.md\nQuarto config defaults]
 ```
 
 ### 7.1 LSP Tool — Pyright MCP
@@ -384,7 +383,7 @@ flowchart LR
 
   DB[database_agent] -->|src/data_handling/| EDIT
   MOD[modeling_agent] -->|src/modeling/| EDIT
-  UI[ui_agent] -->|src/ui/, src/trading/| EDIT
+  UI[ui_agent] -->|src/api/, frontend/, src/worker/...| EDIT
   DOC[code_doc_agent] -->|.agent/, config| EDIT
 
   DB --> SHELL
@@ -474,7 +473,7 @@ flowchart TD
   ROOT["_doc_/ (gyoker)\n0000_project_overview.md\n0001_agentic_system.md"]
   Z1["database_and_code_doc/\nDB sema + kod-referencia (.md)\ncode_doc_agent"]
   Z2["methodology_doc/\nrationale, dontesek (.md, kod-mentes)\nmethodology_agent"]
-  Z3["models_doc/\nmodellenkenti report (.ipynb -> Quarto)\nanalyst_agent"]
+  Z3["models_doc/\nmodell-elemzesek (.md) + research/ + reports/ (report-format)\nanalyst_agent"]
 
   ROOT --- Z2
   ROOT --- Z1
@@ -497,7 +496,7 @@ flowchart LR
 flowchart TD
   A["2000_features.md\nfeature metodologia\nmethodology_doc / methodology_agent"]
   C["2100_sync_features.md\nsync_features.py kod-ref\ndatabase_and_code_doc / code_doc_agent"]
-  N["XXXX.ipynb\nmodell-report\nmodels_doc / analyst_agent"]
+  N["XXXX_slug.md\nmodell-elemzes\nmodels_doc / analyst_agent"]
 
   A -->|Entry Gate: metodologia elobb| C
   C -.->|kotelezo felfele link| A
@@ -512,7 +511,7 @@ flowchart TD
 | X010–X099 | `2010_feature_engineering.md` | `methodology_doc/` | `methodology_agent` | Módszertani háttér |
 | X100 (metod) | `7100_live_trading.md` | `methodology_doc/` | `methodology_agent` | Almodul overview + 6 kötelező szekció |
 | X100 (kód) / X110+ | `2100_sync_features.md`, `1110_duckdb_store.md` | `database_and_code_doc/` | `code_doc_agent` | Kód-referencia, DB séma, teljes .py leírás |
-| XXXX.ipynb | `XXXX_<model>_report.ipynb` | `models_doc/` | `analyst_agent` | Quarto-renderable modell-report |
+| elemzés (.md) / report | `<slug>.md`; `reports/<slug>/` | `models_doc/`, `research/`, `reports/` | `analyst_agent` | Modell-elemzés, kutatási összefoglaló, report-formátum riport |
 | Globális root | `0000`, `0001` | `_doc_/` **gyökér** | — | Project overview, agentic rendszer — **CSAK ez a kettő** |
 | Cross-domain arch ref | `0002+` | `database_and_code_doc/` | `code_doc_agent` | Rendszer-szintű arch referencia (pl. adat-topológia, runtime flow) |
 
@@ -693,10 +692,10 @@ flowchart TD
 |--------------|-------|---------------|
 | `src/data_handling/`, DuckDB, Parquet | `database_agent` | coding, jira, lsp, uv |
 | `src/modeling/`, `src/strategy/`, artifacts | `modeling_agent` | coding, jira, lsp, uv |
-| `src/trading/`, `src/ui/` | `ui_agent` | coding, jira, lsp |
+| `src/api/`, `src/worker/`, `src/cq_mcp/`, `src/sentiment/`, `frontend/`, `scripts/` | `ui_agent` | coding, jira, lsp |
 | `.agent/`, config, `_doc_/database_and_code_doc/` | `code_doc_agent` | docs, jira, uv, permissions |
 | `_doc_/methodology_doc/` — metodológia | `methodology_agent` | methodology_doc, jira |
-| `_doc_/models_doc/`, `analyst/` | `analyst_agent` | analyst, quarto |
+| `src/reports/`, `_doc_/models_doc/`, `_doc_/research/`, `_doc_/reports/` | `analyst_agent` | analyst, jira |
 | `pr_` ticketek validálása | `validator_agent` | jira, lsp, uv |
 
 ---

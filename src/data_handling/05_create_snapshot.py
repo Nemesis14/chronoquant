@@ -80,13 +80,6 @@ def _parse_args() -> argparse.Namespace:
         metavar = "YYYY-MM-DD HH:MM:SS",
         help    = "Range upper bound, inclusive. Omit for full history.",
     )
-    parser.add_argument(
-        "--exclude-altdata",
-        action  = "store_true",
-        help    = "Leave the epic_054 alt-data feature group out of the snapshot. "
-                  "Used to build the control snapshot whose candidate pool differs "
-                  "from the treatment snapshot in exactly that group.",
-    )
     return parser.parse_args()
 
 
@@ -100,13 +93,6 @@ def main() -> None:
         asset_id, args.horizon, args.start, args.end,
     )
 
-    exclude: list[str] | None = None
-    if args.exclude_altdata:
-        from data_handling.sync_tables._altdata_features_polars import ALTDATA_FEATURES
-
-        exclude = list(ALTDATA_FEATURES)
-        logger.info("alt-data kizarva a snapshotbol: %d oszlop", len(exclude))
-
     t0 = time.monotonic()
     conn = utils.open_lab_connection(asset_id)
     try:
@@ -116,7 +102,6 @@ def main() -> None:
             horizon          = args.horizon,
             start_time       = args.start,
             end_time         = args.end,
-            exclude_features = exclude,
         )
     finally:
         conn.close()

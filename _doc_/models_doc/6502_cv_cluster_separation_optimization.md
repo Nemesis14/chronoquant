@@ -272,6 +272,8 @@ No further cluster-based trading validation is recommended under this Epic. Any 
 
 ## Output Files
 
+> **Törölve (epic_068 / t886):** az alábbi `research/cluster_regime/` scriptek és `artifacts/research_cluster_regime/` kimenetek már nem léteznek. Rövid összefoglaló: `_doc_/research/cluster_regime.md`; kód a git historyban a `73f2156` commitnál (a kimenetek nem).
+
 ### Core pipeline (Sections 1–7)
 - `research/cluster_regime/01_target_computation.py` — fw360 target computation (rebuilt)
 - `research/cluster_regime/02_window_representation.py` — 360-bar window features (rebuilt, dynamic feature loading)

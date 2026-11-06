@@ -1,7 +1,6 @@
 """Smoke and sanity tests for the train/valid split sampling path (t2).
 
 Covers:
-  - TrainValidSplitConfig instantiation with correct defaults
   - build_train_valid_split_select_sql() returns a non-empty SQL string
   - build_train_valid_split_ctas_sql() wraps a CREATE OR REPLACE TABLE
   - Generated SQL contains: split TINYINT, QUALIFY ROW_NUMBER, embargo conditions
@@ -16,7 +15,6 @@ from datetime import datetime, timedelta
 import duckdb
 import pytest
 
-from modeling.sampling.config import TrainValidSplitConfig
 from modeling.sampling.snapshot_sampler import (
     build_train_valid_split_ctas_sql,
     build_train_valid_split_select_sql,
@@ -33,53 +31,6 @@ TRAIN_START = "2024-01-01"
 TRAIN_END   = "2024-01-31"
 VALID_START = "2024-02-01"
 VALID_END   = "2024-02-28"
-
-
-# ---------------------------------------------------------------------------
-# TrainValidSplitConfig — smoke
-# ---------------------------------------------------------------------------
-
-
-def test_config_instantiates_with_required_fields() -> None:
-    cfg = TrainValidSplitConfig(
-        sample_id   = "test_sample",
-        asset_id    = "solusdt",
-        train_start = TRAIN_START,
-        train_end   = TRAIN_END,
-        valid_start = VALID_START,
-        valid_end   = VALID_END,
-    )
-    assert cfg.sample_id == "test_sample"
-    assert cfg.asset_id  == "solusdt"
-
-
-def test_config_defaults_are_correct() -> None:
-    cfg = TrainValidSplitConfig(
-        sample_id   = "test_sample",
-        asset_id    = "solusdt",
-        train_start = TRAIN_START,
-        train_end   = TRAIN_END,
-        valid_start = VALID_START,
-        valid_end   = VALID_END,
-    )
-    assert cfg.seed == 42
-    assert cfg.feature_lookback_embargo_minutes == 240
-    assert cfg.target_purge_minutes == 60
-    assert "long_mfe_fw60" in cfg.target_cols
-    assert "short_mfe_fw60" in cfg.target_cols
-
-
-def test_config_is_frozen() -> None:
-    cfg = TrainValidSplitConfig(
-        sample_id   = "test_sample",
-        asset_id    = "solusdt",
-        train_start = TRAIN_START,
-        train_end   = TRAIN_END,
-        valid_start = VALID_START,
-        valid_end   = VALID_END,
-    )
-    with pytest.raises((AttributeError, TypeError)):
-        cfg.seed = 99  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

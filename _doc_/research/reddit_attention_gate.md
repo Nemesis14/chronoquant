@@ -303,3 +303,9 @@ A 168 órás (érvénytelen) futás pillanatképe összehasonlításra:
 
 Előzmény: [tradingview_author_skill.md](tradingview_author_skill.md) — a
 szerző-skill hipotézis, amit ez az epic **nem** nyitott újra.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/data_handling/collectors/reddit/`, `src/modeling/analyst_signal/{social_features,gate_measurement,validate}.py`, `store/analyst_signal_store.py`.

@@ -11,17 +11,15 @@ flowchart TD
     APP["Hívó kód\n(sync_*, 02_sync_pipeline, UI)"]
     STORE["duckdb_store.py\nírás, séma, migráció"]
     QUERY["duckdb_query.py\nolvasás, range, ASOF join"]
-    STATS["duckdb_stats.py\nstat gyűjtés, audit, formázás"]
+    STATS["duckdb_stats.py\nstat gyűjtés, formázás"]
     VALID["validate.py\nintegritás ellenőrzés"]
-    TOOL["toolkit.py\nDS inspekciós segédek"]
     DB[("solusdt.duckdb")]
 
-    APP --> STORE & QUERY & TOOL
+    APP --> STORE & QUERY
     STORE --> DB
     QUERY --> DB
     STATS --> DB
     VALID --> DB
-    TOOL --> QUERY
 ```
 
 ---
@@ -56,7 +54,6 @@ Read-only lekérdezések pandas és Polars DataFrame kimenettel.
 - `query_range_pl(db_path, dataset, start, end, columns)` → Polars DataFrame (zero-copy)
 - `dataset_columns(db_path, dataset)` → oszlopnév lista
 - `dataset_exists(db_path, dataset)` → bool (tábla létezik ÉS van benne sor)
-- `asof_join_predictions_features(db_path, feature_cols, start, end)` → ASOF LEFT JOIN
 - `latest_open_time(db_path, dataset)` → `pd.Timestamp | None`
 - OHLCV shortcut-ok: `ohlcv_dataset_exists`, `ohlcv_row_count`, `ohlcv_latest_open_time`, `ohlcv_time_stats`
 
@@ -71,8 +68,6 @@ DB egészség-statisztikák gyűjtése, formázása és dataset audit.
 **Kulcs funkciók:**
 - `collect_duckdb_stats_report(db_path, tables)` — Sorok, időtartomány, null arányok, timing smoke (1d/1w/1mo/full), GROUP BY year
 - `format_duckdb_stats_report(report)` → szöveg riport stdout-ra
-- `raw_manifest_audit(db_path, dataset)` — Nyers integritás audit: sorok, tartomány, null_ts, dup_ts logolása
-- `log_dataset_check(db_path, dataset)` — Sor szám + időtartomány + `raw_manifest_audit` logolása
 
 ---
 
@@ -84,17 +79,6 @@ Integritás invariánsok ellenőrzése AssertionError-ral.
 - `assert_zero(con, sql, msg)` — SQL futtat, AssertionError ha `count > 0`
 - `check_no_future_features(db_path)` — `available_ts <= open_time` mindenhol
 - `check_target_no_current_bar(db_path)` — NULL tail sorok megléte
-
----
-
-### [toolkit.py](1150_toolkit.md)
-
-DS workflow segédek — dataset inspekció és összefoglalók.
-
-**Kulcs funkciók:**
-- `resolve_db_path(asset_id)` — db_path lekérés config-ból
-- `list_datasets(asset_id)` — Adatot tartalmazó dataset-ek listája
-- `get_dataset_columns`, `get_row_count`, `get_time_range`, `print_summary`
 
 ---
 

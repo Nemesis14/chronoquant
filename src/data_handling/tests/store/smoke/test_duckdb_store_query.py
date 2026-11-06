@@ -13,7 +13,6 @@ import polars as pl
 import pytest
 
 from data_handling.store.duckdb_query import (
-    asof_join_predictions_features,
     dataset_columns,
     dataset_exists,
     latest_open_time,
@@ -198,23 +197,3 @@ def test_query_helpers_handle_ranges_projection_and_missing_tables(tmp_path: Pat
     assert not dataset_exists(data_dir, "missing")
     assert "feat_rsi_14" in dataset_columns(data_dir, "feat_ohlcv_quant")
     assert latest_open_time(data_dir, "ohlcv") == pd.Timestamp("2024-01-01 00:02:00")
-
-
-def test_asof_join_predictions_features_uses_past_features_only(tmp_path: Path) -> None:
-    """Verify ASOF join only attaches features available at prediction time."""
-    data_dir = _data_dir(tmp_path)
-    _seed_store(data_dir)
-
-    joined = asof_join_predictions_features(
-        data_dir,
-        feature_cols = ["feat_rsi_14"],
-    )
-
-    expected_prediction_ts = pd.to_datetime(
-        ["2024-01-01 00:01:00", "2024-01-01 00:02:00"]
-    )
-
-    assert len(joined) == 2
-    assert list(joined["prediction_ts"]) == list(expected_prediction_ts)
-    assert (joined["lookback_end_ts"] <= joined["prediction_ts"]).all()
-    assert list(joined["feat_rsi_14"]) == [45.0, 50.0]

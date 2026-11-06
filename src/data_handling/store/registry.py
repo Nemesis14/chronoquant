@@ -432,35 +432,6 @@ def get(
     return dict(zip(columns, fetched, strict=True))
 
 
-def list_rows(
-    conn   : duckdb.DuckDBPyConnection,
-    table  : str,
-    status : str | None = None,
-    alias  : str = "reg",
-) -> list[dict[str, Any]]:
-    """List registry rows, optionally filtered by status.
-
-    Args:
-        conn   : Open connection with the registry attached under ``alias``.
-        table  : One of REG_TABLES.
-        status : If given, return only rows with this status value.
-        alias  : Schema alias (default 'reg').
-
-    Returns:
-        List of row dicts (possibly empty).
-    """
-    _validate_table(table)
-    if status is None:
-        cursor = conn.execute(f"SELECT * FROM {alias}.{table}")
-    else:
-        cursor = conn.execute(
-            f"SELECT * FROM {alias}.{table} WHERE status = ?", [status]
-        )
-    rows    = cursor.fetchall()
-    columns = [d[0] for d in cursor.description]
-    return [dict(zip(columns, r, strict=True)) for r in rows]
-
-
 def set_status(
     conn     : duckdb.DuckDBPyConnection,
     table    : str,

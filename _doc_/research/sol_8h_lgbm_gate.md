@@ -28,8 +28,8 @@
 | Mérés | 2024-08 … 2026-07, **havi újratanítás** bővülő ablakon, 24 hónap |
 | Költség | 4,72 bps/kötés (maker be + ki, `execution_cost_gate.md`) |
 
-Kód: [sol_lgbm_8h.py](../../src/modeling/experiments/sol_lgbm_8h.py),
-[sol_lgbm_8h_econ.py](../../src/modeling/experiments/sol_lgbm_8h_econ.py).
+Kód: `sol_lgbm_8h.py`,
+`sol_lgbm_8h_econ.py`.
 
 ---
 
@@ -192,7 +192,7 @@ Az 5,6-szoros szakadékot nem elég in-sample optimizmusnak nevezni — meg kell
 nézni, hogy a két oldal egyáltalán ugyanazt a számot számolja-e. Négy magyarázat
 adja ugyanezt a képet, és mind a négy mérhető.
 
-Kód: [sol_lgbm_8h_audit.py](../../src/modeling/experiments/sol_lgbm_8h_audit.py).
+Kód: `sol_lgbm_8h_audit.py`.
 
 ### 9.1 Ugyanazt a mennyiséget mérjük? — Igen
 
@@ -330,7 +330,7 @@ A §4 null-tesztje **egyetlen** eltolással (4380 óra) futott, és tisztának
 látszott (IC −0,0041). Ez volt az alapja annak a §8-beli állításnak, hogy „ez az
 első ág, ami a null-tesztet és a baseline-t is átlépi". **Az állítás téves.**
 
-Kód: [null_distribution.py](../../src/modeling/experiments/null_distribution.py).
+Kód: `null_distribution.py`.
 
 ### 10.1 Két hiba a mérőeszközben
 
@@ -448,3 +448,9 @@ Előre rögzítve, a `t856`-hoz:
 5. **Küszöb:** p < 0,05 az elsődleges mérőszámon. Nem „valamelyik metrikán".
 
 Ha a panel ezt nem hozza, az ág lezárul — nem próbálunk újabb változatot.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/{sol_lgbm_8h,sol_lgbm_8h_econ,sol_lgbm_8h_audit,null_distribution,direction_features}.py`.

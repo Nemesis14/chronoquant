@@ -26,11 +26,11 @@ from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
+import optuna
 import pandas as pd
 from scipy.stats import spearmanr
 
 import utils
-from modeling.training.training_windows import DatasetSplit
 
 logger = logging.getLogger("lgbm_search")
 
@@ -51,17 +51,22 @@ _ES_ROUNDS        = 100
 _CURVE_MAX_POINTS = 100
 _MAX_TRIALS       = 100
 
-try:
-    import optuna  # type: ignore[import-not-found]
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    _HAS_OPTUNA = True
-except ImportError:
-    _HAS_OPTUNA = False
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
 # =============================================================================
 # Search dataset — single train/valid split (split col: 0=train, 1=valid)
 # =============================================================================
+@dataclass(frozen=True)
+class DatasetSplit:
+    """Feature and target matrices for a train/evaluation pair."""
+
+    X_train: pd.DataFrame
+    y_train: pd.Series
+    X_eval: pd.DataFrame
+    y_eval: pd.Series
+
+
 @dataclass(frozen=True)
 class _SearchDataset:
     train: DatasetSplit   # pre-built from split==0 / split==1
@@ -81,7 +86,6 @@ def run_search(
     retry_failed:      bool         = False,
     feature_key:       str          = "selected",
     feature_selection: str          = "joint",
-    gap_penalty:       float        = 0.0,
     search_tag:        str | None   = None,
     direction:         str          = "long",
 ) -> dict:
@@ -135,8 +139,7 @@ def run_search(
         if search_tag:
             search_dir = artifact_dir / f"search_{search_tag}"
         else:
-            tag        = f"joint_reg_gp{int(gap_penalty * 100):02d}" if gap_penalty > 0 else "joint"
-            search_dir = artifact_dir / f"search_{tag}"
+            search_dir = artifact_dir / "search_joint"
     else:
         feature_cols   = _load_feature_cols(artifact_dir, feature_key)
         n_features_max = None
@@ -150,13 +153,13 @@ def run_search(
     logger.info("=" * 72)
     if feature_selection == "joint":
         logger.info(f"LGBM SEARCH  model={model_id}  mode=JOINT (feature_k in Optuna)")
-        logger.info(f"  n_features_max={n_features_max}  gap_penalty={gap_penalty}  stage={stage}")
+        logger.info(f"  n_features_max={n_features_max}  stage={stage}")
     else:
         logger.info(f"LGBM SEARCH  model={model_id}  feature_key={feature_key}")
         logger.info(f"  target={target_col}  stage={stage}")
     logger.info(f"  n_trials={n_trials}  row_stride={row_stride}  n_features={len(feature_cols)}")
     logger.info(f"  max={_MAX_TRIALS}  (no patience early-stopping)")
-    logger.info(f"  engine={'optuna-TPE' if _HAS_OPTUNA else 'seeded-random'}")
+    logger.info("  engine=optuna-TPE")
     logger.info(f"  search_dir={search_dir}")
     logger.info("=" * 72)
 
@@ -178,18 +181,11 @@ def run_search(
         f"[Resume] {len(done_hashes)} completed, {len(fail_hashes)} failed in log"
     )
 
-    if _HAS_OPTUNA:
-        best = _search_optuna(
-            model_id, sd, search_dir, feature_cols, row_stride,
-            n_trials, timeout_hours, stage, done_hashes, fail_hashes,
-            n_features_max=n_features_max, gap_penalty=gap_penalty, direction=direction,
-        )
-    else:
-        best = _search_random(
-            model_id, sd, search_dir, feature_cols, row_stride,
-            n_trials, timeout_hours, stage, done_hashes, fail_hashes,
-            n_features_max=n_features_max, gap_penalty=gap_penalty, direction=direction,
-        )
+    best = _search_optuna(
+        model_id, sd, search_dir, feature_cols, row_stride,
+        n_trials, timeout_hours, stage, done_hashes, fail_hashes,
+        n_features_max=n_features_max, direction=direction,
+    )
 
     if best:
         _write_best_params(search_dir, best)
@@ -856,7 +852,6 @@ def _compact_curves(eval_result: dict, trial_no: int) -> dict:
 # =============================================================================
 def _compute_objective(
     trial_metrics: dict,
-    gap_penalty:   float = 0.0,
     direction:     str   = "long",
 ) -> dict:
     """Compute the search objective from a single trial's metrics.
@@ -864,11 +859,9 @@ def _compute_objective(
     Long:  objective = -valid_ratio_p925 (top 7.5% by score → high MFE for long).
     Short: objective = -valid_ratio_p075 (bottom 7.5% by score → most-negative
            short_mfe for short; dividing two negatives gives ratio > 1 for a good model).
-    With gap_penalty > 0: -(valid_ratio - gap_penalty * max(0, gap)).
 
     Args:
         trial_metrics : Metrics dict from _run_one_trial.
-        gap_penalty   : Weight on train–valid gap penalty (0 = no regularization).
         direction     : "long" or "short" — selects the ratio metric.
 
     Returns:
@@ -883,7 +876,7 @@ def _compute_objective(
 
     train_ratio = float(trial_metrics.get(train_ratio_key, 0.0))
     gap         = train_ratio - float(valid_ratio)
-    penalized   = float(valid_ratio) - gap_penalty * max(0.0, gap)
+    penalized   = float(valid_ratio)
 
     return {
         "objective_score":     -penalized,
@@ -900,42 +893,6 @@ def _compute_objective(
         "valid_mae":           trial_metrics.get("valid_mae"),
         "train_mae":           trial_metrics.get("train_mae"),
     }
-
-
-# =============================================================================
-# Patience stopping helper
-# =============================================================================
-def _check_patience(
-    completed_trials: list[dict],
-    patience:         int = 20,
-    epsilon:          float = 0.001,
-) -> bool:
-    """Return True if patience stopping condition is met.
-
-    Condition: the last `patience` completed trials contain no improvement
-    of at least `epsilon` over the best objective_score seen before them.
-
-    Args:
-        completed_trials : List of completed trial records (chronological order).
-        patience         : Number of trials to look back.
-        epsilon          : Minimum improvement threshold.
-
-    Returns:
-        True if stopping is warranted, False otherwise.
-    """
-    if len(completed_trials) < patience:
-        return False
-
-    recent = completed_trials[-patience:]
-
-    # objective_score is lower=better, so "improvement" is a decrease.
-    def _score(t: dict) -> float:
-        v = t.get("objective_score")
-        return float(v) if v is not None else float("inf")
-
-    best_before = min((_score(t) for t in completed_trials[:-patience]), default=float("inf"))
-    best_recent = min((_score(t) for t in recent), default=float("inf"))
-    return (best_before - best_recent) < epsilon
 
 
 # =============================================================================
@@ -970,98 +927,6 @@ def _select_best_trial(completed_trials: list[dict]) -> dict | None:
 
 
 # =============================================================================
-# Seeded random search
-# =============================================================================
-def _search_random(
-    model_id:       str,
-    sd:             _SearchDataset,
-    search_dir:     Path,
-    feature_cols:   list[str],
-    row_stride:     int,
-    n_trials:       int,
-    timeout_hours:  float | None,
-    stage:          str,
-    done_hashes:    set,
-    fail_hashes:    set,
-    n_features_max: int | None  = None,
-    gap_penalty:    float       = 0.0,
-    direction:      str         = "long",
-) -> dict:
-    rng = np.random.default_rng(seed=42)
-
-    best             = _load_best(search_dir)
-    completed_trials = _load_completed_trials(search_dir)
-    timeout_s        = timeout_hours * 3600 if timeout_hours else None
-    t0               = time.time()
-    completed_count  = 0
-    cons_fails       = 0
-    attempt          = 0
-
-    while completed_count < min(n_trials, _MAX_TRIALS):
-        if timeout_s and (time.time() - t0) > timeout_s:
-            logger.info(f"[Search] Timeout after {completed_count} completed trials")
-            break
-
-        attempt += 1
-        guide    = _build_tpe_guide(completed_trials)
-        params   = _sample_params_random(rng, stage, guide, n_features_max)
-        h        = _make_param_hash(params, len(feature_cols), row_stride)
-
-        if h in done_hashes or h in fail_hashes:
-            continue
-
-        trial_no = len(done_hashes) + len(fail_hashes) + 1
-        logger.info(
-            f"\n[Trial {trial_no:04d}] attempt={attempt}  "
-            f"completed={completed_count}/{n_trials}  "
-            f"guide={'yes' if guide else 'random'}"
-        )
-        logger.info(f"  Params: {_format_params(params)}")
-
-        t_trial = time.time()
-        try:
-            result       = _run_one_trial(trial_no, params, sd, search_dir)
-            obj          = _compute_objective(result, gap_penalty, direction)
-            elapsed      = time.time() - t_trial
-            trial_record = {
-                "trial_no":   trial_no,
-                "param_hash": h,
-                "params":     params,
-                "elapsed_s":  round(elapsed, 1),
-                **obj,
-                "best_iteration":      result.get("best_iteration"),
-                "top20_features":      result.get("top20_features"),
-            }
-
-            _log_trial_result(trial_no, params, trial_record, best)
-            _persist_completed(search_dir, trial_no, trial_record, feature_cols, row_stride)
-            done_hashes.add(h)
-            completed_trials.append(trial_record)
-            completed_count += 1
-            cons_fails       = 0
-            best = _update_best(search_dir, trial_record, best, completed_trials)
-
-        except MemoryError as exc:
-            cons_fails += 1
-            logger.warning(f"[Trial {trial_no}] MemoryError — {exc}")
-            _persist_failed(search_dir, attempt, params, h, "MemoryError", str(exc))
-            fail_hashes.add(h)
-            gc.collect()
-            if cons_fails >= 3:
-                logger.error("[Search] 3 consecutive memory failures — aborting")
-                break
-
-        except Exception as exc:
-            cons_fails += 1
-            logger.warning(f"[Trial {trial_no}] {type(exc).__name__}: {exc}")
-            _persist_failed(search_dir, attempt, params, h, type(exc).__name__, str(exc))
-            fail_hashes.add(h)
-            gc.collect()
-
-    return best or {}
-
-
-# =============================================================================
 # Optuna TPE search
 # =============================================================================
 def _search_optuna(
@@ -1076,10 +941,8 @@ def _search_optuna(
     done_hashes:    set,
     fail_hashes:    set,
     n_features_max: int | None  = None,
-    gap_penalty:    float       = 0.0,
     direction:      str         = "long",
 ) -> dict:
-    import optuna  # type: ignore[import-not-found]
 
     storage_path = search_dir / "optuna_study.db"
     storage      = f"sqlite:///{storage_path}"
@@ -1096,7 +959,7 @@ def _search_optuna(
     completed_trials = _load_completed_trials(search_dir)
     effective_trials = min(n_trials, _MAX_TRIALS)
 
-    def objective(trial: "optuna.Trial") -> float:
+    def objective(trial: optuna.Trial) -> float:
         params = _suggest_optuna_params(trial, stage, n_features_max)
         h      = _make_param_hash(params, len(feature_cols), row_stride)
 
@@ -1108,7 +971,7 @@ def _search_optuna(
 
         t_trial      = time.time()
         result       = _run_one_trial(trial_no, params, sd, search_dir)
-        obj          = _compute_objective(result, gap_penalty, direction)
+        obj          = _compute_objective(result, direction)
         elapsed      = time.time() - t_trial
         trial_record = {
             "trial_no":            trial_no,
@@ -1148,7 +1011,7 @@ def _search_optuna(
 # Parameter sampling
 # =============================================================================
 def _suggest_optuna_params(
-    trial:          "optuna.Trial",
+    trial:          optuna.Trial,
     stage:          str,
     n_features_max: int | None = None,
 ) -> dict:
@@ -1196,102 +1059,6 @@ def _suggest_optuna_params(
         params["feature_k"] = trial.suggest_int("feature_k", 3, n_features_max, log=True)
 
     return params
-
-
-def _sample_params_random(
-    rng:            np.random.Generator,
-    stage:          str,
-    tpe_guide:      dict | None = None,
-    n_features_max: int | None  = None,
-) -> dict:
-    """Sample hyperparameters randomly (fallback when Optuna is unavailable).
-
-    Args:
-        rng       : NumPy random generator.
-        stage     : Search stage (affects num_leaves range).
-        tpe_guide : Optional guide dict from _build_tpe_guide for guided sampling.
-
-    Returns:
-        Dict of hyperparameter name → value.
-    """
-    def log_uni(lo: float, hi: float, center: float | None = None, scale_frac: float | None = None) -> float:
-        if center and scale_frac:
-            log_c  = np.log(center)
-            log_lo = max(np.log(lo), log_c - scale_frac)
-            log_hi = min(np.log(hi), log_c + scale_frac)
-            return float(np.exp(rng.uniform(log_lo, log_hi)))
-        return float(np.exp(rng.uniform(np.log(lo), np.log(hi))))
-
-    def int_log_uni(lo: int, hi: int, center: float | None = None, scale_frac: float | None = None) -> int:
-        return max(lo, min(hi, int(round(log_uni(lo, hi, center, scale_frac)))))
-
-    def uni(lo: float, hi: float, center: float | None = None, scale_frac: float | None = None) -> float:
-        if center and scale_frac:
-            half = (hi - lo) * scale_frac
-            return float(rng.uniform(max(lo, center - half), min(hi, center + half)))
-        return float(rng.uniform(lo, hi))
-
-    g          = tpe_guide or {}
-    leaves_hi  = 31 if stage == "smoke" else 63
-    num_leaves = int_log_uni(3, leaves_hi, g.get("num_leaves"), g.get("_frac"))
-    max_depth  = int(rng.choice([-1, 2, 3, 4, 5, 6, 8]))
-    if max_depth > 0:
-        num_leaves = min(num_leaves, 2 ** max_depth)
-
-    zero_gain      = rng.random() < 0.20
-    min_split_gain = 0.0 if zero_gain else log_uni(1e-5, 0.1)
-
-    result = {
-        "num_leaves":        num_leaves,
-        "max_depth":         max_depth,
-        "min_child_samples": int_log_uni(200, 8000, g.get("min_child_samples"), g.get("_frac")),
-        "min_child_weight":  log_uni(1e-4, 1e-1, g.get("min_child_weight"),  g.get("_frac")),
-        "min_split_gain":    min_split_gain,
-        "reg_alpha":         log_uni(1e-3, 10.0, g.get("reg_alpha"),         g.get("_frac")),
-        "reg_lambda":        log_uni(1.0, 100.0, g.get("reg_lambda"),        g.get("_frac")),
-        "subsample":         uni(0.45, 0.95,     g.get("subsample"),         g.get("_frac")),
-        "colsample_bytree":  uni(0.35, 0.95,     g.get("colsample_bytree"),  g.get("_frac")),
-        "learning_rate":     log_uni(0.005, 0.05, g.get("learning_rate"),    g.get("_frac")),
-        "max_bin":           int(rng.choice([63, 127])),
-        "path_smooth":       log_uni(1e-3, 10.0),
-        "extra_trees":       bool(rng.choice([False, True])),
-    }
-    if n_features_max is not None:
-        result["feature_k"] = int_log_uni(3, n_features_max, g.get("feature_k"), g.get("_frac"))
-    return result
-
-
-def _build_tpe_guide(completed: list[dict], n_startup: int = 20) -> dict | None:
-    """Build a parameter guide from the top-quartile completed trials.
-
-    Args:
-        completed  : List of completed trial records.
-        n_startup  : Minimum trials before building a guide.
-
-    Returns:
-        Guide dict with median params of top-quartile trials, or None.
-    """
-    if len(completed) < n_startup:
-        return None
-    scores = [t["objective_score"] for t in completed if t.get("objective_score") is not None]
-    if not scores:
-        return None
-    threshold = np.percentile(scores, 25)
-    top = [t for t in completed if t.get("objective_score", float("inf")) <= threshold]
-    if not top:
-        return None
-
-    def _median(key: str) -> float | None:
-        vals = [t["params"].get(key) for t in top if t["params"].get(key) is not None]
-        return float(np.median(vals)) if vals else None
-
-    guide = {k: _median(k) for k in (
-        "num_leaves", "min_child_samples", "min_child_weight",
-        "reg_alpha", "reg_lambda", "subsample",
-        "colsample_bytree", "learning_rate", "feature_k",
-    )}
-    guide["_frac"] = 0.5
-    return guide
 
 
 def _make_param_hash(params: dict, n_features: int, row_stride: int) -> str:

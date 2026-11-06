@@ -304,3 +304,9 @@ Legjobb végrehajtás mellett az **emelkedő rezsim long oldala pozitív lett**
 (+2,43 bps/kötés, 568 kötés). A másik három cella továbbra is negatív. A
 mintázat változatlan: **a nyerő irány a trenddel fordul** — ezt kezeli az
 `epic_060` (a rezsim a címke része) és az `epic_062` (a rezsim kiejtése).
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/triple_barrier_eval.py`.

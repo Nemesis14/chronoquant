@@ -19,7 +19,6 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 | `test_insert_ohlcv_filters_columns` | Extra oszlopok csendesen ignorálódnak |
 | `test_query_range_returns_correct_rows` | `query_range()` visszaad 7 napot timestamp BETWEEN-nel |
 | `test_query_range_pl_returns_polars` | `query_range_pl()` Polars DataFrame-et ad vissza |
-| `test_asof_join_predictions_features` | ASOF join helyes sorpárosítást ad |
 | `test_dataset_exists_false_on_empty` | Üres tábla → `dataset_exists() = False` |
 | `test_latest_open_time_returns_max` | `latest_open_time()` a beírt sorok maximumát adja |
 
@@ -53,21 +52,6 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 | `test_rebuild_quant_train_full` | Full rebuild: sorok száma, oszlopok (feat_* + target) megvannak |
 | `test_rebuild_quant_train_range` | Range rebuild: csak a megadott tartomány kerül be |
 | `test_rebuild_quant_train_excludes_null_targets` | NULL target sorok kizárva a quant_train-ből |
-
----
-
-### `test_duckdb_stats_audit.py`
-
-`raw_manifest_audit` és `log_dataset_check` szintetikus adaton és hiányzó DB/tábla esetén.
-
-| Teszt | Mit ellenőriz |
-|-------|---------------|
-| `test_raw_manifest_audit_happy_path` | Nem dob hibát ha az adat megvan |
-| `test_raw_manifest_audit_missing_db` | Nem dob hibát ha a DB fájl hiányzik |
-| `test_raw_manifest_audit_missing_table` | Nem dob hibát ismeretlen táblanévre |
-| `test_log_dataset_check_ohlcv_happy_path` | `log_dataset_check` ohlcv-re nem dob hibát |
-| `test_log_dataset_check_missing_db` | Nem dob hibát ha a DB hiányzik |
-| `test_log_dataset_check_missing_dataset` | Nem dob hibát üres táblára |
 
 ---
 

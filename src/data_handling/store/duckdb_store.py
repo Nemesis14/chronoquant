@@ -258,24 +258,6 @@ def rebuild_quant_train(
         if row[0].startswith("feat_")
     ]
 
-    # Alt-data derivatives features (epic_054) live in their own table so the
-    # OHLCV feature sync can rebuild independently. LEFT JOIN: minutes before
-    # the alt-data archive starts keep NULL features rather than dropping out
-    # of quant_train entirely.
-    alt_cols: list[str] = []
-    if _tbl_exists(conn, "feat_altdata"):
-        alt_cols = [
-            row[0]
-            for row in conn.execute(
-                "SELECT column_name FROM information_schema.columns"
-                " WHERE table_name = 'feat_altdata' ORDER BY ordinal_position"
-            ).fetchall()
-            if row[0].startswith("feat_")
-        ]
-    alt_join = (
-        " LEFT JOIN feat_altdata a ON f.open_time = a.open_time" if alt_cols else ""
-    )
-
     # Target columns are discovered rather than hardcoded so a new horizon
     # (epic_057: fw240) or a new label family (epic_058: tb_label_*) flows
     # through without touching this join again.
@@ -290,7 +272,6 @@ def rebuild_quant_train(
 
     select_parts = ["f.open_time"]
     select_parts += [f'f."{c}"' for c in feat_cols]
-    select_parts += [f'a."{c}"' for c in alt_cols]
     select_parts += [f't."{c}"' for c in target_cols]
     select_cols = ", ".join(select_parts)
 
@@ -303,7 +284,7 @@ def rebuild_quant_train(
             CREATE OR REPLACE TABLE quant_train AS
             SELECT {select_cols}
             FROM feat_ohlcv_quant f
-            INNER JOIN target t ON f.open_time = t.open_time{alt_join}
+            INNER JOIN target t ON f.open_time = t.open_time
             WHERE {null_filter}
         """)
     else:
@@ -313,7 +294,7 @@ def rebuild_quant_train(
                 CREATE TABLE quant_train AS
                 SELECT {select_cols}
                 FROM feat_ohlcv_quant f
-                INNER JOIN target t ON f.open_time = t.open_time{alt_join}
+                INNER JOIN target t ON f.open_time = t.open_time
                 WHERE 1 = 0
             """)
 
@@ -345,7 +326,7 @@ def rebuild_quant_train(
             INSERT INTO quant_train
             SELECT {select_cols}
             FROM feat_ohlcv_quant f
-            INNER JOIN target t ON f.open_time = t.open_time{alt_join}
+            INNER JOIN target t ON f.open_time = t.open_time
             WHERE {' AND '.join(ins_conds)}
             ORDER BY f.open_time
         """,

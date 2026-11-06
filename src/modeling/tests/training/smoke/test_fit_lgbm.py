@@ -74,26 +74,3 @@ def test_save_artifacts_creates_dir_if_missing(tmp_path: Path) -> None:
 def test_fit_raises_for_unknown_model_id() -> None:
     with pytest.raises(ValueError, match="not found in config/models.json"):
         fit_lightgbm_from_search("nonexistent_model_id_xyz")
-
-
-# ---------------------------------------------------------------------------
-# n_estimators formula — pure unit test, no I/O
-# ---------------------------------------------------------------------------
-
-def test_n_estimators_formula() -> None:
-    # mean([100, 200, 300]) * 1.1 = 200.0 * 1.1 = 220.0 -> round = 220
-    fold_summary = [
-        {"best_iteration": 100},
-        {"best_iteration": 200},
-        {"best_iteration": 300},
-    ]
-    best_iterations = [int(f["best_iteration"]) for f in fold_summary]
-    n = round(sum(best_iterations) / len(best_iterations) * 1.1)
-    assert n == 220
-
-
-def test_n_estimators_formula_single_fold() -> None:
-    fold_summary = [{"best_iteration": 150}]
-    best_iterations = [int(f["best_iteration"]) for f in fold_summary]
-    n = round(sum(best_iterations) / len(best_iterations) * 1.1)
-    assert n == 165

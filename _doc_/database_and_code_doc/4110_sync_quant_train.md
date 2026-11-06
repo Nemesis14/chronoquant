@@ -6,7 +6,7 @@ Asset-szintű wrapper a `quant_train` tábla újraépítéséhez. Betölti az as
 megnyitja a DuckDB connectiont, és meghívja a `rebuild_quant_train` store-szintű függvényt.
 
 > Módszertani háttér (quant_train tábla szerepe, NULL policy, rebuild szemantika):
-> → [`../methodology_doc/4000_quant_train.md`](../methodology_doc/4000_quant_train.md)
+> → [`../methodology_doc/4000_quant_train.md`](4100_quant_train.md)
 > Tábla-szintű leírás (séma, mód, CLI): → [`4100_quant_train.md`](4100_quant_train.md)
 
 ---
@@ -88,4 +88,4 @@ uv run python src/data_handling/03_build_quant_train.py --asset-id solusdt
 - [`1110_duckdb_store.md`](1110_duckdb_store.md) — `rebuild_quant_train` store implementáció
 - [`2100_sync_features.md`](2100_sync_features.md) — `feat_ohlcv_quant` forrás tábla
 - [`3100_sync_targets.md`](3100_sync_targets.md) — `target` forrás tábla
-- [`../methodology_doc/4000_quant_train.md`](../methodology_doc/4000_quant_train.md) — módszertani háttér
+- [`../methodology_doc/4000_quant_train.md`](4100_quant_train.md) — módszertani háttér

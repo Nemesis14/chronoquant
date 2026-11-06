@@ -1,9 +1,8 @@
 """Smoke tests for the refactored lgbm_search module (t3).
 
 Covers:
-  - _check_patience() returns the correct bool for various trial histories
   - _select_best_trial() picks the best from a mini trial list (objective min + gap tiebreaker)
-  - Both functions are importable without a real DB or model
+  - The function is importable without a real DB or model
 
 Note: the search objective is ``objective_score`` (lower = better), not the
 legacy ``valid_top10_lift`` (higher = better) — see epic_050 bugfix notes.
@@ -13,55 +12,9 @@ from __future__ import annotations
 
 import pytest
 
-from modeling.search.lgbm_search import _check_patience, _select_best_trial
+from modeling.search.lgbm_search import _select_best_trial
 
 pytestmark = pytest.mark.smoke
-
-
-# ---------------------------------------------------------------------------
-# _check_patience — smoke
-# ---------------------------------------------------------------------------
-
-
-def test_check_patience_returns_false_below_patience_threshold() -> None:
-    """With fewer trials than patience, stopping should never be triggered."""
-    trials = [{"objective_score": float(i) * 0.001} for i in range(10)]
-    assert _check_patience(trials, patience=20, epsilon=0.001) is False
-
-
-def test_check_patience_returns_false_when_improvement_present() -> None:
-    """Patience not triggered when recent trials contain a meaningful improvement."""
-    # 20 old trials at a mediocre objective, 1 recent trial with a much lower (better) objective
-    old    = [{"objective_score": -0.001}] * 20
-    recent = [{"objective_score": -0.001}] * 19 + [{"objective_score": -0.010}]
-    trials = old + recent
-    assert _check_patience(trials, patience=20, epsilon=0.001) is False
-
-
-def test_check_patience_returns_true_when_no_improvement() -> None:
-    """Patience triggered when recent 20 trials don't improve best by epsilon."""
-    # Best before is -0.005; recent 20 are all at -0.005 (delta = 0 < epsilon=0.001)
-    old    = [{"objective_score": -0.005}] * 5
-    recent = [{"objective_score": -0.005}] * 20
-    trials = old + recent
-    assert _check_patience(trials, patience=20, epsilon=0.001) is True
-
-
-def test_check_patience_returns_false_for_empty_trials() -> None:
-    assert _check_patience([], patience=20, epsilon=0.001) is False
-
-
-def test_check_patience_handles_none_lift_without_error() -> None:
-    """Trials with explicit None objective_score must not raise TypeError.
-
-    None values are treated as +inf (worst possible, since lower = better).
-    inf - inf = nan; nan < epsilon is False, so patience is NOT triggered —
-    a conservative safe default.
-    """
-    trials = [{"objective_score": None}] * 25
-    # Must not raise TypeError (regression guard for the None-handling fix)
-    result = _check_patience(trials, patience=20, epsilon=0.001)
-    assert isinstance(result, bool)
 
 
 # ---------------------------------------------------------------------------

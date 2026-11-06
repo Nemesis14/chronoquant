@@ -2,8 +2,8 @@
 
 Az éles (production) folyamat három egymással laza csatolású ciklus: a **sync**
 percenként frissíti az élő adatot, a **live predict** generálja a modell-pontszámokat,
-a **trading service** alkalmazza a kalibrált stratégiát. Mindhárom a `live.duckdb`-n
-kommunikál — közvetlen függőség nélkül.
+az **API/UI** (`src/api`) jeleníti meg a predikciókat és a kalibrált stratégiát (az order-végrehajtó trading service epic_068-ban törölve).
+A sync és a predict a **worker** (`src/worker`) jobjaként is fut (`sync_full`, `sync_predictions`), az API csak olvas a `live.duckdb`-ből.
 
 ---
 
@@ -14,7 +14,7 @@ sequenceDiagram
   participant B as Binance API
   participant S as sync (data_handling)
   participant P as predict (sync_predictions)
-  participant T as trading service
+  participant T as API (src/api, read-only)
   participant DB as live.duckdb
 
   loop percenkent
@@ -24,13 +24,12 @@ sequenceDiagram
     P->>DB: olvassa: quant_train (feat_* + close)
     P->>P: model.pkl + rank_lookup betoltes
     P->>DB: upsert predictions (long_pred, short_pred, long_model_id, short_model_id)
-    T->>DB: olvassa: predictions (legfrissebb sor)
-    T->>T: strategy_artifact + state machine alkalmaz
-    T->>T: trade journal frissit (ha signal keletkezik)
+    T->>DB: olvassa: predictions, ohlcv (RO)
+    T->>T: /api/predictions, /api/market, /api/status
   end
 ```
 
-A trading service soha nem lát részleges `predictions` táblát: a deploy/cutover
+Az API soha nem lát részleges `predictions` táblát: a deploy/cutover
 egyetlen tranzakcióban cseréli az összes sort (lásd lent).
 
 ---
@@ -112,7 +111,7 @@ sequenceDiagram
     Note over SP: 1. feloldja strategy -> model_id_long / short
     Note over SP: 2. betolti model.__pred tablabol a teljes range predikcioit
     Note over SP: 3. BEGIN; DELETE FROM predictions; INSERT INTO predictions; COMMIT
-    Note over SP: (DuckDB MVCC: trading soha nem lat fele tablat)
+    Note over SP: (DuckDB MVCC: az API soha nem lat fele tablat)
     SP->>REG: _activate_deployment (pending -> active, regi -> archived)
   end
 ```
@@ -134,34 +133,20 @@ flowchart TD
   INS -->|"hiba"| ERR
 ```
 
-A DuckDB MVCC biztosítja, hogy a trading service nem lát részleges táblát: vagy
+A DuckDB MVCC biztosítja, hogy az API nem lát részleges táblát: vagy
 a teljes régi állapotot olvassa, vagy a teljesen felváltott új állapotot.
 
 ---
 
-## Trading service
+## API / UI fogyasztás
 
-A trading service a `predictions` táblát olvassa, és a kalibrált `strategy_artifact.json`
-döntési paramétereit alkalmazza. Saját state machine-t futtat.
+Az `src/api` a `predictions` táblát (`/api/predictions/*`), az aktív stratégiát (`/api/strat/active`: `strategy_artifact.json`,
+rank lookup) és a `strat.*` táblákat olvassa read-only; a trade journal (`src/trading/live/journal.py`) és a Binance fill-ek a
+`/api/trades/*` alatt jelennek meg. Az automatikus sync-et a worker ütemezője (`worker.scheduler`) enqueue-olja percenként
+(`ohlcv_sync_delay_seconds` késleltetéssel). Részletek: [8300_api.md](8300_api.md), [8310_worker.md](8310_worker.md).
 
-```mermaid
-stateDiagram-v2
-  [*] --> FLAT
-  FLAT --> LONG : score_pct_long >= long_entry_pct
-  FLAT --> SHORT : score_pct_short >= short_entry_pct
-  LONG --> COOLDOWN : max_hold_minutes, opposite_edge, signal_decay
-  SHORT --> COOLDOWN : max_hold_minutes, opposite_edge, signal_decay
-  COOLDOWN --> FLAT : cooldown_minutes elapsed AND score_pct <= rearm_pct
-```
-
-A service betölti:
-- `strategy_artifact.json` — döntési paraméterek (`decision_params`)
-- `rank_lookup_long/short.parquet` — percentil-kalibráció (raw score → percentil)
-- `isotonic_long/short.pkl` — isotonic kalibráció (alternatív, fallback)
-
-Ezek a fájl-artefaktok az `artifacts/<session_id>/` könyvtárban élnek. A service
-nem olvassa közvetlenül sem a strategy-, sem a predictions-táblát — csak a predictions
-DuckDB táblát és a fájl-artefaktokat.
+Az éles order-logika (state machine, exchange kliens) törölve; a strategy artifactok (`artifacts/<model_id>/strategy/`) ma
+megjelenítési és kutatási célt szolgálnak.
 
 ---
 
@@ -186,6 +171,7 @@ A lab adat (`model.__pred` táblák) megmarad a lab DB-ben — a visszacsere nem
 |------|-----------|
 | Tárolási topológia (3 fájl, sémák) | [0002_data_architecture.md](0002_data_architecture.md) |
 | Modell életciklus (hogyan keletkezik a pred tábla) | [0004_model_lifecycle.md](0004_model_lifecycle.md) |
-| Registry séma + deployments tábla | [1500_registry.md](../methodology_doc/1500_registry.md) |
-| Snapshot + immutability | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
-| Trading state machine | [7100_live_trading.md](../methodology_doc/7100_live_trading.md) |
+| Registry séma + deployments tábla | [1500_registry.md](1500_registry.md) |
+| Snapshot + immutability | [1400_snapshots.md](1400_snapshots.md) |
+| API / UI | [8300_api.md](8300_api.md) |
+| Worker jobok | [8310_worker.md](8310_worker.md) |

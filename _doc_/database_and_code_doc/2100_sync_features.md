@@ -5,7 +5,7 @@
 OHLCV adatok beolvasása, feature pipeline futtatása Polars LazyFrame-mel, majd beírás a `feat_ohlcv_quant` táblába. t-1 lag kötelező az összes OHLCV-alapú feature-re.
 
 > Módszertani háttér (feature engineering rationale, lookahead bias, t-1 lag döntés):
-> → [`../methodology_doc/2000_features.md`](../methodology_doc/2000_features.md)
+> → [`../methodology_doc/2000_features.md`](../methodology_doc/1000_features.md)
 
 ---
 
@@ -71,29 +71,8 @@ Az eltolás után:
 
 ---
 
-## `build_lag_snapshot(db_path, feature_cols, start, end)`
-
-**Célja:** Modeling-ready snapshot készítése ASOF join alapján.
-
-**Paraméterek:**
-
-| Paraméter | Típus | Leírás |
-|-----------|-------|--------|
-| `db_path` | `str` | DuckDB fájl elérési útja |
-| `feature_cols` | `list[str]` | Feature oszlopok listája |
-| `start` | `str` | Időtartomány kezdete |
-| `end` | `str` | Időtartomány vége |
-
-**Visszatérési érték:** `pd.DataFrame` — `predictions` ⋈ `feat_ohlcv_quant` ASOF join eredménye.
-
-**Belső hívás:** `asof_join_predictions_features(db_path, feature_cols, start, end)`
-
-**Felhasználás:** A modeling réteg (`sync_predictions.py` és training pipeline) ezt hívja a feature snapshot elkészítéséhez.
-
----
-
 ## Kapcsolódó dokumentumok
 
 - [`2200_features_polars.md`](2200_features_polars.md) — `_features_polars.py` részletes kód-referencia
 - [`1110_duckdb_store.md`](1110_duckdb_store.md) — `insert_feat_ohlcv_quant` store réteg
-- [`../methodology_doc/2000_features.md`](../methodology_doc/2000_features.md) — feature engineering módszertani háttér
+- [`../methodology_doc/2000_features.md`](../methodology_doc/1000_features.md) — feature engineering módszertani háttér

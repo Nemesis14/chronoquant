@@ -6,7 +6,7 @@ no normalisation. Decoding direction, filtering to BTC and building call_id
 belong to the normalisation step (t3), so that a parser defect never costs a
 re-crawl.
 
-Rate policy (see research/tradingview_poc/README.md):
+Rate policy (see _doc_/research/tradingview_poc.md):
   - 4-8s randomised delay; a fixed interval is a bot fingerprint
   - single threaded, cookie jar + keep-alive, browser User-Agent
   - 429/403 -> immediate hard stop, no retry grinding

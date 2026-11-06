@@ -10,7 +10,7 @@ Ez a kód-referencia a tényleges függvény-API-t írja le; a registry réteg *
 élnek.
 
 > Módszertani háttér (miért, döntések, ER-rationale, paraméter-indoklás):
-> → [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md).
+> → [`../methodology_doc/1500_registry.md`](1500_registry.md).
 > Tárolási topológia (live / lab / registry, ATTACH): `_doc_/database_and_code_doc/0002_data_architecture.md`.
 > Terv: `_doc_/_plans_/data_process_architecture.md` 13.1 (registry, plan 4.2/4.3).
 
@@ -34,7 +34,6 @@ flowchart TD
     OLC["open_lab_connection(lab, live, reg)"]
     UP["upsert"]
     GET["get"]
-    LST["list_rows"]
     SS["set_status"]
     DEL["delete"]
   end
@@ -46,7 +45,7 @@ flowchart TD
   OCC --> ATR
   OLC --> ATL
   OLC --> ATR
-  UP & GET & LST & SS & DEL --> REGDB["reg.<table>"]
+  UP & GET & SS & DEL --> REGDB["reg.<table>"]
 ```
 
 A `registry.py` a katalógus tulajdonosa: a séma a `migrations.py` keretén át jön létre
@@ -152,7 +151,7 @@ A 8 tábla séma-kivonata (minden táblának van `status DEFAULT 'draft'`, `crea
 | `deployments` | `deployment_id` | asset_id, strategy_id, active (BOOLEAN) |
 | `artifacts` | `artifact_id` | owner_id (polimorf), kind, path |
 
-> A teljes ER és az entitás-relációk rationale-ja: [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md).
+> A teljes ER és az entitás-relációk rationale-ja: [`../methodology_doc/1500_registry.md`](1500_registry.md).
 
 ### `_migration_002_deployments_lifecycle(conn)` — v2
 
@@ -305,19 +304,6 @@ flowchart TD
 
 **Visszatérési érték:** `dict[str, Any] | None` — a sor dictként, vagy `None`, ha nincs találat.
 
-### `list_rows(conn, table, status=None, alias="reg")`
-
-**Célja:** Registry-sorok listázása, opcionálisan `status` szerint szűrve.
-
-| Paraméter | Típus | Alap | Leírás |
-|-----------|-------|------|--------|
-| `conn` | `duckdb.DuckDBPyConnection` | — | Connection a registryvel `alias` alatt |
-| `table` | `str` | — | Egy a `REG_TABLES`-ből |
-| `status` | `str \| None` | `None` | Ha megadva, csak az adott státuszú sorok |
-| `alias` | `str` | `"reg"` | A séma alias |
-
-**Visszatérési érték:** `list[dict[str, Any]]` — sor-dictek listája (lehet üres).
-
 ### `set_status(conn, table, pk_value, status, alias="reg")`
 
 **Célja:** Egy registry-sor státuszának frissítése, `updated_at` megújításával. A
@@ -360,7 +346,7 @@ státusz-átmenetek ezen át történnek, nem közvetlen UPDATE-tel.
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Registry módszertan (miért, 8 entitás ER, upsert, status, config-gateway) | [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md) |
+| Registry módszertan (miért, 8 entitás ER, upsert, status, config-gateway) | [`../methodology_doc/1500_registry.md`](1500_registry.md) |
 | Snapshot kód-referencia (a `registry.upsert` egyik hívója) | [`1410_snapshots_code.md`](1410_snapshots_code.md) |
-| Snapshot módszertan | [`../methodology_doc/1400_snapshots.md`](../methodology_doc/1400_snapshots.md) |
+| Snapshot módszertan | [`../methodology_doc/1400_snapshots.md`](1400_snapshots.md) |
 | Tárolási topológia (ATTACH, lab/live/reg) | `_doc_/database_and_code_doc/0002_data_architecture.md` |

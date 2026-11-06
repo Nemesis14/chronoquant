@@ -2,11 +2,9 @@
 
 `src/trading/live/journal.py`
 
-A modul a `trading.db` teljes írható/olvasható szerződése. Minden write tranzakcióban
-fut, a dashboard oldali olvasások pedig ugyanerről a sémáról épülnek.
-
-> Módszertani háttér (journal design, audit trail):
-> → [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md)
+A modul a trading journal (`trading.duckdb`) teljes írható/olvasható szerződése. Minden write tranzakcióban
+fut. Az egykori `TradingService` (író) törölve (epic_068); jelenleg az API olvassa READ_ONLY (`jrn` katalógus,
+`/api/trades/journal/*`, `/api/trades/closed?source=journal`). A write API megmaradt a séma-kontraktus miatt.
 
 ---
 
@@ -14,14 +12,14 @@ fut, a dashboard oldali olvasások pedig ugyanerről a sémáról épülnek.
 
 ```mermaid
 flowchart TD
-  SVC["TradingService"] --> RUN["trading_runs"]
-  SVC --> SIG["trading_signals"]
-  SVC --> POS["trading_positions"]
-  SVC --> ORD["trading_orders"]
-  SVC --> ERR["trading_errors"]
-  UI["Streamlit UI"] --> SIG
-  UI --> POS
-  UI --> RUN
+  W["write API (journal.py)"] --> RUN["trading_runs"]
+  W --> SIG["trading_signals"]
+  W --> POS["trading_positions"]
+  W --> ORD["trading_orders"]
+  W --> ERR["trading_errors"]
+  API["src/api (READ_ONLY jrn)"] --> SIG
+  API --> POS
+  API --> RUN
 ```
 
 ---
@@ -57,7 +55,7 @@ erDiagram
 
 ### `insert_run(...)`
 
-Új service futás indítása.
+Új futás indítása.
 
 Returns: `None`
 
@@ -93,7 +91,7 @@ Returns: `None`
 
 ### `insert_error(...)`
 
-Hibanapló írás; kivétel esetén elnyeli a journal saját hibáját, hogy a service
+Hibanapló írás; kivétel esetén elnyeli a journal saját hibáját, hogy a hívó
 ne essen el másodlagos hibától.
 
 Returns: `None`
@@ -146,6 +144,5 @@ Alacsony szintű export segédek.
 
 ## Kapcsolódó dokumentumok
 
-- [`7120_trading_service.md`](7120_trading_service.md) — journal write hívások kontextusa
-- [`8140_ui_runners.md`](8140_ui_runners.md) — dashboard journal read wrapper
-- [`../methodology_doc/7100_live_trading.md`](../methodology_doc/7100_live_trading.md) — live trading módszertan
+- [`7000_trading.md`](7000_trading.md) — modul-áttekintés
+- [`8300_api.md`](8300_api.md) — az API journal végpontjai

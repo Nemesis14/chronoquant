@@ -60,7 +60,7 @@ flowchart TD
 A `snapshot_id` formátuma: `{asset}_fw{h}_{range}__{hash8}`
 (pl. `solusdt_fw60_2023__a37d2703`).
 
-Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
+Részletek: → [1400_snapshots.md](1400_snapshots.md)
 
 ---
 
@@ -69,24 +69,21 @@ Részletek: → [1400_snapshots.md](../methodology_doc/1400_snapshots.md)
 A sampling az immutable snapshot fölött dolgozik. Forrása a `snap."<snapshot_id>"`
 tábla (nem a `quant_train`), kimenete `model."<model_id>__sample"` DuckDB tábla.
 
-Az aktív champion modellek `train_valid_split` módot használnak: egyetlen kronológiai
-felosztás, `split` TINYINT oszloppal (0=train, 1=valid). A legacy `walk_forward` mód
-`fold_id` TINYINT oszlopot produkál (0=train-only, 1..n=valid fold).
+A modellek az egyetlen támogatott `train_valid_split` módot használják: egyetlen kronológiai
+felosztás, `split` TINYINT oszloppal (0=train, 1=valid). A korábbi `walk_forward` mód törölve (epic_068).
 
 ```mermaid
 flowchart TD
   SNAP["snap.&lt;snapshot_id&gt; (immutable)"]
   HOURLY["hourly select (QUALIFY ROW_NUMBER per hour, seed-del)"]
-  MODE{sampling_mode}
+  MODE{sampling_mode = train_valid_split}
   SPLIT["split indicator\n0=train, 1=valid"]
-  FOLD["fold_id hozzarendeles\nwalk-forward CASE"]
-  SAMP_T["model.&lt;id&gt;__sample\n(open_time + target + split/fold_id)"]
+  SAMP_T["model.&lt;id&gt;__sample\n(open_time + target + split)"]
   FS["reg.feature_sets (selected_cols, n_input, n_selected)"]
   REG_M["reg.models upsert (snapshot_id + feature_set_id, status=sampled)"]
 
   SNAP --> HOURLY --> MODE
   MODE -- train_valid_split --> SPLIT --> SAMP_T
-  MODE -- walk_forward --> FOLD --> SAMP_T
   SAMP_T --> FS --> REG_M
 ```
 
@@ -106,17 +103,16 @@ Részletes invariáns összefoglaló (I1–I7): → [4100_quant_train.md](4100_q
 
 ## 3. Feature Engineering
 
-A feature engineering az adott modell mintáját materializálja egy lokális
-`quant_train` munkatáblába a `snap."<snapshot_id>" ⋈ model."<model_id>__sample"`
-joinból. Kimenete továbbra is egy **logikai feature_set**: a kiválasztott
+A feature engineering (`reports.builders.feature_engineering`, a pipeline `feature_engineering` lépése) az adott modell mintáját a
+`snap."<snapshot_id>" ⋈ model."<model_id>__sample"` joinból tölti be. Kimenete továbbra is egy **logikai feature_set**: a kiválasztott
 oszlopok listája, amelyet a registry tárol.
 
 ```mermaid
 flowchart LR
   SNAP["snap.&lt;snapshot_id&gt;"]
   SAMP["model.&lt;id&gt;__sample"]
-  FE_NB["01_feature_engineering.ipynb (fut, EDA)"]
-  TEMP["temp quant_train\n(sample-scope materializacio)"]
+  FE_NB["reports.builders.feature_engineering\n(szelekcio + riport)"]
+  TEMP["train DataFrame\n(snap JOIN sample)"]
   FS_JSON["feature_set.json (artifacts/)"]
   FS_REG["reg.feature_sets (selected_cols JSON)"]
   JOIN["snap ⋈ model.__sample JOIN\n(search/train input)"]
@@ -167,7 +163,7 @@ az artifact fájlok.
 ```mermaid
 flowchart TD
   TV["snap.&lt;snapshot_id&gt; ⋈ model.&lt;id&gt;__sample"]
-  LGB["LightGBM fit (fold-CV, walk-forward)"]
+  LGB["LightGBM fit (search best params, train+valid sorok)"]
   PKL["model.pkl + features.json + params.json + metrics.json (artifacts/)"]
   REG_T["reg.models UPDATE (status=trained, oos_metric, search_run_id)"]
   ARTS["reg.artifacts INSERT (model.pkl / features / params / metrics / cv_results)"]
@@ -221,9 +217,8 @@ flowchart TD
   OPT_S --> FARTS --> RA
 ```
 
-A live service csak a fájl-artefaktokat tölti be futáskor (`strategy_artifact.json`,
-`rank_lookup_*.parquet`, `isotonic_*.pkl`) — az `strat.*` DuckDB táblák az UI-nak
-és validációnak szólnak.
+A `strategy_artifact.json`, `rank_lookup_*.parquet`, `isotonic_*.pkl` a stratégia kontraktusa (az API `/api/strat/active` olvassa);
+az `strat.*` DuckDB táblák az UI-nak és validációnak szólnak. Az éles order-végrehajtó (live service) törölve.
 
 ---
 
@@ -241,7 +236,7 @@ flowchart TD
   LOAD["model.&lt;long&gt;__pred + model.&lt;short&gt;__pred betoltes lab-bol"]
   TX["BEGIN; DELETE FROM predictions; INSERT INTO predictions (+ stamp); COMMIT"]
   ACT["_activate_deployment: pending -> active, regi -> archived"]
-  LIVE_S["live trading az uj modellel (stamp: long/short_model_id)"]
+  LIVE_S["UI/API az uj modellel (stamp: long/short_model_id)"]
 
   TRIGGER --> PEND --> DETECT --> CUT --> LOAD --> TX --> ACT --> LIVE_S
 ```
@@ -295,10 +290,10 @@ mit lehet újrahasználni:
 |------|-----------|
 | Tárolási topológia (3 fájl, sémák) | [0002_data_architecture.md](0002_data_architecture.md) |
 | Éles folyamat (sync → predict → trade → cutover) | [0003_runtime_flow.md](0003_runtime_flow.md) |
-| Snapshot réteg — miért és hogyan | [1400_snapshots.md](../methodology_doc/1400_snapshots.md) |
-| Registry séma + életciklus | [1500_registry.md](../methodology_doc/1500_registry.md) |
-| Sampling metodológia | [5400_sampling.md](../methodology_doc/5400_sampling.md) |
-| Hyperparameter search | [5500_hyper_param_search.md](../methodology_doc/5500_hyper_param_search.md) |
+| Snapshot réteg — miért és hogyan | [1400_snapshots.md](1400_snapshots.md) |
+| Registry séma + életciklus | [1500_registry.md](1500_registry.md) |
+| Sampling metodológia | [5400_sampling.md](../methodology_doc/3000_sampling.md) |
+| Hyperparameter search | [5500_hyper_param_search.md](../methodology_doc/5000_hyper_param_search.md) |
 | Strategy metodológia | [6000_strategy.md](../methodology_doc/6000_strategy.md) |
 | quant_train tábla + I1-I7 invariánsok | [4100_quant_train.md](4100_quant_train.md) |
 | Sampling kód-ref (create_model_sample) | [5300_create_sample.md](5300_create_sample.md) |

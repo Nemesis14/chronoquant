@@ -1,1 +1,1 @@
-"""Live trading submodule: exchange client, trading service, journal, state, strategy."""
+"""Live trading submodule: journal (trading.duckdb schema and read/write helpers)."""

@@ -6,10 +6,10 @@ A `pipeline.py` a modell fejlesztési pipeline belépési pontja. Egyetlen CLI p
 futtatja az összes lépést sorban, vagy egy kiválasztott lépést önállóan.
 
 > Metodológiai háttér:
-> - [5000_modelling.md](../methodology_doc/5000_modelling.md) — modellezési pipeline overview
-> - [5400_feature_engineering.md](../methodology_doc/5400_feature_engineering.md) — feature engineering módszertan
-> - [5500_sampling.md](../methodology_doc/5500_sampling.md) — sampling módszertan
-> - [5600_model_training.md](../methodology_doc/5600_model_training.md) — training módszertan
+> - [5000_modelling.md](../methodology_doc/0000_overview.md) — modellezési pipeline overview
+> - [5400_feature_engineering.md](../methodology_doc/4000_feature_engineering.md) — feature engineering módszertan
+> - [5500_sampling.md](../methodology_doc/3000_sampling.md) — sampling módszertan
+> - [5600_model_training.md](../methodology_doc/5100_training.md) — training módszertan
 
 Részletes kód-referencia (step implementációk, predict, provenance):
 → [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md)
@@ -23,12 +23,13 @@ flowchart TD
   CLI["pipeline.py\n--model model_id\n--step step"]
   SETUP["setup\nartifact_dir + manifest.json"]
   SAMPLE["sample\nmodel.__sample FROM snap"]
-  FE["feature_engineering\n01_feature_engineering.ipynb via papermill"]
+  FE["feature_engineering\nreports.builders.feature_engineering"]
   SEARCH["search\nlgbm_search.run_search"]
   TRAIN["train\ntrain_model -> model.pkl"]
   PREDICT["predict\npredict_offline -> model.__pred"]
+  ANALYZE["analyze\nreports.builders.* -> reports/"]
 
-  CLI --> SETUP --> SAMPLE --> FE --> SEARCH --> TRAIN --> PREDICT
+  CLI --> SETUP --> SAMPLE --> FE --> SEARCH --> TRAIN --> PREDICT --> ANALYZE
 ```
 
 ---
@@ -54,11 +55,10 @@ uv run python src/modeling/pipeline.py --model <model_id> --step sample --snapsh
 | Argumentum | Default | Leírás |
 |------------|---------|--------|
 | `--model` | kötelező | Modell ID a `config/models.json`-ból |
-| `--step` | `None` (összes) | Egyetlen step futtatása: `setup`, `sample`, `feature_engineering`, `search`, `train`, `predict` |
+| `--step` | `None` (összes) | Egyetlen step futtatása: `setup`, `sample`, `feature_engineering`, `search`, `train`, `predict`, `analyze` |
 | `--stage` | `None` | Search stage: `smoke`, `explore`, `refine` (csak `search` stepnél) |
 | `--n-trials` | `100` | Max Optuna trial (csak `search` stepnél) |
 | `--timeout-hours` | `None` | Falióra korlát órában (csak `search` stepnél) |
-| `--fold-limit` | `None` | Fold limit (search stepnél, stage default-ot felülírja) |
 | `--snapshot` | `None` | Snapshot ID override (sample és feature_engineering stepnél) |
 
 ---
@@ -69,10 +69,11 @@ uv run python src/modeling/pipeline.py --model <model_id> --step sample --snapsh
 |-------|-------|-------|--------|
 | `setup` | `pipeline.step_setup` | `config/models.json` meta | `artifact_dir/manifest.json`; `reg.models` draft sor |
 | `sample` | `modeling.sampling.create_model_sample` | `snap."<snapshot_id>"` + `config/models.json` sampling config | `model."<model_id>__sample"` DuckDB tábla; `reg.feature_sets` bejegyzés |
-| `feature_engineering` | `01_feature_engineering.ipynb` (papermill) | `snap ⋈ model.__sample` | `artifact_dir/feature_engineering/feature_set.json`; executed notebook + HTML |
+| `feature_engineering` | `reports.builders.feature_engineering.build` | `snap ⋈ model.__sample` | `artifact_dir/feature_engineering/feature_set.json`; riport `artifact_dir/reports/02_feature_engineering/` |
 | `search` | `modeling.search.lgbm_search.run_search` | `model.__sample` + `feature_set.json` | `artifact_dir/search/search_best.json`; `reg.search_runs` bejegyzés |
 | `train` | `modeling.training.train.train_model` | `search_best.json` + `feature_set.json` + `snap ⋈ model.__sample` | `artifact_dir/model.pkl`, `features.json`, `params.json`, `metrics.json` |
 | `predict` | `modeling.predict.predict_offline` | `model.pkl` + `features.json` + `snap."<snapshot_id>"` (teljes range) | `model."<model_id>__pred"` DuckDB tábla; `reg.models` status → `predicted` |
+| `analyze` | `pipeline.step_analyze` -> `reports.builders.{sampling,feature_engineering,hyperparameter_search,strategy}` | artifactok (előfeltétel-fájlonként; hiányzót kihagy) | `artifact_dir/reports/{01_sampling,02_feature_engineering,03_hyperparameter_search,04_strategy}/` (report-formátum) |
 
 ```mermaid
 sequenceDiagram
@@ -93,7 +94,7 @@ sequenceDiagram
   SAMPLE ->> DB: model.__sample FROM snap
   SAMPLE ->> DB: reg.feature_sets + reg.models sampled
   CLI ->> FE: model_id, meta, artifact_dir
-  FE ->> FS: feature_set.json, executed notebook, HTML
+  FE ->> FS: feature_set.json, reports/02_feature_engineering/
   FE ->> DB: reg.feature_sets link
   CLI ->> SEARCH: model_id, stage, n_trials
   SEARCH ->> FS: search_best.json
@@ -104,6 +105,7 @@ sequenceDiagram
   CLI ->> PRED: model_id
   PRED ->> DB: model.__pred (full snapshot range)
   PRED ->> DB: reg.models predicted
+  CLI ->> FS: analyze -> reports/*/ (manifest, report.md, charts, tables)
 ```
 
 ---
@@ -112,7 +114,7 @@ sequenceDiagram
 
 A `manifest.json` `pipeline_status` mezője minden lépés után frissül:
 
-`setup` → `sample_done` → `feature_engineering_done` → `search_done` → `train_done` → `predict_done`
+`setup` → `sample_done` → `feature_engineering_done` → `search_done` → `train_done` → `predict_done` → `analyze_done`
 
 ---
 
@@ -121,6 +123,7 @@ A `manifest.json` `pipeline_status` mezője minden lépés után frissül:
 | Fájl | Tartalom |
 |------|----------|
 | [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) | Pipeline step implementációk, predict, provenance részletes kód-ref |
+| [8330_reports.md](8330_reports.md) | `reports.builders.*` (FE és analyze lépések riportjai) |
 | [5510_training.md](5510_training.md) | `train_model()` és training submodule kód-ref |
 | [5520_search.md](5520_search.md) | Hyperparameter search kód-ref |
 | [5300_create_sample.md](5300_create_sample.md) | `create_model_sample` snap-natív sampling kód-ref |

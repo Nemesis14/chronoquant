@@ -1,0 +1,206 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/equity.json",
+        "height": 360,
+        "id": "equity",
+        "title": "Kumulált hozam a validációs periódusban"
+      },
+      {
+        "file": "charts/week_2026_01_26.json",
+        "height": 520,
+        "id": "week_2026_01_26",
+        "title": "Hét 2026-01-26"
+      },
+      {
+        "file": "charts/week_2026_02_02.json",
+        "height": 520,
+        "id": "week_2026_02_02",
+        "title": "Hét 2026-02-02"
+      },
+      {
+        "file": "charts/week_2026_02_09.json",
+        "height": 520,
+        "id": "week_2026_02_09",
+        "title": "Hét 2026-02-09"
+      },
+      {
+        "file": "charts/week_2026_02_16.json",
+        "height": 520,
+        "id": "week_2026_02_16",
+        "title": "Hét 2026-02-16"
+      },
+      {
+        "file": "charts/week_2026_02_23.json",
+        "height": 520,
+        "id": "week_2026_02_23",
+        "title": "Hét 2026-02-23"
+      },
+      {
+        "file": "charts/week_2026_03_02.json",
+        "height": 520,
+        "id": "week_2026_03_02",
+        "title": "Hét 2026-03-02"
+      },
+      {
+        "file": "charts/week_2026_03_09.json",
+        "height": 520,
+        "id": "week_2026_03_09",
+        "title": "Hét 2026-03-09"
+      },
+      {
+        "file": "charts/week_2026_03_16.json",
+        "height": 520,
+        "id": "week_2026_03_16",
+        "title": "Hét 2026-03-16"
+      },
+      {
+        "file": "charts/week_2026_03_23.json",
+        "height": 520,
+        "id": "week_2026_03_23",
+        "title": "Hét 2026-03-23"
+      },
+      {
+        "file": "charts/week_2026_03_30.json",
+        "height": 520,
+        "id": "week_2026_03_30",
+        "title": "Hét 2026-03-30"
+      },
+      {
+        "file": "charts/week_2026_04_06.json",
+        "height": 520,
+        "id": "week_2026_04_06",
+        "title": "Hét 2026-04-06"
+      },
+      {
+        "file": "charts/week_2026_04_13.json",
+        "height": 520,
+        "id": "week_2026_04_13",
+        "title": "Hét 2026-04-13"
+      },
+      {
+        "file": "charts/week_2026_04_20.json",
+        "height": 520,
+        "id": "week_2026_04_20",
+        "title": "Hét 2026-04-20"
+      },
+      {
+        "file": "charts/week_2026_04_27.json",
+        "height": 520,
+        "id": "week_2026_04_27",
+        "title": "Hét 2026-04-27"
+      },
+      {
+        "file": "charts/week_2026_05_04.json",
+        "height": 520,
+        "id": "week_2026_05_04",
+        "title": "Hét 2026-05-04"
+      },
+      {
+        "file": "charts/week_2026_05_11.json",
+        "height": 520,
+        "id": "week_2026_05_11",
+        "title": "Hét 2026-05-11"
+      },
+      {
+        "file": "charts/week_2026_05_18.json",
+        "height": 520,
+        "id": "week_2026_05_18",
+        "title": "Hét 2026-05-18"
+      },
+      {
+        "file": "charts/week_2026_05_25.json",
+        "height": 520,
+        "id": "week_2026_05_25",
+        "title": "Hét 2026-05-25"
+      },
+      {
+        "file": "charts/week_2026_06_01.json",
+        "height": 520,
+        "id": "week_2026_06_01",
+        "title": "Hét 2026-06-01"
+      },
+      {
+        "file": "charts/week_2026_06_08.json",
+        "height": 520,
+        "id": "week_2026_06_08",
+        "title": "Hét 2026-06-08"
+      },
+      {
+        "file": "charts/week_2026_06_15.json",
+        "height": 520,
+        "id": "week_2026_06_15",
+        "title": "Hét 2026-06-15"
+      },
+      {
+        "file": "charts/week_2026_06_22.json",
+        "height": 520,
+        "id": "week_2026_06_22",
+        "title": "Hét 2026-06-22"
+      },
+      {
+        "file": "charts/week_2026_06_29.json",
+        "height": 520,
+        "id": "week_2026_06_29",
+        "title": "Hét 2026-06-29"
+      },
+      {
+        "file": "charts/week_2026_07_06.json",
+        "height": 520,
+        "id": "week_2026_07_06",
+        "title": "Hét 2026-07-06"
+      },
+      {
+        "file": "charts/week_2026_07_13.json",
+        "height": 520,
+        "id": "week_2026_07_13",
+        "title": "Hét 2026-07-13"
+      },
+      {
+        "file": "charts/week_2026_07_20.json",
+        "height": 520,
+        "id": "week_2026_07_20",
+        "title": "Hét 2026-07-20"
+      },
+      {
+        "file": "charts/week_2026_07_27.json",
+        "height": 520,
+        "id": "week_2026_07_27",
+        "title": "Hét 2026-07-27"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/strategy_summary.json",
+        "id": "strategy_summary",
+        "title": "Stratégia paraméterek"
+      },
+      {
+        "file": "tables/weekly_summary.json",
+        "id": "weekly_summary",
+        "title": "Heti összesítő"
+      }
+    ]
+  },
+  "created_at": "2026-11-06T11:25:56Z",
+  "id": "04_strategy",
+  "model_id": "lgbm_solusdt_l_fw60_2101_2607",
+  "order": 40,
+  "schema_version": 1,
+  "scope": "model",
+  "source": {
+    "generator": "reports.builders.strategy",
+    "git_sha": "73f2156",
+    "kind": "pipeline_step",
+    "step": "strategy"
+  },
+  "summary": "Long stratégia: cutoff 0.9, 2682 validációs trade, win rate 0.363.",
+  "tags": [
+    "strategy",
+    "long"
+  ],
+  "title": "Stratégia (validációs periódus)",
+  "updated_at": "2026-11-06T11:27:15Z"
+}

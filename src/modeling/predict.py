@@ -155,9 +155,6 @@ def _load_selected_features(artifact_dir: Path) -> list[str]:
 _PREDICT_CHUNK_SIZE = 250_000
 
 
-_PREDICT_CHUNK_SIZE = 250_000
-
-
 def _score_snapshot_chunked(
     conn              : duckdb.DuckDBPyConnection,
     model             : Any,
@@ -219,52 +216,6 @@ def _score_snapshot_chunked(
         logger.info("predict chunked: %d / %d rows scored", n_written, total_rows)
 
     return n_written
-
-
-def _read_snapshot_features(
-    conn              : duckdb.DuckDBPyConnection,
-    snapshot_id       : str,
-    selected_features : list[str],
-) -> pd.DataFrame:
-    """Read ``open_time`` + the selected feature columns for the full snapshot range.
-
-    The features come from the immutable snapshot (read-only); the snapshot is not
-    modified.  Rows are ordered by open_time so the written pred table is stable.
-    """
-    feat_sql = ", ".join(f'"{c}"' for c in selected_features)
-    return conn.execute(
-        f'SELECT open_time, {feat_sql} FROM {snapshot_table_fqn(snapshot_id)} ORDER BY open_time'
-    ).df()
-
-
-def _score(model: Any, features_df: pd.DataFrame, selected_features: list[str]) -> pd.DataFrame:
-    """Score the model over the snapshot rows -> DataFrame(open_time, pred)."""
-    x_pred = features_df[selected_features]
-    preds  = model.predict(x_pred)
-    return pd.DataFrame({"open_time": features_df["open_time"].to_numpy(), "pred": preds})
-
-
-# %% Pred table write + immutability check
-
-
-def _write_pred_table(conn: duckdb.DuckDBPyConnection, model_id: str, pred_df: pd.DataFrame) -> int:
-    """CREATE OR REPLACE the ``model."<id>__pred"`` table from the scored DataFrame.
-
-    Idempotent: a re-run replaces the table in place (deterministic for a fixed
-    model + immutable snapshot).  Only ``open_time`` and ``pred`` are written.
-    """
-    conn.execute("CREATE SCHEMA IF NOT EXISTS model")
-    fqn = pred_table_fqn(model_id)
-    conn.register("_pred_df", pred_df)
-    try:
-        conn.execute(
-            f"CREATE OR REPLACE TABLE {fqn} AS "
-            "SELECT open_time, CAST(pred AS DOUBLE) AS pred FROM _pred_df ORDER BY open_time"
-        )
-    finally:
-        conn.unregister("_pred_df")
-    row = conn.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()
-    return int(row[0]) if row else 0
 
 
 def _snapshot_content_sha256(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> str:

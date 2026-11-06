@@ -1,8 +1,12 @@
 # 5520 — Hyperparameter Search
 
 A `src/modeling/search/lgbm_search.py` valósítja meg a LightGBM hyperparameter
-keresést fix train/valid split alapon, `valid_top10_lift` objektívvel. Optuna TPE
-(ha telepítve van) vagy seeded random search futtatható.
+keresést fix train/valid split alapon. Objektív: `valid_ratio_p925` (long) / `valid_ratio_p075` (short) —
+a score szerinti felső (alsó) 7,5% átlagos target-értéke osztva az összátlaggal. Optuna TPE (`optuna_study.db`),
+max 100 trial, nincs patience-alapú korai leállás. Quantile objective (`alpha=0.925`) a fix LightGBM paraméterekben.
+
+További belépési pontok: `run_gain_rank(model_id)` (gain szerinti feature rangsor -> `feature_set.json["gain_ranked"]`, joint search
+bemenet) és `run_prune(model_id, feature_key, search_tag)` (nulla split-importance feature-ök elhagyása).
 
 Forrás:
 - [search/lgbm_search.py](../../src/modeling/search/lgbm_search.py)
@@ -18,13 +22,9 @@ flowchart TD
   CLI[pipeline.step_search\n--model --stage --n-trials] --> RS[run_search\nlgbm_search.py]
   RS --> FE[_load_feature_cols\nfeature_set.json]
   RS --> LD[_load_search_dataset\nsnap x model.__sample JOIN\nsplit col: 0=train, 1=valid]
-  RS --> OPTUNA{Optuna\ntelepitve?}
-  OPTUNA -- igen --> OPT[_search_optuna\nTPE sampler]
-  OPTUNA -- nem --> RND[_search_random\nseeded random]
+  RS --> OPT[_search_optuna\nTPE sampler, seed 42]
   OPT --> TRIAL[_run_one_trial\nLightGBM fit\ntrain + valid pred]
-  RND --> TRIAL
-  TRIAL --> OBJ[_compute_objective\nvalid_top10_lift]
-  OBJ --> PAT[_check_patience\npatience=20 stopping]
+  TRIAL --> OBJ[_compute_objective\nvalid_ratio_p925 / p075]
   OBJ --> BEST[_update_best\n_select_best_trial\nsearch_best.json]
   BEST --> PROV[_register_search_provenance\nreg.search_runs + reg.artifacts]
 ```
@@ -42,8 +42,7 @@ flowchart LR
 ## `run_search(model_id, stage, n_trials, timeout_hours, row_stride, retry_failed)`
 
 A fő belépési pont. Betölti a feature listát, betölti az adatot a snap ⋈ model.__sample
-JOIN-ból (split col alapján), majd Optuna TPE vagy seeded random kereséssel iterál
-trial-okon. Patience-alapú korai megállással.
+JOIN-ból (split col alapján), majd Optuna TPE kereséssel iterál a trial-okon (max `_MAX_TRIALS=100`).
 
 | Paraméter | Típus | Default | Leírás |
 |-----------|-------|---------|--------|
@@ -53,9 +52,13 @@ trial-okon. Patience-alapú korai megállással.
 | `timeout_hours` | `float \| None` | `None` | Falióra korlát (nincs ha None) |
 | `row_stride` | `int \| None` | `None` | Sub-sampling stride (None = 1 = minden sor) |
 | `retry_failed` | `bool` | `False` | Korábban hibás trial-ok újrafuttatása |
+| `feature_key` | `str` | `"selected"` | Kulcs a `feature_set.json`-ban |
+| `feature_selection` | `str` | `"joint"` | `fixed` (feature_key lista) vagy `joint` (gain_ranked + `feature_k` Optuna paraméter); a pipeline `fixed`-et ad |
+| `search_tag` | `str \| None` | `None` | `search_<tag>/` könyvtár |
+| `direction` | `str` | `"long"` | `long` -> `ratio_p925`, `short` -> `ratio_p075` |
 
 Returns: `dict` — legjobb trial rekord (`trial_no`, `params`, `objective_score`,
-`valid_top10_lift`, `train_top10_lift`, `train_valid_gap`, `spearman_rho`, stb.).
+`valid_ratio_p925`, `valid_ratio_p075`, `train_valid_gap`, `spearman_rho`, stb.).
 
 ```mermaid
 sequenceDiagram
@@ -63,13 +66,13 @@ sequenceDiagram
   participant R as run_search
   participant FE as _load_feature_cols
   participant LD as _load_search_dataset
-  participant SR as _search_optuna / _search_random
+  participant SR as _search_optuna
   participant PR as _register_search_provenance
 
   P ->> R: model_id, stage, n_trials
   R ->> FE: artifact_dir/feature_engineering/feature_set.json
   R ->> LD: snap x model.__sample JOIN (DuckDB, split col)
-  R ->> SR: sd (_SearchDataset), n_trials, patience
+  R ->> SR: sd (_SearchDataset), n_trials, direction
   SR -->> R: best trial dict
   R ->> PR: model_id, stage, best, search_dir
   R -->> P: best dict
@@ -114,7 +117,7 @@ minden trial újrahasználja — nincs ismételt DB hívás.
 | `train_n` | `int` | Train sorok száma |
 | `valid_n` | `int` | Valid sorok száma |
 
-### `DatasetSplit` (frozen dataclass, `modeling.training.training_windows`)
+### `DatasetSplit` (frozen dataclass, ugyanebben a modulban)
 
 | Mező | Típus | Leírás |
 |------|-------|--------|
@@ -125,85 +128,38 @@ minden trial újrahasználja — nincs ismételt DB hívás.
 
 ---
 
-## Objektív függvény — `valid_top10_lift`
+## Objektív függvény — rank-arány
 
 ```
-objective = valid_top10_lift (magasabb = jobb)
-objective_score = -valid_top10_lift (Optuna minimize irány)
+long : objective_score = -valid_ratio_p925   (mean(y | score >= p92.5) / mean(y))
+short: objective_score = -valid_ratio_p075   (mean(y | score <= p7.5)  / mean(y); két negatív szám hányadosa)
 ```
 
-### Top10 Lift definíció — `_compute_top10_lift(y_true, y_score)`
+`_compute_ratio_p925` / `_compute_ratio_p075`: 0.0, ha a maszk üres vagy az összátlag nem pozitív (long) / nulla (short).
+`_compute_decile_monotonicity`: a szomszédos score-decilis párok aránya, ahol az átlagos target nő.
 
-```
-threshold = percentile(y_score, 90)
-top_mask  = y_score >= threshold
-top10_lift = mean(y_true[top_mask]) - mean(y_true)
-```
-
-A top 10%-os predikciók átlagos y_true értéke mínusz az overall átlag.
-A lift akkor pozitív, ha a modell képes elkülöníteni a magasabb hozamú sorokat.
-
-```mermaid
-flowchart LR
-  SCORE[model predicted scores] --> P90[90th percentile threshold]
-  P90 --> MASK[top 10% mask]
-  MASK --> MEAN_TOP[mean y_true in top 10%]
-  SCORE --> MEAN_ALL[overall mean y_true]
-  MEAN_TOP --> LIFT[lift = mean_top - mean_all]
-```
-
-A `_compute_objective` a trial metrikákból csomagolja az objektívet és az audit metrikákat:
+A `_compute_objective` csomagolja az objektívet és az audit metrikákat:
 
 | Mező | Leírás |
 |------|--------|
-| `objective_score` | `-valid_top10_lift` (lower is better, Optuna minimize) |
-| `valid_top10_lift` | Fő objektív |
-| `train_top10_lift` | Diagnosztikai metrika |
-| `train_valid_gap` | `train_top10_lift - valid_top10_lift` (overfit proxy) |
+| `objective_score` | `-penalized_ratio` (lower is better, Optuna minimize) |
+| `valid_ratio_p925` / `valid_ratio_p075` | Valid rank-arányok |
+| `penalized_ratio` | = a választott irány valid aránya (a korábbi gap_penalty kivezetve) |
+| `train_ratio_p925` / `train_ratio_p075` | Diagnosztika |
+| `train_valid_gap` | `train_ratio - valid_ratio` (overfit proxy) |
 | `spearman_rho` | Spearman korreláció (valid) |
 | `decile_monotonicity` | Szomszédos decilis párok monoton aránya (valid) |
-| `valid_rmse` | RMSE (valid) |
-| `train_rmse` | RMSE (train) |
+| `valid_rmse`, `train_rmse`, `valid_mae`, `train_mae` | Hibametrikák |
 
----
-
-## Patience stopping — `_check_patience`
-
-```mermaid
-flowchart TD
-  N[completed_trials kevesebb mint patience?] -- igen --> CONT[folytatás]
-  N -- nem --> RECENT[utolsó patience trial]
-  RECENT --> BEST_BEFORE[legjobb valid_top10_lift a patience ablak előtt]
-  BEST_BEFORE --> CMP{best_recent - best_before < epsilon?}
-  CMP -- igen --> STOP[stopping: True]
-  CMP -- nem --> CONT2[folytatás: False]
-```
-
-| Konstans | Érték | Leírás |
-|----------|-------|--------|
-| `_PATIENCE` | `20` | Visszatekintési ablak (trial) |
-| `_PATIENCE_EPSILON` | `0.001` | Minimális javulás threshold |
-
-Feltétel: az utolsó `patience` trial-on belül nincs legalább `epsilon` javulás a megelőző
-legjobb `valid_top10_lift`-hez képest → stopping.
+A gap **nem** kemény cutoff — másodlagos preferencia az egyenlő teljesítményű jelöltek között.
 
 ---
 
 ## Legjobb trial kiválasztás — `_select_best_trial`
 
-```mermaid
-flowchart TD
-  VALID[valid_top10_lift is not None szűrés] --> SORT[csökkenő valid_top10_lift szerint rendezés]
-  SORT --> TOP5[top-5 jelölt]
-  TOP5 --> GAP[legkisebb train_valid_gap\ngap = train_top10_lift - valid_top10_lift]
-  GAP --> BEST[legjobb trial]
-```
-
-1. Kizárja a `valid_top10_lift` nélküli trial-okat
-2. Csökkenő `valid_top10_lift` szerint rendez
-3. Top-5 jelöltből a legkisebb `|train_valid_gap|`-et választja
-
-A gap **nem** kemény cutoff — másodlagos preferencia az egyenlő teljesítményű jelöltek között.
+1. Kizárja az `objective_score` nélküli trial-okat
+2. Növekvő `objective_score` (= csökkenő valid arány) szerint rendez
+3. A top-5 jelöltből a legkisebb `|train_valid_gap|`-et választja
 
 ---
 
@@ -214,25 +170,14 @@ majd train + valid predikció és metrika számítás.
 
 **Early stopping:** `lgb.early_stopping(_ES_ROUNDS=100)` — 100 round RMSE javulás nélkül megáll.
 
-**Metrikák:**
-
-| Metrika | Leírás |
-|---------|--------|
-| `train_top10_lift` | Top10 lift a train seten |
-| `valid_top10_lift` | Top10 lift a valid seten (fő objektív) |
-| `train_valid_gap` | `train_top10_lift - valid_top10_lift` |
-| `train_rmse` / `valid_rmse` | RMSE |
-| `train_mae` / `valid_mae` | MAE |
-| `spearman_rho` | Spearman korreláció (valid) |
-| `decile_monotonicity` | Monoton szomszédos decilis párok aránya (valid) |
-| `best_iteration` | LGB best iteration (early stopping után) |
-| `top20_features` | Top 20 feature gain importance |
+**Metrikák:** `train_/valid_ratio_p925`, `train_/valid_ratio_p075`, `train_/valid_rmse`, `train_/valid_mae`, `spearman_rho`,
+`decile_monotonicity`, `best_iteration` (early stopping után), `top20_features` (gain importance).
 
 Learning curve: `trial_curves/trial_NNNN.json` — lecompressálva `_CURVE_MAX_POINTS=100` pontra.
 
 ---
 
-## Paraméter tér — `_suggest_optuna_params` / `_sample_params_random`
+## Paraméter tér — `_suggest_optuna_params`
 
 | Paraméter | Tartomány | Skála |
 |-----------|-----------|-------|
@@ -280,10 +225,10 @@ fájlokból beolvassa a korábbi futások hash-eit — duplikált trial-t nem fu
 | `trial_no` | `int` | Szekvenciális trial szám |
 | `param_hash` | `str` | 16 karakteres SHA256 hash (deduplication kulcs) |
 | `params` | `dict` | Hyperparaméter dict |
-| `objective_score` | `float` | `-valid_top10_lift` (lower is better) |
-| `valid_top10_lift` | `float` | Fő metrika — valid top10 lift |
-| `train_top10_lift` | `float` | Diagnosztikai — train top10 lift |
-| `train_valid_gap` | `float` | `train_top10_lift - valid_top10_lift` (overfit proxy) |
+| `objective_score` | `float` | `-valid_ratio` (lower is better) |
+| `valid_ratio_p925` / `valid_ratio_p075` | `float` | Fő metrika irányonként |
+| `train_ratio_p925` / `train_ratio_p075` | `float` | Diagnosztikai |
+| `train_valid_gap` | `float` | `train_ratio - valid_ratio` (overfit proxy) |
 | `spearman_rho` | `float \| null` | Spearman korreláció (valid) |
 | `decile_monotonicity` | `float` | Monoton decilis arány (valid) |
 | `valid_rmse` | `float` | RMSE (valid) |
@@ -298,7 +243,7 @@ fájlokból beolvassa a korábbi futások hash-eit — duplikált trial-t nem fu
 
 | Fájl | Tartalom |
 |------|----------|
-| [5500_hyper_param_search.md](../methodology_doc/5500_hyper_param_search.md) | Search metodológia |
+| [5500_hyper_param_search.md](../methodology_doc/5000_hyper_param_search.md) | Search metodológia |
 | [5510_training.md](5510_training.md) | Training kód-ref |
 | [5530_pipeline_predict_provenance.md](5530_pipeline_predict_provenance.md) | Pipeline / predict / provenance kód-ref |
 | [5300_create_sample.md](5300_create_sample.md) | Sampling kód-ref (train/valid split kimenet) |

@@ -1,21 +1,7 @@
 {
     "schema_version": 1,
-    "mode": "dry_run",
-    "asset_id": "solusdt",
     "strategy_session_long_id": "lgbm_solusdt_l_fw60_2101_2607/strategy",
     "strategy_session_short_id": "lgbm_solusdt_s_fw60_2101_2607/strategy",
-    "leverage": 10,
-    "quote_order_qty": 10.0,
-    "poll_seconds": 60,
     "ohlcv_sync_delay_seconds": 3,
-    "db_path": "database/trading.duckdb",
-    "risk": {
-        "max_daily_trades": 20,
-        "max_daily_loss_usdt": 30.0,
-        "max_consecutive_errors": 3
-    },
-    "journal": {
-        "report_dir": "trading_reports",
-        "export_on_stop": true
-    }
+    "db_path": "database/trading.duckdb"
 }

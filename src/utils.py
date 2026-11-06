@@ -378,21 +378,17 @@ def load_env_config() -> dict:
 
 
 _CHAT_DEFAULTS: dict = {
-    "model"               : "sonnet",
-    "timeout_s"           : 1800,
-    "persona_prompt_path" : "src/ui/chat/persona_prompt.md",
-    "allowed_bash"        : [
-        "uv run python research/tv_report/*",
-        "uv run python src/data_handling/07_query_readonly.py*",
-    ],
+    "model"     : "sonnet",
+    "timeout_s" : 1800,
 }
 
 
 def load_chat_config() -> dict:
-    """Load UI chat (claude CLI) settings: defaults overlaid with env.json `chat` section.
+    """Load chat (claude CLI) settings: defaults overlaid with env.json `chat` section.
 
-    Keys: model, timeout_s, persona_prompt_path (repo-relative), allowed_bash (list of
-    Bash allowlist patterns, without the `Bash(...)` wrapper).
+    Keys: model, timeout_s, and optionally mcp_url (consumed by `api.chat.runner`).
+    The persona prompt lives next to the runner (`src/api/chat/persona_prompt.md`);
+    the chat has no Bash tool, so there is no Bash allowlist.
     """
     cfg = copy.deepcopy(_CHAT_DEFAULTS)
     cfg.update(load_env_config().get("chat", {}))

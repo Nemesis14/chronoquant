@@ -1,13 +1,13 @@
 # Modeling Agent
 
-Owns model training, evaluation, feature engineering, and prediction pipeline.
+Owns model sampling, training, hyperparameter search, prediction pipeline and strategy calibration.
 
 ---
 
 ## Role
 
 Feature generation logic, model training, cross-validation, prediction artifact
-management, and backtest evaluation. Reads from and writes to the store only
+management. Reads from and writes to the store only
 via the defined interfaces in `src/data_handling/store/`. Does not touch the store layer
 directly or UI code.
 
@@ -31,9 +31,9 @@ Load on demand (only when relevant):
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/5000_modelling.md` — if touching `src/modeling/`
-- `_doc_/5500_hyper_param_search.md` — if touching model search
-- `_doc_/6000_strategy.md` — if touching `src/strategy/`
+- `_doc_/database_and_code_doc/5700_offline_prediction.md`, `_doc_/database_and_code_doc/0004_model_lifecycle.md` — if touching `src/modeling/`
+- `_doc_/database_and_code_doc/6100_strategy_module.md` ... `6140_artifacts.md` — if touching `src/strategy/`
+- `_doc_/database_and_code_doc/8330_reports.md` — a pipeline `feature_engineering`/`analyze` lépései a `src/reports` buildereket hívják
 
 ---
 
@@ -42,15 +42,13 @@ Load relevant module docs (only for affected modules):
 | Path | Responsibility |
 |------|---------------|
 | `src/modeling/` | Training, CV, dataset preparation, model artifacts |
-| `src/modeling/evaluation/` | Backtest, metrics, reporting |
 | `src/strategy/` | Isotonic calibration, Optuna threshold sweep, strategy artifact |
 | `src/data_handling/sync_tables/_features_polars.py` | Feature computation logic |
 | `src/data_handling/sync_tables/sync_features.py` | Feature sync into store |
 | `src/data_handling/sync_tables/sync_predictions.py` | Prediction sync into store |
 | `artifacts/` | Generated model artifacts (`artifacts/<model_id>/`) |
 | `src/modeling/tests/` | Modeling tests for training and sampling |
-| `src/modeling/feature_engineering/tests/` | Feature engineering tests |
-| `_doc_/5xxx*.md`, `_doc_/6000_strategy.md` | Modeling and strategy documentation |
+| `src/modeling/pipeline.py` | Pipeline orchestrator; a `feature_engineering` és `analyze` lépések hívják a `src/reports/builders/*`-t (a builderek tartalma az analyst_agent-é) |
 
 ---
 
@@ -63,7 +61,9 @@ Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 ## Key Patterns
 
 - Feature columns: `feat_` prefix; primary target columns: `long_mfe_fw60`, `short_mfe_fw60`
-- Model naming: `lgbm_{asset}_{direction}_fw{horizon}_q{quantile}_{year}`
+- Model naming: `lgbm_{asset}_{direction}_fw{horizon}_{start}_{end}` (pl. `lgbm_solusdt_l_fw60_2101_2607`); config: `config/models.json`
+- Egyetlen támogatott `sampling_mode`: `train_valid_split`
+- Riportok (sampling, FE, search, strategy) NEM notebookok: `src/reports` builderek -> `artifacts/<model_id>/reports/`
 - Model artifacts: `artifacts/<model_id>/`
 - Candidate evaluation output stays separate from live predictions table
 - Use Polars for feature computation — do not mix with pandas in same step

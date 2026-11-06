@@ -8,7 +8,7 @@ a current champion modellekkel.
 
 > Kapcsolódó kód-referencia: [`1230_sync_predictions.md`](1230_sync_predictions.md) — `sync_predictions()` részletes leírása.
 > Módszertani háttér (predictions pipeline, champion model, deploy/cutover):
-> → [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md)
+> → [`../methodology_doc/1500_registry.md`](1500_registry.md)
 > → [`0003_runtime_flow.md`](0003_runtime_flow.md) — runtime flow és deploy narratíva.
 
 ---
@@ -116,4 +116,4 @@ uv run python src/data_handling/04_backfill_predictions.py --asset-id solusdt
 - [`1230_sync_predictions.md`](1230_sync_predictions.md) — `sync_predictions(backfill=True)` részletes kód-ref
 - [`1530_trigger_deploy.md`](1530_trigger_deploy.md) — deploy trigger CLI
 - [`0003_runtime_flow.md`](0003_runtime_flow.md) — runtime flow, ahol a backfill szerepel
-- [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md) — registry és champion model metodológia
+- [`../methodology_doc/1500_registry.md`](1500_registry.md) — registry és champion model metodológia

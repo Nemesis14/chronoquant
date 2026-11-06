@@ -10,7 +10,7 @@ táblába + `reg.snapshots` sor. Content-hash alapú reuse-detektálás, determi
 dokumentumban élnek.
 
 > Módszertani háttér (miért, döntések, kockázatok, paraméter-indoklás):
-> → [`../methodology_doc/1400_snapshots.md`](../methodology_doc/1400_snapshots.md).
+> → [`../methodology_doc/1400_snapshots.md`](1400_snapshots.md).
 > Tárolási topológia (live / lab / registry, ATTACH): `_doc_/database_and_code_doc/0002_data_architecture.md`.
 > Terv: `_doc_/_plans_/data_process_architecture.md` 13.1 (snapshot réteg, plan 4.1/5/6).
 
@@ -259,7 +259,7 @@ flowchart TD
 
 | Téma | Hivatkozás |
 |------|-----------|
-| Snapshot módszertan (miért, immutability, hash-ek, range, reprodukció) | [`../methodology_doc/1400_snapshots.md`](../methodology_doc/1400_snapshots.md) |
+| Snapshot módszertan (miért, immutability, hash-ek, range, reprodukció) | [`../methodology_doc/1400_snapshots.md`](1400_snapshots.md) |
 | Registry kód-referencia (a `registry.upsert` célja) | [`1510_registry_code.md`](1510_registry_code.md) |
-| Registry módszertan | [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md) |
+| Registry módszertan | [`../methodology_doc/1500_registry.md`](1500_registry.md) |
 | Tárolási topológia (ATTACH, lab/live/reg) | `_doc_/database_and_code_doc/0002_data_architecture.md` |

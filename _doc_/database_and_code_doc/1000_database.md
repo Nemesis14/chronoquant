@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS ohlcv (
 
 **NULL sorok:** Az utolsó 60 sor minden fw60 outcome oszlopban `NULL` — nincs elegendő jövőbeli adat.
 
-**Kód referencia:** [`_doc_/3100_sync_targets.md`](3100_sync_targets.md) | **Metodológia:** [`_doc_/3000_targets.md`](../methodology_doc/3000_targets.md)
+**Kód referencia:** [`_doc_/database_and_code_doc/3100_sync_targets.md`](3100_sync_targets.md) | **Metodológia:** [`_doc_/methodology_doc/2000_targets.md`](../methodology_doc/2000_targets.md)
 
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS predictions (
 
 **CLI:** `uv run python src/data_handling/03_build_quant_train.py [--start YYYY-MM-DD] [--end YYYY-MM-DD]`
 
-**Kód referencia:** [`_doc_/4100_quant_train.md`](4100_quant_train.md)
+**Kód referencia:** [`_doc_/database_and_code_doc/4100_quant_train.md`](4100_quant_train.md)
 
 | Oszlop | Típus | Leírás |
 |--------|-------|--------|

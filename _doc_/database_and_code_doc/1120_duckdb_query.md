@@ -74,37 +74,6 @@ A feature computation (`sync_features.py`) ezt használja a OHLCV adatok betölt
 
 ---
 
-## `asof_join_predictions_features(db_path, feature_cols, start, end)`
-
-**Célja:** ASOF JOIN a `predictions` és `feat_ohlcv_quant` táblák között, modeling-ready snapshothoz.
-
-**Paraméterek:**
-
-| Paraméter | Típus | Leírás |
-|-----------|-------|--------|
-| `db_path` | `str` | DuckDB fájl elérési útja |
-| `feature_cols` | `list[str] \| None` | Feature oszlopok listája (`feat_*`); `None` = összes `feat_*` oszlop |
-| `start` | `str \| None` | Időtartomány kezdete |
-| `end` | `str \| None` | Időtartomány vége |
-
-**Visszatérési érték:** `pd.DataFrame`
-
-**SQL logika:**
-```sql
-SELECT p.open_time AS prediction_ts,
-       f.available_ts AS lookback_end_ts,
-       f.feat_col1, f.feat_col2, ...
-FROM predictions p
-ASOF LEFT JOIN feat_ohlcv_quant f
-    ON p.open_time >= f.available_ts
-WHERE p.open_time BETWEEN ? AND ?
-ORDER BY prediction_ts
-```
-
-Az `available_ts` biztosítja, hogy minden predikció sorhoz csak már elérhető feature-ök csatlakoznak.
-
----
-
 ## `latest_open_time(db_path, dataset)`
 
 **Célja:** A tárolt adatok legújabb timestampje.

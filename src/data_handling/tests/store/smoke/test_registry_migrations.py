@@ -147,8 +147,10 @@ def test_registry_crud_roundtrip(tmp_path: Path) -> None:
         row = registry.get(conn, "assets", "solusdt")
         assert row is not None and row["status"] == "active"
 
-        active = registry.list_rows(conn, "assets", status="active")
-        assert len(active) == 1
+        n_active = conn.execute(
+            "SELECT COUNT(*) FROM reg.assets WHERE status = 'active'"
+        ).fetchone()
+        assert n_active is not None and n_active[0] == 1
 
         registry.delete(conn, "assets", "solusdt")
         assert registry.get(conn, "assets", "solusdt") is None

@@ -1,7 +1,7 @@
 """DuckDB journal for the live trading service.
 
 Stores trading runs, signals, positions, orders, and errors.
-All writes are transactional; reads are safe from Streamlit fragments.
+All writes are transactional; reads are safe from concurrent API readers.
 """
 
 from __future__ import annotations

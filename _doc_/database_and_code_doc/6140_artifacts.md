@@ -12,8 +12,8 @@ Handles all persistence for a strategy session. Two complementary surfaces:
 
 1. **DuckDB tables** in the `strat` schema of the lab database — queried
    directly by the UI (`strat."<session>__trades"`, `__equity`, `__cutoffs`).
-2. **File artifacts** under `artifacts/{session_id}/` — loaded by the live
-   trading service (`strategy_artifact.json`, `isotonic_*.pkl`,
+2. **File artifacts** under `artifacts/{session_id}/` — read by the API
+   (`/api/strat/active`; the live trading service was removed) (`strategy_artifact.json`, `isotonic_*.pkl`,
    `rank_lookup_*.parquet`).
 
 Also writes registry rows to `reg.strategies` and `reg.artifacts`.
@@ -95,11 +95,11 @@ All files reside under `artifacts/{session_id}/`.
 
 | File | Written by | Loaded by |
 |------|-----------|-----------|
-| `strategy_artifact.json` | `write_strategy_artifact` | live trading service |
-| `rank_lookup_long.parquet` | `calibrate.fit_calibration` | live trading service |
-| `rank_lookup_short.parquet` | `calibrate.fit_calibration` | live trading service |
-| `isotonic_long.pkl` | `calibrate.fit_calibration` | live trading service |
-| `isotonic_short.pkl` | `calibrate.fit_calibration` | live trading service |
+| `strategy_artifact.json` | `write_strategy_artifact` | API `/api/strat/active` (megjelenítés) |
+| `rank_lookup_long.parquet` | `calibrate.fit_calibration` | API `/api/strat/active` (megjelenítés) |
+| `rank_lookup_short.parquet` | `calibrate.fit_calibration` | API `/api/strat/active` (megjelenítés) |
+| `isotonic_long.pkl` | `calibrate.fit_calibration` | API `/api/strat/active` (megjelenítés) |
+| `isotonic_short.pkl` | `calibrate.fit_calibration` | API `/api/strat/active` (megjelenítés) |
 | `sweep_results.csv` | `optimize.optimize_strategy` | analyst review only |
 
 ---

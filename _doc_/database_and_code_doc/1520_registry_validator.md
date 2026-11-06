@@ -8,7 +8,7 @@ eltéréseket WARNING szinten loggolja, de nem dob kivételt — a validator rip
 eszköz, nem blocker.
 
 > Módszertani háttér (registry konzisztencia, config-gateway pattern):
-> → [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md)
+> → [`../methodology_doc/1500_registry.md`](1500_registry.md)
 
 ---
 
@@ -120,5 +120,5 @@ if not result.ok:
 ## Kapcsolódó dokumentumok
 
 - [`1510_registry_code.md`](1510_registry_code.md) — registry.py + migrations.py kód-referencia
-- [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md) — registry módszertan (config-gateway, status lifecycle)
+- [`../methodology_doc/1500_registry.md`](1500_registry.md) — registry módszertan (config-gateway, status lifecycle)
 - [`0003_runtime_flow.md`](0003_runtime_flow.md) — deploy/cutover folyamat

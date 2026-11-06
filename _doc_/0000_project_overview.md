@@ -1,12 +1,14 @@
 ﻿# ChronoQuant — Project Overview
 
 Single source of truth for the orchestrator. Detailed module documentation lives
-in three zone subdirectories under `_doc_/` (database_and_code_doc / methodology_doc / models_doc); this file is for cross-domain context only.
+in zone subdirectories under `_doc_/` (database_and_code_doc / methodology_doc / models_doc, plus research/ and reports/); this file is for cross-domain context only.
 
 **Adat-architektúra referenciák (epic_031 DuckDB-natív migráció után):**
 - `_doc_/database_and_code_doc/0002_data_architecture.md` — 3-fájlos tárolási topológia, sémák, ATTACH
-- `_doc_/database_and_code_doc/0003_runtime_flow.md` — éles folyamat: sync → live predict → trade → deploy
+- `_doc_/database_and_code_doc/0003_runtime_flow.md` — éles folyamat: sync → live predict → UI/API → deploy
 - `_doc_/database_and_code_doc/0004_model_lifecycle.md` — modell életciklus: snapshot → sample → FE → search → train → predict → deploy/cutover
+- `_doc_/database_and_code_doc/8300_api.md` ... `8360_scripts.md` — BFF/worker/MCP/reports/sentiment/frontend/scripts referencia (epic_068)
+- `_doc_/_plans_/068_bff_ui.md` — a BFF/UI architektúra kontraktusa
 
 ---
 
@@ -21,52 +23,69 @@ futures on Binance**. The core loop:
    Favorable Excursion) — a continuous logreturn outcome — for long and short direction.
 4. The strategy module calibrates entry/exit rules against model output,
    producing a strategy artifact with isotonic-calibrated scores and Optuna-optimised thresholds.
-5. A Streamlit dashboard consumes live predictions and strategy rules, shows
-   signals, and exposes live trading controls.
+5. Egy **FastAPI BFF** (`src/api`, :8600) szolgálja ki a **React UI**-t (`frontend/`) és a REST/SSE API-t;
+   a dashboard az élő predikciókat, stratégia-szabályokat, tradeket, equity-t, riportokat mutat.
+6. Egy különálló **worker** folyamat (`src/worker`) futtatja a hosszú jobokat (OHLCV/predikció sync, TV hangulat-frissítés),
+   így az API nem blokkol és a DuckDB írója egyetlen processz.
+7. A UI alján/önálló ablakban **Claude chat** fut (helyi `claude` CLI, előfizetés), ami a `chronoquant` MCP szerveren
+   (`src/cq_mcp`, `/mcp/chronoquant`) át, szűk, többnyire csak-olvasó jogosultsággal éri el az adatokat.
 
-Elliott wave analysis (`research/elliott/`) is a parallel research module —
-it does not feed the live trading pipeline.
+Az éles kereskedés order-logikája (live service, exchange kliens, state machine) **törölve** (epic_068); a UI-ban a trade
+journal (`src/trading/live/journal.py`) olvasása és a Binance fill-ek megjelenítése maradt. A korábbi Streamlit UI, a `research/`
+sandbox, az `analyst/` + Quarto láncot és a `docs/` mappa megszűnt (a kutatási tartalom: `_doc_/research/*.md`; a git history: commit `73f2156`).
+Terv/kontraktus: `_doc_/_plans_/068_bff_ui.md`.
 
 ---
 
 ## Module Architecture
 
-Five production modules with clear, non-overlapping responsibilities:
+Termelési modulok, egyértelmű felelősségekkel:
 
 ### `src/data_handling/` — Operational data layer
 Owns all live data: ingestion, storage, sync, and validation.
 - Syncs raw OHLCV from Binance
 - Computes and syncs features, targets, predictions into DuckDB
+- `07_query_readonly.py`: csak-olvasó SQL CLI (live/lab/registry)
 - No modeling logic; no strategy logic
 
 ### `src/modeling/` — Offline ML development
 Produces model artifacts from historical data. Runs ad-hoc, not in production.
 - Snapshot-natív pipeline: `snap."<snapshot_id>"` a forrás; kimenetek DuckDB táblák (`model.__sample`, `model.__pred`) + fájl-artefaktok
-- Outputs: `model.pkl`, `features.json`, `params.json`, `model."<id>__pred"` (offline predikció); registry provenance minden lépésnél
-- Does not operate live; does not decide thresholds or rules
+- Egyetlen támogatott sampling mód: `train_valid_split`
+- Outputs: `model.pkl`, `features.json`, `params.json`, `feature_set.json`, `model."<id>__pred"`; registry provenance minden lépésnél
+- A pipeline `feature_engineering` és `analyze` lépései a `src/reports` buildereket hívják (nem notebook)
 
 ### `src/strategy/` — Offline strategy calibration
 Consumes model artifacts to calibrate trading rules. Runs ad-hoc, not in production.
-- Strategy tábla: `snap ⋈ model_long.__pred ⋈ model_short.__pred` JOIN (parquet-mozgatás nélkül)
-- Calibrates raw regression scores via rank percentile lookup + isotonic regression
-- Optimises entry/exit/cooldown with Optuna (continuous MFE objective)
-- Outputs: `strat."<session>__trades/__equity/__cutoffs"` (lab.duckdb) + `strategy_artifact.json`, `rank_lookup_*.parquet`, `isotonic_*.pkl` (fájl); reg.strategies + reg.artifacts bejegyzés
+- Strategy tábla: `snap ⋈ model_long.__pred ⋈ model_short.__pred` JOIN
+- Rank percentile lookup + isotonic regression; Optuna/grid search entry/exit
+- Outputs: `strat."<session>__trades/__equity/__cutoffs"` (lab.duckdb) + `strategy_artifact.json`, `rank_lookup_*.parquet`, `isotonic_*.pkl`
 
-### `src/trading/` — Live operations only
-Runs the calibrated strategy live. Does not calibrate or optimise — only executes.
-- Reads `predictions` table + `strategy_artifact.json`, applies rules, journals trades
-- Owns: live state machine (FLAT → LONG/SHORT → COOLDOWN), position sizing, trade journal
+### `src/trading/` — Trade journal (csak olvasás a UI-nak)
+Az order-logika törölve. Marad: `src/trading/live/journal.py` (DuckDB trade journal: runs/signals/positions/orders/errors),
+amit az API `/api/trades/journal/*` olvas.
 
-### `src/ui/` — Display layer
-Reads from the database and from artifacts; does not write business data.
-- Shows live predictions, signals, equity curve, trade journal
-- Exposes live trading controls (start/stop, parameter overrides)
-- **Claude chat (epic_066):** az UI egyetlen oldalának alján egy chat-ablak (`src/ui/chat/`, `src/ui/components/chat_panel.py`), ami a helyi, bejelentkezett `claude` CLI-t futtatja headless módban (előfizetés, nem API-kulcs; `ANTHROPIC_API_KEY` env kiszűrve). Jogosultság: Read, WebSearch, WebFetch + szűk Bash allowlist (`research/tv_report/*`, `src/data_handling/07_query_readonly.py`); Edit/Write tiltott; a projekt `.claude` settings nem töltődik be (`--setting-sources ""`). Persona: `src/ui/chat/persona_prompt.md`; tv_market_sentiment workflow: `.agent/skills/tv_sentiment_skill.md`. Konfig: `src/utils.py` → `load_chat_config()` (opcionális `chat` szekció a `config/env.json`-ban)
+### `src/api/` — FastAPI BFF
+REST + SSE (`/api/*`), `/mcp/chronoquant` mount, `frontend/dist` statikus kiszolgálás. Csak olvas (DuckDB RO); írás = worker job.
+Chat: `src/api/chat/` (claude CLI stream-json runner + persona). → `_doc_/database_and_code_doc/8300_api.md`
 
-### `research/` — Sandbox
-Exploratory code, prototypes, and ideas not yet ready for production.
-- `research/elliott/` — Elliott wave parser, validators, scanners (isolated)
-- No code here feeds the live pipeline
+### `src/worker/` — Job worker
+Külön processz (`python -m worker`), SQLite WAL job-sor (`database/_jobs/jobs.sqlite`), auto-sync ütemező. Job kindek: `sync_full`, `sync_predictions`, `sentiment_refresh`. → `8310_worker.md`
+
+### `src/cq_mcp/` — chronoquant MCP szerver
+18 tool (16 olvasó + `enqueue_sync`, `sentiment_refresh`), FastMCP streamable HTTP az API-ban, stdio-n is futtatható. → `8320_cq_mcp.md`
+
+### `src/reports/` — Riport formátum és builderek
+`ReportBuilder` (manifest.json + report.md + charts/*.json (Plotly) + tables/*.json), tároló/olvasó, pipeline-builderek. → `8330_reports.md`
+
+### `src/sentiment/` — TradingView hangulat
+`tv_report/` (fetch, summary, author_backtest CLI); kimenet: `data/tv_report/` (gitignore). A worker `sentiment_refresh` jobja és az MCP `sentiment_*` tooljai használják. → `8340_sentiment.md`
+
+### `frontend/` — React UI
+Vite + React 18 + TypeScript + Tailwind; oldalak: Dashboard, Reports (Elemzések), Chat (+ ChatDock popout). → `8350_frontend.md`
+
+### `scripts/` — PowerShell indítók
+`dev.ps1`, `start.ps1`, `stop.ps1`, `install_autostart.ps1`, `_common.ps1`. → `8360_scripts.md`
 
 ---
 
@@ -102,10 +121,10 @@ deploy/cutover:
   06_trigger_deploy.py  ──▶  reg.deployments (pending)
   sync_predictions      ──▶  predictions (backfill+swap, atomikus tranzakcio)
 
-trading/
-  live loop  ◀──  predictions (live.duckdb)  ◀──  strategy_artifact.json + rank_lookup*.parquet
-
-ui/  ◀──  predictions + strat.* táblák (lab.duckdb ATTACH) + trade journal
+api/ (read-only)  ◀──  live.duckdb + lab.duckdb + registry.duckdb (RO) + trade journal + Binance (fills, cache)
+                  ◀──  artifacts/<model_id>/reports/ és _doc_/reports/ (report manifest + json)
+worker            ──▶  live.duckdb (sync_full / sync_predictions)   ◀── API enqueue (SQLite jobs.sqlite) ◀── UI / MCP
+frontend (React)  ◀──  /api/* (REST + SSE)         chat ──▶ claude CLI ──▶ /mcp/chronoquant (cq_mcp)
 ```
 
 ---
@@ -121,9 +140,11 @@ ui/  ◀──  predictions + strat.* táblák (lab.duckdb ATTACH) + trade journ
 | Offline predictions (teljes range) | `lab.duckdb` model séma (`model."<id>__pred"`) | Snapshot-tól elkülönítve; snap hash sértetlen marad |
 | Strategy tables (trades/equity/cutoffs) | `lab.duckdb` strat séma (`strat."<session>__*"`) | UI és validáció közvetlen query-vel éri el |
 | Registry (provenance lánc) | `registry.duckdb` reg séma | Normalizált igazságforrás; assets → snapshots → models → strategies → deployments |
-| Feature engineering analysis | `artifacts/<model_id>/feature_engineering/` (`.ipynb`, `.html`, `feature_set.json`) | Per-model, analyst output; feature_set.json → reg.feature_sets |
-| Model-specifikus elemzések | `artifacts/<model_id>/analysis/` (`.ipynb`, `.html`) — számozott: `01_sampling`, `02_feature_engineering`, `03_hyperparameter_search`, `04_strategy` | analyst_agent output; konkrét modellhez kötött |
-| Általános adatelemzések | `_doc_/models_doc/XXXX_<slug>.ipynb` + `.html` | analyst_agent output; nem kötött model/session ID-hoz (target, feature, sampling) |
+| Modell-riportok (sampling, FE, hyperparam search, stratégia) | `artifacts/<model_id>/reports/<slug>/` (`manifest.json`, `report.md`, `charts/*.json`, `tables/*.json`) | `src/reports` builderek írják (pipeline lépések), a UI és az MCP olvassa |
+| Általános riportok (nem modellhez kötött) | `_doc_/reports/<slug>/` (ugyanaz a formátum, `scope: general`) | analyst_agent / builder output |
+| Feature set | `artifacts/<model_id>/feature_engineering/feature_set.json` | FE lépés outputja → reg.feature_sets |
+| Worker job-tár | `database/_jobs/jobs.sqlite` (WAL) + `logs/jobs/<id>.log` | Multi-process safe; nem üzleti adat |
+| TV hangulat riport | `data/tv_report/` (gitignore) | `src/sentiment/tv_report` outputja |
 | Model artifacts | `artifacts/<model_id>/` (`manifest.json`, `model.pkl`, `features.json`, `params.json`, `search/`) | Runtime use by prediction sync |
 | Strategy artifacts | `artifacts/<model_id>/strategy/` — `strategy_artifact.json`, `rank_lookup_long/short.parquet`, `isotonic_long/short.pkl`, `grid_results.csv` | Runtime use by live trading loop; útvonalak a reg.artifacts-ban. Külön `strat_*` top-level mappa nem létezik — strategy a modell almappájában él. |
 
@@ -137,84 +158,66 @@ Mindent a registry köt össze. Részletek: → `_doc_/database_and_code_doc/000
 ```
 src/
   data_handling/    Operational data layer
-    store/            DuckDB store, queries, validation, stats
+    store/            DuckDB store, queries, validation, stats, registry
     sync_tables/      OHLCV sync, feature sync, prediction sync, target sync
+    collectors/       Külső adatforrás kliensek (tradingview)
     tests/            Tests (store/, sync_tables/ — smoke, sanity, perf, integration)
-    01_validate_stats.py
-    02_sync_pipeline.py
-    07_query_readonly.py  Read-only SQL CLI (live/lab/registry, 1 statement, csak SELECT-jellegű; a chat használja)
+    01_validate_stats.py ... 07_query_readonly.py  (CLI-k; 07 = csak-olvasó SQL, chat/MCP is használja)
 
   modeling/         Offline ML development
-    sampling/           Yearly sample creation: config, sampler, audit, artifacts
-    training/           LightGBM trainer, CV, datasets, metrics, reports, artifacts
-    evaluation/         Backtest runner, metrics
+    sampling/           train_valid_split sampler (snapshot_sampler, create_sample)
+    training/           LightGBM trainer, CV, artifacts
     search/             Hyperparameter search (LightGBM + Optuna)
-    feature_engineering/  Feature quality, target-relation, redundancy, stability library
-    text/               Future placeholder
-    pipeline.py         Unified pipeline orchestrator (setup|sample|FE|search|train|predict|analyze)
-    00_create_sample.py
-    01_feature_engineering.ipynb
-    02_hyper_param_search.py
-    03_fit_model.py
+    pipeline.py         Unified pipeline orchestrator (setup|sample|feature_engineering|search|train|predict|analyze)
+    predict.py, provenance.py
+    00_create_sample.py, 02_hyper_param_search.py, 03_fit_model.py
 
-  strategy/         Offline strategy calibration (ad-hoc, not in production)
+  strategy/         Offline strategy calibration (ad-hoc)
     strategy/           build_table, calibrate, search, artifacts library
-    tests/              Smoke tests
     00_run_strategy_session.py
 
-  trading/          Live trading operations only
-    live/               TradingService, exchange client, journal, state machine, strategy evaluator
-    01_run_service.py
+  trading/live/journal.py   Trade journal (DuckDB) — az order-logika törölve
 
-  ui/               Streamlit dashboard (pages, components, data loading)
-    chat/               Claude CLI chat: runner.py (stream-json), model.py (UI-state), persona_prompt.md
+  api/              FastAPI BFF: main.py (app factory), routers/, services/, schemas.py, deps.py, errors.py, chat/ (runner + persona_prompt.md), tests/
+  worker/           python -m worker: queue.py (SQLite), runner.py, scheduler.py, logs.py, handlers/, tests/
+  cq_mcp/           chronoquant MCP szerver: server.py + tools_{data,models,jobs,reports,sentiment}.py, tests/
+  reports/          Riport formátum: schema.py, builder.py, store.py, theme.py, builders/ (sampling, feature_engineering, hyperparameter_search, strategy, target_regime), tests/
+  sentiment/        tv_report/ (fetch.py, summary.py, author_backtest.py, paths.py)
   utils.py          All config loading — single entry point, never read JSON directly
 
-research/           Sandbox — explorations not yet production-ready
-  elliott/            Elliott wave parser, validators, scanners, backtest
-
-analyst/            Analyst Python segédmodulok (table_formatting, plot_utils, db_utils, CSS, _quarto.yml, doc_renderer/)
-  notebooks/          4 Quarto template notebook (01_sampling, 02_feature_engineering, 03_hyperparameter_search, 04_strategy) — pipeline instantiálja nbformat+papermill-lel minden modellhez
-_doc_/              Dokumentáció — három zóna + globális gyökér
+frontend/           React UI (Vite, TS, Tailwind): src/{pages,components,api,lib,types}, dist/ (build output, gitignore)
+scripts/            dev.ps1, start.ps1, stop.ps1, install_autostart.ps1, _common.ps1
+_doc_/              Dokumentáció — zónák + globális gyökér
   0000_*, 0001_*      Globális (project overview, agentic rendszer)
   database_and_code_doc/   ZÓNA 1 — DB séma + kód-referencia (.md) — code_doc_agent
   methodology_doc/         ZÓNA 2 — rationale, döntések, módszertan (.md, kód-mentes) — methodology_agent
-  models_doc/              ZÓNA 3 — modellenkénti report (.ipynb→Quarto) — analyst_agent
-  _plans_/                 Draft rendszertervek (nem kanonikus zóna)
+  models_doc/              ZÓNA 3 — modell-elemzések (.md) — analyst_agent
+  research/                Lezárt kutatások/kísérletek md összefoglalói (a kód a git historyban: 73f2156) — analyst_agent
+  reports/                 Általános riportok (report formátum, `scope: general`) — analyst_agent
+  _plans_/                 Tervek (068_bff_ui.md = az implementált BFF kontraktusa)
 _jira_/             Local task tracking (epics → tasks → stories); jira.json = epic counter
 .agent/             Agent rules, skills, tool docs
-config/             JSON config files (assets, features, models, strategies, trading…)
+config/             JSON config files (assets, features, models, strategies, trading, env…)
+data/               Lokális, gitignore-os adatok (pl. data/tv_report/)
+logs/               api/worker logok, logs/jobs/<id>.log
 artifacts/          Model and strategy artifacts
   <model_id>/
     manifest.json                   Pipeline state + model summary
-    metadata.json / audit.json      Sample metadata (written by sample step)
-    sample_train_valid.parquet      Hourly sample: own target + pred_{dir} + all feat_* + fold_id
-    model.pkl / features.json / params.json
-    01_sampling.html                Rendered analysis reports (root-level HTML)
-    02_feature_engineering.html
-    03_hyperparameter_search.html
-    04_strategy.html
-    search/                         Hyperparameter search results (active)
-    _experimental/                  Kísérleti search variánsok (search_joint, search_top10, gp, stb.)
-    feature_engineering/            feature_set.json
-    analysis/                       Numbered Quarto notebooks
-      01_sampling.ipynb             Train/valid sampling analysis
-      02_feature_engineering.ipynb  Feature MI + correlation analysis
-      03_hyperparameter_search.ipynb  Optuna search review
-      04_strategy.ipynb             Strategy signal validation (validation period day charts)
-    strategy/                       Strategy artifacts — strategy session outputjai
+    feature_engineering/feature_set.json; features.json / model.pkl / params.json
+    search/                         Hyperparameter search results
+    reports/<slug>/                 Report-formátum riportok (manifest.json, report.md, charts/, tables/)
+    strategy/                       Strategy artifacts
       strategy_artifact.json        Grid search best setup + decision_params + strat table refs
-      rank_lookup_long.parquet      Rank percentile lookup — score_raw|score_pct|bucket_id|bucket_mean/median/p75_mfe
-      rank_lookup_short.parquet     Rank percentile lookup (short direction)
-      isotonic_long.pkl             Fitted sklearn IsotonicRegression (long direction)
-      isotonic_short.pkl            Fitted sklearn IsotonicRegression (short direction)
-      grid_results.csv              Grid search results: all (direction, entry_cutoff, tp_spec, sl_spec)
+      rank_lookup_long/short.parquet  Rank percentile lookup
+      isotonic_long/short.pkl       Fitted sklearn IsotonicRegression
+      grid_results.csv              Grid search results
 database/           DuckDB files (3-fájlos topológia — részletek: _doc_/database_and_code_doc/0002_data_architecture.md)
   solusdt/
     solusdt.duckdb         <- LIVE (main séma)
     solusdt_lab.duckdb     <- LAB (snap / model / strat sémák)
   _registry/
     registry.duckdb        <- REGISTRY (reg séma, globális)
+  _jobs/jobs.sqlite        <- worker job-tár (SQLite WAL)
 ```
 
 ---
@@ -264,15 +267,15 @@ lgbm_{asset}_{direction}_fw{horizon}_{year}               ← éves modell
 lgbm_{asset}_{direction}_fw{horizon}_{start}_{end}        ← multi-year champion
 ```
 pl. `lgbm_solusdt_l_fw60_2021`, `lgbm_solusdt_s_fw60_2023`
-pl. `lgbm_solusdt_l_fw60_2101_2605` (anchor 2023-01, valid through 2026-05)
+pl. `lgbm_solusdt_l_fw60_2101_2607` (train 2021-01-től, valid 2026-07-ig)
 
-**Active models:** 10 éves modell (2021–2025 × long + short) + 2 champion modell (`lgbm_solusdt_l/s_fw60_2101_2605`) — mind `active: false` amíg nem kerül kiválasztásra élő kereskedésre. Config: `config/models.json` (schema v4).
+**Modellek:** a `config/models.json` (schema v4) az igazság (jelenleg 7 modell, mind `train_valid_split`; aktuális champion pár: `lgbm_solusdt_l/s_fw60_2101_2607`, artifact: `artifacts/lgbm_solusdt_{l,s}_fw60_2101_2607/`).
 
 - **Target semantics:** `fw60` = 60-bar forward window; `long_mfe_fw60` = log(max upside / close[t]); `short_mfe_fw60` = log(min downside / close[t]). Folytonos regressziós target — nincs percentilis küszöb, nincs binarizálás.
 - **Feature prefix:** `feat_` | **t-1 lag mandatory** on all features (prevents data leakage).
 - **Feature engineering target:** only the model's own direction target is used (`l` → `long_mfe_fw60`, `s` → `short_mfe_fw60`).
-- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `sample_train_valid.parquet`, `model.pkl`, `features.json`, `params.json`, `search/`, `feature_engineering/`. Note: `sample_oos.parquet` is **not** produced by the fit step — strategy calibration reads from `quant_train` (DuckDB) directly.
-- **Samples:** model-specifikusak, az artifact mappában élnek. A `sample_train_valid.parquet` a `sample` lépés outputja; a `pred_{dir}` oszlop a `train` lépés után kerül bele.
+- **Artifacts:** `artifacts/<model_id>/` — `manifest.json`, `model.pkl`, `features.json`, `feature_engineering/feature_set.json`, `params.json`, `search/`, `reports/`, `strategy/`. A sample a lab.duckdb-ben él (`model."<id>__sample"`), nem parquet.
+- **Samples:** model-specifikusak, a lab.duckdb `model` sémájában élnek (`model."<id>__sample"`); a predikció `model."<id>__pred"`.
 
 ### Pipeline (runs offline, in order)
 
@@ -281,90 +284,47 @@ pl. `lgbm_solusdt_l_fw60_2101_2605` (anchor 2023-01, valid through 2026-05)
 uv run python src/data_handling/05_create_snapshot.py --asset-id solusdt --start 2021-01-01 --end 2025-12-31
 
 # Teljes pipeline egy modellre:
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607
 
 # Egyes lépések:
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step setup
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step sample
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step feature_engineering
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step search --stage smoke
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step train
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step predict
-uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2021 --step analyze
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step setup
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step sample
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step feature_engineering
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step search --stage smoke
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step train
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step predict
+uv run python src/modeling/pipeline.py --model lgbm_solusdt_l_fw60_2101_2607 --step analyze
 
 # Deploy trigger (dual-session — long és short külön):
-uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_long_2101_2605
-uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_short_2101_2605
+uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_long_2101_2607
+uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id strat_solusdt_fw60_short_2101_2607
 ```
 
 | Lépés | Input | Output |
 |-------|-------|--------|
 | `setup` | `config/models.json` | `manifest.json` (artifact); `reg.models` draft |
 | `sample` | `snap."<snapshot_id>"` (lab.duckdb) | `model."<id>__sample"` (lab.duckdb); `reg.feature_sets`, `reg.models` sampled |
-| `feature_engineering` | `model.__sample` | `feature_engineering/01_fe.ipynb`, `.html`, `feature_set.json` (artifact); `reg.feature_sets` link |
+| `feature_engineering` | `model.__sample` | `feature_set.json` (artifact) + riport `artifacts/<id>/reports/feature_engineering/` (`reports.builders.feature_engineering`); `reg.feature_sets` link |
 | `search` | `model."<id>__train_input"` VIEW | `search/search_best.json`, `search_trials.jsonl` (artifact); `reg.search_runs` |
 | `train` | `model."<id>__train_input"` VIEW | `model.pkl`, `features.json`, `params.json` (artifact); `reg.models` trained |
 | `predict` | `snap."<snapshot_id>"` + `model.pkl` | `model."<id>__pred"` (lab.duckdb); `reg.models` predicted |
+| `analyze` | artifactok + lab/live táblák | report-formátum riportok `artifacts/<id>/reports/` (sampling, hyperparameter_search, strategy) |
 
-### Yearly sample model
+### Sampling (train_valid_split — az egyetlen támogatott mód)
 
-One sample = one calendar year. Sample ID: `{asset_id}_fw60_yearly_{year}`.
+A korábbi `yearly_random_hour` és `walk_forward` módok kikerültek a kódból (`create_sample` ValueError-t dob más módra).
+Fix dátumhatárok a `config/models.json` → `sampling`-ból (`train_start/end`, `valid_start/end`); `split` TINYINT: 0=train, 1=valid.
+Feature lookback embargo: 240 perc a train elején; target purge: utolsó 60 perc a train végéről; valid oldalon nincs embargo.
+Seed=42, óránkénti véletlenszerű perc mintavétel. A valid periódus szándékosan egybeesik a strategy calibrációs ablakkal.
+Módszertan: `_doc_/methodology_doc/`.
 
-**Három sampling mód** van (`config/models.json` → `sampling.sampling_mode`):
-
-| Mód | `sampling_mode` | CV struktúra | Split indicator | Státusz |
-|-----|----------------|--------------|-----------------|---------|
-| Legacy weekly | `yearly_random_hour` (default) | 4-fold random-week, monthly stratified | `fold_id` 1–4 per week | Legacy |
-| Walk-forward | `walk_forward` | 9m train + 3m valid, 3m shift | `fold_id` 1–4 (valid ablak) / `0` (train-only) | Éves modellek |
-| **Train/Valid split** | `train_valid_split` | fix train + fix valid periódus | `split` TINYINT: 0=train, 1=valid | **ACTIVE — champion** |
-
-**Train/Valid split (ACTIVE — epic_039, champion modellek):** fix dátumhatárok a `config/models.json` → `sampling`-ból (`train_start/end`, `valid_start/end`). Feature lookback embargo: 240 perc a train elején. Target purge: utolsó 60 perc a train végéről. Valid oldalon nincs embargo. Seed=42, óránkénti véletlenszerű perc mintavétel.
-
-| Modell típus | sampling_mode | train | valid |
-|---|---|---|---|
-| Éves (2021–2025) | `walk_forward` | 9m (3m shift, 4 fold) | 3m |
-| Champion (`_2101_2605`) | `train_valid_split` | 2021-01-01 – 2025-04-30 | 2025-05-01 – 2026-05-31 |
-
-Champion modellek: a valid periódus szándékosan egybeesik a strategy calibrációs ablakkal (2025-05 – 2026-05).
-
-**Search objective (ACTIVE — epic_039):** Egyszerű valid top10_lift maximalizálása (fold-stability penalty eltávolítva):
-```
-top10_lift = mean(y_true | score ∈ top 10%) − mean(y_true | all valid)
-objective  = valid_top10_lift   [higher is better]
-```
-Train top10_lift minden trial-ban riportált (diagnosztika, nem optimized). Optuna patience stopping: patience=20, epsilon=0.001, max 100 trial. Best trial: legmagasabb valid top10_lift, ahol train-valid gap minimális. Mentve: `search_best.json`, `search_trials.jsonl`.
-
-```
-sample_train_valid.parquet columns (artifacts/<model_id>/):
-  l-irányú model: open_time | long_mfe_fw60  | pred_long  | fold_id/split | feat_* (all)
-  s-irányú model: open_time | short_mfe_fw60 | pred_short | fold_id/split | feat_* (all)
-  — pred_{dir} csak a train step után kerül bele
-  — walk_forward módban: fold_id Int8, 0–4 (0 = train-only)
-  — train_valid_split módban: split TINYINT, 0=train, 1=valid
-```
-
-Features a sample parquetban tárolódnak (all feat_* a train_valid-ban). Nincs DB join training közben.
-Samples are parquet only — no DuckDB materialization.
-Methodology details: `_doc_/5010_sampling_yearly.md`.
+**Search objective:** valid top10_lift maximalizálása (`top10_lift = mean(y_true | score ∈ top 10%) − mean(y_true | all valid)`),
+Optuna patience stopping (patience=20, epsilon=0.001, max 100 trial). A train top10_lift diagnosztika. Mentve: `search_best.json`, `search_trials.jsonl`.
 
 ### OOS evaluation
 
-For **yearly models**, the intended OOS is always a **separate, future calendar year** — not a holdout
-month from the training year. This ensures all seasonal effects are represented in
-the training data, and the OOS is a genuinely unseen period.
-
-```
-2021 model  →  trained on 2021 sample  →  strategy calibration uses 2022 data from quant_train
-2022 model  →  trained on 2022 sample  →  strategy calibration uses 2023 data from quant_train
-...
-```
-
-`uv run python src/modeling/03_fit_model.py --model lgbm_solusdt_l_fw60_2021` produces:
-1. Final model refitted on **all rows** of the 2021 sample (fold_id is CV metadata only).
-2. Updated `sample_train_valid.parquet` with `pred_{dir}` column added.
-
-The `src/strategy/` module scores any date range directly from `quant_train` (DuckDB) using
-the trained `model.pkl` — no pre-computed OOS parquet is needed or produced.
+A `src/strategy/` modul a snapshot adatot a tanított modell `__pred` tábláján át közvetlenül pontozza —
+nincs előre számolt OOS parquet.
 
 ---
 
@@ -397,13 +357,9 @@ Strategy calibration is performed offline by `src/strategy/`, then the artifact 
 - `strat."<session>__summary"` — 1-soros aggregált összesítő (n_trades, total/avg fact_log_return, compounded_return_pct, win_rate)
 - `strat."<session>__grid_results"` — az összes keresési setup eredménye
 
-**Live state machine (`src/trading/live/`) — epic_036 után:**
-- **States:** FLAT → LONG / SHORT → FLAT (COOLDOWN state eltávolítva)
-- Entry: `score_pct_long >= entry_cutoff_long` (long); `(1 - score_pct_short) >= entry_cutoff_short` (short — invertált ranking, mert `short_mfe_fw60 < 0`)
-- Exit: `hold_minutes >= max_hold_minutes` (timeout-only; intrabar TP/SL a live service-ben külön epicben)
-- Service loads two `strategy_artifact.json` files (long + short session) + two rank lookup parquet pairs; converts raw predictions to percentiles via `np.interp` at each bar
-- `config/trading.json`: `strategy_session_long_id` + `strategy_session_short_id` — path-like string az `artifacts/` alá: `"lgbm_solusdt_l_fw60_2101_2605/strategy"` (külön cutoff: long=0.98, short=0.94)
-- ⚠️ Intrabar TP/SL monitoring (bracket order) a live service-ben még nem implementált — külön epic szükséges
+**Éles végrehajtás:** az order-logika (live service, exchange kliens, state machine) epic_068-ban törölve. A `strategy_artifact.json` és
+`config/trading.json` (`strategy_session_long_id/short_id`, cutoffök) továbbra is a stratégia kontraktusa, de nincs futó végrehajtó;
+a UI az aktív stratégiát (`/api/strat/active`), a predikciókat/jeleket és a trade journalt/Binance fill-eket jeleníti meg.
 
 ---
 
@@ -416,9 +372,11 @@ Strategy calibration is performed offline by `src/strategy/`, then the artifact 
 | `uv run pytest src/data_handling/tests/ -v` | Store or pipeline changes |
 | `uv run pytest src/modeling/ -v` | Modeling changes |
 | `uv run pytest src/strategy/tests/ -v` | Strategy calibration changes |
-| `uv run pytest src/trading/tests/ -v` | Live trading service changes |
-| `STREAMLIT_CONFIG_DIR=src/ui uv run streamlit run src/ui/main.py` | UI changes (manual smoke test) |
-| `scripts/start_ui.ps1` / `stop_ui.ps1` | UI indítás/leállítás (rejtett, :8501, logok: `logs/ui.*.log`); Windows-belépéskor `scripts/install_autostart.ps1` task (`ChronoQuantUiAutostart`) indítja |
+| `uv run pytest src/api src/worker src/cq_mcp src/sentiment src/reports` | BFF / worker / MCP / sentiment / report változás |
+| `cd frontend && npx tsc --noEmit && npm run build` | Frontend változás (típusellenőrzés + build) |
+| `scripts\dev.ps1` | Fejlesztői mód: `uvicorn --reload` (:8600) + worker + Vite (:5173), megnyitja a böngészőt |
+| `scripts\start.ps1` (`-NoBrowser`, `-Build`) / `scripts\stop.ps1` | Éles mód: rejtett API (:8600, a `frontend/dist`-et is szolgálja) + worker; logok: `logs/api.*.log`, `logs/worker.*.log` |
+| `scripts\install_autostart.ps1` (`-Uninstall`) | Windows-belépéskor induló Task (`ChronoQuantAutostart`; a régi `ChronoQuantUiAutostart`-ot törli) |
 
 Always run pyright and ruff for the affected module. Never skip for non-trivial changes.
 
@@ -429,12 +387,16 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 - **Config gateway:** all config through `src/utils.py` — no raw JSON reads in `src/`
 - **Active asset:** `solusdt` — do not spend time on inactive asset paths
 - **Polars for features:** feature computation uses Polars; pandas allowed elsewhere
-- **No print() in library code** — use `logging` or `st.*`
+- **No print() in library code** — use `logging`
 - **Upserts only** — no delete/truncate patterns in sync operations
 - **DuckDB-natív:** strukturált adat → DuckDB (séma+tábla); blob/report → fájl; registry köti össze
 - **3-fájlos topológia:** live.duckdb (sync) / lab.duckdb (modellezés) / registry.duckdb (katalógus); ATTACH-cal egyetlen connectionból joinolható
 - **Snapshot = immutable:** a `snap."<snapshot_id>"` tábla tartalma soha nem íródik felül; új adatállapot = új snapshot_id
-- **Elliott and research are isolated** — nothing in `research/` feeds the live pipeline
+- **API csak olvas:** az `src/api` DuckDB-t csak read-only nyit; minden írás worker job (`sync_full`, `sync_predictions`, `sentiment_refresh`)
+- **/api prefix:** minden REST/SSE végpont `/api/*` alatt; MCP: `/mcp/chronoquant`; a SPA fallback nem nyel el `/api/*` 404-et
+- **Riport = fájl-formátum, nem notebook:** manifest.json + report.md + Plotly-JSON charts + JSON tables (`src/reports`); nincs Quarto/papermill
+- **Chat jogosultság:** Read, WebSearch, WebFetch + `chronoquant` MCP; Edit/Write/Bash tiltott
+- **Kutatás = md:** lezárt kísérletek `_doc_/research/*.md` (a kód a git historyban), nem futtatható sandbox
 
 ---
 
@@ -444,8 +406,8 @@ Always run pyright and ruff for the affected module. Never skip for non-trivial 
 |-------|------|
 | Database Agent | `src/data_handling/`, `config/assets.json`, DuckDB schema |
 | Modeling Agent | `src/modeling/`, feature computation, model artifacts; `src/strategy/` |
-| UI Agent | `src/ui/`, `src/trading/` |
+| UI Agent | `src/api/`, `src/worker/`, `src/cq_mcp/`, `src/sentiment/`, `frontend/`, `src/trading/` (journal), `scripts/` |
 | Code Doc Agent | `.agent/`, tooling, infra, dependencies; `_doc_/database_and_code_doc/` (DB séma + kód-referencia zóna) |
-| Analyst Agent | `artifacts/<model_id>/analysis/` és `artifacts/<session_id>/analysis/` (modell/stratégia-specifikus elemzések); `_doc_/models_doc/` (általános adatelemzések); `analyst/` (Python segédmodulok: `table_formatting`, `plot_utils`, `db_utils`, CSS, `_quarto.yml`, `doc_renderer/`); user-célból indul, nem spec-ből; interaktív session |
+| Analyst Agent | `src/reports/` builderek (pipeline-lépések riportjai), `_doc_/research/`, `_doc_/models_doc/`, `_doc_/reports/` — user-célból indul, interaktív session |
 | Methodology Agent | `_doc_/methodology_doc/` — business rationale, methodological decisions, parameter justification (kód-mentes) |
 | Validator Agent | `pr_` ticket validation: ruff + pyright + pytest, then `done_` promotion |

@@ -441,14 +441,11 @@ Az aktuális modell **nem** frissíti a K-means centroideket az új adatokkal �
 
 - `_doc_/_plans_/plan.md` — Epic 065 teljes módszertani terv
 - `_jira_/epic_065_cluster_regime_strategy/epic.md` — Epic cél és tasklista
-- `artifacts/research_cluster_regime/oos_validation_results.json` — t867 statisztikai eredmények
+- t867 statisztikai eredmények: a `_doc_/research/cluster_regime.md` oldalon (a korábbi `artifacts/research_cluster_regime/oos_validation_results.json` törölve)
 
 ### Adatok Repozitóriuma
 
-- Train/Valid data: `research/cluster_regime/data/training_{train,valid}_periods.parquet`
-- OOS data: `research/cluster_regime/data/oos_validation_periods.parquet`
-- Klaszter-modell: `artifacts/research_cluster_regime/kmeans_model_k3_random42.pkl`
-- Feature-készlet: `artifacts/research_cluster_regime/selected_features_14dim.json`
+A train/valid/OOS periódusok, a klaszter-modell és a feature-készlet részletei (a korábbi `research/cluster_regime/` és `artifacts/research_cluster_regime/` útvonalak törölve) a `_doc_/research/cluster_regime.md` oldalon találhatók.
 
 ### Számítási Metodológia (Auditálható)
 

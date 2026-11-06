@@ -6,7 +6,7 @@ Minden `sync_targets` hívás teljes rebuild — DELETE+INSERT az összes tárol
 A régi bináris `trg_*` target rendszer eltávolítva (epic-011).
 
 > Módszertani háttér (fw60 forward outcome definíció, target rationale, lookahead bias protection):
-> → [`../methodology_doc/3000_targets.md`](../methodology_doc/3000_targets.md)
+> → [`../methodology_doc/3000_targets.md`](../methodology_doc/2000_targets.md)
 
 ---
 

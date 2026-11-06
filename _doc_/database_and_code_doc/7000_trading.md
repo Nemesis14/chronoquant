@@ -1,8 +1,11 @@
-# 7000 - Trading
+# 7000 - Trading (trade journal)
 
-A `src/trading/` modul a strategy artifact live alkalmazó rétege: percenként
-friss adatot szinkronizál, a nyers predikciókat percentilissé alakítja, majd
-pozíciót nyit/zár és a teljes futást `trading.db`-be naplózza.
+A `src/trading/` modulból epic_068 után kizárólag a **trade journal** maradt: `src/trading/live/journal.py`
+(DuckDB, `config/trading.json` -> `db_path`, jelenleg `database/trading.duckdb`).
+
+Az éles order-logika törölve (live `TradingService`, exchange kliens, state machine / decision engine, `01_run_service.py`);
+a kód a git historyban él (commit `73f2156`). A strategy artifactok (`strategy_artifact.json`, rank lookup) továbbra is léteznek,
+de nincs futó végrehajtó.
 
 ---
 
@@ -10,43 +13,28 @@ pozíciót nyit/zár és a teljes futást `trading.db`-be naplózza.
 
 ```mermaid
 flowchart TD
-  CFG["config/trading.json"]
-  PRED["predictions tábla"]
-  ART["artifacts/<session_id>/strategy_artifact.json<br/>rank lookup parquetek"]
-  CLI["01_run_service.py"]
-  SVC["TradingService"]
-  DEC["live/strategy.py<br/>decision engine"]
-  EX["live/exchange.py<br/>Binance client"]
-  JRN["live/journal.py<br/>trading.db"]
+  CFG["config/trading.json\ndb_path, strategy_session_*_id"]
+  JRN["live/journal.py\ntrading.duckdb"]
+  API["src/api: /api/trades/journal/*\n(jrn katalógus, READ_ONLY)"]
+  UI["frontend: Dashboard trade tabok"]
 
-  CFG --> CLI --> SVC
-  PRED --> SVC
-  ART --> SVC --> DEC
-  SVC --> EX
-  SVC --> JRN
+  CFG --> JRN
+  JRN --> API --> UI
 ```
-
----
 
 ## Felelősség
 
-- Live loop futtatása a `strategy_session_id` alapján.
-- Raw predikciók rank-percentile transzformációja a strategy artifact lookupjai szerint.
-- Entry/exit/cooldown döntések végrehajtása.
-- Folyamatos journal írás `trading_runs`, `trading_signals`, `trading_positions`,
-  `trading_orders`, `trading_errors` táblákba.
+- A journal séma (`trading_runs`, `trading_signals`, `trading_positions`, `trading_orders`, `trading_errors`) és írási/olvasási API-ja.
+- Az API a journalt READ_ONLY `jrn` katalógusként csatolja (`api.deps`); a tábla hiánya üres oldalt ad.
 
 ## Nem feladata
 
-- Strategy kalibráció vagy Optuna optimalizáció.
-- Modelltanítás vagy score kalibráció újrafit.
-- UI megjelenítés.
+- Order placement, pozíció-kezelés (törölve).
+- Strategy kalibráció (`src/strategy`), UI megjelenítés (`frontend/`).
 
 ## Fejezetek
 
-| Szám | Fájl | Tartalom | Szint |
-|------|------|----------|-------|
-| 7100 | [7100_live_trading.md](7100_live_trading.md) | Runtime metodológia és almodul-térkép | X100 |
-
-Részletes kódszintű bontás külön a code-doc zónában él; a methodology zóna itt
-szándékosan csak a runtime döntési és operációs elveket rögzíti.
+| Szám | Fájl | Tartalom |
+|------|------|----------|
+| 7130 | [7130_trading_journal.md](7130_trading_journal.md) | Journal séma, write/read/export API |
+| 8300 | [8300_api.md](8300_api.md) | `/api/trades/*` végpontok |

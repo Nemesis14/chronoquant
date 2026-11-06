@@ -136,3 +136,9 @@ belépéssel számol. A `src/trading/live/` belépési logikája szintén market
 order. Mindkettőt maker-alapúra kell állítani — de **csak akkor**, ha a
 lift-oldali epic-ek valamelyike átbillenti a rendszert pozitívba. Addig ez
 egy mérési eredmény, nem üzemeltetési változás.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/{triple_barrier_eval,walk_forward_tb}.py`.

@@ -111,6 +111,10 @@ Developer agents do not write tests — this is the Validator Agent's responsibi
 
 ```powershell
 uv run pytest src/<affected_module>/tests/ -v
+# BFF/worker/MCP/sentiment/reports modulok (epic_068):
+uv run pytest src/api src/worker src/cq_mcp src/sentiment src/reports
+# frontend változásnál (nincs JS tesztfutó, a típusellenőrzés + build a kapu):
+cd frontend && npx tsc --noEmit && npm run build
 ```
 
 Fix test failures that are small: off-by-one errors, wrong defaults, minor type

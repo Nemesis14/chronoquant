@@ -575,7 +575,6 @@ def _load_model_artifacts(
     feature_list = _feature_list_for_prediction(
         features_data = features_data,
         model         = model,
-        trainer       = model_meta.get("trainer", ""),
     )
     return model, feature_list
 
@@ -597,12 +596,9 @@ def _run_inference(
     Returns:
         Array-like of probability values aligned to df rows.
     """
-    trainer        = model_meta.get("trainer", "")
     predict_method = model_meta.get("predict", {}).get("method", "predict")
 
     X = df.select(feature_list).fill_nan(0.0).fill_null(0.0).to_numpy()
-    if trainer.startswith("statsmodels") and "const" not in feature_list:
-        X = np.column_stack([np.ones(len(X)), X])
 
     if predict_method == "predict_proba":
         proba: Any = model.predict_proba(X)  # type: ignore[union-attr]
@@ -617,22 +613,17 @@ def _run_inference(
 def _feature_list_for_prediction(
     features_data : dict | list,
     model         : object,
-    trainer       : str = "",
 ) -> list[str]:
     """Resolve the ordered feature list for prediction from artifact metadata.
 
     Args:
         features_data : Loaded features.json payload (dict or list).
         model         : Loaded model object (may expose feature_names_in_).
-        trainer       : Trainer string from model metadata.
 
     Returns:
         Ordered list of feature column names.
     """
     payload_features = _features_from_payload(features_data)
-    if trainer.startswith("statsmodels"):
-        return payload_features
-
     input_features = (
         features_data.get("input_features")
         if isinstance(features_data, dict)

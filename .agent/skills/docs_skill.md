@@ -31,7 +31,9 @@ _doc_/
     1xxx–8xxx *.md               ← per-module code reference, DB schema
   methodology_doc/               ← ZONE 2 — rationale, decisions, methodology
     1xxx–8xxx *.md               ← per-module methodology docs
-  models_doc/                    ← ZONE 3 — per-model reports (.ipynb → Quarto)
+  models_doc/                    ← ZONE 3 — model analyses (.md; analyst_agent)
+  research/                      ← closed research summaries (.md; analyst_agent)
+  reports/                       ← general reports in the report format (manifest + md + chart/table JSON; analyst_agent)
 
   _plans_/                       ← draft system plans (not a canonical zone)
 ```
@@ -48,7 +50,7 @@ or data flow, or in `methodology_doc/` if it is rationale-only.
 |------|---------------|---------|--------|--------|
 | `database_and_code_doc/` | **code_doc_agent** (exclusive) | DB schema, code reference; mermaid/UML; every function broken down | DB schema + X110 code-reference (incl. code-type X100, e.g. `2100_sync_features`, `4100_quant_train`) | `.md` |
 | `methodology_doc/` | **methodology_agent** (exclusive) | Rationale, decisions, methodology; many diagrams; **nothing about code** | X000 domain overviews + X010–X099 methodology + methodology-type X100 | `.md` |
-| `models_doc/` | **analyst_agent** (exclusive) | One report per model, references methodology; Quarto + CSS + plot palette | per-model | `.ipynb` (+ rendered `.html`) |
+| `models_doc/`, `research/`, `reports/` | **analyst_agent** (exclusive) | Model analyses, closed research summaries (`.md`); general reports in the `src/reports` format (`reports/<slug>/`) | per-model / per-topic | `.md`; report folder |
 
 **Single-writer rule:** no agent writes into another agent's zone. If a doc needs
 content from another zone, **link** to it — do not duplicate or cross-write.
@@ -62,7 +64,7 @@ A file lands in the zone matching its **dominant content type**:
   `3100_sync_targets`, `4100_quant_train`, and the entire 1xxx infrastructure block).
 - **Methodology / rationale** — describes *why*, decisions, alternatives, parameters, with
   **no code** → `methodology_doc/` (X000 domain overviews, X010 methodology, methodology X100).
-- **Per-model analysis report** → `models_doc/` as a notebook.
+- **Per-model analysis / research summary** → `models_doc/` or `research/` as `.md`; structured reports → `_doc_/reports/` or `artifacts/<model_id>/reports/` (report format).
 
 ---
 
@@ -92,17 +94,18 @@ spec lives in `.agent/skills/methodology_doc_skill.md`.
 
 ---
 
-## models_doc — registry + rendered report
+## models_doc / reports — registry-driven analyses
 
-Zone 3 is **not** hand-maintained markdown. Each model gets **one `.ipynb`** that:
+Zone 3 is **not** hand-maintained per-instance markdown. Per-model reports are produced by the `src/reports` builders
+(`ReportBuilder`: manifest.json + report.md + Plotly chart JSON + table JSON) and live in `artifacts/<model_id>/reports/`;
+general ones in `_doc_/reports/`. They:
 
-- pulls per-instance data from the **registry + model artifact** (the modeling_agent is
-  the *source*; the analyst_agent is the *owner/renderer*),
-- references the relevant `methodology_doc` pages for the "why",
-- renders to `.html` via Quarto (CSS + plot palette in `analyst/`).
+- pull per-instance data from the **registry + model artifact + DuckDB** (modeling_agent is the *source*; analyst_agent the *owner*),
+- reference the relevant `methodology_doc` pages for the "why",
+- are rendered by the React UI (`/reports`) — there is no Quarto/notebook/HTML render step (removed in epic_068).
 
 **Per-instance data never grows the `_doc_` tree as static markdown** — 50 models must
-not mean 50 hand-written pages. The data comes from registry queries; the report renders it.
+not mean 50 hand-written pages. Format: `_doc_/database_and_code_doc/8330_reports.md`.
 
 ---
 
@@ -141,8 +144,7 @@ A new code doc must get a number higher than its related methodology doc.
 ## Navigation
 
 There is **no separate TOC-index file**. Navigation relies on the speaking, numbered
-filenames + `Glob`/`Grep`. The consolidated Quarto render (`analyst/doc_renderer/`)
-provides the reading-order TOC for the HTML output.
+filenames + `Glob`/`Grep`. Reading order = the topic-number order of the filenames.
 
 ---
 
@@ -189,31 +191,8 @@ sequenceDiagram
 - Prefer **multiple simple diagrams** over one complex one
 - Every diagram must be readable without rendering (label all nodes)
 - Max ~15 nodes per diagram; split if larger
-- Avoid emoji/status glyphs inside Mermaid node labels (`✅`, `❌`, `⚠️`).
-  Quarto's bundled Mermaid renderer may parse them as syntax errors. Use
-  `OK:`, `NO:`, and `WARN:` inside Mermaid nodes; emoji can remain in normal
-  markdown tables.
-- For rendered Quarto HTML readability, Mermaid sizing is controlled by
-  `analyst/chronoquant_analysis.css`. Keep diagrams within the report body:
-  wrapper elements and `svg.mermaid-js` should fill `100%` width with
-  `height: auto`; do not use a desktop-only width that exceeds the body unless
-  the user explicitly asks for horizontal overflow.
-
-### Quarto TOC / Mermaid Render Notes
-
-- `_chronoquant_docs.ipynb` is generated by
-  `analyst/doc_renderer/build_doc_notebook.py`; it walks the three zones in
-  topic-number order. Its Raw-cell frontmatter can override `analyst/_quarto.yml`.
-  When changing global doc layout, update both if the generated notebook must keep the setting.
-- Current working TOC grid for consolidated docs: `sidebar-width: 380px`,
-  `body-width: 900px`, `margin-width: 140px`, `gutter-width: 2rem`.
-- The left TOC needs both enough sidebar grid width and CSS width. In
-  `analyst/chronoquant_analysis.css`, keep `nav#TOC { width: 100%; font-size:
-  0.92rem; }` for readable, less-wrapped TOC labels.
-- Mermaid diagrams render as `pre.mermaid-js` converted to `svg.mermaid-js` by
-  Quarto at page load. If a diagram appears tiny despite `svg { width: 100% }`,
-  also set the intermediate `.cell-output-display` / `figure` wrappers to
-  `width: 100%`; otherwise the SVG expands only inside a shrink-to-fit wrapper.
+- Avoid emoji/status glyphs inside Mermaid node labels (`✅`, `❌`, `⚠️`); use
+  `OK:`, `NO:`, and `WARN:` — some renderers parse the glyphs as syntax errors. Emoji can remain in normal markdown tables.
 
 ---
 
@@ -364,7 +343,7 @@ Task files in `_jira_/` may reference `_doc_/` pages for context:
 ```markdown
 ## Scope
 See `_doc_/database_and_code_doc/1110_duckdb_store.md` for the store code reference.
-See `_doc_/methodology_doc/3000_targets.md` for the target methodology.
+See `_doc_/methodology_doc/2000_targets.md` for the target methodology.
 ```
 
 This keeps task files concise while pointing to stable reference docs.

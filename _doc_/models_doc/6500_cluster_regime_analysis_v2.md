@@ -204,7 +204,7 @@ Net = -$31.80 - (-$3) = -$28.80
 
 ## VII. Artifacts & Files
 
-- **Code:** `research/cluster_regime/03_clustering.py` (k=10 K-means)
+- **Code:** `research/cluster_regime/03_clustering.py` (k=10 K-means) — *törölve (t886), lásd `_doc_/research/cluster_regime.md`*
 - **Backtest:** `artifacts/research_cluster_regime/k10_backtest_trades.csv` (2,235 trades)
 - **Analysis:** This notebook
 

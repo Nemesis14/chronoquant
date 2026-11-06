@@ -9,20 +9,21 @@ Usage:
 
 Steps (in order):
     setup               Create artifact directory and write manifest.json
-    feature_engineering Run 01_feature_engineering.ipynb via papermill → artifact/feature_engineering/
+    feature_engineering IV/MI feature selection → artifact/feature_engineering/feature_set.json
+                        + report artifact/reports/02_feature_engineering/ (reports.builders)
     search              Hyperparameter search → artifact/search/
     train               Fit final model → artifact/model.pkl, features.json, params.json
     predict             Score the full snapshot range → model."<model_id>__pred" table
-    analyze             Instantiate and run analysis notebooks → artifact/analysis/ + artifact/*.html
+    analyze             Build the 4 model reports → artifact/reports/<slug>/ (manifest.json + report.md
+                        + charts/*.json + tables/*.json; no notebook / HTML / Quarto)
 
 When --step is omitted, all steps run in order.
 """
 
 import argparse
 import json
-import subprocess
 import sys
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 _ROOT = next(p for p in [Path(__file__).resolve().parent, *Path(__file__).resolve().parents] if (p / "pyproject.toml").exists())
@@ -30,8 +31,6 @@ sys.path.insert(0, str(_ROOT / "src"))
 
 import utils  # noqa: E402
 
-NOTEBOOK_TEMPLATE      = _ROOT / "src" / "modeling" / "01_feature_engineering.ipynb"
-ANALYSIS_TEMPLATES_DIR = _ROOT / "analyst" / "notebooks"
 ALL_STEPS = ["setup", "sample", "feature_engineering", "search", "train", "predict", "analyze"]
 
 
@@ -48,7 +47,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--step", choices=ALL_STEPS, default=None,
         help="Single pipeline step to run. Omit to run all steps in order. "
-             "Steps: setup → sample → feature_engineering → search → train → predict → analyze",
+             "Steps: setup -> sample -> feature_engineering -> search -> train -> predict -> analyze",
     )
     parser.add_argument(
         "--stage", choices=["smoke", "explore", "refine"], default=None,
@@ -61,10 +60,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timeout-hours", type=float, default=None,
         help="Hard time limit in hours for the search step. Default: no limit",
-    )
-    parser.add_argument(
-        "--fold-limit", type=int, default=None,
-        help="Limit to first N validation folds in search step. Default: stage default",
     )
     parser.add_argument(
         "--snapshot", default=None,
@@ -113,7 +108,7 @@ def step_sample(model_id: str, artifact_dir: Path, snapshot_id: str | None = Non
 
     Snapshot-native path (plan 5, steps 2-3): the source is an immutable
     ``snap."<snapshot_id>"`` table and the output is a small DuckDB table
-    (open_time + target(s) + fold_id) in the lab database; the feature selection
+    (open_time + target(s) + split) in the lab database; the feature selection
     is registered in ``reg.feature_sets``.  The ``snapshot_id`` may be passed
     explicitly (e.g. from ``--snapshot`` CLI arg) or resolved from the model's
     sampling config (``sampling.snapshot_id``).
@@ -132,10 +127,9 @@ def step_sample(model_id: str, artifact_dir: Path, snapshot_id: str | None = Non
 
     from modeling.sampling import create_model_sample
     summary = create_model_sample(model_id, snapshot_id)
-    splits_or_folds = summary.get("split_row_counts") or summary.get("fold_row_counts", {})
     print(
         f"[sample] {summary['sample_table']} created: rows={summary['n_rows']} "
-        f"splits={splits_or_folds} feature_set={summary['feature_set_id']} "
+        f"splits={summary['split_row_counts']} feature_set={summary['feature_set_id']} "
         f"(n_input={summary['n_input']} n_selected={summary['n_selected']})"
     )
 
@@ -160,63 +154,36 @@ def step_feature_engineering(
     artifact_dir: Path,
     snapshot_id: str | None = None,
 ) -> None:
-    try:
-        import papermill as pm
-    except ImportError:
-        print("[feature_engineering] ERROR: papermill not installed. Run: uv add papermill")
-        sys.exit(1)
+    """Feature selection (IV / MI / quality / redundancy) + the ``02_feature_engineering`` report.
 
-    fe_dir = artifact_dir / "feature_engineering"
-    fe_dir.mkdir(parents=True, exist_ok=True)
+    Writes ``feature_engineering/feature_set.json`` (input of search / train) and the report
+    folder ``reports/02_feature_engineering/``; no notebook, HTML or Quarto involved.
+    """
+    from reports.builders import feature_engineering
 
-    output_nb = fe_dir / "01_feature_engineering.ipynb"
-    output_html = fe_dir / "01_feature_engineering.html"
-
-    # Sample is now model-specific and lives in the artifact directory.
-    sample_dir = str(artifact_dir)
-
-    # Resolve snapshot_id: explicit arg > manifest.json > models.json fallback.
-    # The notebook has its own fallback chain (models.json → reg.models), but
-    # passing SNAPSHOT_ID explicitly ensures --snapshot CLI overrides propagate.
+    # Resolve snapshot_id: explicit arg > manifest.json > models.json (handled by the builder);
+    # an explicit --snapshot override must win, so it is passed through unchanged.
     if not snapshot_id:
-        snapshot_id = meta.get("sampling", {}).get("snapshot_id", "")
-    snapshot_id = snapshot_id or ""
+        snapshot_id = meta.get("sampling", {}).get("snapshot_id") or None
 
-    print("[feature_engineering] Running notebook via papermill...")
-    print(f"  template   : {NOTEBOOK_TEMPLATE}")
-    print(f"  output     : {output_nb}")
-    print(f"  sample_dir : {sample_dir}")
+    print("[feature_engineering] Running feature selection (reports.builders.feature_engineering)...")
+    print(f"  artifact   : {artifact_dir}")
     if snapshot_id:
         print(f"  snapshot_id: {snapshot_id}")
 
-    pm.execute_notebook(
-        str(NOTEBOOK_TEMPLATE),
-        str(output_nb),
-        parameters={
-            "ARTIFACT_DIR": str(artifact_dir),
-            "SAMPLE_DIR"  : sample_dir,
-            "MODEL_ID"    : model_id,
-            "SNAPSHOT_ID" : snapshot_id,
-        },
-        kernel_name="python3",
+    report_dir = feature_engineering.build(
+        model_id, artifact_dir, snapshot_id, write_selection=True
     )
+    feature_set_path = artifact_dir / "feature_engineering" / "feature_set.json"
+    print(f"[feature_engineering] feature_set.json -> {feature_set_path}")
+    print(f"[feature_engineering] report -> {report_dir}")
 
-    import subprocess
-    result = subprocess.run(
-        ["uv", "run", "quarto", "render", str(output_nb), "--no-execute"],
-        capture_output=True, text=True,
-    )
-    if result.returncode == 0:
-        print(f"[feature_engineering] HTML rendered -> {output_html}")
-    else:
-        print(f"[feature_engineering] WARNING: quarto render failed:\n{result.stderr}")
-
-    # Provenance: link the FE-selected feature_set + register notebook/html artifacts.
+    # Provenance: link the FE-selected feature_set + register feature_set / report artifacts.
     from modeling import provenance
     feature_set_id = provenance.link_feature_set(model_id, asset_id=meta.get("asset_id"))
     provenance.register_artifacts(
         model_id,
-        [("fe_notebook", output_nb), ("fe_html", output_html)],
+        [("fe_feature_set", feature_set_path), ("fe_report", report_dir / "manifest.json")],
         asset_id=meta.get("asset_id"),
     )
     print(f"[feature_engineering] reg.feature_sets linked: {feature_set_id}")
@@ -292,158 +259,43 @@ def step_predict(model_id: str) -> None:
 # Step: analyze
 # ---------------------------------------------------------------------------
 
-_ANALYSIS_NOTEBOOKS: list[tuple[str, str]] = [
-    ("01_sampling",              "manifest.json"),
-    ("02_feature_engineering",   "feature_engineering/feature_set.json"),
-    ("03_hyperparameter_search", "search/search_best.json"),
-    ("04_strategy",              "strategy/strategy_artifact.json"),
+# (report slug, reports.builders module, prerequisite artifact relative to the artifact dir)
+_ANALYSIS_REPORTS: list[tuple[str, str, str]] = [
+    ("01_sampling",              "sampling",              "manifest.json"),
+    ("02_feature_engineering",   "feature_engineering",   "feature_engineering/feature_set.json"),
+    ("03_hyperparameter_search", "hyperparameter_search", "search/search_best.json"),
+    ("04_strategy",              "strategy",              "strategy/strategy_artifact.json"),
 ]
 
 
-def _instantiate_analysis_notebook(
-    template_path : Path,
-    output_path   : Path,
-    placeholders  : dict[str, str],
-) -> None:
-    """Phase 1: replace {{PLACEHOLDER}} in raw cells, ensure parameters tag on Cell 1."""
-    try:
-        import nbformat
-    except ImportError:
-        print("[analyze] ERROR: nbformat not installed. Run: uv add nbformat")
-        sys.exit(1)
-
-    nb = nbformat.read(str(template_path), as_version=4)
-    for cell in nb.cells:
-        if cell.cell_type == "raw":
-            src = cell.source if isinstance(cell.source, str) else "".join(cell.source)
-            for key, val in placeholders.items():
-                src = src.replace(key, val)
-            cell.source = src
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    nbformat.write(nb, str(output_path))
-
-
 def step_analyze(model_id: str, artifact_dir: Path) -> None:
-    """Instantiate and execute analysis notebooks, then render HTML via Quarto.
+    """Build the four model reports (``reports.builders``) into ``<artifact>/reports/<slug>/``.
 
-    Templates live in analyst/notebooks/. For each notebook:
-      1. nbformat: replace {{PLACEHOLDER}} in raw frontmatter cell.
-      2. papermill: execute with MODEL_ID / DIRECTION / TARGET parameters.
-      3. quarto render --no-execute: produce HTML at artifact root.
-
-    Skips any notebook whose prerequisite artifact is missing.
+    Each report is a folder of ``manifest.json`` + ``report.md`` + ``charts/*.json`` +
+    ``tables/*.json`` (Plotly JSON, no notebook / HTML / Quarto).  Skips a report whose
+    prerequisite artifact is missing; a failing builder is reported and does not stop the others.
+    ``02_feature_engineering`` is refreshed here without rewriting ``feature_set.json``.
     """
-    try:
-        import papermill as pm
-    except ImportError:
-        print("[analyze] ERROR: papermill not installed. Run: uv add papermill")
-        sys.exit(1)
+    import importlib
+    import traceback
 
-    direction       = "long"  if "_l_" in model_id else "short"
-    direction_label = "Long"  if direction == "long"  else "Short"
-    target          = "long_mfe_fw60" if direction == "long" else "short_mfe_fw60"
-    today           = date.today().isoformat()
-
-    placeholders = {
-        "{{MODEL_ID}}":         model_id,
-        "{{DIRECTION_LABEL}}":  direction_label,
-        "{{DATE}}":             today,
-    }
-
-    # Resolve SNAPSHOT_ID from manifest for 02_feature_engineering
-    manifest_path = artifact_dir / "manifest.json"
-    snapshot_id   = ""
-    if manifest_path.exists():
-        _manifest   = json.loads(manifest_path.read_text(encoding="utf-8"))
-        snapshot_id = (
-            _manifest.get("snapshot_id")
-            or _manifest.get("sampling", {}).get("snapshot_id", "")
-            or _manifest.get("provenance", {}).get("snapshot_id", "")
-            or ""
-        )
-
-    # Resolve strategy VALID_START/VALID_END for 04_strategy papermill params
-    strategy_artifact_path = artifact_dir / "strategy" / "strategy_artifact.json"
-    valid_start = valid_end = ""
-    if strategy_artifact_path.exists():
-        _art = json.loads(strategy_artifact_path.read_text(encoding="utf-8"))
-        valid_start = _art.get("fit_period", {}).get("start", "")
-        valid_end   = _art.get("fit_period", {}).get("end",   "")
-
-    # Per-notebook papermill parameter sets
-    extra_params: dict[str, dict] = {
-        "01_sampling": {
-            "MODEL_ID" : model_id,
-            "DIRECTION": direction,
-            "TARGET"   : target,
-        },
-        "02_feature_engineering": {
-            "ARTIFACT_DIR": str(artifact_dir),
-            "SAMPLE_DIR"  : str(artifact_dir),
-            "MODEL_ID"    : model_id,
-            "SNAPSHOT_ID" : snapshot_id,
-        },
-        "03_hyperparameter_search": {
-            "model_id": model_id,
-        },
-        "04_strategy": {
-            "MODEL_ID"    : model_id,
-            "DIRECTION"   : direction,
-            "STRATEGY_DIR": str(artifact_dir / "strategy"),
-            "VALID_START" : valid_start,
-            "VALID_END"   : valid_end,
-        },
-    }
-
-    analysis_dir = artifact_dir / "analysis"
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-
-    for nb_stem, prereq in _ANALYSIS_NOTEBOOKS:
-        prereq_path = artifact_dir / prereq
-        if not prereq_path.exists():
-            print(f"[analyze] SKIP {nb_stem} — prerequisite missing: {prereq}")
+    for slug, builder, prereq in _ANALYSIS_REPORTS:
+        if not (artifact_dir / prereq).exists():
+            print(f"[analyze] SKIP {slug} - prerequisite missing: {prereq}")
             continue
-
-        template_path = ANALYSIS_TEMPLATES_DIR / f"{nb_stem}.ipynb"
-        if not template_path.exists():
-            print(f"[analyze] SKIP {nb_stem} — template not found: {template_path}")
-            continue
-
-        output_nb   = analysis_dir / f"{nb_stem}.ipynb"
-        output_html = artifact_dir / f"{nb_stem}.html"
-
-        print(f"[analyze] {nb_stem} — instantiating template...")
-        _instantiate_analysis_notebook(template_path, output_nb, placeholders)
-
-        print(f"[analyze] {nb_stem} — executing via papermill...")
+        print(f"[analyze] {slug} - building report...")
         try:
-            pm.execute_notebook(
-                str(output_nb),
-                str(output_nb),
-                parameters = extra_params[nb_stem],
-                kernel_name = "python3",
-            )
-        except Exception as exc:
+            module = importlib.import_module(f"reports.builders.{builder}")
+            if slug == "02_feature_engineering":
+                out = module.build(model_id, artifact_dir, None, write_selection=False)
+            else:
+                out = module.build(model_id, artifact_dir)
+        except Exception as exc:  # noqa: BLE001 - one broken report must not stop the rest
             msg = str(exc).encode("ascii", errors="replace").decode("ascii")
-            print(f"[analyze] WARNING: papermill execution failed for {nb_stem}: {msg[:300]}")
+            print(f"[analyze] WARNING: report {slug} failed: {type(exc).__name__}: {msg[:300]}")
+            traceback.print_exc()
             continue
-
-        print(f"[analyze] {nb_stem} — rendering HTML via Quarto...")
-        result = subprocess.run(
-            ["uv", "run", "quarto", "render", f"{nb_stem}.ipynb", "--no-execute",
-             "--embed-resources"],
-            capture_output=True, text=True, cwd=str(analysis_dir),
-        )
-        html_in_analysis = analysis_dir / f"{nb_stem}.html"
-        if html_in_analysis.exists():
-            import shutil
-            shutil.move(str(html_in_analysis), str(output_html))
-            print(f"[analyze] {nb_stem} — HTML rendered -> {output_html}")
-            if result.returncode != 0:
-                print(f"[analyze] NOTE: quarto returned non-zero but HTML produced:\n{result.stderr[:400]}")
-        else:
-            print(f"[analyze] WARNING: quarto render failed for {nb_stem}:\n{result.stderr[:400]}")
+        print(f"[analyze] {slug} - report written -> {out}")
 
     _update_manifest_status(artifact_dir, "analyze_done")
 

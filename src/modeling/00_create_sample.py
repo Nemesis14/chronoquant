@@ -1,6 +1,6 @@
 """CLI for creating a model's snapshot-native sample table.
 
-Builds ``model."<model_id>__sample"`` (open_time + target(s) + fold_id) from an
+Builds ``model."<model_id>__sample"`` (open_time + target(s) + split) from an
 immutable ``snap."<snapshot_id>"`` table and registers the logical feature_set in
 ``reg.feature_sets`` (plan section 5, steps 2-3).
 
@@ -53,8 +53,8 @@ def main() -> None:
     print(f"    feature_set    = {summary['feature_set_id']}")
     print(f"    n_input        = {summary['n_input']}")
     print(f"    n_selected     = {summary['n_selected']}")
-    for fold_id in sorted(summary["fold_row_counts"], key=int):
-        print(f"      fold {fold_id}        = {summary['fold_row_counts'][fold_id]}")
+    for split, n in sorted(summary["split_row_counts"].items(), key=lambda kv: int(kv[0])):
+        print(f"      split {split} ({'train' if split == '0' else 'valid'}) = {n}")
 
 
 if __name__ == "__main__":

@@ -258,5 +258,10 @@ python -m modeling.analyst_signal.validate
 Eredmények: `database/analyst_signal/analyst_signal.duckdb`
 (`calls`, `call_returns`, `author_scores`, `score_params`, `oos_validation`).
 
-A felderítés részletei: [research/tradingview_poc/README.md](../../research/tradingview_poc/README.md)
-és [REVIEW.md](../../research/tradingview_poc/REVIEW.md).
+A felderítés részletei: [tradingview_poc.md](tradingview_poc.md) (a `research/tradingview_poc/` törölve).
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/analyst_signal/{score_authors,validate}.py`, `sync_tables/sync_call_returns.py`, `src/data_handling/collectors/tradingview/` (utóbbi marad).

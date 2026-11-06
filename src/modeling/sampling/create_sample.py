@@ -6,24 +6,20 @@ DuckDB-native sampling path (plan section 5, steps 2-3, and 5.1):
     snapshot layer), *not* the mutable ``quant_train`` table — this is what makes
     a model reproducible.
   * **Output** is a small ``model."<model_id>__sample"`` table inside the lab
-    database: ``open_time`` + the model's target column(s) + either ``fold_id``
-    (walk-forward CV) or ``split`` (train/valid split) only.
+    database: ``open_time`` + the model's target column(s) + ``split``
+    (0 = train, 1 = valid) only.
     Features stay in the snapshot; downstream steps project them via the
     ``__train_input`` view (plan 5.1) — there is no per-model feature copy.
   * **Feature filtering** is a *logical* feature_set, registered in
     ``reg.feature_sets`` (selected_cols, n_input, n_selected); no physical column
     drop happens here.
 
-Two sampling modes are supported (``sampling_mode`` in config/models.json):
+The only supported ``sampling_mode`` (config/models.json) is ``train_valid_split``:
+single chronological split; ``split`` TINYINT 0 = train, 1 = valid.  Feature lookback
+embargo applied at train start; target purge applied at train end; no embargo at valid
+start.
 
-  * ``walk_forward`` (legacy): hourly select + walk-forward ``fold_id`` CASE
-    chain.  ``fold_id`` Int8 0..n, 0 = train-only.
-  * ``train_valid_split`` (active): single chronological split; ``split`` TINYINT
-    0 = train, 1 = valid.  Feature lookback embargo applied at train start;
-    target purge applied at train end; no embargo at valid start.
-
-Only this module touches utils and the lab connection; ``snapshot_sampler`` and
-``yearly_sampler`` are IO-free.
+Only this module touches utils and the lab connection; ``snapshot_sampler`` is IO-free.
 """
 
 from __future__ import annotations
@@ -39,11 +35,9 @@ import utils
 from data_handling.store import registry
 from modeling.sampling.snapshot_sampler import (
     build_feature_set_id,
-    build_sample_ctas_sql,
     build_train_valid_split_ctas_sql,
     sample_table_fqn,
 )
-from modeling.sampling.yearly_sampler import generate_walk_forward_folds
 from utils import _snapshot_exists
 
 logger = logging.getLogger(__name__)
@@ -55,23 +49,20 @@ _DIRECTION_BY_TARGET_PREFIX = {"long": "l", "short": "s"}
 def create_model_sample(model_id: str, snapshot_id: str) -> dict[str, Any]:
     """Create the ``model."<model_id>__sample"`` table for a config-defined model.
 
-    Dispatches to the appropriate sampling path based on ``sampling_mode`` in
-    config/models.json:
-
-    * ``"train_valid_split"`` → :func:`create_snapshot_sample_train_valid_split`
-    * ``"walk_forward"`` (or absent) → :func:`create_snapshot_sample`
+    Reads the ``sampling`` block of config/models.json (``sampling_mode`` must be
+    ``train_valid_split``) and delegates to
+    :func:`create_snapshot_sample_train_valid_split`.
 
     Args:
         model_id    : Model key from config/models.json.
         snapshot_id : Immutable snapshot id (``snap."<id>"``) to sample from.
 
     Returns:
-        Summary dict.  Keys vary by sampling mode — see the delegated function
-        for details.
+        Summary dict — see :func:`create_snapshot_sample_train_valid_split`.
 
     Raises:
         ValueError: If the model is unknown, the snapshot has no usable rows, or
-                    an unrecognised ``sampling_mode`` is specified.
+                    ``sampling_mode`` is not ``train_valid_split``.
     """
     models_cfg = utils.load_models_config()
     if model_id not in models_cfg.get("models", {}):
@@ -82,202 +73,39 @@ def create_model_sample(model_id: str, snapshot_id: str) -> dict[str, Any]:
     target_name   = meta["target_name"]
     sampling_meta = meta.get("sampling", {})
     artifact_dir  = Path(utils._resolve_path(meta["artifact_dir"]))
-    sampling_mode = sampling_meta.get("sampling_mode", "walk_forward")
+    sampling_mode = sampling_meta.get("sampling_mode", "train_valid_split")
+
+    if sampling_mode != "train_valid_split":
+        raise ValueError(
+            f"Unknown sampling_mode '{sampling_mode}' for model '{model_id}'. "
+            "Supported: 'train_valid_split'."
+        )
 
     selected_cols = _resolve_selected_features(artifact_dir, target_name)
     conn          = utils.open_lab_connection(asset_id)
 
     try:
-        if sampling_mode == "train_valid_split":
-            # --- train/valid split path ---
-            horizon   = _horizon_from_target(target_name)
-            direction = _direction_from_target(target_name)
-            seed      = int(sampling_meta.get("seed", 42))
-
-            train_start                      = sampling_meta["train_start"]
-            train_end                        = sampling_meta["train_end"]
-            valid_start                      = sampling_meta["valid_start"]
-            valid_end                        = sampling_meta["valid_end"]
+        return create_snapshot_sample_train_valid_split(
+            conn                             = conn,
+            model_id                         = model_id,
+            snapshot_id                      = snapshot_id,
+            asset_id                         = asset_id,
+            target_cols                      = [target_name],
+            horizon                          = _horizon_from_target(target_name),
+            direction                        = _direction_from_target(target_name),
+            seed                             = int(sampling_meta.get("seed", 42)),
+            train_start                      = sampling_meta["train_start"],
+            train_end                        = sampling_meta["train_end"],
+            valid_start                      = sampling_meta["valid_start"],
+            valid_end                        = sampling_meta["valid_end"],
             feature_lookback_embargo_minutes = int(
                 sampling_meta.get("feature_lookback_embargo_minutes", 240)
-            )
-            target_purge_minutes             = int(
-                sampling_meta.get("target_purge_minutes", 60)
-            )
-
-            return create_snapshot_sample_train_valid_split(
-                conn                             = conn,
-                model_id                         = model_id,
-                snapshot_id                      = snapshot_id,
-                asset_id                         = asset_id,
-                target_cols                      = [target_name],
-                horizon                          = horizon,
-                direction                        = direction,
-                seed                             = seed,
-                train_start                      = train_start,
-                train_end                        = train_end,
-                valid_start                      = valid_start,
-                valid_end                        = valid_end,
-                feature_lookback_embargo_minutes = feature_lookback_embargo_minutes,
-                target_purge_minutes             = target_purge_minutes,
-                selected_cols                    = selected_cols,
-            )
-
-        if sampling_mode == "walk_forward":
-            # --- walk-forward CV path ---
-            horizon      = _horizon_from_target(target_name)
-            direction    = _direction_from_target(target_name)
-            year         = _anchor_year(sampling_meta)
-            seed         = 42 + year
-            train_months = int(sampling_meta.get("train_months", 9))
-            valid_months = int(sampling_meta.get("valid_months", 3))
-            shift_months = int(sampling_meta.get("shift_months", 3))
-            n_folds      = int(sampling_meta.get("n_folds", 4))
-            purge_minutes = int(sampling_meta.get("purge_minutes", 240))
-
-            return create_snapshot_sample(
-                conn          = conn,
-                model_id      = model_id,
-                snapshot_id   = snapshot_id,
-                asset_id      = asset_id,
-                target_cols   = [target_name],
-                horizon       = horizon,
-                direction     = direction,
-                year          = year,
-                seed          = seed,
-                train_months  = train_months,
-                valid_months  = valid_months,
-                shift_months  = shift_months,
-                n_folds       = n_folds,
-                purge_minutes = purge_minutes,
-                selected_cols = selected_cols,
-            )
-
-        raise ValueError(
-            f"Unknown sampling_mode '{sampling_mode}' for model '{model_id}'. "
-            "Supported: 'train_valid_split', 'walk_forward'."
+            ),
+            target_purge_minutes             = int(sampling_meta.get("target_purge_minutes", 60)),
+            selected_cols                    = selected_cols,
         )
     finally:
         conn.close()
-
-
-def create_snapshot_sample(
-    conn          : duckdb.DuckDBPyConnection,
-    model_id      : str,
-    snapshot_id   : str,
-    asset_id      : str,
-    target_cols   : list[str],
-    horizon       : int = 60,
-    direction     : str = "l",
-    year          : int = 2023,
-    seed          : int = 42,
-    train_months  : int = 9,
-    valid_months  : int = 3,
-    shift_months  : int = 3,
-    n_folds       : int = 4,
-    purge_minutes : int = 240,
-    selected_cols : list[str] | None = None,
-) -> dict[str, Any]:
-    """Build the sample table + reg.feature_sets row on an open lab connection.
-
-    Pure orchestration over the IO-free SQL builders — owns the DuckDB execution
-    and the registry write.  Deterministic: an immutable snapshot + fixed seed +
-    fixed fold parameters yields a bit-identical sample table.
-
-    Args:
-        conn          : Open lab connection (lab default + ``snap``/``model`` + ``reg``).
-        model_id      : Owning model id (sample table token + reg.models link).
-        snapshot_id   : Immutable source snapshot id.
-        asset_id      : Asset key (for the feature_set_id and reg links).
-        target_cols   : Target column(s) to carry into the sample.
-        horizon       : Forward-window bar count (feature_set_id token).
-        direction     : ``l``/``s``/``combo`` (feature_set_id token).
-        year          : Anchor calendar year for the walk-forward folds.
-        seed          : Reproducibility seed for the per-hour pick.
-        train_months  : Walk-forward training window length (months).
-        valid_months  : Walk-forward validation window length (months).
-        shift_months  : Months to shift between successive folds.
-        n_folds       : Number of folds (validation windows 1..n; 0 = train-only).
-        purge_minutes : Purge gap in minutes (metadata; applied at search time).
-        selected_cols : Logical feature_set columns.  If None, all feat_* columns
-                        of the snapshot are taken as the selection.
-
-    Returns:
-        Summary dict (see :func:`create_model_sample`).
-
-    Raises:
-        ValueError: If the snapshot table is missing or has no usable rows.
-    """
-    _ensure_model_schema(conn)
-
-    if not _snapshot_exists(conn, snapshot_id):
-        raise ValueError(
-            f"Snapshot table snap.\"{snapshot_id}\" not found — create it first "
-            "(src/data_handling/05_create_snapshot.py)."
-        )
-
-    all_feat_cols = _snapshot_feature_columns(conn, snapshot_id)
-    n_input       = len(all_feat_cols)
-    selected      = list(selected_cols) if selected_cols else all_feat_cols
-
-    fold_time_windows = generate_walk_forward_folds(
-        year          = year,
-        train_months  = train_months,
-        valid_months  = valid_months,
-        shift_months  = shift_months,
-        purge_minutes = purge_minutes,
-        n_folds       = n_folds,
-    )
-
-    ctas_sql = build_sample_ctas_sql(
-        model_id          = model_id,
-        snapshot_id       = snapshot_id,
-        seed              = seed,
-        target_cols       = target_cols,
-        fold_time_windows = fold_time_windows,
-    )
-    conn.execute(ctas_sql)
-
-    sample_fqn = sample_table_fqn(model_id)
-    n_rows_row = conn.execute(f"SELECT COUNT(*) FROM {sample_fqn}").fetchone()
-    n_rows     = int(n_rows_row[0]) if n_rows_row else 0
-    if n_rows == 0:
-        raise ValueError(
-            f"Sample is empty — snapshot snap.\"{snapshot_id}\" has no rows with "
-            f"non-null targets {target_cols}."
-        )
-
-    fold_row_counts = _fold_counts(conn, sample_fqn)
-
-    feature_set_id = build_feature_set_id(asset_id, horizon, direction, selected)
-    registry.upsert(
-        conn,
-        "feature_sets",
-        {
-            "feature_set_id": feature_set_id,
-            "snapshot_id":    snapshot_id,
-            "n_input":        n_input,
-            "n_selected":     len(selected),
-            "selected_cols":  selected,
-            "status":         "candidate",
-        },
-    )
-    _link_model(conn, model_id, snapshot_id, feature_set_id)
-
-    logger.info(
-        "create_snapshot_sample: %s rows=%d folds=%s fs=%s (n_input=%d n_selected=%d)",
-        sample_fqn, n_rows, fold_row_counts, feature_set_id, n_input, len(selected),
-    )
-    return {
-        "model_id":        model_id,
-        "snapshot_id":     snapshot_id,
-        "sample_table":    sample_fqn,
-        "n_rows":          n_rows,
-        "fold_row_counts": fold_row_counts,
-        "feature_set_id":  feature_set_id,
-        "n_input":         n_input,
-        "n_selected":      len(selected),
-    }
 
 
 def create_snapshot_sample_train_valid_split(
@@ -427,20 +255,6 @@ def _direction_from_target(target_name: str) -> str:
     return _DIRECTION_BY_TARGET_PREFIX.get(prefix, "l")
 
 
-def _anchor_year(sampling_meta: dict[str, Any]) -> int:
-    """Resolve the anchor calendar year from sampling metadata (matches legacy logic)."""
-    if "year" in sampling_meta:
-        return int(sampling_meta["year"])
-    sample_id = sampling_meta.get("sample_id", "")
-    if "_yearly_" in sample_id:
-        return int(sample_id.split("_yearly_")[-1])
-    if sample_id:
-        tail = sample_id.split("_")[-1]
-        if tail.isdigit():
-            return int(tail)
-    return 2023
-
-
 def _resolve_selected_features(artifact_dir: Path, target_name: str) -> list[str] | None:
     """Read the FE feature_set.json selection, if present, else None (= all feat_*).
 
@@ -471,14 +285,6 @@ def _snapshot_feature_columns(conn: duckdb.DuckDBPyConnection, snapshot_id: str)
     rows = conn.execute(f'SELECT * FROM snap."{snapshot_id}" LIMIT 0').description
     cols = [d[0] for d in rows]
     return sorted(c for c in cols if c.startswith("feat_"))
-
-
-def _fold_counts(conn: duckdb.DuckDBPyConnection, sample_fqn: str) -> dict[str, int]:
-    """Return per-fold row counts as a {fold_id_str: count} dict."""
-    rows = conn.execute(
-        f"SELECT fold_id, COUNT(*) FROM {sample_fqn} GROUP BY fold_id ORDER BY fold_id"
-    ).fetchall()
-    return {str(r[0]): int(r[1]) for r in rows}
 
 
 def _split_counts(conn: duckdb.DuckDBPyConnection, sample_fqn: str) -> dict[str, int]:

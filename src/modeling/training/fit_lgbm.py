@@ -3,9 +3,9 @@
 Reads best_params.json + search_best.json (n_estimators), feature_set.json.
 Loads training data via snap ⋈ model.__sample JOIN (DuckDB-native, plan 5.1):
   - source: snap."<snapshot_id>" (features) INNER JOIN model."<model_id>__sample"
-    (open_time + target + fold_id) on open_time
-  - uses ALL fold rows (fold_id 0 = train-only, fold_id 1..n = walk-forward folds)
-    for the final production fit
+    (open_time + target + split) on open_time
+  - uses ALL sample rows (split 0 = train and split 1 = valid) for the final
+    production fit
 
 Offline prediction is a separate pipeline step (modeling.predict) that scores the
 full snapshot range into model."<id>__pred" — it is no longer fused into the
@@ -45,7 +45,7 @@ def fit_lightgbm_from_search(
     """Fit a LightGBM model from search artifacts.
 
     Training data is loaded via the snap ⋈ model.__sample JOIN (DuckDB-native,
-    plan 5.1) — all fold rows are used for the final production fit.  Offline
+    plan 5.1) — all sample rows (train + valid) are used for the final production fit.  Offline
     scoring of the full snapshot range is the separate predict step.
 
     Args:
@@ -89,13 +89,7 @@ def fit_lightgbm_from_search(
             f"feature_set.json['{feature_key}'] is empty for {model_id}"
         )
 
-    if "fold_summary" in search_best:
-        # legacy format: list of per-fold dicts with best_iteration
-        best_iterations = [int(fold["best_iteration"]) for fold in search_best["fold_summary"]]
-        n_estimators = round(sum(best_iterations) / len(best_iterations) * 1.1)
-    else:
-        # new flat format (t4 refactor): single best_iteration at top level
-        n_estimators = round(int(search_best["best_iteration"]) * 1.1)
+    n_estimators = round(int(search_best["best_iteration"]) * 1.1)
 
     final_params: dict = {**_FIXED_PARAMS, **best_params, "n_estimators": n_estimators, "random_state": 42}
 
@@ -142,9 +136,9 @@ def _load_train_data(
     """Load training matrix from snap ⋈ model.__sample JOIN (plan 5.1).
 
     Joins the immutable snapshot (feature columns) with the model's small
-    sample table (open_time + target + fold_id) on open_time.  All fold rows
-    are used for the final production fit (fold_id 0 = train-only rows,
-    fold_id 1..n = walk-forward validation folds — both included).
+    sample table (open_time + target + split) on open_time.  All sample rows
+    are used for the final production fit (split 0 = train, split 1 = valid —
+    both included).
 
     Args:
         model_id          : Model key from config/models.json (used to resolve

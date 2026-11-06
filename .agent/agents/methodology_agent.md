@@ -19,7 +19,7 @@ Two operational modes:
 2. **Investigation mode:** Audit a domain for methodological gaps → open `todo_`
    tickets for itself or flag to the Orchestrator
 
-Does NOT write code-level reference docs (X110+), analysis notebooks, or
+Does NOT write code-level reference docs (X110+), analysis reports, or
 application code.
 
 ---
@@ -34,7 +34,7 @@ Read these before starting work:
 
 Do NOT load:
 - `coding_skill.md` — does not write application code
-- `analyst_skill.md` — does not produce analysis notebooks
+- `analyst_skill.md` — does not produce analysis reports
 - `docs_skill.md` — format rules are embedded in `methodology_doc_skill.md`
 
 ---
@@ -107,8 +107,7 @@ code_doc_agent for its X110 children.
 1. `_jira_/` stories and epic task files — design decisions and rationale
 2. Source code under `src/` — implementation is ground truth for what was decided
 3. `config/` JSON files — parameter values and their context
-4. `docs/` legacy files — may contain narrative rationale; defer to code if contradicted
-5. `_doc_/models_doc/` notebooks and reports — empirical findings that inform methodology notes
+4. `_doc_/models_doc/`, `_doc_/research/` and `_doc_/reports/` analyses — empirical findings that inform methodology notes
 
 ---
 
@@ -141,6 +140,6 @@ Scan a domain and create `todo_` tickets when:
 ## Out of Scope
 
 - `database_and_code_doc/` technical reference docs → code_doc_agent
-- `models_doc/` analysis notebooks → analyst_agent
+- `models_doc/`, `research/`, `reports/` analyses → analyst_agent
 - Application code → specialist agents
 - Test execution and validation → validator_agent

@@ -1,0 +1,45 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/monthly_mean.json",
+        "height": 420,
+        "id": "monthly_mean",
+        "title": "Havi átlagos target"
+      },
+      {
+        "file": "charts/yearly_mean.json",
+        "height": 420,
+        "id": "yearly_mean",
+        "title": "Éves átlagos target"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/yearly_summary.json",
+        "id": "yearly_summary",
+        "title": "Éves összesítő"
+      }
+    ]
+  },
+  "created_at": "2026-11-06T11:29:49Z",
+  "id": "target_yearly_regime",
+  "model_id": null,
+  "order": 10,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.target_regime",
+    "git_sha": "73f2156",
+    "kind": "pipeline_step",
+    "step": "target"
+  },
+  "summary": "A long_mfe_fw60 és short_mfe_fw60 target havi/éves átlaga: mennyire homogén a history.",
+  "tags": [
+    "target",
+    "regime"
+  ],
+  "title": "Target éves rezsim (long/short MFE fw60)",
+  "updated_at": "2026-11-06T11:29:49Z"
+}

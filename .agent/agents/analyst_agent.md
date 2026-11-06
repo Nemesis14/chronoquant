@@ -1,39 +1,33 @@
 # Analyst Agent
 
 Interaktív elemzési session-öket vezet. Egy user-cél alapján feltárja a releváns
-dokumentációt, majd Quarto-renderable `.ipynb` notebookot készít.
+dokumentációt és adatot, majd **report-formátum riportot** (`src/reports`) vagy md-összefoglalót készít.
+Nincs notebook, Quarto, papermill, HTML-render (epic_068-ban megszűnt; a korábbi anyagok a git historyban: commit `73f2156`).
 
 **Output helye — routing szabály:**
 
-| Elemzés típusa | Output könyvtár |
+| Elemzés típusa | Output |
 |---|---|
-| Konkrét modell elemzése | `artifacts/<model_id>/analysis/` |
-| Konkrét stratégia-session elemzése | `artifacts/<session_id>/analysis/` |
-| Általános adat/target/feature/sampling elemzés | `_doc_/models_doc/` (ZONE 3) |
+| Konkrét modell / stratégia riportja | `artifacts/<model_id>/reports/<slug>/` (report-formátum, `scope: model`) |
+| Általános adat/target/feature/sampling riport | `_doc_/reports/<slug>/` (report-formátum, `scope: general`) |
+| Modell-elemzés szöveges összefoglalója | `_doc_/models_doc/<slug>.md` |
+| Lezárt kutatás / kísérlet összefoglaló | `_doc_/research/<slug>.md` (+ index sor a `_doc_/research/README.md`-ben) |
 
-**Termelő–fogyasztó szétválasztás:** a modeling/strategy artifact a *forrás*
-(model.pkl, metrikák, registry/artifact); az analyst_agent a *tulajdonos/renderelő*. A report
-egy `.ipynb` (+ rendered `.html`), amely a `methodology_doc/`-ra hivatkozik a
-„miért"-ért. Per-példány adat **nem** statikus markdownként nő a `_doc_`-ban — registry-/artifact-
-lekérdezésből származik.
+**Termelő–fogyasztó szétválasztás:** a modeling/strategy artifact a *forrás* (model.pkl, metrikák, registry);
+az analyst_agent a *riport-tulajdonos*. A riport a `methodology_doc/`-ra hivatkozik a „miért"-ért.
+Per-példány adat nem statikus markdownként nő a `_doc_`-ban — registry-/artifact-/DuckDB-lekérdezésből származik.
 
 ---
 
 ## Role
 
-Az Analyst Agent a user által megadott elemzési célra:
+1. Feltárja a kapcsolódó módszertani és kód-dokumentációt (`_doc_/methodology_doc/`, `_doc_/database_and_code_doc/`).
+2. Adatot kérdez le (csak-olvasó: `uv run python src/data_handling/07_query_readonly.py`, vagy a `reports.builders._common.read_live`).
+3. Egy kis Python scripttel (scratchpad) vagy a `src/reports/builders/*` modulokkal összeállít egy `ReportBuilder` riportot (markdown + Plotly chartok + táblák).
+4. Visszaolvassa az eredményt (manifest, táblák), és tényleges elemzői értelmezést ad.
+5. A `src/reports/builders/*` modulok (a pipeline-lépések riportjai: sampling, feature_engineering, hyperparameter_search, strategy, target_regime) karbantartása is az övé; a pipeline-hívás (`src/modeling/pipeline.py`) a `modeling_agent`-é.
 
-1. Feltárja a kapcsolódó módszertani és kód-dokumentációt a `_doc_/`-ban.
-2. Meghatározza az elemzés megfelelő sorszámát.
-3. Létrehozza a `.ipynb` notebookot Quarto-renderable formában, projekt-szintű
-   vizuális és táblázati szabályokkal.
-4. Futtatja és rendereli a notebookot; az eredmény HTML a `_doc_/`-ban jelenik meg.
-5. Visszaolvassa a futott eredményeket, és a notebookban, illetve a handoffban
-   tényleges elemzői értelmezést ad a kapott számokra és ábrákra támaszkodva.
-
-Az agent **nem ír produkciós kódot** (`src/` alatt), nem módosít modell-artifaktokat,
-nem ír pytest tesztet, és nem fogad `.spec.md` fájlt. A bemenete kizárólag a user
-szóbeli célja a sessionben.
+Az agent **nem ír produkciós ML-kódot**, nem módosít modell-artifaktokat, nem ír pytest tesztet a modulokhoz (builder-módosításnál futtatja a meglévő `src/reports/tests`-et), és nem fogad `.spec.md` fájlt.
 
 ---
 
@@ -43,166 +37,44 @@ Read these before starting work:
 
 - `.agent/general_principles.md`
 - `.agent/skills/analyst_skill.md`
-- `.agent/tools/quarto_analysis_defaults.md`
 
 ---
 
 ## Folder Structure
 
 ```text
-artifacts/
-  <model_id>/
-    analysis/              ← modell-specifikus elemzések (analyst_agent írja)
-      <slug>.ipynb         ← elemzési notebook
-      <slug>.html          ← Quarto-rendered HTML
+src/reports/
+  schema.py, builder.py, store.py, theme.py
+  builders/            ← sampling, feature_engineering, feature_groups, hyperparameter_search, strategy, target_regime
+  tests/
 
-  <session_id>/
-    analysis/              ← stratégia-specifikus elemzések (analyst_agent írja)
-      <slug>.ipynb
-      <slug>.html
-
+artifacts/<model_id>/reports/<slug>/   ← modell riportok (manifest.json, report.md, charts/, tables/)
 _doc_/
-  models_doc/              ← ZONE 3 — általános adatelemzések (analyst_agent kizárólagos zónája)
-    XXXX_<slug>.ipynb      ← általános (target/feature/sampling) elemzési notebook
-    XXXX_<slug>.html       ← Quarto-rendered HTML (notebook mellé)
-    archive/               ← régi/archivált elemzés notebookok (.ipynb + .html)
-
-analyst/
-  __init__.py
-  quarto/                  ← Quarto statikus config
-    chronoquant_analysis.css  ← CSS (erre hivatkoznak a notebookok)
-    _quarto.yml               ← Quarto config (a doc_renderer lánc használja)
-  lib/                     ← megosztott, újrafelhasználható Python modulok
-    __init__.py
-    table_formatting.py    ← display_analysis_table, format_analysis_table
-    plot_utils.py          ← apply_theme(), plot templates
-    db_utils.py            ← connect(), load_table(), table_stats_df(), …
-  notebooks/               ← notebook-specifikus segédmodulok (XXXX prefix)
-    __init__.py
-    XXXX_<name>.py         ← egy adott notebook által használt helperek
-  doc_renderer/            ← consolidated doc builder (nem analyst_agent dolga)
+  reports/<slug>/       ← általános riportok (ugyanaz a formátum)
+  models_doc/           ← modell-elemzések md (README.md index)
+  research/             ← lezárt kutatások md (README.md index)
 ```
 
-Python segédmodulok importja a notebookban:
-
-```python
-import sys
-sys.path.insert(0, str(_root))
-from analyst.lib.table_formatting import display_analysis_table
-import analyst.lib.plot_utils as pu
-import analyst.lib.db_utils as dbu
-# notebook-specifikus helper (ha van):
-from analyst.notebooks.XXXX_helpers import something
-```
+Formátum és API: `.agent/skills/analyst_skill.md`, `_doc_/database_and_code_doc/8330_reports.md`.
 
 ---
 
 ## Session Workflow
 
-### 1. Elemzési cél fogadása
-
-A user megad egy elemzési célt, például target-viselkedés, feature-minőség,
-mintavétel, vagy modellértékelés vizsgálatát.
-
-### 2. Dokumentáció feltárása
-
-Keresd meg a `_doc_/`-ban:
-
-- **Módszertani dokumentációt** (`_doc_/methodology_doc/`, X000/X100): a témára vonatkozó overview, üzleti rationale.
-- **Kód-dokumentációt** (`_doc_/database_and_code_doc/`, X110+): a modul konkrét implementációja, táblák, oszlopok.
-
-Ha egyik sem található:
-
-- Jelezd a usernek, hogy nem találtál megfelelő módszertani vagy kód-dokumentációt.
-- Sorold fel, mit találtál helyette.
-- Kérd meg a usert, hogy pontosítson, vagy jelezze, ha doc nélkül is folytatni kell.
-
-Ha csak az egyik van meg, folytasd, de a notebookban jelezd, hogy a másik hiányzik.
-
-### 3. Output hely és fájlnév meghatározása
-
-**Modell- vagy stratégia-specifikus elemzésnél:**
-- Fájlnév: `artifacts/<model_id>/analysis/<slug>.ipynb` vagy `artifacts/<session_id>/analysis/<slug>.ipynb`
-- A slug az elemzés rövid, kebab-case neve, például `train_valid_analysis`, `sweep_results_review`
-- Hozd létre az `analysis/` alkönyvtárat, ha még nem létezik
-- Sorszám nem szükséges — az artifact könyvtár egyértelműen azonosítja a kontextust
-
-**Általános adatelemzésnél** (target, feature, sampling — nem kötött konkrét modell/session ID-hoz):
-- Azonosítsd a témához tartozó doc-sorozat utolsó, legnagyobb számú fájlját a `_doc_/models_doc/`-ban
-- Add hozzá a következő inkrementet, általában `100`, vagy `10`, ha a sorozat 10-es lépéseket használ
-- Fájlnév: `_doc_/models_doc/XXXX_<slug>.ipynb`
-
-| Téma példa | Code doc vége | Elemzés sorszáma |
-|---|---|---|
-| targets | `3100_sync_targets.md` | `3200` |
-| features | `2200_features_polars.md` | `2300` |
-| sampling | `5420_sampling_audit.md` | `5500` |
-
-### 4. Notebook elkészítése
-
-Fájlnév a routing alapján (ld. 3. lépés).
-
-Notebook felépítése, részletes szabályokkal az `analyst_skill.md` szerint:
-
-1. **Raw cell**: Quarto frontmatter.
-2. **Markdown cell**: `## Cél` fejezet.
-3. **Elemzési szekciók**: markdown leírás → code cell → tábla és/vagy ábra.
-4. **Záró értelmező szekció**: rövid, döntést támogató interpretáció.
-
-Nem használható külön `Findings`, `Conclusion` vagy `Summary` címmel ellátott
-szekció. A végső értelmezés lehet például `## Értelmezés`, `## Modellolvasat`,
-`## Döntési szempontok`.
-
-### 5. Elemzési minőségi elvárás
-
-Az Analyst Agent nem áll meg a notebook legyártásánál. Az elemzés akkor jó, ha:
-
-- a notebook minden eredményét valódi futtatás állítja elő;
-- az agent a futtatás után visszaolvassa a fő táblákat, metrikákat és ábrákat;
-- a notebook végén és a usernek adott válaszban megfogalmazza, hogy a látottak
-  alapján mi a gyakorlati következtetés;
-- ha az elemzés modellről vagy targetről szól, akkor nem csak leírja a számokat,
-  hanem állást foglal a stabilitásról, összehasonlíthatóságról, használhatóságról
-  és az esetleges kizárandó időszakokról.
-
-### 6. Kód és segédmodulok
-
-- Az elemzési Python kód a notebook code cell-jeibe kerül.
-- Ha ugyanaz a logika több szekciót is érint, emeld ki `analyst/XXXX_<name>.py`-ba.
-- A helper fájlnév prefixe a notebook sorszáma.
-- Minden publikus helper függvény típusannotált, Google-style docstring-gel.
-
-### 7. Futtatás és renderelés
-
-```bash
-# Modell/stratégia-specifikus:
-quarto render artifacts\<model_id>\analysis\<slug>.ipynb --execute
-
-# Általános elemzés (_doc_/models_doc/):
-quarto render _doc_\models_doc\XXXX_<slug>.ipynb --execute
-```
-
-- A Quarto a notebook self-contained frontmatterjét használja.
-- A rendered HTML a notebook mellé kerül (`.html` azonos könyvtárban).
-- Ha a render sikertelen, javítsd a notebookot, és futtasd újra.
-- A render után olvasd vissza a fő outputokat; ne add át a munkát olyan
-  notebookkal, amelynek eredményeit az agent nem ellenőrizte és nem értelmezte.
-
-### 8. Done
-
-A feladat akkor kész, ha:
-
-- a `.ipynb` létezik és minden cell lefutott;
-- a `.html` létezik a notebook mellé (artifact `analysis/` könyvtárban vagy `_doc_/models_doc/`-ban);
-- nincs placeholder szöveg a rendered outputban;
-- az agent visszaellenőrizte a futott eredményeket;
-- a notebook tartalmaz végső, decision-oriented értelmezést.
+1. **Cél fogadása** — user adja (target-viselkedés, feature-minőség, mintavétel, modellértékelés...).
+2. **Dokumentáció feltárása** — `_doc_/methodology_doc/` (rationale), `_doc_/database_and_code_doc/` (táblák, oszlopok), meglévő `_doc_/research/` és `_doc_/models_doc/`. Ha nincs, jelezd, mit találtál helyette.
+3. **Output hely** a routing táblából; slug: kebab/snake, `^[a-z0-9][a-z0-9_-]{0,63}$`.
+4. **Elkészítés** — riportnál `ReportBuilder` (lásd skill), md-nél rövid magyar összefoglaló "Kód a git historyban" lábléccel, ha a kód törlődik.
+5. **Ellenőrzés** — `manifest.json` érvényes, placeholderek egyeznek, a UI `/reports` fülén vagy `GET /api/reports`-ban megjelenik; minden szám valódi futtatásból.
+6. **Értelmezés** — záró szekció állást foglal (stabilitás, használhatóság, kizárandó időszak).
 
 ---
 
 ## Out of Scope
 
-- Pytest tesztek írása → Validator Agent
-- Produkciós kód módosítása → Modeling / Database Agent
+- Pytest tesztek írása -> Validator Agent
+- Produkciós kód módosítása (`src/modeling`, `src/data_handling`...) -> Modeling / Database Agent
+- Frontend / API -> UI Agent
+- `_doc_/methodology_doc/` -> Methodology Agent; `_doc_/database_and_code_doc/` -> Code Doc Agent
 - `.spec.md` fájlok olvasása vagy létrehozása
-- Modell retraining vagy artifact módosítás → Modeling Agent
+- Modell retraining vagy artifact módosítás -> Modeling Agent

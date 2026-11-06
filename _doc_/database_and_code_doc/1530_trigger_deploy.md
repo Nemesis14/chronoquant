@@ -8,7 +8,7 @@ futásán észleli a pending sort, és atomikusan végrehajtja a backfill+swap
 cserét (cutover).
 
 > Módszertani háttér (deploy/cutover design, registry-intent model, rollback):
-> → [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md)
+> → [`../methodology_doc/1500_registry.md`](1500_registry.md)
 > → [`0003_runtime_flow.md`](0003_runtime_flow.md) — teljes deploy/cutover narratíva
 > → [`0004_model_lifecycle.md`](0004_model_lifecycle.md) — model lifecycle és deployment fázisok
 
@@ -132,4 +132,4 @@ ERROR ... Deploy trigger FAILED: strategy_id '...' not found in reg.strategies.
 - [`1520_registry_validator.md`](1520_registry_validator.md) — config↔registry konzisztencia ellenőrzés
 - [`1230_sync_predictions.md`](1230_sync_predictions.md) — `sync_predictions` cutover végrehajtás
 - [`0003_runtime_flow.md`](0003_runtime_flow.md) — teljes deploy/cutover narratíva
-- [`../methodology_doc/1500_registry.md`](../methodology_doc/1500_registry.md) — registry módszertan
+- [`../methodology_doc/1500_registry.md`](1500_registry.md) — registry módszertan

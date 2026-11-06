@@ -2,31 +2,26 @@
 
 Covers the IO-free SQL builders and an end-to-end CTAS over a synthetic snapshot
 table in an in-memory DuckDB connection, validating the deterministic hourly
-select + walk-forward fold_id semantics and the reg.feature_sets contract.
+select + train/valid split semantics and the reg.feature_sets contract.
 """
 
 from __future__ import annotations
-
-from datetime import datetime, timedelta
 
 import duckdb
 import pytest
 
 from data_handling.store import registry
-from modeling.sampling.create_sample import create_snapshot_sample
+from modeling.sampling.create_sample import create_snapshot_sample_train_valid_split
 from modeling.sampling.snapshot_sampler import (
     build_feature_set_id,
-    build_fold_case_sql,
-    build_sample_ctas_sql,
     sample_table_fqn,
     snapshot_table_fqn,
 )
-from modeling.sampling.yearly_sampler import generate_walk_forward_folds
 
 pytestmark = pytest.mark.smoke
 
-SNAPSHOT_ID = "solusdt_fw60_2023__deadbeef"
-MODEL_ID    = "lgbm_solusdt_l_fw60_2023_v1"
+SNAPSHOT_ID = "solusdt_fw60_2024__deadbeef"
+MODEL_ID    = "lgbm_solusdt_l_fw60_2024_v1"
 TARGET      = "long_mfe_fw60"
 
 
@@ -57,33 +52,21 @@ def test_feature_set_id_changes_with_selection() -> None:
     assert a != b
 
 
-def test_empty_fold_windows_yield_zero_case() -> None:
-    assert build_fold_case_sql([]) == "CAST(0 AS TINYINT)"
-
-
-def test_fold_case_contains_each_fold() -> None:
-    folds = generate_walk_forward_folds(year=2023, n_folds=4)
-    case_sql = build_fold_case_sql(folds)
-    for fw in folds:
-        assert f"THEN {fw['fold_id']}" in case_sql
-    assert "ELSE 0" in case_sql
-
-
-def test_ctas_sql_wraps_create_or_replace() -> None:
-    folds = generate_walk_forward_folds(year=2023, n_folds=4)
-    sql = build_sample_ctas_sql(MODEL_ID, SNAPSHOT_ID, seed=42, target_cols=[TARGET], fold_time_windows=folds)
-    assert sql.startswith(f'CREATE OR REPLACE TABLE model."{MODEL_ID}__sample" AS')
-    assert f'FROM snap."{SNAPSHOT_ID}"' in sql
-
-
 # ---------------------------------------------------------------------------
 # End-to-end: synthetic snapshot -> model.__sample + reg.feature_sets
 # ---------------------------------------------------------------------------
 
+_SPLIT: dict[str, str] = {
+    "train_start": "2024-01-01",
+    "train_end":   "2024-01-31",
+    "valid_start": "2024-02-01",
+    "valid_end":   "2024-02-28",
+}
+
 
 def _build_lab_with_snapshot(tmp_path) -> duckdb.DuckDBPyConnection:
     """In-memory lab connection with snap/model schemas, reg attached, and a
-    synthetic minute-level snapshot table spanning the 2023 walk-forward range."""
+    synthetic minute-level snapshot table covering January-February 2024."""
     reg_path = str(tmp_path / "registry.duckdb")
     registry.ensure_registry(reg_path)
 
@@ -92,56 +75,52 @@ def _build_lab_with_snapshot(tmp_path) -> duckdb.DuckDBPyConnection:
     conn.execute("CREATE SCHEMA snap")
     conn.execute("CREATE SCHEMA model")
 
-    # 200 days of minute bars from 2023-08-01 (covers folds 1..4 validation windows).
-    start = datetime(2023, 8, 1)
-    rows = []
-    for i in range(200 * 24 * 60):
-        t = start + timedelta(minutes=i)
-        rows.append((t, 1.5 + (i % 7) * 0.1, 0.4 + (i % 3) * 0.05))
     conn.execute(
-        f'CREATE TABLE snap."{SNAPSHOT_ID}" '
-        "(open_time TIMESTAMP, feat_a DOUBLE, long_mfe_fw60 DOUBLE)"
-    )
-    conn.executemany(
-        f'INSERT INTO snap."{SNAPSHOT_ID}" VALUES (?, ?, ?)', rows
+        f'''CREATE TABLE snap."{SNAPSHOT_ID}" AS
+        SELECT
+            ts AS open_time,
+            1.5 + (i % 7) * 0.1 AS feat_a,
+            0.4 + (i % 3) * 0.05 AS long_mfe_fw60
+        FROM (
+            SELECT TIMESTAMP '2024-01-01 00:00:00' + INTERVAL (i) MINUTE AS ts, i
+            FROM range(60 * 24 * 60) t(i)
+        )'''
     )
     return conn
 
 
-def test_create_snapshot_sample_end_to_end(tmp_path) -> None:
+def _create(conn) -> dict:
+    return create_snapshot_sample_train_valid_split(
+        conn=conn, model_id=MODEL_ID, snapshot_id=SNAPSHOT_ID, asset_id="solusdt",
+        target_cols=[TARGET], seed=42, selected_cols=["feat_a"],
+        train_start=_SPLIT["train_start"], train_end=_SPLIT["train_end"],
+        valid_start=_SPLIT["valid_start"], valid_end=_SPLIT["valid_end"],
+    )
+
+
+def test_create_sample_end_to_end(tmp_path) -> None:
     conn = _build_lab_with_snapshot(tmp_path)
     try:
-        summary = create_snapshot_sample(
-            conn        = conn,
-            model_id    = MODEL_ID,
-            snapshot_id = SNAPSHOT_ID,
-            asset_id    = "solusdt",
-            target_cols = [TARGET],
-            year        = 2023,
-            seed        = 2065,
-            selected_cols = ["feat_a"],
-        )
+        summary = _create(conn)
 
         # Sample table exists with exactly the small projection.
         cols = [d[0] for d in conn.execute(f'SELECT * FROM model."{MODEL_ID}__sample" LIMIT 0').description]
-        assert cols == ["open_time", TARGET, "fold_id"]
+        assert cols == ["open_time", TARGET, "split"]
 
         # Hourly select: at most one row per hour.
         dup = conn.execute(
-            f'SELECT COUNT(*) FROM (SELECT date_trunc(\'hour\', open_time) h, COUNT(*) c '
+            f"SELECT COUNT(*) FROM (SELECT date_trunc('hour', open_time) h, COUNT(*) c "
             f'FROM model."{MODEL_ID}__sample" GROUP BY h HAVING c > 1)'
         ).fetchone()
         assert dup is not None and dup[0] == 0
 
-        # fold_id is Int8/TINYINT and within 0..4.
-        ftype = conn.execute(
+        # split is TINYINT with both train (0) and valid (1) rows present.
+        stype = conn.execute(
             f"SELECT data_type FROM information_schema.columns "
-            f"WHERE table_schema='model' AND table_name='{MODEL_ID}__sample' AND column_name='fold_id'"
+            f"WHERE table_schema='model' AND table_name='{MODEL_ID}__sample' AND column_name='split'"
         ).fetchone()
-        assert ftype is not None and "TINYINT" in ftype[0].upper()
-        fold_vals = {int(r[0]) for r in conn.execute(f'SELECT DISTINCT fold_id FROM model."{MODEL_ID}__sample"').fetchall()}
-        assert fold_vals <= {0, 1, 2, 3, 4}
-        assert 0 in fold_vals  # train-only rows present
+        assert stype is not None and "TINYINT" in stype[0].upper()
+        assert set(summary["split_row_counts"]) == {"0", "1"}
 
         assert summary["n_rows"] > 0
         assert summary["n_input"] == 1
@@ -163,20 +142,15 @@ def test_create_snapshot_sample_end_to_end(tmp_path) -> None:
         conn.close()
 
 
-def test_create_snapshot_sample_deterministic(tmp_path) -> None:
+def test_create_sample_deterministic(tmp_path) -> None:
     """Same (snapshot, seed) -> bit-identical sample (immutable source + fixed seed)."""
     conn = _build_lab_with_snapshot(tmp_path)
     try:
-        create_snapshot_sample(
-            conn=conn, model_id=MODEL_ID, snapshot_id=SNAPSHOT_ID, asset_id="solusdt",
-            target_cols=[TARGET], year=2023, seed=2065, selected_cols=["feat_a"],
-        )
-        first = conn.execute(f'SELECT open_time, fold_id FROM model."{MODEL_ID}__sample" ORDER BY open_time').fetchall()
-        create_snapshot_sample(
-            conn=conn, model_id=MODEL_ID, snapshot_id=SNAPSHOT_ID, asset_id="solusdt",
-            target_cols=[TARGET], year=2023, seed=2065, selected_cols=["feat_a"],
-        )
-        second = conn.execute(f'SELECT open_time, fold_id FROM model."{MODEL_ID}__sample" ORDER BY open_time').fetchall()
+        query = f'SELECT open_time, split FROM model."{MODEL_ID}__sample" ORDER BY open_time'
+        _create(conn)
+        first = conn.execute(query).fetchall()
+        _create(conn)
+        second = conn.execute(query).fetchall()
         assert first == second
     finally:
         conn.close()
@@ -190,9 +164,11 @@ def test_missing_snapshot_raises(tmp_path) -> None:
     conn.execute("CREATE SCHEMA snap")
     try:
         with pytest.raises(ValueError, match="not found"):
-            create_snapshot_sample(
+            create_snapshot_sample_train_valid_split(
                 conn=conn, model_id=MODEL_ID, snapshot_id="nope", asset_id="solusdt",
-                target_cols=[TARGET], year=2023, seed=42,
+                target_cols=[TARGET],
+                train_start=_SPLIT["train_start"], train_end=_SPLIT["train_end"],
+                valid_start=_SPLIT["valid_start"], valid_end=_SPLIT["valid_end"],
             )
     finally:
         conn.close()

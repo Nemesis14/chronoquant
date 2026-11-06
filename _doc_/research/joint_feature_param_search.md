@@ -96,7 +96,7 @@ A K=5 modellnél a cutoff 0.90–0.96 között azonos n_trades (420) és azonos 
 
 **A joint K=57 a nyertes:** 50.1% compounded return vs 30.3%, 79.5% win rate vs 52.4%. A gap regularizáció (λ=0.2) ugyan megoldja a train-valid gap problémát, de azzal egyidejűleg a modell komplexitását és prediktív erejét is lecsökkenti.
 
-**A joint search (gap_penalty=0, feature_selection="joint") az éles pipeline standard megközelítése.** A gap_penalty kutatási opcióként megmarad a kódban, de a módszertani alapértelmezett 0.
+**A joint search (gap_penalty=0, feature_selection="joint") az éles pipeline standard megközelítése.** A gap_penalty paraméter a kódból törlődött (t895); a régi `search_joint_reg_gp*` kísérletek nem reprodukálhatók, az alapértelmezett mindig 0 volt.
 
 **HTML reportok:** az összes search variáns HTML reportja az artifact könyvtárban érhető el:
 - `artifacts/lgbm_solusdt_l_fw60_2101_2605/search_joint/search_report.html`

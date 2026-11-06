@@ -49,7 +49,7 @@ Ruff always CLI (`--fix` auto-applies; MCP cannot do this).
 - Prefer native DuckDB SQL for filtering, joining, aggregation, window functions, sampling, and large scans.
 - Use Polars when transformations are large, in-memory, or awkward to express clearly in SQL.
 - Use pandas only for small final display tables, seaborn/matplotlib plotting inputs, or cases where DuckDB/Polars are impractical.
-- Analysis helpers under `analyst/` follow the same typing, docstring, logging, and organization rules as other Python modules.
+- Report builders under `src/reports/builders/` follow the same typing, docstring, logging, and organization rules as other Python modules.
 - Analysis helpers must not write to DuckDB, mutate production tables, or change model artifacts unless explicitly requested.
 
 ---
@@ -192,7 +192,7 @@ src/<domain>/               ← module root
 - The module root contains **only** scripts (`NN_name.py`) and `__init__.py` — no loose library `.py` files.
 - Scripts are thin CLI wrappers; all reusable logic belongs in a submodule folder.
 - Scripts are numbered (`00_`, `01_`, …) when execution order is defined.
-- Submodule folders group files **by topic** (e.g., `sampling/`, `training/`, `search/`, `evaluation/`).
+- Submodule folders group files **by topic** (e.g., `sampling/`, `training/`, `search/`).
 - Tests live next to the owning module under `src/<module>/tests/`.
 - Tests mirror the submodule structure: `src/<module>/tests/<submodule>/<type>/test_*.py`.
 

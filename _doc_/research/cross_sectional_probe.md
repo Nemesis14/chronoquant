@@ -242,3 +242,9 @@ ahol tudjuk, hogy veszteséges (−2,78 bps/kötés).
 4. **Kockázat-kiegyenlített súlyozás** és a margin/likvidációs modell.
 
 ⚠️ Éles tőke egyik lépés előtt sem.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/{cross_sectional_probe,cross_sectional_ranker}.py`, `src/data_handling/collectors/universe/`, `sync_tables/sync_universe_{features,target}.py`.

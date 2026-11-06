@@ -10,7 +10,7 @@ are granted by the active runtime — this file documents the expected profile.
 | Capability | CLAUDE.md | Database Agent | Modeling Agent | UI Agent | Doc Agent |
 |-----------|:---------:|:--------------:|:--------------:|:--------:|:---------:|
 | File read | yes | yes | yes | yes | yes |
-| File edit/write | `_jira_/` only | `src/data_handling/` | `src/modeling/` | `src/ui/`, `src/trading/` | `.agent/`, config |
+| File edit/write | `_jira_/` only | `src/data_handling/` | `src/modeling/` | `src/api/`, `src/worker/`, `src/cq_mcp/`, `src/sentiment/`, `frontend/`, `scripts/` | `.agent/`, config |
 | Shell / PowerShell | no | yes | yes | yes | yes |
 | MCP language-server | no | yes | yes | yes | no |
 | Web access | no | on demand | on demand | no | on demand |

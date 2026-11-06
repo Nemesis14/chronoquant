@@ -148,3 +148,9 @@ egyszerűen **kevés a jel**: a modell ~+9pp liftet ad, ahol ~+15pp kellene.
   irány-jel **strukturálisan kicsi** ezen a horizonton. Ezt az `epic_062`
   (cross-sectional) kerüli meg: ott nem abszolút irányt kell eltalálni,
   hanem relatív sorrendet — és a modell dokumentáltan azt tudja.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/{triple_barrier_eval,walk_forward_tb}.py`.

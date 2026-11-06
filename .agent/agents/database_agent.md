@@ -29,8 +29,8 @@ Load on demand (only when relevant):
 
 Load relevant module docs (only for affected modules):
 
-- `_doc_/1000_database.md` — if touching database schema
-- `_doc_/1200_sync_tables.md` — if touching sync tables
+- `_doc_/database_and_code_doc/1000_database.md`, `0002_data_architecture.md` — if touching database schema
+- `_doc_/database_and_code_doc/1200_sync_tables.md` — if touching sync tables
 
 ---
 
@@ -38,13 +38,13 @@ Load relevant module docs (only for affected modules):
 
 | Path | Responsibility |
 |------|---------------|
-| `src/data_handling/store/` | DuckDB store, queries, maintenance, validation, stats, toolkit |
+| `src/data_handling/store/` | DuckDB store, queries, maintenance, validation, stats |
 | `src/data_handling/sync_tables/` | OHLCV sync, feature sync, prediction sync, target sync, rebuild derived |
-| `src/data_handling/01_validate_stats.py`, `src/data_handling/02_sync_pipeline.py`, `src/data_handling/03_build_quant_train.py` | Operational entry points |
+| `src/data_handling/01_validate_stats.py`, `src/data_handling/02_sync_pipeline.py`, `src/data_handling/03_build_quant_train.py`, `src/data_handling/07_query_readonly.py` | Operational entry points (07 = csak-olvasó SQL CLI) |
 | `config/assets.json` | Asset configuration |
 | `src/utils.py` | Config-loading helpers (shared — coordinate with others) |
 | `src/data_handling/tests/store/`, `src/data_handling/tests/sync_tables/`, `src/data_handling/tests/sync_pipeline/` | Tests for this layer |
-| `_doc_/store/`, `_doc_/data_pipeline/` | Module documentation |
+| `src/data_handling/collectors/` | Külső adatforrás kliensek (tradingview) |
 
 ---
 
@@ -61,6 +61,8 @@ Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 - Timestamps: UTC strings `YYYY-MM-DD HH:MM:SS`
 - Idempotent upserts by `open_time` — all sync ops safe to re-run
 - Primary active asset: SOLUSDT — do not spend time on bchusdt paths
+- A DuckDB írója a sync (CLI vagy `src/worker` job); az `src/api` csak read-only nyit — ne adj API-nak írási utat
+- A régi altdata / analyst_signal / universe táblák és collectorok törölve (epic_068) — ne építs rájuk
 
 ---
 

@@ -116,68 +116,6 @@ def _sl_lr_array(sl_spec: str, tp_lr: np.ndarray) -> np.ndarray:
     raise ValueError(f"Unknown sl_spec: {sl_spec!r}")
 
 
-# %% Scalar helpers (kept for external use and backward-compatibility)
-
-
-def _resolve_tp_lr(
-    tp_spec       : str,
-    bucket_mean   : float,
-    bucket_median : float,
-    bucket_p75    : float,
-) -> float:
-    """Compute the take-profit log-return for a single entry bar.
-
-    Args:
-        tp_spec       : One of the TP_SPECS constants.
-        bucket_mean   : Bucket mean MFE for the entry bar.
-        bucket_median : Bucket median MFE for the entry bar.
-        bucket_p75    : Bucket 75th-percentile MFE for the entry bar.
-
-    Returns:
-        Take-profit log-return (scalar).
-
-    Raises:
-        ValueError: If tp_spec is not recognised.
-    """
-    if tp_spec == "bucket_mean_mfe":
-        return bucket_mean
-    if tp_spec == "bucket_median_mfe":
-        return bucket_median
-    if tp_spec == "bucket_p75_mfe":
-        return bucket_p75
-    if tp_spec == "0.75x_bucket_mean":
-        return 0.75 * bucket_mean
-    if tp_spec == "0.50x_bucket_mean":
-        return 0.50 * bucket_mean
-    raise ValueError(f"Unknown tp_spec: {tp_spec!r}")
-
-
-def _resolve_sl_lr(sl_spec: str, tp_lr: float) -> float:
-    """Compute the stop-loss log-return given a tp_lr.
-
-    Args:
-        sl_spec : One of the SL_SPECS constants.
-        tp_lr   : The resolved take-profit log-return.
-
-    Returns:
-        Stop-loss magnitude (>= 0.0).  Zero means no stop-loss.
-
-    Raises:
-        ValueError: If sl_spec is not recognised.
-    """
-    if sl_spec == "none":
-        return 0.0
-    if sl_spec == "0.5x_tp":
-        return 0.5 * tp_lr
-    if sl_spec == "1.0x_tp":
-        return 1.0 * tp_lr
-    if sl_spec == "1.5x_tp":
-        return 1.5 * tp_lr
-    if sl_spec == "2.0x_tp":
-        return 2.0 * tp_lr
-    raise ValueError(f"Unknown sl_spec: {sl_spec!r}")
-
-
 # %% Fast inner simulation (pre-extracted numpy arrays)
 
 

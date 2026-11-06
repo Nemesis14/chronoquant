@@ -1,1 +1,1 @@
-"""Trading module: live trading service, exchange client, journal, state machine."""
+"""Trading module: journal (trading.duckdb schema reference)."""

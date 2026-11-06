@@ -47,7 +47,7 @@ def _connect_with_retry(db_path: str, attempts: int = 12) -> duckdb.DuckDBPyConn
         except duckdb.IOException:
             time.sleep(5)
     raise RuntimeError(
-        "A live DuckDB tartosan zarolt -- fut meg a Streamlit dashboard?"
+        "A live DuckDB tartosan zarolt -- fut meg a worker sync vagy egy masik iro folyamat?"
     )
 
 

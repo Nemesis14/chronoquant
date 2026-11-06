@@ -192,14 +192,13 @@ Zárd le a sessiont, ha az adott fázis kész — ne tarts orchestrátort nyitva
 | Domain | Agent |
 |--------|-------|
 | `src/data_handling/` (store, sync_tables), DuckDB, Parquet | `database_agent` |
-| `src/modeling/` (sampling, training, evaluation, feature_engineering), model artifacts | `modeling_agent` |
+| `src/modeling/` (sampling, training, search, pipeline), model artifacts | `modeling_agent` |
 | `src/strategy/` (isotonic calibration, Optuna sweep, strategy artifacts) | `modeling_agent` |
-| `src/trading/` (live service, journal, exchange client) | `ui_agent` |
-| `src/ui/` (Streamlit dashboard, pages, components) | `ui_agent` |
+| `src/api/` (FastAPI BFF, chat), `src/worker/`, `src/cq_mcp/` (chronoquant MCP), `src/sentiment/`, `frontend/` (React UI), `scripts/` (dev/start/stop/autostart), `src/trading/live/journal.py` | `ui_agent` |
 | `.agent/`, tooling, infra, dependencies; `_doc_/database_and_code_doc/` (kód-referencia zóna) | `code_doc_agent` |
-| `_doc_/models_doc/` (modell-report notebookok, .ipynb→Quarto), ML EDA | `analyst_agent` |
+| `src/reports/` builderek + report-formátum (`artifacts/<model_id>/reports/`, `_doc_/reports/`), `_doc_/models_doc/` (modell-elemzések, md), ML EDA | `analyst_agent` |
 | `_doc_/methodology_doc/` (X000/X100 módszertani háttér és üzleti rationale, kód-mentes) | `methodology_agent` |
-| `research/` | `analyst_agent` |
+| `_doc_/research/` (lezárt kutatások md összefoglalói; a `research/` mappa megszűnt) | `analyst_agent` |
 | `pr_` ticketek validálása, tesztelés, javítás | `validator_agent` |
 
 Ha egy task több domaint érint: bontsd szét több taskra, minden taskhoz egy agent.

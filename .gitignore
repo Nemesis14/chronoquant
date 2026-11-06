@@ -32,7 +32,7 @@ dist/
 .pytest_cache/
 
 # =============================================================================
-# Rendered documents / generated site assets
+# Misc generated
 # =============================================================================
 plan.html
 plan_files/
@@ -52,16 +52,12 @@ plan_files/
 .mcp.json
 .claude/settings.local.json
 
-# Local tooling binaries (aria2c, torrent metadata) — not part of the repo
-tools/
-
 # =============================================================================
-# Research outputs / generated docs (nem verziózott)
+# Generated / experimental outputs (TV report kimenet: data/tv_report/, a data/ már ignorált)
 # =============================================================================
-research/tv_report/
-research/ma_cross/
-research/rsi_divergence/
-_chronoquant_docs.ipynb
-_chronoquant_docs.html
-_chronoquant_docs_files/
+data/tv_report/
 artifacts/_experiments/
+
+# frontend (epic_068)
+frontend/node_modules/
+frontend/dist/

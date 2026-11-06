@@ -36,6 +36,7 @@ Do NOT load:
 | `.agent/agents/` | Agent manifests — update when agent roles evolve |
 | `.agent/skills/` | Skill files — update when workflows change |
 | `.agent/tools/` | Tool docs — update when tools change |
+| `scripts/` (doksi-egyezés) | Csak a dokumentáció ellenőrzése; a scriptek a ui_agent területe |
 | `_doc_/database_and_code_doc/` | **Kizárólagos író.** Implementation zóna: DB séma, kód-referencia (X110 + kód-jellegű X100, pl. `2100_sync_features`, `4100_quant_train`), függvény API, paraméterek, CLI, mermaid/UML — teljes .py szintű leírás |
 | `pyproject.toml`, `uv.lock` | Dependency management via `uv` |
 | `.mcp.json` | MCP server config (gitignored, machine-specific) |
@@ -66,7 +67,7 @@ le ide.
 - `_jira_/` task content (Orchestrator creates tasks; Doc Agent only maintains the skill file)
 - `_doc_/methodology_doc/` — methodology zóna, a `methodology_agent` kizárólagos területe;
   ha egy methodology doc hiányzik, ne töltsd ki — nyiss `todo_` ticketet a `methodology_agent`-nek
-- `_doc_/models_doc/` — modell-report zóna, az `analyst_agent` kizárólagos területe
+- `_doc_/models_doc/`, `_doc_/research/`, `_doc_/reports/` — az `analyst_agent` kizárólagos zónái (md elemzések, kutatási összefoglalók, report-formátum riportok)
 
 ---
 

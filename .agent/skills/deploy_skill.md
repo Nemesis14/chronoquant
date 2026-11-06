@@ -64,7 +64,7 @@ egyetlen tranzakcióban hajtja végre:
   ```sql
   SELECT COUNT(*), MIN(open_time), MAX(open_time), model_id FROM main.predictions GROUP BY model_id;
   ```
-- [ ] UI: predictions tábla frissül (Streamlit dashboard — live data tab)
+- [ ] UI: predictions tábla frissül (React dashboard — `/api/predictions/latest`)
 - [ ] Trading service: következő döntési ciklus az új stratégia `strategy_artifact.json`-ját tölti be
 - [ ] `reg.deployments` aktív bejegyzés ellenőrzése
 

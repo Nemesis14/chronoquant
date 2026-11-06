@@ -33,7 +33,7 @@ Chapter assignment:
 | 5000–5999 | Sampling / Modelling (sampling, training, evaluation) |
 | 6000–6999 | Strategy (isotonic calibration, Optuna) |
 | 7000–7999 | Trading Runtime (live service, journal, exchange) |
-| 8000–8999 | UI Dashboard (Streamlit pages, components) |
+| 8000–8999 | UI Dashboard (BFF/React UI: api, worker, MCP, reports, frontend) |
 
 If no number exists for a new submodule: assign the next available X100 slot
 within the domain's range.
@@ -50,8 +50,7 @@ Before writing any section:
    - Copy rationale verbatim, then rewrite in doc style
 2. **Read `src/<module>/`** — implementation is ground truth for what was actually decided
 3. **Read `config/`** entries for parameter values
-4. **Check `docs/` legacy** for any narrative rationale worth migrating; if content contradicts current code, trust the code
-5. **Check `_doc_/models_doc/`** for empirical findings relevant to this module
+4. **Check `_doc_/models_doc/`** for empirical findings relevant to this module
 
 ---
 
@@ -165,16 +164,16 @@ Minimum five items. Items must be actionable checks, not vague goals.
 
 ## Incorporating Analyst Findings
 
-If `_doc_/models_doc/` contains a notebook with findings for this module:
+If `_doc_/models_doc/`, `_doc_/research/` or `_doc_/reports/` contains an analysis with findings for this module:
 
-1. Read the Summary section of the notebook
+1. Read the summary/interpretation section of the analysis
 2. Translate relevant findings into methodology notes:
    - Confirmed assumptions → add to "Miért ezt a megközelítést?" as empirical support
    - Risk observations → add a row to "Ismert kockázatok és korlátok"
    - Calibration or distribution issues → named risk row with known mitigation status
 3. Cite the source:
    ```markdown
-   Forrás: `_doc_/models_doc/<slug>.ipynb` — <dátum>, <finding title>
+   Forrás: `_doc_/models_doc/<slug>.md` — <dátum>, <finding title>
    ```
 
 ---

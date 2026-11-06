@@ -154,18 +154,18 @@ a kód-referencia szintű összefoglalás.
 | **I7** | `feature_set.json["provenance"]` tartalmaz: `snapshot_id`, `sample_table`, `sample_rows`, `joined_rows`, `min_open_time`, `max_open_time`, `source_contract: "snap ⋈ model.__sample"` | FE notebook + `sample_scope.py` |
 
 Metodológiai háttér (miért, alternatívák, döntések):
-→ [5000_modelling.md](../methodology_doc/5000_modelling.md) — I1-I7 teljes invariáns-rationale, A vs B döntés, provenance szerződés, predict aszimmetria
-→ [5400_sampling.md](../methodology_doc/5400_sampling.md) — I1, I2, I5 sampling nézőpontból; sorpontos scope vs. időablakos szűkítés
-→ [5600_model_training.md](../methodology_doc/5600_model_training.md) — I2 invariáns training kontextusa
+→ [5000_modelling.md](../methodology_doc/0000_overview.md) — I1-I7 teljes invariáns-rationale, A vs B döntés, provenance szerződés, predict aszimmetria
+→ [5400_sampling.md](../methodology_doc/3000_sampling.md) — I1, I2, I5 sampling nézőpontból; sorpontos scope vs. időablakos szűkítés
+→ [5600_model_training.md](../methodology_doc/5100_training.md) — I2 invariáns training kontextusa
 
 ---
 
 ## Kapcsolódó dokumentumok
 
-- [`_doc_/1000_database.md`](1000_database.md) — teljes DuckDB séma áttekintő
-- [`_doc_/1110_duckdb_store.md`](1110_duckdb_store.md) — store réteg
-- [`_doc_/3100_sync_targets.md`](3100_sync_targets.md) — target tábla és fw60 outcome-ok
-- [`_doc_/3000_targets.md`](../methodology_doc/3000_targets.md) — target layer módszertani háttér
-- [`_doc_/5010_sampling_yearly.md`](../methodology_doc/5010_sampling_yearly.md) — aktív yearly sampling metodológia
-- [`_doc_/5300_create_sample.md`](5300_create_sample.md) — `create_model_sample` snap-natív sampling kód-ref
-- [`_doc_/0004_model_lifecycle.md`](0004_model_lifecycle.md) — teljes modell életciklus
+- [`_doc_/database_and_code_doc/1000_database.md`](1000_database.md) — teljes DuckDB séma áttekintő
+- [`_doc_/database_and_code_doc/1110_duckdb_store.md`](1110_duckdb_store.md) — store réteg
+- [`_doc_/database_and_code_doc/3100_sync_targets.md`](3100_sync_targets.md) — target tábla és fw60 outcome-ok
+- [`_doc_/methodology_doc/2000_targets.md`](../methodology_doc/2000_targets.md) — target layer módszertani háttér
+- [`_doc_/methodology_doc/3000_sampling.md`](../methodology_doc/3000_sampling.md) — aktív yearly sampling metodológia
+- [`_doc_/database_and_code_doc/5300_create_sample.md`](5300_create_sample.md) — `create_model_sample` snap-natív sampling kód-ref
+- [`_doc_/database_and_code_doc/0004_model_lifecycle.md`](0004_model_lifecycle.md) — teljes modell életciklus

@@ -92,8 +92,8 @@ def test_create_snapshot_is_immutable_on_rerun(tmp_path: Path) -> None:
         assert n is not None and n[0] == 0
 
         # exactly one reg.snapshots row for this asset
-        rows = registry.list_rows(conn, "snapshots")
-        assert len(rows) == 1
+        n_rows = conn.execute("SELECT COUNT(*) FROM reg.snapshots").fetchone()
+        assert n_rows is not None and n_rows[0] == 1
     finally:
         conn.close()
 

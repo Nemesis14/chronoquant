@@ -168,3 +168,9 @@ alapértéktől mért **eltérés** a használható jel, trailing normalizálás
 
 **Adatablak a modellezéshez:** 2022-01-01 → (a `metrics` 2021-12-01-es kezdete
 miatt), valid a championnel azonos: 2026-02-01 → 2026-07-31.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/data_handling/collectors/derivatives/{vision,liquidations,load}.py`.

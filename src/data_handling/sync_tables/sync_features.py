@@ -30,7 +30,6 @@ import polars as pl
 
 import utils
 from data_handling.store.duckdb_query import (
-    asof_join_predictions_features,
     dataset_columns,
     dataset_exists,
     query_range_pl,
@@ -39,7 +38,7 @@ from data_handling.store.duckdb_store import ensure_tables, get_connection, inse
 from data_handling.sync_tables._features_polars import compute_features_polars
 
 if TYPE_CHECKING:
-    import pandas as pd
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -143,32 +142,3 @@ def sync_features(
     finally:
         conn.close()
     logger.info("OK: %d feature sor szamolva, %d uj sor irva", len(df_final), written)
-
-
-def build_lag_snapshot(
-    db_path      : str,
-    feature_cols : list[str] | None = None,
-    start        : str | None = None,
-    end          : str | None = None,
-) -> pd.DataFrame:
-    """Build a modeling-ready feature snapshot using ASOF JOIN.
-
-    Joins each prediction timestamp to the most recently available feature
-    row (available_ts <= prediction_ts), ensuring temporal correctness.
-    Output contains prediction_ts and lookback_end_ts as explicit columns.
-
-    Args:
-        db_path      : Absolute path to the asset .duckdb file.
-        feature_cols : Feature columns to include. None = all feat_* columns.
-        start        : Optional lower bound on prediction_ts.
-        end          : Optional upper bound on prediction_ts.
-
-    Returns:
-        DataFrame with prediction_ts, lookback_end_ts, and feature columns.
-    """
-    return asof_join_predictions_features(
-        db_path,
-        feature_cols = feature_cols,
-        start        = start,
-        end          = end,
-    )

@@ -37,6 +37,8 @@ ARTIFACT_KINDS: tuple[str, ...] = (
     "manifest",
     "fe_notebook",
     "fe_html",
+    "fe_feature_set",
+    "fe_report",
     "search_best",
     "search_trials",
     "search_summary",

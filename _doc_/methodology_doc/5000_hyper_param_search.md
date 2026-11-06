@@ -68,7 +68,7 @@ Az optimizer egyszerre keres optimális paramétereket és optimális feature-sz
 |---|---|---|---|
 | **Joint search (feature_k + params)** | Feature-szám és params egyszerre optimalizált; gain-rank jó prior | ~2× trial-idő nagy K-nál, mint kis K-nál | ✅ Aktív |
 | Fix feature lista (összes selected) | Egyszerűbb | Nincs mechanizmus kevesebb feature felé; overfit a search-ben magas | Baseline / research |
-| Gap penalty (λ > 0) | Közel nulla train-valid gap | Elveszi a modell komplexitását → discriminative power csökken | Kutatási opció — nem éles |
+| Gap penalty (λ > 0) | Közel nulla train-valid gap | Elveszi a modell komplexitását → discriminative power csökken | ❌ Megszüntetve (korábban használt; lásd Gap penalty szakasz) |
 | Walk-forward CV | Több ablak → robusztusabb | Implementációs hiba (`_fold_split_walk_forward`); kivezetett | ❌ Kivezetett |
 | Csak RMSE objective | Egyszerű | Gyenge top-decile rangsor | ❌ Elvetett |
 
@@ -123,14 +123,9 @@ flowchart LR
 
 ## Gap Penalty és Best Trial Kiválasztás
 
-### Gap penalty — aktív állapot
+### Gap penalty — megszüntetve
 
-A `gap_penalty = 0.0` az éles konfiguráció. A gap penalty (λ > 0) kipróbált kutatási opció, de éles konfigurációban nem használt: a train-valid gap büntetése csökkentette a modell diszkriminatív erejét anélkül, hogy mérhetően javította volna a live stratégia teljesítményét.
-
-| Konfig | Státusz | Indoklás |
-|---|---|---|
-| `gap_penalty = 0.0` | Aktív (éles) | Csak a valid lift számít |
-| `gap_penalty > 0` (pl. λ=1.0) | Kutatási opció | Közelebb nulla gap, de gyengébb top-decile rangsor |
+Korábban használt, megszüntetve: a train-valid gap penalty (`gap_penalty`, λ) a keresési paraméterek közül kikerült, az aktuális keresés gap penalty nélkül fut. A régi gap penalty-kísérletek nem reprodukálhatók (a konfiguráció nem volt teljesen rögzítve), ezért eredményeik nem hivatkozhatók.
 
 ### Best trial kiválasztás
 
@@ -153,7 +148,7 @@ A best-params-szal fitelt modellnél néhány feature (a `feature_k`-on belül) 
 | `feature_k` | Optuna integer, log-scale | Log-scale favorizálja a kis K-t; 3 az abszolút minimum |
 | Max trial | `100` | Felső korlát; valid set overfitting elleni védelem |
 | Search objective | `valid_ratio_p925` (long) / `valid_ratio_p075` (short) | Közvetlenül a strategy céljával összhangban |
-| `gap_penalty` | `0.0` | Éles pipeline nem használ gap penalty-t |
+| `gap_penalty` | — | Megszüntetve (korábban használt; lásd Gap penalty szakasz) |
 
 ### Ismert kockázatok és korlátok
 
@@ -162,7 +157,6 @@ A best-params-szal fitelt modellnél néhány feature (a `feature_k`-on belül) 
 | Valid set overfitting | Szép search score, gyenge out-of-sample stratégia | Max 100 trial; gain-rank prior a feature-sorrendhez |
 | Feature drift | A gain_rank más rezsimben más sorrendet ad | Periodikus re-run; ha a best K jelentősen változik, modell re-train |
 | Snapshotváltás | Más adatverzió ugyanahhoz a model_id-hoz | Registry link kötelező minden search futásnál |
-| Gap penalty bekapcsolása tévesen | Discriminative power elvész | Kizárólag `gap_penalty = 0.0` az éles konfigurációban |
 
 ### Validációs checklist
 
@@ -170,7 +164,6 @@ A best-params-szal fitelt modellnél néhány feature (a `feature_k`-on belül) 
 - [ ] `feature_selection="joint"`, `direction` a modell irányával konzisztens
 - [ ] A valid periódus 2025-05-01 – 2026-05-31 (sampling config-gal összhangban)
 - [ ] A search objective: long → `valid_ratio_p925`; short → `valid_ratio_p075`
-- [ ] `gap_penalty = 0.0` — nincs gap büntetés az éles konfigurációban
 - [ ] `run_prune()` lefutott, `pruned_joint` létezik a feature_set-ben
 - [ ] A `best_params` és `search_best` artifact ugyanahhoz a search tag-hez tartozik
 - [ ] A training lépés a `pruned_joint` feature listát és a megfelelő `search_tag`-et használja

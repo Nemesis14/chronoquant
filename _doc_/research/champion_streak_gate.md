@@ -8,7 +8,7 @@ shortra, és tartjuk napokig. Működik-e ez?
 **Válasz.** Nem mérhető ki. A valid időszakban egyetlen beállítás sem veri
 azt, hogy egyszerűen tartjuk ugyanazt az irányt — a legjobb `t = 1,19`.
 
-Kód: [champion_streak_test.py](../../src/modeling/experiments/champion_streak_test.py).
+Kód: `champion_streak_test.py`.
 
 ---
 
@@ -152,3 +152,9 @@ teljes történeten ~4 év out-of-sample rekord keletkezne 6 hónap helyett. A
 
 Enélkül a kérdés eldönthetetlen, és semmilyen további szabály-változat nem
 segít — az mind ugyanazon a 15 epizódon futna.
+
+---
+
+## Kód a git historyban
+
+A kísérleti kód a repóból törlődik (epic_068, t894/t895). Törlés előtti állapot: commit `73f2156`, útvonalak: `src/modeling/experiments/champion_streak_test.py`.

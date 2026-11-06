@@ -16,6 +16,7 @@ from ui.components.formatting import MUTED as _MUTED
 from ui.components.formatting import PANEL as _PANEL
 from ui.components.formatting import RED as _RED
 from ui.components.formatting import TEXT as _TEXT
+from ui.components.formatting import scaled
 
 CHART_LOAD_LOOKBACK_HOURS = 24
 CHART_INITIAL_FOCUS_HOURS = 24
@@ -159,7 +160,7 @@ def prediction_price_figure(
             xref="paper", yref="y3 domain",
             text="no strategy thresholds configured",
             showarrow=False, xanchor="left", yanchor="bottom",
-            font={"color": _MUTED, "size": 10},
+            font={"color": _MUTED, "size": scaled(10)},
         )
 
     return _style_figure(fig, x_start=x_start, x_end=x_end, y2_range=y2_range)
@@ -168,7 +169,7 @@ def prediction_price_figure(
 def _ann(fig, text: str, y: float) -> None:
     fig.add_annotation(
         text=text, x=0.5, y=y, xref="paper", yref="paper",
-        showarrow=False, font={"color": _MUTED, "size": 13},
+        showarrow=False, font={"color": _MUTED, "size": scaled(13)},
     )
 
 
@@ -274,10 +275,21 @@ def _threshold_legend(
             xref="paper", yref=y_domain_ref,
             text=f"{label} {value:.3f}",
             showarrow=False, xanchor="left", yanchor="top",
-            font={"color": color, "size": 11},
+            font={"color": color, "size": scaled(11)},
             bgcolor="rgba(17, 20, 24, 0.88)",
             bordercolor=color, borderwidth=1, borderpad=3,
         )
+
+
+def _add_annotations(fig, annotations: list[dict]) -> None:
+    """Append many annotations with ONE validation pass.
+
+    `fig.add_annotation` re-validates the whole annotation tuple on every call (O(n^2));
+    with a few hundred signal markers a single chart build took tens of seconds and froze
+    the whole script run (the UI looked "stuck" after every sync).
+    """
+    if annotations:
+        fig.layout.annotations = (*fig.layout.annotations, *annotations)
 
 
 def _long_signal_markers(
@@ -291,15 +303,17 @@ def _long_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, _pred in zip(sig["open_time"], sig["long_prediction"], strict=False):
-        fig.add_annotation(
-            x=ts, y=0.99,
-            xref="x", yref="y2 domain",
-            text="▲",
-            showarrow=False,
-            font={"color": _GREEN, "size": 13},
-            xanchor="center", yanchor="top",
-        )
+    _add_annotations(fig, [
+        {
+            "x": ts, "y": 0.99,
+            "xref": "x", "yref": "y2 domain",
+            "text": "▲",
+            "showarrow": False,
+            "font": {"color": _GREEN, "size": scaled(13)},
+            "xanchor": "center", "yanchor": "top",
+        }
+        for ts in sig["open_time"]
+    ])
 
 
 def _short_signal_markers(
@@ -313,21 +327,23 @@ def _short_signal_markers(
     sig = df[mask]
     if sig.empty:
         return
-    for ts, _pred in zip(sig["open_time"], sig["short_prediction"], strict=False):
-        fig.add_annotation(
-            x=ts, y=0.01,
-            xref="x", yref="y2 domain",
-            text="▼",
-            showarrow=False,
-            font={"color": _RED, "size": 13},
-            xanchor="center", yanchor="bottom",
-        )
+    _add_annotations(fig, [
+        {
+            "x": ts, "y": 0.01,
+            "xref": "x", "yref": "y2 domain",
+            "text": "▼",
+            "showarrow": False,
+            "font": {"color": _RED, "size": scaled(13)},
+            "xanchor": "center", "yanchor": "bottom",
+        }
+        for ts in sig["open_time"]
+    ])
 
 
 def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
     xkw: dict = dict(
         title_text="",
-        tickfont={"color": _MUTED, "size": 11},
+        tickfont={"color": _MUTED, "size": scaled(11)},
         linecolor=_GRID, linewidth=1, mirror=False,
         showgrid=True, gridcolor=_GRID,
         rangeslider={"visible": False},
@@ -340,7 +356,7 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
 
     fig.update_layout(
         template="plotly_dark",
-        height=820,
+        height=scaled(820),
         margin={"l": 0, "r": 72, "t": 12, "b": 40},
         paper_bgcolor=_BG,
         plot_bgcolor=_PANEL,
@@ -358,8 +374,8 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
     fig.update_xaxes(**xkw)
     fig.update_yaxes(
         title_text="Long",
-        title_font={"color": "#5b8af5", "size": 11},
-        tickfont={"color": _MUTED, "size": 11},
+        title_font={"color": "#5b8af5", "size": scaled(11)},
+        tickfont={"color": _MUTED, "size": scaled(11)},
         linecolor=_GRID, linewidth=1,
         mirror=False, side="right",
         showgrid=True, gridcolor=_GRID,
@@ -369,7 +385,7 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
     )
     y2_kw: dict = dict(
         title_text="",
-        tickfont={"color": _MUTED, "size": 12},
+        tickfont={"color": _MUTED, "size": scaled(12)},
         linecolor=_GRID, linewidth=1,
         mirror=False, side="right",
         showgrid=True, gridcolor=_GRID,
@@ -381,8 +397,8 @@ def _style_figure(fig, x_start=None, x_end=None, y2_range=None):
     fig.update_yaxes(**y2_kw, row=2, col=1)
     fig.update_yaxes(
         title_text="Short",
-        title_font={"color": "#e05252", "size": 11},
-        tickfont={"color": _MUTED, "size": 11},
+        title_font={"color": "#e05252", "size": scaled(11)},
+        tickfont={"color": _MUTED, "size": scaled(11)},
         linecolor=_GRID, linewidth=1,
         mirror=False, side="right",
         showgrid=True, gridcolor=_GRID,

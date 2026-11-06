@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import utils
 from ui import data, trading_runner
 from ui.components.charts import PLOTLY_CHART_CONFIG, prediction_price_figure
+from ui.components.chat_panel import CHAT_DOCK_CSS, render_chat_panel
 from ui.components.formatting import GOLD as _GOLD
 from ui.components.formatting import GREEN as _GREEN
 from ui.components.formatting import GRID as _GRID
@@ -20,6 +21,7 @@ from ui.components.formatting import MUTED as _MUTED
 from ui.components.formatting import PANEL as _PANEL
 from ui.components.formatting import RED as _RED
 from ui.components.formatting import TEXT as _TEXT
+from ui.components.formatting import UI_ZOOM as _UI_ZOOM
 from ui.components.log_panel import render_log_panel
 from ui.components.trade_panel import render_trade_panel
 from ui.dashboard_logging import get_dashboard_logger
@@ -40,16 +42,19 @@ st.set_page_config(
 )
 
 st.markdown(
-    """
+    f"""
     <style>
-    header[data-testid="stHeader"] { display: none; }
-    html, body { font-size: 15px; }
-    .stApp, .block-container { font-size: 15px; }
-    p, span, div, label, .stCaption { font-size: 1rem; }
-    .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }
-    [data-testid="stSidebar"] > div:first-child { padding-top: 1.5rem; }
-    [data-testid="stPlotlyChart"] { border-radius: 6px; overflow: hidden; }
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] span { font-size: 0.95rem; }
+    header[data-testid="stHeader"] {{ display: none; }}
+    html, body {{ font-size: {15 * _UI_ZOOM:g}px; }}
+    .stApp, .block-container {{ font-size: {15 * _UI_ZOOM:g}px; }}
+    [data-testid="stMarkdownContainer"] > div[style] {{ zoom: {_UI_ZOOM}; }}
+    p, span, div, label, .stCaption {{ font-size: 1rem; }}
+    .block-container {{ padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }}
+    [data-testid="stSidebar"][aria-expanded="true"] {{ min-width: {300 * _UI_ZOOM:g}px; width: {300 * _UI_ZOOM:g}px !important; }}
+    [data-testid="stSidebar"] > div:first-child {{ padding-top: 1.5rem; }}
+    [data-testid="stPlotlyChart"] {{ border-radius: 6px; overflow: hidden; }}
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {{ font-size: 0.95rem; }}
+    {CHAT_DOCK_CSS}
     </style>
     """,
     unsafe_allow_html=True,
@@ -329,3 +334,5 @@ with col_chart:
 
 with col_trade:
     render_trade_panel(active_asset_id)
+
+render_chat_panel()

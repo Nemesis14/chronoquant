@@ -61,6 +61,7 @@ Runs the calibrated strategy live. Does not calibrate or optimise — only execu
 Reads from the database and from artifacts; does not write business data.
 - Shows live predictions, signals, equity curve, trade journal
 - Exposes live trading controls (start/stop, parameter overrides)
+- **Claude chat (epic_066):** az UI egyetlen oldalának alján egy chat-ablak (`src/ui/chat/`, `src/ui/components/chat_panel.py`), ami a helyi, bejelentkezett `claude` CLI-t futtatja headless módban (előfizetés, nem API-kulcs; `ANTHROPIC_API_KEY` env kiszűrve). Jogosultság: Read, WebSearch, WebFetch + szűk Bash allowlist (`research/tv_report/*`, `src/data_handling/07_query_readonly.py`); Edit/Write tiltott; a projekt `.claude` settings nem töltődik be (`--setting-sources ""`). Persona: `src/ui/chat/persona_prompt.md`; tv_market_sentiment workflow: `.agent/skills/tv_sentiment_skill.md`. Konfig: `src/utils.py` → `load_chat_config()` (opcionális `chat` szekció a `config/env.json`-ban)
 
 ### `research/` — Sandbox
 Exploratory code, prototypes, and ideas not yet ready for production.
@@ -141,6 +142,7 @@ src/
     tests/            Tests (store/, sync_tables/ — smoke, sanity, perf, integration)
     01_validate_stats.py
     02_sync_pipeline.py
+    07_query_readonly.py  Read-only SQL CLI (live/lab/registry, 1 statement, csak SELECT-jellegű; a chat használja)
 
   modeling/         Offline ML development
     sampling/           Yearly sample creation: config, sampler, audit, artifacts
@@ -165,6 +167,7 @@ src/
     01_run_service.py
 
   ui/               Streamlit dashboard (pages, components, data loading)
+    chat/               Claude CLI chat: runner.py (stream-json), model.py (UI-state), persona_prompt.md
   utils.py          All config loading — single entry point, never read JSON directly
 
 research/           Sandbox — explorations not yet production-ready

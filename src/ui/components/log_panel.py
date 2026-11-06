@@ -10,6 +10,7 @@ from ui.components.formatting import GOLD as _GOLD
 from ui.components.formatting import MUTED as _MUTED
 from ui.components.formatting import RED as _RED
 from ui.components.formatting import TEXT as _TEXT
+from ui.components.formatting import scaled
 from ui.dashboard_logging import clear_logs, read_recent_logs
 
 _LOG_HEADER_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}")
@@ -76,7 +77,7 @@ def _render_log_terminal(lines: list[str]) -> None:
             overflow-y: auto; padding: 10px 14px;
             background: {_BG}; color: {_TEXT};
             font-family: Consolas, "Courier New", monospace;
-            font-size: 13px; line-height: 1.6;
+            font-size: {scaled(13)}px; line-height: 1.6;
         }}
         </style>
         <div id="term">{body}</div>
@@ -86,7 +87,7 @@ def _render_log_terminal(lines: list[str]) -> None:
         </script>
         """,
         width="stretch",
-        height=118,
+        height=scaled(118),
     )
 
 

@@ -377,6 +377,33 @@ def load_env_config() -> dict:
     return _load_json("env.json")
 
 
+_CHAT_DEFAULTS: dict = {
+    "model"               : "sonnet",
+    "timeout_s"           : 1800,
+    "persona_prompt_path" : "src/ui/chat/persona_prompt.md",
+    "allowed_bash"        : [
+        "uv run python research/tv_report/*",
+        "uv run python src/data_handling/07_query_readonly.py*",
+    ],
+}
+
+
+def load_chat_config() -> dict:
+    """Load UI chat (claude CLI) settings: defaults overlaid with env.json `chat` section.
+
+    Keys: model, timeout_s, persona_prompt_path (repo-relative), allowed_bash (list of
+    Bash allowlist patterns, without the `Bash(...)` wrapper).
+    """
+    cfg = copy.deepcopy(_CHAT_DEFAULTS)
+    cfg.update(load_env_config().get("chat", {}))
+    return cfg
+
+
+def repo_root() -> str:
+    """Absolute path of the repository root."""
+    return _repo_root()
+
+
 # %% Model helpers
 
 def active_model_ids(model_cfg: dict) -> list[str]:

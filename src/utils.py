@@ -57,10 +57,14 @@ def load_assets_config() -> dict:
     return _load_json("assets.json")
 
 
+#: Last-resort asset when config/assets.json has no ``default_asset_id``.
+FALLBACK_ASSET_ID = "solusdt"
+
+
 def default_asset_id(assets_cfg: dict | None = None) -> str:
     """Return the default asset ID from assets config."""
     assets_cfg = assets_cfg or load_assets_config()
-    return assets_cfg.get("default_asset_id", "solusdt")
+    return assets_cfg.get("default_asset_id", FALLBACK_ASSET_ID)
 
 
 def resolve_asset_id(asset_id: str | None = None) -> str:
@@ -81,7 +85,7 @@ def load_asset_config(asset_id: str | None = None) -> dict:
         ValueError: If asset_id is not found or has no db_path configured.
     """
     assets_cfg = load_assets_config()
-    resolved   = asset_id or assets_cfg.get("default_asset_id", "solusdt")
+    resolved   = asset_id or default_asset_id(assets_cfg)
     assets     = assets_cfg.get("assets", {})
 
     if resolved not in assets:
@@ -110,7 +114,7 @@ def load_asset_config(asset_id: str | None = None) -> dict:
 def load_database_metadata(asset_id: str | None = None) -> dict:
     """Load the per-database metadata JSON for an asset.
 
-    This file (e.g. database/solusdt/solusdt.json) stores computed target
+    This file (e.g. database/<asset>/<asset>.json) stores computed target
     thresholds, table names, and champion model references for the asset.
 
     Args:
@@ -167,7 +171,7 @@ def lab_db_path(asset_id: str | None = None) -> str:
     """Return the absolute path to an asset's modeling lab database.
 
     Derived from the asset's live db_path by inserting a ``_lab`` suffix
-    (e.g. database/solusdt/solusdt.duckdb -> database/solusdt/solusdt_lab.duckdb),
+    (e.g. database/<asset>/<asset>.duckdb -> database/<asset>/<asset>_lab.duckdb),
     per the 3-file topology in plan 4.2.
 
     Args:
@@ -297,6 +301,52 @@ def load_unusable_features() -> list[str]:
     return list(cfg.get("feature_taxonomy", {}).get("unusable", []))
 
 
+def load_levels_detector_config() -> dict:
+    """Return the ``levels_detector`` block of config/features.json (epic_071).
+
+    Params of the S/R level + trendline detector
+    (``data_handling.sync_tables._levels_polars``): pivot / level / line /
+    event thresholds and the per-scale ``{"bar", "lookback_days"}`` map.
+
+    Raises:
+        KeyError: If the block is missing from features.json.
+    """
+    cfg = _load_json("features.json")
+    if "levels_detector" not in cfg:
+        raise KeyError("config/features.json has no 'levels_detector' block")
+    return copy.deepcopy(cfg["levels_detector"])
+
+
+def feature_profile_extra_tables(profile_id: str | None) -> list[str]:
+    """Return the extra feature tables of a profile (empty for champion profiles).
+
+    A challenger profile (``base_profile`` + ``extra_feature_tables`` in
+    config/features.json, epic_071) adds whole live tables (e.g. ``feat_levels``)
+    to its quant_train build.
+
+    Raises:
+        ValueError: If the profile does not exist.
+    """
+    if not profile_id:
+        return []
+    profiles = _load_json("features.json").get("profiles", {})
+    if profile_id not in profiles:
+        raise ValueError(f"Feature profile not found in config/features.json: {profile_id}")
+    return list(profiles[profile_id].get("extra_feature_tables", []))
+
+
+def quant_train_table(profile_id: str | None) -> str:
+    """Live table that holds the model-ready join of a feature profile.
+
+    Champion profiles (no extra feature tables) -> ``quant_train`` (unchanged);
+    challenger profiles -> ``quant_train__<profile_id>`` (own table, so the
+    champion quant_train content never changes).
+    """
+    if feature_profile_extra_tables(profile_id):
+        return f"quant_train__{profile_id}"
+    return "quant_train"
+
+
 def feature_profile_id(asset_id: str | None = None) -> str | None:
     """Return the features_profile key for the given asset."""
     db_cfg = load_asset_config(asset_id).get("database", {})
@@ -326,9 +376,27 @@ def apply_feature_profile(features_cfg: dict, profile_id: str | None) -> dict:
     if profile_id not in profiles:
         raise ValueError(f"Feature profile not found in config/features.json: {profile_id}")
 
+    profile = profiles[profile_id]
+    # Challenger profile (epic_071): base_profile's indicators + extra feature
+    # tables. It must not redefine indicators, otherwise its feat_ohlcv_quant
+    # columns would differ from the base profile the live table is built with.
+    if profile.get("base_profile"):
+        if any(k in profile for k in ("targets", "indicators", "indicators_extend")):
+            raise ValueError(
+                f"Feature profile {profile_id} has base_profile and must not redefine "
+                "targets/indicators"
+            )
+        cfg = apply_feature_profile(features_cfg, profile["base_profile"])
+        feature_cfg = cfg.setdefault("database", {}).setdefault("features", {})
+        feature_cfg["base_profile_id"] = profile["base_profile"]
+        feature_cfg["extra_feature_tables"] = list(profile.get("extra_feature_tables", []))
+        feature_cfg["profile_id"] = profile_id
+        if profile.get("description"):
+            feature_cfg["profile_description"] = profile["description"]
+        return cfg
+
     cfg         = copy.deepcopy(features_cfg)
     feature_cfg = cfg.setdefault("database", {}).setdefault("features", {})
-    profile     = profiles[profile_id]
 
     if "targets" in profile:
         feature_cfg["targets"] = copy.deepcopy(profile["targets"])
@@ -370,6 +438,59 @@ def load_strategies_config() -> dict:
 def load_trading_config() -> dict:
     """Load trading config from config/trading.json."""
     return _load_json("trading.json")
+
+
+def trading_asset_ids() -> list[str]:
+    """Asset ids that have a strategy-session assignment in config/trading.json.
+
+    New format: keys of ``trading.json["assets"]``. Legacy flat format (top-level
+    ``strategy_session_*_id``): just ``[default_asset_id]``.
+    """
+    cfg = load_trading_config()
+    assets = cfg.get("assets")
+    if isinstance(assets, dict) and assets:
+        return list(assets)
+    return [default_asset_id()]
+
+
+def strategy_session_ids(asset_id: str | None = None) -> dict[str, str | None]:
+    """Active strategy session ids of an asset: ``{"long": id|None, "short": id|None}``.
+
+    Reads ``config/trading.json``::
+
+        {"assets": {"solusdt": {"strategy_session_long_id": "...",
+                                "strategy_session_short_id": "..."}}, ...}
+
+    Legacy flat keys (``strategy_session_long_id`` / ``strategy_session_short_id`` /
+    ``strategy_session_id`` at the top level) are honoured for the default asset only
+    (and for any asset missing from ``assets`` when that asset is the default).
+    Unknown asset / unset value -> ``None``.
+
+    Args:
+        asset_id : Asset key; uses default_asset_id if None.
+    """
+    resolved = resolve_asset_id(asset_id)
+    cfg = load_trading_config()
+    entry = (cfg.get("assets") or {}).get(resolved)
+    if isinstance(entry, dict):
+        fallback = entry.get("strategy_session_id") or None
+        return {
+            "long":  entry.get("strategy_session_long_id") or fallback,
+            "short": entry.get("strategy_session_short_id") or fallback,
+        }
+    if resolved == default_asset_id():
+        fallback = cfg.get("strategy_session_id") or None
+        return {
+            "long":  cfg.get("strategy_session_long_id") or fallback,
+            "short": cfg.get("strategy_session_short_id") or fallback,
+        }
+    return {"long": None, "short": None}
+
+
+def model_asset_id(model_id: str) -> str:
+    """Asset key of a model: ``models[model_id]["asset_id"]``, else the default asset."""
+    meta = load_models_config().get("models", {}).get(model_id, {})
+    return meta.get("asset_id") or default_asset_id()
 
 
 def load_env_config() -> dict:

@@ -189,6 +189,114 @@
         "method": "predict"
       },
       "active": false
+    },
+    "lgbm_bchusdt_l_fw60_2101_2607": {
+      "display_name": "BCH Long LightGBM 2101-2607",
+      "description": "BCH long model - train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (SOL champion window, epic_069).",
+      "asset_id": "bchusdt",
+      "target_name": "long_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_bchusdt_l_fw60_2101_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "bchusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_bchusdt_l_fw60_2101_2607",
+        "snapshot_id": "bchusdt_fw60_2101_2607__51471332",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": true
+    },
+    "lgbm_bchusdt_s_fw60_2101_2607": {
+      "display_name": "BCH Short LightGBM 2101-2607",
+      "description": "BCH short model - train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (SOL champion window, epic_069).",
+      "asset_id": "bchusdt",
+      "target_name": "short_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_bchusdt_s_fw60_2101_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "bchusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_bchusdt_s_fw60_2101_2607",
+        "snapshot_id": "bchusdt_fw60_2101_2607__51471332",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": true
+    },
+    "lgbm_btcusdt_l_fw60_2101_2607": {
+      "display_name": "BTC Long LightGBM 2101-2607",
+      "description": "BTC long model - train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (SOL/BCH champion window, epic_075 t944).",
+      "asset_id": "btcusdt",
+      "target_name": "long_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_btcusdt_l_fw60_2101_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "btcusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_btcusdt_l_fw60_2101_2607",
+        "snapshot_id": "btcusdt_fw60_2101_2607__51471332",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": true
+    },
+    "lgbm_btcusdt_s_fw60_2101_2607": {
+      "display_name": "BTC Short LightGBM 2101-2607",
+      "description": "BTC short model - train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (SOL/BCH champion window, epic_075 t944).",
+      "asset_id": "btcusdt",
+      "target_name": "short_mfe_fw60",
+      "family": "lightgbm",
+      "trainer": "lightgbm_regression",
+      "artifact_dir": "artifacts/lgbm_btcusdt_s_fw60_2101_2607",
+      "oos_year": null,
+      "sampling": {
+        "sample_id": "btcusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_btcusdt_s_fw60_2101_2607",
+        "snapshot_id": "btcusdt_fw60_2101_2607__51471332",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+      },
+      "predict": {
+        "method": "predict"
+      },
+      "active": true
     }
   }
 }

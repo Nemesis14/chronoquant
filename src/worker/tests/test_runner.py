@@ -26,7 +26,7 @@ def test_run_one_success_writes_log_and_result(queue: JobQueue) -> None:
     done = queue.get(job["id"])
     assert done is not None
     assert done["status"] == "succeeded"
-    assert done["result"] == {"echo": {"x": 1}}
+    assert done["result"] == {"echo": {"x": 1, "asset_id": "solusdt"}}
     assert done["started_at"] and done["finished_at"]
     path = queue.log_path(job["id"])
     assert path is not None

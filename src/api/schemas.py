@@ -73,6 +73,21 @@ class Status(_Model):
     db: DbStatus
 
 
+class AssetInfo(_Model):
+    asset_id: str
+    symbol: str | None
+    interval: str | None
+    market: str | None
+    is_default: bool
+    has_data: bool
+    active: bool
+
+
+class AssetList(_Model):
+    default_asset_id: str
+    items: list[AssetInfo]
+
+
 # --- market ----------------------------------------------------------------------------------
 
 
@@ -306,3 +321,108 @@ class LogLine(_Model):
 
 class LogResponse(_Model):
     lines: list[LogLine]
+
+
+# --- Impulse Scout (epic_074 / t942) ---------------------------------------------------------
+
+
+class ScoutRuleResult(_Model):
+    """Trade plan + outcome of one exit rule (outcome fields null while the event is open)."""
+
+    tp: float | None = None
+    sl: float | None = None
+    outcome: str | None = None          # tp | sl | timeout | invalid
+    outcome_at: str | None = None
+    exit_price: float | None = None
+    net_bps: float | None = None
+
+
+class ScoutEvent(_Model):
+    """One ``scout_signals`` row; prediction fields are immutable (forward-log)."""
+
+    event_id: str
+    asset_id: str
+    model_id: str
+    cell_id: str | None = None
+    t0: str                             # local low (event anchor)
+    t_c: str                            # confirmation = prediction time
+    label_end: str | None = None        # t_c + H: the outcome is known after this
+    low_t0: float | None = None
+    close_tc: float | None = None
+    a_log: float | None = None
+    sigma_w: float | None = None
+    a_sigma: float | None = None
+    p_star: float | None = None
+    stop: float | None = None
+    velocity_1h: float | None = None
+    pretrend_3d: float | None = None
+    log_sigma_1m: float | None = None
+    drop_depth: float | None = None
+    volume_ratio: float | None = None
+    scorable: bool | None = None
+    p_impulse: float | None = None
+    p_false_start: float | None = None
+    p_sideways: float | None = None
+    oof_percentile: float | None = None
+    top20: bool | None = None
+    top10: bool | None = None
+    entry: float | None = None
+    rules: dict[str, ScoutRuleResult] = Field(default_factory=dict)
+    status: str                         # open | resolved | invalid
+    label_class: str | None = None      # impulse | false_start | sideways
+    as_of: str | None = None
+    scored_at: str | None = None        # write time
+    backfilled: bool | None = None
+    write_lag_s: int | None = None      # scored_at - t_c
+
+
+class ScoutSignals(_Model):
+    asset_id: str
+    available: bool                     # False: no scout_signals table for the asset (e.g. bchusdt)
+    items: list[ScoutEvent]
+
+
+class ScoutCounts(_Model):
+    total: int
+    open: int
+    resolved: int
+    invalid: int
+    top20: int
+    top10: int
+    backfilled: int
+    as_of: str | None = None
+    last_scored_at: str | None = None
+    first_live_sync_at: str | None = None
+
+
+class ScoutRuleMeta(_Model):
+    key: str | None = None
+    name: str | None = None
+    description: str | None = None
+
+
+class ScoutMeta(_Model):
+    model_id: str
+    display_name: str | None = None
+    status: str
+    experimental: bool
+    scout_asset: bool
+    thresholds: dict[str, float | None]
+    live_start: str | None = None
+    detect_anchor: str | None = None
+    holdout2_start: str | None = None
+    cell_id: str | None = None
+    h_min: int | None = None
+    train_assets: list[str] = Field(default_factory=list)
+    oof_auc: float | None = None
+    rules: list[ScoutRuleMeta] = Field(default_factory=list)
+    freeze_hash: str | None = None
+
+
+class ScoutLatest(_Model):
+    asset_id: str
+    available: bool
+    meta: ScoutMeta
+    counts: ScoutCounts | None = None
+    open_events: list[ScoutEvent]
+    recent: list[ScoutEvent]            # newest first

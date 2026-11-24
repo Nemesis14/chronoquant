@@ -1,0 +1,1 @@
+{"columns": [{"key": "asset_id", "label": "Asset", "type": "str"}, {"key": "false_start", "label": "false_start", "type": "int"}, {"key": "impulse", "label": "impulse", "type": "int"}, {"key": "sideways", "label": "sideways", "type": "int"}], "rows": [["ethusdt", 61, 55, 679], ["btcusdt", 70, 60, 638], ["solusdt", 58, 66, 655]], "total_rows": 3, "truncated": false}

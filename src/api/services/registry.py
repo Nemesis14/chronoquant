@@ -55,7 +55,7 @@ def listing(conn: Conn, table: str, limit: int, offset: int, text: str | None) -
     return {"items": items, "total": total}
 
 
-def active(conn: Conn) -> dict[str, Any]:
+def active(conn: Conn, asset_id: str | None = None) -> dict[str, Any]:
     """Live models (from the newest prediction stamp), strategy sessions, pending deployments."""
     live: dict[str, Any] = {"long": None, "short": None}
     preds = common.live_table("predictions")
@@ -66,7 +66,7 @@ def active(conn: Conn) -> dict[str, Any]:
         ).fetchone()
         if row:
             live = {"long": row[0], "short": row[1]}
-    sessions = common.active_sessions()
+    sessions = common.active_sessions(asset_id)
     pending: list[dict[str, Any]] = []
     if common.table_exists(conn, "reg", "main", "deployments"):
         pending = common.fetch_rows(
@@ -124,6 +124,6 @@ def model_features(model_id: str) -> dict[str, Any]:
     return common.json_safe(data)
 
 
-def live_asset() -> dict[str, Any]:
-    db = utils.load_asset_config(None)["database"]
+def live_asset(asset_id: str | None = None) -> dict[str, Any]:
+    db = utils.load_asset_config(asset_id)["database"]
     return {"asset_id": db.get("asset_id"), "symbol": db.get("symbol"), "interval": db.get("interval")}

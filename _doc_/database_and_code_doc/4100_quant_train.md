@@ -127,12 +127,42 @@ uv run python src/data_handling/03_build_quant_train.py --asset-id solusdt
 
 ---
 
+## Challenger profil: `quant_train__<profile_id>` (epic_071 / t912)
+
+Egy challenger feature-profil (`config/features.json` `profiles`, `base_profile` + `extra_feature_tables`) **saját táblába** épül, a champion `quant_train` érintetlen marad. Az első challenger: `solusdt_fw60_sr` (`base_profile: solusdt_fw60`, `extra_feature_tables: ["feat_levels"]`) → `quant_train__solusdt_fw60_sr`.
+
+```mermaid
+flowchart LR
+  F[feat_ohlcv_quant] -->|INNER JOIN open_time| QT[quant_train__solusdt_fw60_sr]
+  T[target] -->|INNER JOIN open_time, NULL target kizárva| QT
+  L[feat_levels] -.->|LEFT JOIN open_time| QT
+```
+
+- **Sorhalmaz:** pontosan a champion join sorai (`feat_ohlcv_quant ⋈ target`, ugyanaz a NULL-target szűrő). A `feat_levels` LEFT JOIN-ként csak oszlopokat ad hozzá.
+- **Oszlopok:** a champion `feat_*` + a `feat_levels` 50 db `feat_*` oszlopa + a target oszlopok. A `feat_levels.available_ts` nem kerül át.
+- **Ellenőrzés (SOL live DB, 2026-11-19):** a challenger tábla nem-`feat_levels` `feat_*` készlete pontosan a champion snapshot 208 feature-je; mind a 208 oszlop értéke egyezik a 2 933 276 soron. A `quant_train` (champion) sorszáma és tartalma nem változott.
+- **Védelem:** challenger profillal a `quant_train` nem írható (`rebuild_quant_train` `ValueError`); a `utils.quant_train_table(profile)` `quant_train__<profile>`-t ad vissza, ha a profilnak van `extra_feature_tables`, különben `quant_train`-t.
+- **Ismert eltérés:** a live champion `quant_train` 27 régi alt-data oszlopot (`feat_oi_*`, `feat_basis_*`, `feat_depth_*`, `feat_ls_*`, `feat_prem_*`, `feat_funding_*`, `feat_spot_*`) hordoz (epic_068 előtt épült). Ezek a `feat_ohlcv_quant`-ban már nincsenek, így a challenger táblában sincsenek.
+
+```powershell
+# challenger tábla építése (a profil neve a config/features.json profiles kulcsa)
+uv run python src/data_handling/03_build_quant_train.py --features-profile solusdt_fw60_sr
+
+# a challenger tábla snapshotja (quant_train__solusdt_fw60_sr forrásból)
+uv run python src/data_handling/05_create_snapshot.py --features-profile solusdt_fw60_sr --start "2021-01-01 00:00:00" --end "2026-07-31 00:00:00"
+```
+
+A `feat_levels`-ös build előtt a `feat_levels` táblának fel kell töltődnie (→ [1200_sync_tables.md](1200_sync_tables.md), `sync_levels`). Ha a detektor config változik, a `feat_levels`-t `--full`-lal újra kell tölteni, utána a challenger `quant_train__*`-t is újra kell építeni.
+
+---
+
 ## Implementáció
 
 | Fájl | Szerepe |
 |------|---------|
-| [`src/data_handling/store/duckdb_store.py`](../../src/data_handling/store/duckdb_store.py) | `rebuild_quant_train(conn, start_time, end_time)` — core rebuild logika |
-| [`src/data_handling/sync_tables/sync_quant_train.py`](../../src/data_handling/sync_tables/sync_quant_train.py) | `sync_quant_train(asset_id, start_time, end_time)` — asset-szintű wrapper |
+| [`src/data_handling/store/duckdb_store.py`](../../src/data_handling/store/duckdb_store.py) | `rebuild_quant_train(conn, start_time, end_time, extra_feature_tables=None, table_name="quant_train")` — core rebuild logika |
+| [`src/data_handling/sync_tables/sync_quant_train.py`](../../src/data_handling/sync_tables/sync_quant_train.py) | `sync_quant_train(asset_id, start_time, end_time, features_profile=None)` — asset-szintű wrapper |
+| [`src/utils.py`](../../src/utils.py) | `feature_profile_extra_tables(profile_id)`, `quant_train_table(profile_id)` — profil → extra táblák / cél-tábla |
 | [`src/data_handling/03_build_quant_train.py`](../../src/data_handling/03_build_quant_train.py) | Standalone CLI |
 
 ---

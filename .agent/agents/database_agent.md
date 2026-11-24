@@ -31,6 +31,7 @@ Load relevant module docs (only for affected modules):
 
 - `_doc_/database_and_code_doc/1000_database.md`, `0002_data_architecture.md` — if touching database schema
 - `_doc_/database_and_code_doc/1200_sync_tables.md` — if touching sync tables
+- `_doc_/database_and_code_doc/5800_scout_runtime.md` — if touching `sync_scout.py` / `scout_signals` (a runtime kimeneti sémája)
 
 ---
 
@@ -60,7 +61,7 @@ Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 - Config always loaded through `src/utils.py` — never read JSON directly
 - Timestamps: UTC strings `YYYY-MM-DD HH:MM:SS`
 - Idempotent upserts by `open_time` — all sync ops safe to re-run
-- Primary active asset: SOLUSDT — do not spend time on bchusdt paths
+- Aktív assetek: `solusdt` (default), `bchusdt`, `btcusdt` (élő modellpár), `ethusdt` (sync-aktív, data-only); `scout_signals` csak SOL/BTC/ETH; mindig `--asset-id`/`utils.resolve_asset_id` — ne égess be assetet (új asset: `0004_model_lifecycle.md` onboarding)
 - A DuckDB írója a sync (CLI vagy `src/worker` job); az `src/api` csak read-only nyit — ne adj API-nak írási utat
 - A régi altdata / analyst_signal / universe táblák és collectorok törölve (epic_068) — ne építs rájuk
 

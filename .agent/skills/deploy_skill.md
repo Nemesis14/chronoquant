@@ -38,7 +38,7 @@ A „miértek" és az élő rendszer end-to-end leírása: `_doc_/database_and_c
 
 ### 2. Deploy trigger (pending bejegyzés)
 
-- [ ] `uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id <session_id>`
+- [ ] `uv run python src/data_handling/06_trigger_deploy.py --asset-id <asset> --strategy-session-id <session_id>` (asset elhagyva = default; a `config/trading.json` `assets.<asset>` blokk kell az auto-synchez)
 - [ ] Ellenőrizd: `reg.deployments` új sor, `status='pending'`, `active=FALSE`
   ```sql
   SELECT * FROM reg.deployments WHERE strategy_id = '<session_id>' ORDER BY created_at DESC LIMIT 1;
@@ -76,9 +76,9 @@ Ha a cutover után problémát találsz:
 
 - [ ] Az előző `strategy_id` a `reg.deployments.previous_strategy_id` mezőben van:
   ```sql
-  SELECT previous_strategy_id FROM reg.deployments WHERE active = TRUE AND asset_id = 'solusdt';
+  SELECT previous_strategy_id FROM reg.deployments WHERE active = TRUE AND asset_id = '<asset>';
   ```
-- [ ] Rollback trigger: `uv run python src/data_handling/06_trigger_deploy.py --strategy-session-id <previous_strategy_id>`
+- [ ] Rollback trigger: `uv run python src/data_handling/06_trigger_deploy.py --asset-id <asset> --strategy-session-id <previous_strategy_id>`
 - [ ] A következő sync cycle visszaállítja a predictions táblát az előző modell pred adataira
 - [ ] A lab DB adatok (`model.__pred` táblák) megmaradnak — rollback bármikor lehetséges
 

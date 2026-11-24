@@ -38,7 +38,7 @@ _COLORS = {"Train": theme.BLUE, "Valid": theme.ORANGE}
 
 
 def _load_sample(model_id: str, target: str) -> pd.DataFrame:
-    con = duckdb.connect(utils.lab_db_path(), read_only=True)
+    con = duckdb.connect(utils.lab_db_path(utils.model_asset_id(model_id)), read_only=True)
     try:
         df = con.execute(
             f'SELECT open_time, {target} AS target, split FROM model."{model_id}__sample"'
@@ -235,11 +235,12 @@ def _trend_chart(trend: pd.DataFrame, thresholds: dict[str, float], valid_start:
     return themed(fig, x_title="Hónap", y_title="Top10 decilis / nap (db)")
 
 
-def _hourly_close(df: pd.DataFrame) -> pd.DataFrame | None:
+def _hourly_close(df: pd.DataFrame, asset_id: str | None = None) -> pd.DataFrame | None:
     prices = read_live(
         "SELECT open_time, close FROM ohlcv WHERE open_time >= ? AND open_time <= ? "
         "AND minute(open_time) = 0 ORDER BY open_time",
         [df["open_time"].min().to_pydatetime(), df["open_time"].max().to_pydatetime()],
+        asset_id=asset_id,
     )
     if prices is None or prices.empty:
         return None
@@ -306,7 +307,7 @@ def build(model_id: str, artifact_dir: Path | None = None, root: Path | None = N
         f"`{target}` átlagos időbeli alakulása és a target-eloszlás stabilitása train vs valid között.\n\n"
         "**Kapcsolódó dokumentáció:** módszertan `_doc_/methodology_doc/3000_sampling.md`, "
         "kód `_doc_/database_and_code_doc/5300_create_sample.md`.\n\n"
-        "**Asset:** SOLUSDT | **Forrás:** "
+        f"**Asset:** {utils.model_asset_id(model_id).upper()} | **Forrás:** "
         f"`model.\"{model_id}__sample\"` (`open_time`, `{target}`, `split`)."
     )
 
@@ -372,7 +373,7 @@ def build(model_id: str, artifact_dir: Path | None = None, root: Path | None = N
         "Szegmensenként és naptári évenként egy-egy ábra: felül a close, alul a target, piros pontok "
         f"= top10 (küszöb: szegmens {q})."
     )
-    prices = _hourly_close(df)
+    prices = _hourly_close(df, utils.model_asset_id(model_id))
     if prices is None:
         rb.add_markdown("_Az élő adatbázis nem érhető el (zárolt) - az árfolyam panel kimaradt._")
     for seg in ("Train", "Valid"):

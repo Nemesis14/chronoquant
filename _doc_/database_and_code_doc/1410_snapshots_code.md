@@ -53,6 +53,7 @@ táblát.
 | `SNAP_SCHEMA` | `"snap"` | A snapshot táblák sémája a lab DB-ben |
 | `LIVE_SOURCE` | `"live.quant_train"` | A befagyasztás forrása (ATTACH-olt, READ_ONLY live DB) |
 | `HASH8_LEN` | `8` | A `content_sha256` `snapshot_id`-be ágyazott hex-prefix hossza |
+| `VALUES_HASH_VERSION` | `"v1"` | A `values_sha256` fingerprint algoritmus-címkéje (recept-váltáskor bump) |
 
 ---
 
@@ -70,6 +71,7 @@ Egy `create_snapshot` hívás kimenete (immutable).
 | `content_sha256` | `str` | Teljes sha256 a rendezett sor-tartalom fölött |
 | `feature_set_hash` | `str` | sha256 a rendezett `feat_*` oszloplista fölött |
 | `reused` | `bool` | `True`, ha azonos tartalmú snapshot már létezett (nincs írás) |
+| `values_sha256` | `str \| None` | Érték-fingerprint a befagyasztott snap tábla fölött (additív, NEM része az id-nek); `None`, ha nem elérhető |
 
 ---
 
@@ -138,6 +140,45 @@ fingerprint OOM-mentes és determinista.
 
 **Visszatérési érték:** `tuple[str, int]` — `(content_sha256, row_count)`.
 
+> **Korlát (t949):** a fingerprint csak időrács + sorszám + határok + oszlopkészlet — az
+> értékeket NEM látja. Azonos rácson befagyasztott különböző assetek (BTC/BCH/ETH
+> `..._2101_2607__51471332`) ezért azonos `content_sha256`-ot kapnak. A reuse kulcsa
+> `(asset_id, content_sha256)`, így asseten belül ez nem okoz ütközést; az érték-azonosságot a
+> `values_sha256` adja. A `content_sha256` szándékosan változatlan (snapshot_id-k, registry- és
+> artifact-hivatkozások, `predict.py` integritás-ellenőrzés épülnek rá).
+
+### `compute_values_sha256(conn, table_fqn)` (epic_076 / t949)
+
+**Célja:** Additív érték-hash egy (snapshot) tábla fölött. Oszloponként
+`SUM(hash(open_time, col))` (az értéket a sor `open_time`-jához köti → sorok közti csere is
+detektált, a fizikai sorrend viszont nem számít) + `COUNT(*)`, a rendezett oszlopnevek szerint
+összefűzve, `VALUES_HASH_VERSION` címkével, sha256. Egyetlen teljes scan, sor-materializálás
+nélkül (OOM-mentes). Költség: ~2–3 perc egy ~2.9M soros, ~200+ oszlopos snapshoton.
+
+**Caveat:** a DuckDB `hash()` nem garantáltan stabil DuckDB fő-verziók között — a hash
+azonosság-/változás-detektálásra való, nem archív checksum. Verzióváltás után `force=True`
+backfill-lel újraszámolható.
+
+| Paraméter | Típus | Leírás |
+|-----------|-------|--------|
+| `conn` | `duckdb.DuckDBPyConnection` | A táblát olvasni tudó connection |
+| `table_fqn` | `str` | Minősített táblanév, pl. `snap."<id>"`; `open_time` oszlop kötelező (különben `ValueError`) |
+
+**Visszatérési érték:** `str` — 64 hex karakteres sha256.
+
+### `backfill_values_sha256(conn, asset_id, force=False)`
+
+**Célja:** Meglévő `reg.snapshots` sorok `values_sha256` mezőjének kitöltése az adott asset lab
+DB-jében lévő `snap` táblákból. Hiányzó snap tábla → `NULL` marad. `snapshot_id` /
+`content_sha256` nem változik. `force=True` újraszámol már kitöltött sorokra is.
+
+**Visszatérési érték:** `dict[str, str | None]` — `{snapshot_id: values_sha256 | None}`.
+
+```python
+conn = utils.open_lab_connection("btcusdt")   # lab RW + reg RW
+snapshots.backfill_values_sha256(conn, "btcusdt")
+```
+
 ### `compute_feature_set_hash(conn)`
 
 **Célja:** sha256 a forrástábla rendezett `feat_*` oszloplistája fölött (a logikai
@@ -154,17 +195,22 @@ feature-szuperszettet rögzíti, nem a tartalmat).
 | Függvény | Visszatérés | Leírás |
 |----------|-------------|--------|
 | `_ordered_feature_columns(conn)` | `list[str]` | A forrástábla `feat_*` oszlopai rendezve (`open_time`/target kizárva) — determinista feature-hash alapja |
+| `_snap_table_exists(conn, snapshot_id)` | `bool` | Létezik-e `snap."<id>"` a lab DB-ben |
+| `_stored_values_sha256(conn, snapshot_id)` | `str \| None` | A regisztrált `values_sha256` (reuse-ágon lusta kitöltéshez) |
 | `_resolve_range(conn, start_time, end_time)` | `tuple[str, str]` | A tényleges inkluzív range; a nem megadott oldalak a forrás min/max `open_time`-jából. `ValueError`, ha üres a range |
 
 ---
 
 ## Snapshot creation
 
-### `create_snapshot(conn, asset_id, horizon=60, start_time=None, end_time=None)`
+### `create_snapshot(conn, asset_id, horizon=60, start_time=None, end_time=None, exclude_features=None, source_table="quant_train")`
 
-**Célja:** A `live.quant_train` egy range-ének befagyasztása immutable `snap` táblába +
+**Célja:** A `live.<source_table>` (alapból `live.quant_train`; challenger: `live.quant_train__<profile>`) egy range-ének befagyasztása immutable `snap` táblába +
 `reg.snapshots` sor. Lépések: (1) range feloldás, (2) content + feature-set hash, (3) reuse-
-detektálás, (4) CTAS + reg-upsert. Reuse esetén nincs írás (a snapshot immutable).
+detektálás, (4) CTAS + `compute_values_sha256` a frissen befagyasztott táblán + reg-upsert
+(`values_sha256` is). Reuse esetén nincs táblaírás (a snapshot immutable); ha a regisztrált
+sorból hiányzik a `values_sha256` (t949 előtti snapshot), a reuse-ág kiszámolja a meglévő snap
+táblából és csak ezt a mezőt UPDATE-eli.
 
 | Paraméter | Típus | Alap | Leírás |
 |-----------|-------|------|--------|
@@ -173,14 +219,19 @@ detektálás, (4) CTAS + reg-upsert. Reuse esetén nincs írás (a snapshot immu
 | `horizon` | `int` | `60` | Forward-window bar szám az id tokenhez (`fw60`) |
 | `start_time` | `str \| None` | `None` | Opcionális inkluzív alsó határ; `None` = history eleje |
 | `end_time` | `str \| None` | `None` | Opcionális inkluzív felső határ; `None` = history vége |
+| `exclude_features` | `list[str] \| None` | `None` | Kihagyott oszlopok a snapshotból. `None` = `SELECT *` (a target oszlopok is bekerülnek) |
+| `source_table` | `str` | `"quant_train"` | Live forrástábla (`_live_source`); a név csak betű/szám/`_` lehet, különben `ValueError` |
 
 **Visszatérési érték:** `SnapshotResult` — az új vagy reuse-olt snapshot leírása.
+
+**Challenger snapshot (epic_071 / t912):** `source_table="quant_train__solusdt_fw60_sr"` (CLI: `--features-profile`). A snapshot_id a tartalom-hashből képződik, ezért eltér a championétól, még azonos feature-halmaz esetén is (az oszlopkészlet része a hash-nek).
 
 **Raises:** `ValueError`, ha a kért range nem tartalmaz sort.
 
 **Mellékhatások:** `ensure_snap_schema`; reuse hiányában `CREATE TABLE IF NOT EXISTS
-snap."<snapshot_id>"` (CTAS, `ORDER BY open_time`) + `registry.upsert("snapshots", ...,
-status="candidate")`.
+snap."<snapshot_id>"` (CTAS, `ORDER BY open_time`) + `compute_values_sha256` +
+`registry.upsert("snapshots", ..., values_sha256, status="candidate")`; reuse-ágon esetleg
+`UPDATE reg.snapshots SET values_sha256`.
 
 ```mermaid
 sequenceDiagram
@@ -190,7 +241,7 @@ sequenceDiagram
   participant S as snap.<snapshot_id>
 
   C->>L: _resolve_range (MIN/MAX open_time)
-  C->>L: compute_content_sha256 (to_json + sha256, ORDER BY open_time)
+  C->>L: compute_content_sha256 (COUNT + SUM(hash(open_time)) + határok + oszlopok)
   C->>L: compute_feature_set_hash (feat_* oszloplista)
   C->>C: build_snapshot_id
   C->>R: _find_reusable_snapshot(asset_id, content_sha256)
@@ -199,7 +250,8 @@ sequenceDiagram
     C-->>C: SnapshotResult(reused=True)
   else uj befagyasztas
     C->>S: CREATE TABLE IF NOT EXISTS AS SELECT range
-    C->>R: registry.upsert(status=candidate)
+    C->>S: compute_values_sha256 (érték-fingerprint)
+    C->>R: registry.upsert(values_sha256, status=candidate)
     C-->>C: SnapshotResult(reused=False)
   end
 ```
@@ -216,7 +268,8 @@ sequenceDiagram
 ## CLI — `05_create_snapshot.py`
 
 A `live.quant_train` range-ének befagyasztása parancssorból. Megnyit egy lab connectiont,
-meghívja a `create_snapshot`-ot, logolja az eredményt (rows, range, mindkét hash, elapsed).
+meghívja a `create_snapshot`-ot, logolja az eredményt (rows, range, `content_sha256`,
+`feature_set_hash`, `values_sha256`, elapsed).
 
 ### Argumentumok (`_parse_args`)
 
@@ -226,6 +279,7 @@ meghívja a `create_snapshot`-ot, logolja az eredményt (rows, range, mindkét h
 | `--horizon` | `int` | `60` | Forward-window bar szám (`fw{horizon}`) |
 | `--start` | `str` | `None` | Range alsó határ, inkluzív; üres = teljes history |
 | `--end` | `str` | `None` | Range felső határ, inkluzív; üres = teljes history |
+| `--features-profile` | `str` | `None` | Feature-profil; `None` = champion `quant_train`. Challenger profilnál a `quant_train__<profile_id>` a forrás (`utils.quant_train_table`) |
 
 ### Használat
 

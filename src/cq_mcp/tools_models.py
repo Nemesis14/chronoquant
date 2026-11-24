@@ -6,43 +6,55 @@ from typing import Literal
 
 from api import deps
 from api.services import binance, registry, status, strat, trades
-from cq_mcp.common import MAX_ROWS, clamp, dump
+from cq_mcp.common import MAX_ROWS, clamp, dump, resolve_asset
+from worker import assets
 
 
-def get_status() -> str:
-    """Data freshness, active models, worker and sync state."""
-    return dump(status.status())
+def list_assets() -> str:
+    """Configured assets (asset_id, symbol, interval, is_default, has_data = live DB exists, active = auto-synced). Every other tool takes an optional `asset` id (default: the default asset, solusdt)."""
+    return dump(assets.list_assets())
 
 
-def get_active_strategy() -> str:
-    """Active long/short strategy cards (session, cutoff, TP/SL spec, metrics)."""
-    return dump(strat.active())
+def get_status(asset: str | None = None) -> str:
+    """Data freshness, active models, worker and sync state of an asset (`asset`: asset id, default solusdt)."""
+    return dump(status.status(resolve_asset(asset)))
 
 
-def get_trades(source: Literal["strat", "journal", "binance"] = "strat", limit: int = 100) -> str:
-    """Trades: `strat` = backtest-ledger closed trades, `journal` = live journal positions, `binance` = exchange fills."""
+def get_active_strategy(asset: str | None = None) -> str:
+    """Active long/short strategy cards (session, cutoff, TP/SL spec, metrics). `asset`: asset id (default solusdt)."""
+    return dump(strat.active(resolve_asset(asset)))
+
+
+def get_trades(
+    source: Literal["strat", "journal", "binance"] = "strat", limit: int = 100, asset: str | None = None
+) -> str:
+    """Trades: `strat` = backtest-ledger closed trades, `journal` = live journal positions, `binance` = exchange fills. `asset`: asset id (default solusdt; the journal is shared across assets)."""
     n = clamp(limit, 1, MAX_ROWS)
+    asset_id = resolve_asset(asset)
     if source == "binance":
         try:
-            return dump(binance.recent_trades(n))
+            return dump(binance.recent_trades(n, asset_id))
         except binance.BinanceUnavailableError as exc:
             raise RuntimeError(f"binance unavailable: {exc}") from exc
-    with deps.ro_connection() as conn:
+    with deps.ro_connection(asset_id) as conn:
         if source == "journal":
             return dump(trades.journal_rows(conn, "trading_positions", "entry_time", n))
-        return dump(trades.closed(conn, n, 0, "strat"))
+        return dump(trades.closed(conn, n, 0, "strat", asset_id))
 
 
-def get_equity(session: str = "active", direction: Literal["both", "long", "short"] = "both") -> str:
-    """Cumulative fact-log-return equity points plus the long/short summary."""
-    with deps.ro_connection() as conn:
-        data = strat.equity(conn, session, direction)
+def get_equity(
+    session: str = "active", direction: Literal["both", "long", "short"] = "both", asset: str | None = None
+) -> str:
+    """Cumulative fact-log-return equity points plus the long/short summary. `asset`: asset id (default solusdt)."""
+    asset_id = resolve_asset(asset)
+    with deps.ro_connection(asset_id) as conn:
+        data = strat.equity(conn, session, direction, asset_id)
     points = data.get("points") or []
     if len(points) > 2000:
         data["points"] = points[:: len(points) // 2000 + 1]
         data["note"] = "points downsampled"
     data.pop("series", None)
-    return dump({"equity": data, "summary": strat.equity_summary()})
+    return dump({"equity": data, "summary": strat.equity_summary(asset_id)})
 
 
 def list_models(status: str | None = None) -> str:  # noqa: A002

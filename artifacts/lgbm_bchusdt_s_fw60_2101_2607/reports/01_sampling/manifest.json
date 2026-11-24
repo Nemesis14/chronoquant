@@ -1,0 +1,114 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/monthly_target.json",
+        "height": 420,
+        "id": "monthly_target",
+        "title": "Havi átlagos short_mfe_fw60 és ±1σ sáv"
+      },
+      {
+        "file": "charts/distribution_kde.json",
+        "height": 420,
+        "id": "distribution_kde",
+        "title": "short_mfe_fw60 eloszlása (KDE)"
+      },
+      {
+        "file": "charts/distribution_box.json",
+        "height": 380,
+        "id": "distribution_box",
+        "title": "short_mfe_fw60 boxplot"
+      },
+      {
+        "file": "charts/top10_monthly_trend.json",
+        "height": 420,
+        "id": "top10_monthly_trend",
+        "title": "Havi top10 decilis / nap"
+      },
+      {
+        "file": "charts/top10_train_2021.json",
+        "height": 520,
+        "id": "top10_train_2021",
+        "title": "Train 2021: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_train_2022.json",
+        "height": 520,
+        "id": "top10_train_2022",
+        "title": "Train 2022: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_train_2023.json",
+        "height": 520,
+        "id": "top10_train_2023",
+        "title": "Train 2023: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_train_2024.json",
+        "height": 520,
+        "id": "top10_train_2024",
+        "title": "Train 2024: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_train_2025.json",
+        "height": 520,
+        "id": "top10_train_2025",
+        "title": "Train 2025: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_train_2026.json",
+        "height": 520,
+        "id": "top10_train_2026",
+        "title": "Train 2026: close és short_mfe_fw60"
+      },
+      {
+        "file": "charts/top10_valid_2026.json",
+        "height": 520,
+        "id": "top10_valid_2026",
+        "title": "Valid 2026: close és short_mfe_fw60"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/train_valid_summary.json",
+        "id": "train_valid_summary",
+        "title": "Train és Valid összesítő"
+      },
+      {
+        "file": "tables/interp_metrics.json",
+        "id": "interp_metrics",
+        "title": "Train vs Valid metrikák"
+      },
+      {
+        "file": "tables/top10_reference.json",
+        "id": "top10_reference",
+        "title": "Top10 küszöb és lift"
+      },
+      {
+        "file": "tables/top10_monthly.json",
+        "id": "top10_monthly",
+        "title": "Top10 decilis havi/éves bontás"
+      }
+    ]
+  },
+  "created_at": "2026-11-07T09:10:20Z",
+  "id": "01_sampling",
+  "model_id": "lgbm_bchusdt_s_fw60_2101_2607",
+  "order": 10,
+  "schema_version": 1,
+  "scope": "model",
+  "source": {
+    "generator": "reports.builders.sampling",
+    "git_sha": "13ee2fb",
+    "kind": "pipeline_step",
+    "step": "sample"
+  },
+  "summary": "Short modell train/valid periódusa, a short_mfe_fw60 target stabilitása.",
+  "tags": [
+    "sampling",
+    "short"
+  ],
+  "title": "Mintavételezés (train/valid)",
+  "updated_at": "2026-11-07T09:26:17Z"
+}

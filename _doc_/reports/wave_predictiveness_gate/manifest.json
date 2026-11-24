@@ -1,0 +1,85 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/null.json",
+        "height": 340,
+        "id": "null",
+        "title": "Nap-blokkos permutációs null (elsődleges, AE) a megfigyelt ΔAUC-val"
+      },
+      {
+        "file": "charts/blocks.json",
+        "height": 340,
+        "id": "blocks",
+        "title": "Blokkonkénti ΔAUC és AUC (elsődleges, AE)"
+      },
+      {
+        "file": "charts/calibration.json",
+        "height": 340,
+        "id": "calibration",
+        "title": "Megbízhatósági görbe: Modell A vs Modell B (elsődleges, AE)"
+      },
+      {
+        "file": "charts/sensitivity.json",
+        "height": 340,
+        "id": "sensitivity",
+        "title": "ΔAUC reprezentációnként (C = 0,1) bootstrap CI-vel"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/criteria.json",
+        "id": "criteria",
+        "title": "Go/no-go feltételek sorrendben (elsődleges: AE embedding)"
+      },
+      {
+        "file": "tables/summary.json",
+        "id": "summary",
+        "title": "Reprezentációk: összevont OOF AUC, ΔAUC, CI, p (csak az első sor döntési)"
+      },
+      {
+        "file": "tables/blocks_table.json",
+        "id": "blocks_table",
+        "title": "Blokk-táblázat (elsődleges, AE)"
+      },
+      {
+        "file": "tables/calibration_table.json",
+        "id": "calibration_table",
+        "title": "Kalibrációs bin-ek"
+      },
+      {
+        "file": "tables/sensitivity_table.json",
+        "id": "sensitivity_table",
+        "title": "Tanuló- és reprezentáció-érzékenység (pont-becslés)"
+      },
+      {
+        "file": "tables/runtime.json",
+        "id": "runtime",
+        "title": "Futási idő (CPU, 1 szál)"
+      }
+    ]
+  },
+  "created_at": "2026-11-20T15:33:49Z",
+  "id": "wave_predictiveness_gate",
+  "model_id": null,
+  "order": 32,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.wave_predictiveness_gate",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "5200 v2 / t920: a W4h_H8h cella Modell B (S0 + C + AE-kép) vs Modell A (S0 + C), összevont OOF ΔAUC a 6 blokkos purged CV-n, nap-blokkos permutációs teszt (N = 1000), blokk-előjel, érzékenységi vizsgálatok. Döntés: NO-GO.",
+  "tags": [
+    "wave",
+    "epic_072",
+    "go-no-go",
+    "permutation",
+    "v2"
+  ],
+  "title": "Hullámkezdet előrejelző-erő kapu — kép vs skalár alap, purged CV (W4h_H8h, train)",
+  "updated_at": "2026-11-20T15:33:49Z"
+}

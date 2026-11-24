@@ -109,6 +109,54 @@ def test_feature_set_hash_uses_feature_columns_only(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_values_sha256_registered_and_value_sensitive(tmp_path: Path) -> None:
+    """values_sha256 is stored, deterministic, and changes with values (t949)."""
+    conn, _, _ = _open_lab(tmp_path)
+    try:
+        result = snapshots.create_snapshot(conn, asset_id="solusdt", horizon=60)
+        assert result.values_sha256 is not None and len(result.values_sha256) == 64
+        row = registry.get(conn, "snapshots", result.snapshot_id)
+        assert row is not None and row["values_sha256"] == result.values_sha256
+
+        fqn = f'snap."{result.snapshot_id}"'
+        assert snapshots.compute_values_sha256(conn, fqn) == result.values_sha256
+
+        # Same grid / row count / columns, different values -> content_sha256
+        # would be identical, values_sha256 must differ.
+        conn.execute(f"CREATE TABLE other AS SELECT * FROM {fqn}")
+        conn.execute("UPDATE other SET feat_a = feat_a + 1")
+        assert snapshots.compute_values_sha256(conn, "other") != result.values_sha256
+
+        # Swapping values between rows is detected (value bound to open_time).
+        conn.execute(f"CREATE TABLE swapped AS SELECT * FROM {fqn}")
+        conn.execute("UPDATE swapped SET feat_a = 119 - feat_a")
+        assert snapshots.compute_values_sha256(conn, "swapped") != result.values_sha256
+    finally:
+        conn.close()
+
+
+def test_values_sha256_backfill_and_lazy_fill_on_reuse(tmp_path: Path) -> None:
+    """Pre-existing rows without values_sha256 get it via backfill / reuse; ids unchanged."""
+    conn, _, _ = _open_lab(tmp_path)
+    try:
+        first = snapshots.create_snapshot(conn, asset_id="solusdt", horizon=60)
+        conn.execute("UPDATE reg.snapshots SET values_sha256 = NULL")
+
+        filled = snapshots.backfill_values_sha256(conn, "solusdt")
+        assert filled == {first.snapshot_id: first.values_sha256}
+
+        conn.execute("UPDATE reg.snapshots SET values_sha256 = NULL")
+        again = snapshots.create_snapshot(conn, asset_id="solusdt", horizon=60)
+        assert again.reused
+        assert again.snapshot_id == first.snapshot_id
+        assert again.content_sha256 == first.content_sha256
+        assert again.values_sha256 == first.values_sha256
+        row = registry.get(conn, "snapshots", first.snapshot_id)
+        assert row is not None and row["values_sha256"] == first.values_sha256
+    finally:
+        conn.close()
+
+
 def test_format_range_single_year_vs_span() -> None:
     assert snapshots.format_range("2023-01-01 00:00:00", "2023-12-31 23:59:00") == "2023"
     assert (

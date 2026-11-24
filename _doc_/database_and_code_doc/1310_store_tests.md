@@ -59,6 +59,12 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 
 **Előfeltétel:** Éles DB megléte. Ha hiányzik, minden teszt `pytest.skip()`.
 
+**Lock-retry (epic_076 / t949):** a `conftest.py` `conn` fixture-je a read-only connectet
+`connect_read_only_with_retry`-vel nyitja (`LOCK_RETRY_TRIES=30` × `LOCK_RETRY_DELAY_S=1.5` s
+≈ 45 s), mert Windowson a worker írása alatt a `read_only=True` connect is `duckdb.IOException`-t
+dob. Ha a lock a keret után is fennáll → `pytest.skip` (környezeti állapot, nem teszthiba), nem
+setup error.
+
 ### `test_ohlcv.py`
 
 | Teszt | Mit ellenőriz |
@@ -86,6 +92,8 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 | `test_target_required_columns` | `long_mfe_fw60`, `short_mfe_fw60` és fw60 outcome oszlopok jelen vannak |
 | `test_target_long_mfe_range` | `long_mfe_fw60` értékek az elvárt tartományban (logreturn) |
 | `test_target_short_mfe_range` | `short_mfe_fw60` értékek az elvárt tartományban (logreturn) |
+| `test_feat_ohlcv_quant_no_time_gap` | Nincs belső 1 perces lyuk a `feat_ohlcv_quant`-ban (belső lyuk javítása: `02_sync_pipeline.py --repair-gaps`, t947) |
+| `test_target_row_count_matches_features` | `target` és `feat_ohlcv_quant` soronként egyezik a target lefedett tartományán: azonos kezdet, `target.max <= feat.max`, azonos sorszám `<= target.max`-ig, nincs feature nélküli target sor. A worker (`sync_full`) a targetet NEM frissíti (retrainkor `--tables targets`), ezért a teljes sorszám-egyezés elavult elvárás volt (t949) |
 
 ---
 
@@ -107,7 +115,7 @@ Szintetikus adattal futnak, nem igényelnek éles DB-t.
 |-------|---------------|
 | `test_predictions_table_exists` | `predictions` tábla létezik |
 | `test_predictions_required_columns` | `long_pred`, `short_pred` jelen van |
-| `test_predictions_score_range` | `long_pred`, `short_pred` ∈ [0, 1] |
+| `test_predictions_score_range` | `long_pred`, `short_pred` véges és `\|x\| <= 2`. A champion modellek LightGBM regresszorok (`objective: regression`, fw60 MFE logreturn; a short negatív) — a korábbi [0, 1] (valószínűség) elvárás elavult (t949) |
 | `test_predictions_label_end_ts` | `label_end_ts > open_time` minden sorra |
 | `test_predictions_alignment_with_ohlcv` | `predictions.open_time ⊆ ohlcv.open_time` |
 

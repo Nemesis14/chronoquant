@@ -33,6 +33,7 @@ Load relevant module docs (only for affected modules):
 
 - `_doc_/database_and_code_doc/5700_offline_prediction.md`, `_doc_/database_and_code_doc/0004_model_lifecycle.md` — if touching `src/modeling/`
 - `_doc_/database_and_code_doc/6100_strategy_module.md` ... `6140_artifacts.md` — if touching `src/strategy/`
+- `_doc_/database_and_code_doc/5800_scout_runtime.md` — if touching `src/scout/` / `artifacts/scout_s0c_r1/` (Impulse Scout)
 - `_doc_/database_and_code_doc/8330_reports.md` — a pipeline `feature_engineering`/`analyze` lépései a `src/reports` buildereket hívják
 
 ---
@@ -47,6 +48,7 @@ Load relevant module docs (only for affected modules):
 | `src/data_handling/sync_tables/sync_features.py` | Feature sync into store |
 | `src/data_handling/sync_tables/sync_predictions.py` | Prediction sync into store |
 | `artifacts/` | Generated model artifacts (`artifacts/<model_id>/`) |
+| `src/scout/`, `artifacts/scout_s0c_r1/` | Impulse Scout runtime + befagyasztott artifact (kísérleti, NO-GO); új verzió = új artifact (pl. `scout_s0c_r2`) |
 | `src/modeling/tests/` | Modeling tests for training and sampling |
 | `src/modeling/pipeline.py` | Pipeline orchestrator; a `feature_engineering` és `analyze` lépések hívják a `src/reports/builders/*`-t (a builderek tartalma az analyst_agent-é) |
 
@@ -68,7 +70,7 @@ Minden egyéb domain: lásd delegation table — `CLAUDE.md`.
 - Candidate evaluation output stays separate from live predictions table
 - Use Polars for feature computation — do not mix with pandas in same step
 - Apply t-1 lag on all features before training to prevent data leakage
-- Primary active asset: SOLUSDT
+- Aktív assetek: `solusdt` (default), `bchusdt`, `btcusdt` (élő modellpár); `ethusdt` data-only (nincs quant modell); a modell assetje `models.json` `asset_id` (`utils.model_asset_id`)
 
 ---
 

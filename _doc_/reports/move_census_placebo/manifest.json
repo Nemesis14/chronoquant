@@ -1,0 +1,75 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/count_ratio_k3.json",
+        "height": 380,
+        "id": "count_ratio_k3",
+        "title": "Nagy emelkedések száma, valós / placebo-átlag (k = 3)"
+      },
+      {
+        "file": "charts/count_ratio_k4.json",
+        "height": 380,
+        "id": "count_ratio_k4",
+        "title": "Nagy emelkedések száma, valós / placebo-átlag (k = 4)"
+      },
+      {
+        "file": "charts/count_ratio_k6.json",
+        "height": 380,
+        "id": "count_ratio_k6",
+        "title": "Nagy emelkedések száma, valós / placebo-átlag (k = 6)"
+      },
+      {
+        "file": "charts/er_k4.json",
+        "height": 380,
+        "id": "er_k4",
+        "title": "Medián hatékonysági arány (k = 4)"
+      },
+      {
+        "file": "charts/dur_k4.json",
+        "height": 380,
+        "id": "dur_k4",
+        "title": "Medián hossz, valós / placebo-átlag (k = 4)"
+      },
+      {
+        "file": "charts/share_big_k4.json",
+        "height": 380,
+        "id": "share_big_k4",
+        "title": "A felfelé szakaszok mekkora része nagy (k = 4)"
+      },
+      {
+        "file": "charts/vr.json",
+        "height": 380,
+        "id": "vr",
+        "title": "Variancia-arány a skála függvényében"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/summary.json",
+        "id": "summary",
+        "title": "Valós vs placebo (minden cella és mutató)"
+      }
+    ]
+  },
+  "created_at": "2026-11-24T07:07:06Z",
+  "id": "move_census_placebo",
+  "model_id": null,
+  "order": 76,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.move_census_placebo",
+    "kind": "analysis"
+  },
+  "summary": "Ugyanaz a detektor és rács 200+200 placebo-útvonalon: mennyi a katalógusból véletlenül is kijön.",
+  "tags": [
+    "research",
+    "scout2",
+    "move_census",
+    "placebo"
+  ],
+  "title": "Placebo-null a nagy-mozgás katalógushoz — BTCUSDT (epic_077 / t951)",
+  "updated_at": "2026-11-24T07:07:06Z"
+}

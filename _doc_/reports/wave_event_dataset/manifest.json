@@ -1,0 +1,167 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/cv_block_shares.json",
+        "height": 380,
+        "id": "cv_block_shares",
+        "title": "Osztályarányok CV-blokkonként (train)"
+      },
+      {
+        "file": "charts/quint_impulse.json",
+        "height": 340,
+        "id": "quint_impulse",
+        "title": "Impulzus-arány A/σ_W kvintilisenként (train)"
+      },
+      {
+        "file": "charts/dist_a_sigma.json",
+        "height": 340,
+        "id": "dist_a_sigma",
+        "title": "A/σ_W eloszlás cellánként (train)"
+      },
+      {
+        "file": "charts/input_w4h_h4h_impulse.json",
+        "height": 460,
+        "id": "input_w4h_h4h_impulse",
+        "title": "Modell-bemenet (W=4h, H=4h) — impulzus (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/input_w4h_h4h_false_start.json",
+        "height": 460,
+        "id": "input_w4h_h4h_false_start",
+        "title": "Modell-bemenet (W=4h, H=4h) — hamis indulás (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/input_w4h_h4h_sideways.json",
+        "height": 460,
+        "id": "input_w4h_h4h_sideways",
+        "title": "Modell-bemenet (W=4h, H=4h) — oldalazás (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/ex_w4h_h4h_impulse.json",
+        "height": 480,
+        "id": "ex_w4h_h4h_impulse",
+        "title": "W4h_H4h: impulzus — t_c 2023-09-13 21:48"
+      },
+      {
+        "file": "charts/ex_w4h_h4h_false_start.json",
+        "height": 480,
+        "id": "ex_w4h_h4h_false_start",
+        "title": "W4h_H4h: hamis indulás — t_c 2023-04-03 19:01"
+      },
+      {
+        "file": "charts/ex_w4h_h4h_sideways.json",
+        "height": 480,
+        "id": "ex_w4h_h4h_sideways",
+        "title": "W4h_H4h: oldalazás — t_c 2023-07-15 00:34"
+      },
+      {
+        "file": "charts/input_w4h_h8h_impulse.json",
+        "height": 460,
+        "id": "input_w4h_h8h_impulse",
+        "title": "Modell-bemenet (W=4h, H=8h) — impulzus (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/input_w4h_h8h_false_start.json",
+        "height": 460,
+        "id": "input_w4h_h8h_false_start",
+        "title": "Modell-bemenet (W=4h, H=8h) — hamis indulás (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/input_w4h_h8h_sideways.json",
+        "height": 460,
+        "id": "input_w4h_h8h_sideways",
+        "title": "Modell-bemenet (W=4h, H=8h) — oldalazás (ATR-normált prefix + relatív volumen)"
+      },
+      {
+        "file": "charts/ex_w4h_h8h_impulse.json",
+        "height": 480,
+        "id": "ex_w4h_h8h_impulse",
+        "title": "W4h_H8h: impulzus — t_c 2023-06-20 18:30"
+      },
+      {
+        "file": "charts/ex_w4h_h8h_false_start.json",
+        "height": 480,
+        "id": "ex_w4h_h8h_false_start",
+        "title": "W4h_H8h: hamis indulás — t_c 2023-03-08 02:09"
+      },
+      {
+        "file": "charts/ex_w4h_h8h_sideways.json",
+        "height": 480,
+        "id": "ex_w4h_h8h_sideways",
+        "title": "W4h_H8h: oldalazás — t_c 2023-09-01 01:09"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/params.json",
+        "id": "params",
+        "title": "Definíciók (5200 v2, fagyasztva)"
+      },
+      {
+        "file": "tables/summary.json",
+        "id": "summary",
+        "title": "Train-eseményszám és címke-osztályok cellánként (OOS / holdout-2: db)"
+      },
+      {
+        "file": "tables/funnel.json",
+        "id": "funnel",
+        "title": "Detektálási tölcsér cellánként"
+      },
+      {
+        "file": "tables/same_bar.json",
+        "id": "same_bar",
+        "title": "Same-bar gyakoriság és osztályarány az ellenkező tie-break mellett (train)"
+      },
+      {
+        "file": "tables/cv_blocks.json",
+        "id": "cv_blocks",
+        "title": "Esemény- és osztály-darabszám CV-blokkonként (train)"
+      },
+      {
+        "file": "tables/cv_checks.json",
+        "id": "cv_checks",
+        "title": "Minimum-ellenőrzés cellánként"
+      },
+      {
+        "file": "tables/quintiles.json",
+        "id": "quintiles",
+        "title": "Osztályarányok A/σ_W kvintilisenként (train)"
+      },
+      {
+        "file": "tables/oos_counts.json",
+        "id": "oos_counts",
+        "title": "OOS / holdout-2 darabszám (cella-összeg és egyedi t0)"
+      },
+      {
+        "file": "tables/examples.json",
+        "id": "examples",
+        "title": "A kiválasztott prefix-példák (train)"
+      }
+    ]
+  },
+  "created_at": "2026-11-20T11:51:42Z",
+  "id": "wave_event_dataset",
+  "model_id": null,
+  "order": 30,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.wave_event_dataset",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "5200 v2: megerősített lokális mélypontok SOLUSDT 1m-en a (4h,4h) és (4h,8h) cellában, háromosztályos first-touch címke (impulzus / hamis indulás / oldalazás), CV-blokkonkénti eloszlás, same-bar gyakoriság, A/σ_W vs impulzus-arány. Csak train; OOS / holdout-2 csak darabszám. Ellenőrzőpont a t919 előtt.",
+  "tags": [
+    "wave",
+    "epic_072",
+    "events",
+    "dataset",
+    "checkpoint",
+    "v2"
+  ],
+  "title": "Hullámkezdet-események v2 — adatkészlet, first-touch címke, CV-blokkok",
+  "updated_at": "2026-11-20T11:51:42Z"
+}

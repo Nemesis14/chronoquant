@@ -48,10 +48,13 @@ flowchart TD
   QT --> PRED_S["sync_predictions"]
 ```
 
-Minden lépés **idempotens upsert** — újrafuttatás nem duplikál. Az `open_time`
+Minden lépés **idempotens upsert** — újrafuttatás nem duplikál. Hibatűrés (epic_076 / t947): ha egy job az OHLCV beírása után, de a feature-írás előtt bukik (tipikusan DuckDB fájlzár — Windows-on egy másik processz, pl. az API read-only kapcsolata is kizárja az írót), a következő futás `sync_features` catch-up kezdése a feature-tail + 1 perctől pótol, a predictions pedig a saját tailjétől indul — így nem keletkezik végleges 1 perces lyuk. Régi belső lyukak pótlása: `02_sync_pipeline.py --repair-gaps --asset-id <id>` ([1200_sync_tables.md](1200_sync_tables.md)). Az `open_time`
 az összes tábla primary key-e. A `quant_train` a legutóbbi elérhető range
 DELETE+INSERT-tel frissül (nem full rebuild).
 
+### Multi-asset ütemezés
+
+A sync **asset-onként** fut (`02_sync_pipeline.py --asset-id`, worker `sync_full` job `params.asset_id`). A scheduler minden *sync-aktív* assetre enqueue-ol percenként (default elöl, a worker egy jobot futtat egyszerre, tehát egymás után; dedup kulcs `(kind, asset_id)`). **Sync-aktív** = konfigurált asset ÉS létező live DB-fájl ÉS `config/trading.json` `assets.<id>` blokk. Így egy új asset bootstrap alatt nem blokkolja a default asset auto-syncjét; a trading.json blokk felvételével a szinkron újraindítás nélkül bekapcsol. A deploy-cutover (`sync_predictions`) szintén asset-onként történik. A funding sync a `sync_full` része (`sync_funding(only_if_due=True)`, nem-fatális; epic_074 / t939). Modell nélküli asset (BTC/ETH) üres trading.json blokkal is sync-aktív; a predictions lépés ott no-op. Részletek: [8310_worker.md](8310_worker.md).
 ---
 
 ## Live predict (sync_predictions)
@@ -143,7 +146,7 @@ a teljes régi állapotot olvassa, vagy a teljesen felváltott új állapotot.
 Az `src/api` a `predictions` táblát (`/api/predictions/*`), az aktív stratégiát (`/api/strat/active`: `strategy_artifact.json`,
 rank lookup) és a `strat.*` táblákat olvassa read-only; a trade journal (`src/trading/live/journal.py`) és a Binance fill-ek a
 `/api/trades/*` alatt jelennek meg. Az automatikus sync-et a worker ütemezője (`worker.scheduler`) enqueue-olja percenként
-(`ohlcv_sync_delay_seconds` késleltetéssel). Részletek: [8300_api.md](8300_api.md), [8310_worker.md](8310_worker.md).
+(`ohlcv_sync_delay_seconds` késleltetéssel). Részletek: [8300_api.md](8300_api.md), [8310_worker.md](8310_worker.md). Az API minden olvasó végpontja fogad `?asset=<id>`-t (default: solusdt), az UI `/a/:asset` fülekkel váltogat ([8350_frontend.md](8350_frontend.md)).
 
 Az éles order-logika (state machine, exchange kliens) törölve; a strategy artifactok (`artifacts/<model_id>/strategy/`) ma
 megjelenítési és kutatási célt szolgálnak.

@@ -62,14 +62,33 @@ erDiagram
         DOUBLE short_mfe_fw60 "fw60 short outcome"
     }
 
+    feat_levels {
+        TIMESTAMP open_time PK
+        TIMESTAMP available_ts "= open_time"
+        DOUBLE feat_cols "50 db feat_* (S/R szint + trendvonal, 1m, t-1 lag)"
+    }
+
+    scout_signals {
+        VARCHAR event_id PK "asset|W4h_H8h|t0"
+        TIMESTAMP t0
+        TIMESTAMP t_c "predikció ideje"
+        DOUBLE p_impulse "immutable predikció"
+        VARCHAR status "open / resolved / invalid"
+        TIMESTAMP scored_at "írás ideje"
+        BOOLEAN backfilled
+    }
+
     ohlcv ||--o{ target : "open_time"
+    ohlcv ||--o{ scout_signals : "scout.run (detect_anchor-tól)"
+    ohlcv ||--o{ feat_levels : "open_time (detektor, teljes történet)"
+    feat_levels ||--o{ quant_train : "LEFT JOIN open_time (challenger quant_train__&lt;profile&gt; only)"
     ohlcv ||--o{ feat_ohlcv_quant : "open_time"
     feat_ohlcv_quant ||--o{ predictions : "available_ts ASOF join"
     feat_ohlcv_quant ||--o{ quant_train : "INNER JOIN open_time"
     target ||--o{ quant_train : "INNER JOIN open_time"
 ```
 
-Minden tábla `open_time` TIMESTAMP primary key-en alapul. Az összes timestamp **UTC**, `YYYY-MM-DD HH:MM:SS` formátumban tárolva.
+Minden tábla `open_time` TIMESTAMP primary key-en alapul (kivétel: `scout_signals`, PK `event_id`; `funding_rate`, kulcs `funding_ts`). Az összes timestamp **UTC**, `YYYY-MM-DD HH:MM:SS` formátumban tárolva.
 
 **DuckDB fájl helye:** `database/<asset_id>/<asset_id>.duckdb`
 
@@ -237,6 +256,62 @@ CREATE TABLE IF NOT EXISTS predictions (
 | `feat_*` | `DOUBLE` | Az összes `feat_ohlcv_quant`-ban szereplő feature oszlop (t-1 lag már alkalmazva) |
 | `long_mfe_fw60` | `DOUBLE` | Fw60 long outcome: `log(max_fw60 / close[t])`. NULL sorok kizárva. |
 | `short_mfe_fw60` | `DOUBLE` | Fw60 short outcome: `log(min_fw60 / close[t])`. NULL sorok kizárva. |
+
+**Challenger tábla:** a `quant_train__<profile_id>` (pl. `quant_train__solusdt_fw60_sr`) ugyanezt a sorhalmazt adja, a `feat_levels` `feat_*` oszlopaival kiegészítve (LEFT JOIN). Részletek: [4100_quant_train.md](4100_quant_train.md) (Challenger profil szakasz).
+
+---
+
+### feat_levels
+
+**Cél:** S/R szint- és trendvonal-feature-ök 1m baronként (epic_071 challenger). A champion `feat_ohlcv_quant` nem olvassa.
+
+**Forrás:** a `levels_detector` (config v1) detektor a teljes `ohlcv` történeten; a sorok `t-1` lag-gel, `open_time` szerint.
+
+**Beírási mód:** idempotens upsert (`INSERT OR REPLACE`, PK `open_time`). Sync: `sync_levels.py` / `02_sync_pipeline.py --tables levels`.
+
+| Oszlop | Típus | Leírás |
+|--------|-------|--------|
+| `open_time` | `TIMESTAMP` (PK) | Bar nyitási ideje, UTC |
+| `available_ts` | `TIMESTAMP` | = `open_time` (konvenció, mint `feat_ohlcv_quant`) |
+| `feat_*` | `DOUBLE` | 50 db feature; NULL = nincs az adott objektum `T`-ben. Lista és definíciók: [1200_sync_tables.md](1200_sync_tables.md) |
+
+**Kód referencia:** [`1200_sync_tables.md`](1200_sync_tables.md) (`_levels_features.py`, `sync_levels.py`), migráció: [`1110_duckdb_store.md`](1110_duckdb_store.md) (v6).
+
+### scout_signals
+
+**Cél:** az Impulse Scout (`scout_s0c_r1`, epic_074) **forward-logja**: minden megerősített mélypont-esemény egy
+sor, a predikció a kimenet előtt íródik és utána nem módosul. Kísérleti, NO-GO — nem kereskedési jel, a quant modell
+nem olvassa. Minden live DB-ben létrejön (migráció v8); írva SOL / BTC / ETH-re.
+
+**Forrás:** `scout.run(asset_id, ohlcv_1m, artifact)` ([5800](5800_scout_runtime.md)) az `ohlcv` táblán,
+`detect_anchor`-tól (2026-07-24); események `t0 >= live_start` (2026-11-01).
+
+**Beírási mód:** `sync_scout.py` (egyetlen író) — új esemény INSERT; meglévő sornál csak a megengedett mezők
+frissülnek (lásd lent). Sor soha nem törlődik. Sync: `02_sync_pipeline.py --tables scout` (opt-in) / worker (t942).
+
+| Oszlopcsoport | Oszlopok | Szabály |
+|---|---|---|
+| kulcs, geometria | `event_id` (PK, `asset\|cell\|t0`), `asset_id, model_id, cell_id, t0, t_c, label_end, low_t0, close_tc, a_log, sigma_w, a_sigma, p_star, stop` | **immutable** |
+| feature-ök | `velocity_1h, pretrend_3d, log_sigma_1m, drop_depth, volume_ratio, scorable` | **immutable** |
+| predikció | `p_impulse, p_false_start, p_sideways, oof_percentile, top20, top10` | **immutable** (NULL, ha `scorable = false`) |
+| tervek | `entry`, `default_tp, default_sl, r2_03_tp, r2_03_sl` | set-once (csak NULL → érték) |
+| kimenet | `{default,r2_03}_{outcome, outcome_at, exit_price, net_bps}`, `status`, `label_class` | egyszer, `status`: `open` → `resolved` / `invalid` |
+| meta | `as_of` | frissül, amíg `status = open`; utána fagyott |
+| író | `scored_at` (TIMESTAMP, beszúrás ideje, UTC), `backfilled` (BOOLEAN) | insertkor, utána soha |
+
+Az oszlopok forrása a `scout.OUTPUT_SCHEMA` (+ `scored_at`, `backfilled`); a típusokat a
+`duckdb_store.scout_signals_columns()` képzi. Eltérő runtime séma (új artifact-verzió) → új migráció kell; a sync
+addig hibát dob.
+
+**`backfilled`:** `t_c < first_live_sync_at`, ahol `first_live_sync_at` = `MIN(scored_at)` az asset táblájában (az első
+sikeres írás ideje; az első futás a saját `now`-ját használja). Az első éles futás előtt lezárt (`t_c`) események
+backfill-ek, a későbbiek valódi forward predikciók. Az írási késés soronként: `scored_at − t_c`.
+Első éles futás: 2026-11-23 07:33 UTC (SOL 8, BTC 9, ETH 8 esemény, mind `backfilled = true`).
+
+**Kód referencia:** [`1200_sync_tables.md`](1200_sync_tables.md) (`sync_scout.py`), migráció:
+[`1110_duckdb_store.md`](1110_duckdb_store.md) (v8), runtime: [`5800_scout_runtime.md`](5800_scout_runtime.md).
+
+---
 
 > **Megjegyzés:** A `quant_train` nem tartalmaz `close`, `available_ts`, `label_end_ts` vagy predikció oszlopokat.
 > A legacy `trg_*` boolean target elnevezés NEM kerül felhasználásra ebben a rétegben.

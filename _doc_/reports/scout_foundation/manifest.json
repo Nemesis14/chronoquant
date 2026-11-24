@@ -1,0 +1,93 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/pca_explained.json",
+        "height": 300,
+        "id": "pca_explained",
+        "title": "Az embedding PCA-spektruma (teljes train, leíró)"
+      },
+      {
+        "file": "charts/null_dauc.json",
+        "height": 320,
+        "id": "null_dauc",
+        "title": "ΔAUC permutációs null-eloszlás (N = 200, fej-refit)"
+      },
+      {
+        "file": "charts/blocks_scout_chronos_r1.json",
+        "height": 340,
+        "id": "blocks_scout_chronos_r1",
+        "title": "Blokkonkénti AUC és ΔAUC — csak embedding"
+      },
+      {
+        "file": "charts/blocks_scout_chronos_s0c_r1.json",
+        "height": 340,
+        "id": "blocks_scout_chronos_s0c_r1",
+        "title": "Blokkonkénti AUC és ΔAUC — embedding + S0C"
+      },
+      {
+        "file": "charts/reliability_scout_chronos_r1.json",
+        "height": 320,
+        "id": "reliability_scout_chronos_r1",
+        "title": "Megbízhatósági görbe — csak embedding"
+      },
+      {
+        "file": "charts/reliability_scout_chronos_s0c_r1.json",
+        "height": 320,
+        "id": "reliability_scout_chronos_s0c_r1",
+        "title": "Megbízhatósági görbe — embedding + S0C"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/univariate.json",
+        "id": "univariate",
+        "title": "Egyváltozós AUC és átfedés az S0 + C skalárokkal"
+      },
+      {
+        "file": "tables/leaderboard.json",
+        "id": "leaderboard",
+        "title": "Leaderboard: baseline + Chronos embedding (+ S0C)"
+      },
+      {
+        "file": "tables/assets.json",
+        "id": "assets",
+        "title": "Asset-bontás"
+      },
+      {
+        "file": "tables/trades.json",
+        "id": "trades",
+        "title": "Szimuláció: jelzés-szám, hit / stop / időkorlát, nettó hozam (bp)"
+      },
+      {
+        "file": "tables/runtime.json",
+        "id": "runtime",
+        "title": "Futásidő (CPU, párhuzamos agent-futások mellett)"
+      }
+    ]
+  },
+  "created_at": "2026-11-21T14:20:18Z",
+  "id": "scout_foundation",
+  "model_id": null,
+  "order": 37,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.scout_foundation_report",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "epic_073 t935: frozen Chronos-Bolt-small embedding; ΔAUC csak embedding -0.0106, embedding + S0C +0.0040 (baseline AUC 0.6361); perm. p 0.692 / 0.498 (N = 200, fej-refit); 2170 train esemény.",
+  "tags": [
+    "scout",
+    "epic_073",
+    "chronos",
+    "foundation_model",
+    "embedding",
+    "leaderboard"
+  ],
+  "title": "Impulse Scout — Modell 4: Chronos-Bolt embedding + lineáris fej (X2, kísérleti)",
+  "updated_at": "2026-11-22T06:16:16Z"
+}

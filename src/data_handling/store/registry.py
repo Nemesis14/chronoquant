@@ -203,9 +203,24 @@ def _migration_002_deployments_lifecycle(conn: duckdb.DuckDBPyConnection) -> Non
     )
 
 
+def _migration_003_snapshot_values_hash(conn: duckdb.DuckDBPyConnection) -> None:
+    """Add the additive value hash column to the snapshots table (epic_076 / t949).
+
+    ``content_sha256`` fingerprints only the time grid + row count + column set
+    (it drives the snapshot_id and reuse), so two assets over the same grid hash
+    identically.  ``values_sha256`` fingerprints the frozen *values* as well; it
+    is informational and never part of the snapshot_id. Nullable: rows whose
+    snap table is unavailable keep NULL.
+    """
+    conn.execute(
+        "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS values_sha256 VARCHAR"
+    )
+
+
 REG_MIGRATIONS: list[Migration] = [
     Migration(version=1, name="reg_schema_initial",        apply=_migration_001_reg_schema),
     Migration(version=2, name="deployments_lifecycle_cols", apply=_migration_002_deployments_lifecycle),
+    Migration(version=3, name="snapshot_values_sha256",     apply=_migration_003_snapshot_values_hash),
 ]
 
 

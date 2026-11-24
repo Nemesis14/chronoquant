@@ -12,7 +12,7 @@ Kapcsolat kezelés, táblák inicializálása, migráció és adatbeírás. Ez a
 flowchart TD
     GC["get_connection(db_path)"]
     ET["ensure_tables(conn)"]
-    MIG["LIVE_DB_MIGRATIONS\n(v1..v5)"]
+    MIG["LIVE_DB_MIGRATIONS\n(v1..v8)"]
     EFQ["_ensure_feat_ohlcv_quant_table(conn, df)"]
     IAO["_insert_append_only(conn, table, df)"]
     IO["insert_ohlcv(conn, df)"]
@@ -69,6 +69,12 @@ flowchart TD
 | v3 | `drop_legacy_split_cols` | `dataset_split`, `fold_id` törlése `feat_ohlcv_quant`-ból és `predictions`-ből |
 | v4 | `drop_predictions_boolean_targets` | Régi BOOLEAN target oszlopok törlése + `long_mfe_fw60`, `short_mfe_fw60` hozzáadása |
 | v5 | `add_model_stamp_cols` | `long_model_id`, `short_model_id` VARCHAR oszlopok hozzáadása `predictions`-hoz |
+| v6 | `create_feat_levels` | `feat_levels` tábla (PK `open_time`, `available_ts`, 50 db `feat_*` DOUBLE; oszloplista: `_feat_levels_v1_columns()`, epic_071 / t912) |
+| v7 | `create_funding_rate` | `funding_rate` (`funding_ts, funding_rate, mark_price`), `IF NOT EXISTS` — a régi ad-hoc SOL/BCH tábla változatlan (epic_074 / t939) |
+| v8 | `create_scout_signals` | `scout_signals` (PK `event_id`; oszlopok = `scout.OUTPUT_SCHEMA` + `scored_at`, `backfilled`), `IF NOT EXISTS` (epic_074 / t941). A DDL-t a `scout_signals_columns()` képzi (lusta `scout` import, hogy a store / API importja könnyű maradjon) |
+
+**`scout_signals_columns() -> dict[str, str]`:** oszlop → DuckDB típus (`_sql_type_from_polars` a `scout.OUTPUT_SCHEMA`-ra
++ `SCOUT_SIGNALS_EXTRA_COLUMNS`). Ezt használja a v8 DDL és a `sync_scout.check_table_schema` drift-ellenőrzés is.
 
 **Megjegyzés:** A `feat_ohlcv_quant` tábla NEM itt jön létre — dinamikus séma, az első `insert_feat_ohlcv_quant()` hívásnál keletkezik.
 
@@ -217,7 +223,11 @@ flowchart TD
 | `conn` | `duckdb.DuckDBPyConnection` | — | Nyitott írható kapcsolat |
 | `start_time` | `str \| None` | `None` | Opcionális alsó határ, inkluzív (`YYYY-MM-DD HH:MM:SS`) |
 | `end_time` | `str \| None` | `None` | Opcionális felső határ, inkluzív |
+| `extra_feature_tables` | `list[str] \| None` | `None` | További feat táblák, mindegyik `LEFT JOIN` a `open_time`-ra (pl. `["feat_levels"]`); a sorhalmaz változatlan marad (champion join), a táblák `feat_*` oszlopai hozzáfűződnek |
+| `table_name` | `str` | `"quant_train"` | Kimeneti tábla. `extra_feature_tables` megadásakor kötelezően más, mint `quant_train` (konvenció: `quant_train__<profile_id>`), különben `ValueError` |
 
 **Visszatérési érték:** `int` — sorok száma a `quant_train` táblában rebuild után.
+
+**Challenger build (epic_071 / t912):** a champion `quant_train` sosem íródik challenger profillal. A `feat_levels`-ös build a `quant_train__solusdt_fw60_sr` táblába ír (`utils.quant_train_table`). Hiányzó extra tábla vagy duplikált feature-oszlop `ValueError`.
 
 **Megjegyzés:** A `feat_*` oszlopok dinamikusan kerülnek kiválasztásra az `information_schema`-ból — nem hardcoded lista.

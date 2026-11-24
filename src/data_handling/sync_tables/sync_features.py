@@ -13,6 +13,16 @@ DuckDB (ohlcv)  →  query_range_pl()  →  Polars DataFrame
                                       →  insert_feat_ohlcv_quant() (native Polars insert)
                                       →  DuckDB (feat_ohlcv_quant table)
 
+Catch-up start (epic_076 / t947)
+--------------------------------
+feat_ohlcv_quant is append-only (only open_time > MAX is inserted).  A caller that
+passes a start_time beyond ``MAX(open_time) + 1 minute`` would therefore leave a
+permanent hole — this happened when a live sync_full job inserted OHLCV and then
+failed before the feature write (e.g. DuckDB file lock): the next job started from
+the *new* OHLCV tail.  sync_features now lowers start_time to the stored feature
+tail + 1 minute in that case (warning logged), so every run self-heals.
+Interior holes are repaired with ``backfill=True`` (see sync_tables.repair_gaps).
+
 t-1 live consistency guarantee
 -------------------------------
 All OHLCV-based features are shifted by one bar inside compute_features_polars so
@@ -32,9 +42,15 @@ import utils
 from data_handling.store.duckdb_query import (
     dataset_columns,
     dataset_exists,
+    latest_open_time,
     query_range_pl,
 )
-from data_handling.store.duckdb_store import ensure_tables, get_connection, insert_feat_ohlcv_quant
+from data_handling.store.duckdb_store import (
+    backfill_feat_ohlcv_quant,
+    ensure_tables,
+    get_connection,
+    insert_feat_ohlcv_quant,
+)
 from data_handling.sync_tables._features_polars import compute_features_polars
 
 if TYPE_CHECKING:
@@ -51,6 +67,7 @@ def sync_features(
     lookback_bars : int = 2880,
     end_time      : str | None = None,
     asset_id      : str | None = None,
+    backfill      : bool = False,
 ) -> None:
     """Fetch OHLCV, compute all configured indicators, and write to feat_ohlcv_quant.
 
@@ -62,6 +79,8 @@ def sync_features(
         lookback_bars : Extra minutes fetched before start_time for indicator warmup.
         end_time      : Optional upper bound for controlled rebuilds.
         asset_id      : Asset key from config/assets.json; uses default if None.
+        backfill      : If True, fill interior gaps (skip stored open_times) instead of
+                        the append-only insert; the catch-up start is not applied.
     """
     # --- load configuration ---
     db_cfg   = utils.load_asset_config(asset_id)
@@ -79,6 +98,10 @@ def sync_features(
 
     base_cols   = ["open_time", "open", "high", "low", "close", "volume"]
     select_cols = base_cols + available_activity
+
+    # --- catch-up: never start beyond the stored feature tail + 1 minute ---
+    if not backfill:
+        start_time = _catch_up_start(db_path, start_time)
 
     # --- fetch raw OHLCV as Polars DataFrame ---
     fetch_start = (
@@ -138,7 +161,40 @@ def sync_features(
     conn = get_connection(db_path)
     ensure_tables(conn)
     try:
-        written = insert_feat_ohlcv_quant(conn, df_final)
+        written = (
+            backfill_feat_ohlcv_quant(conn, df_final)
+            if backfill
+            else insert_feat_ohlcv_quant(conn, df_final)
+        )
     finally:
         conn.close()
     logger.info("OK: %d feature sor szamolva, %d uj sor irva", len(df_final), written)
+
+
+# %% Helpers
+
+
+def _catch_up_start(db_path: str, start_time: str) -> str:
+    """Return min(start_time, feature tail + 1 minute) as a UTC string.
+
+    Args:
+        db_path    : Asset DuckDB path.
+        start_time : Requested lower bound, UTC YYYY-MM-DD HH:MM:SS.
+
+    Returns:
+        The effective start_time (unchanged when the table is absent/empty or
+        already reaches start_time - 1 minute).
+    """
+    tail = latest_open_time(db_path, "feat_ohlcv_quant")
+    if tail is None:
+        return start_time
+    next_dt  = tail.to_pydatetime() + timedelta(minutes=1)
+    start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    if next_dt >= start_dt:
+        return start_time
+    caught = next_dt.strftime("%Y-%m-%d %H:%M:%S")
+    logger.warning(
+        "Feature catch-up: feat_ohlcv_quant tail=%s < start_time=%s, start -> %s",
+        tail, start_time, caught,
+    )
+    return caught

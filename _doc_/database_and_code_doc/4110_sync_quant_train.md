@@ -34,6 +34,7 @@ flowchart TD
 | `asset_id` | `str \| None` | `None` | Asset kulcs a `config/assets.json`-ból; `None` = default asset |
 | `start_time` | `str \| None` | `None` | Range rebuild alsó határ, inclusive (`YYYY-MM-DD HH:MM:SS`). `None` = full rebuild |
 | `end_time` | `str \| None` | `None` | Range rebuild felső határ, inclusive. `None` = full rebuild |
+| `features_profile` | `str \| None` | `None` | Feature-profil (`config/features.json`). `None` = az asset champion profilja → `quant_train`. Challenger profilnál (`extra_feature_tables`) a cél a `quant_train__<profile_id>` (`utils.quant_train_table`) |
 
 **Visszatérési érték:** `int` — a `quant_train` tábla sorainak száma a rebuild után.
 
@@ -78,6 +79,9 @@ uv run python src/data_handling/03_build_quant_train.py \
 
 # Explicit asset
 uv run python src/data_handling/03_build_quant_train.py --asset-id solusdt
+
+# Challenger profil (quant_train__solusdt_fw60_sr)
+uv run python src/data_handling/03_build_quant_train.py --features-profile solusdt_fw60_sr
 ```
 
 ---

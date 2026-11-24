@@ -32,7 +32,7 @@ DuckDB kapcsolat kezelés, séma inicializálás és adatbeírás.
 
 **Kulcs funkciók:**
 - `get_connection(db_path)` — DuckDB kapcsolat megnyitása, parent dir létrehozása
-- `ensure_tables(conn)` — Verziózott migrációk futtatása (`LIVE_DB_MIGRATIONS` v1–v5, idempotens)
+- `ensure_tables(conn)` — Verziózott migrációk futtatása (`LIVE_DB_MIGRATIONS` v1–v8, idempotens; v8 = `scout_signals`)
 - `_ensure_feat_ohlcv_quant_table(conn, df)` — Dinamikus séma: tábla létrehozása vagy oszlopbővítés
 - `_insert_append_only(conn, table, df)` — Core append logika `MAX(open_time)` alapon
 - `insert_ohlcv(conn, df)` — OHLCV beírás (10 oszlop szűrés + append)
@@ -88,7 +88,11 @@ Integritás invariánsok ellenőrzése AssertionError-ral.
 |-------|-----------|----------|
 | `ohlcv` | Append-only (`MAX(open_time)` alap) | `insert_ohlcv` |
 | `feat_ohlcv_quant` | Append-only + dinamikus séma | `insert_feat_ohlcv_quant` |
-| `target` | DELETE WHERE IN + INSERT (teljes rebuild) | `insert_target` |
+| `target` | DELETE WHERE IN + INSERT (teljes rebuild); a live worker (`sync_full`) NEM frissíti — retrainkor `02_sync_pipeline.py --tables targets`, ezért a vége elmaradhat a `feat_ohlcv_quant` mögött (t949) | `insert_target` |
 | `predictions` | Append-only | `insert_predictions` |
 | `predictions` | Gap-fill (INSERT OR IGNORE) | `backfill_predictions` |
 | `quant_train` | Full rebuild (CREATE OR REPLACE) / Range (DELETE+INSERT) | `rebuild_quant_train` |
+| `quant_train__<profile>` | Mint `quant_train`, challenger profilnál (`extra_feature_tables` LEFT JOIN) | `rebuild_quant_train(..., extra_feature_tables, table_name)` |
+| `feat_levels` | Idempotens upsert (`INSERT OR REPLACE BY NAME`, PK `open_time`) | `upsert_feat_levels` (`sync_levels.py`) |
+| `scout_signals` | Forward-log: INSERT új eseményre; immutable predikció, set-once tervek, egyszeri kimenet (`open` → `resolved`/`invalid`), nincs törlés | `upsert_scout_signals` (`sync_scout.py`) |
+| `snap."<snapshot_id>"` (lab DB) + `reg.snapshots` | Immutable CTAS, egyszer; a reg sor `content_sha256` (id/reuse) + additív `values_sha256` (érték-fingerprint, t949) | `snapshots.create_snapshot` → [1410](1410_snapshots_code.md) |

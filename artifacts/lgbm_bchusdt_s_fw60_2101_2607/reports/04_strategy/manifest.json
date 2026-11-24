@@ -1,0 +1,128 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/equity.json",
+        "height": 360,
+        "id": "equity",
+        "title": "Kumulált hozam a validációs periódusban"
+      },
+      {
+        "file": "charts/week_2026_01_26.json",
+        "height": 520,
+        "id": "week_2026_01_26",
+        "title": "Hét 2026-01-26"
+      },
+      {
+        "file": "charts/week_2026_02_02.json",
+        "height": 520,
+        "id": "week_2026_02_02",
+        "title": "Hét 2026-02-02"
+      },
+      {
+        "file": "charts/week_2026_02_09.json",
+        "height": 520,
+        "id": "week_2026_02_09",
+        "title": "Hét 2026-02-09"
+      },
+      {
+        "file": "charts/week_2026_02_16.json",
+        "height": 520,
+        "id": "week_2026_02_16",
+        "title": "Hét 2026-02-16"
+      },
+      {
+        "file": "charts/week_2026_02_23.json",
+        "height": 520,
+        "id": "week_2026_02_23",
+        "title": "Hét 2026-02-23"
+      },
+      {
+        "file": "charts/week_2026_03_02.json",
+        "height": 520,
+        "id": "week_2026_03_02",
+        "title": "Hét 2026-03-02"
+      },
+      {
+        "file": "charts/week_2026_03_23.json",
+        "height": 520,
+        "id": "week_2026_03_23",
+        "title": "Hét 2026-03-23"
+      },
+      {
+        "file": "charts/week_2026_05_04.json",
+        "height": 520,
+        "id": "week_2026_05_04",
+        "title": "Hét 2026-05-04"
+      },
+      {
+        "file": "charts/week_2026_05_18.json",
+        "height": 520,
+        "id": "week_2026_05_18",
+        "title": "Hét 2026-05-18"
+      },
+      {
+        "file": "charts/week_2026_05_25.json",
+        "height": 520,
+        "id": "week_2026_05_25",
+        "title": "Hét 2026-05-25"
+      },
+      {
+        "file": "charts/week_2026_06_01.json",
+        "height": 520,
+        "id": "week_2026_06_01",
+        "title": "Hét 2026-06-01"
+      },
+      {
+        "file": "charts/week_2026_06_08.json",
+        "height": 520,
+        "id": "week_2026_06_08",
+        "title": "Hét 2026-06-08"
+      },
+      {
+        "file": "charts/week_2026_06_15.json",
+        "height": 520,
+        "id": "week_2026_06_15",
+        "title": "Hét 2026-06-15"
+      },
+      {
+        "file": "charts/week_2026_06_22.json",
+        "height": 520,
+        "id": "week_2026_06_22",
+        "title": "Hét 2026-06-22"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/strategy_summary.json",
+        "id": "strategy_summary",
+        "title": "Stratégia paraméterek"
+      },
+      {
+        "file": "tables/weekly_summary.json",
+        "id": "weekly_summary",
+        "title": "Heti összesítő"
+      }
+    ]
+  },
+  "created_at": "2026-11-07T09:28:04Z",
+  "id": "04_strategy",
+  "model_id": "lgbm_bchusdt_s_fw60_2101_2607",
+  "order": 40,
+  "schema_version": 1,
+  "scope": "model",
+  "source": {
+    "generator": "reports.builders.strategy",
+    "git_sha": "13ee2fb",
+    "kind": "pipeline_step",
+    "step": "strategy"
+  },
+  "summary": "Short stratégia: cutoff 0.99, 232 validációs trade, win rate 0.634.",
+  "tags": [
+    "strategy",
+    "short"
+  ],
+  "title": "Stratégia (validációs periódus)",
+  "updated_at": "2026-11-07T09:28:04Z"
+}

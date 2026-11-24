@@ -15,7 +15,7 @@ def test_enqueue_creates_queued_job(queue: JobQueue) -> None:
     job, dedup = queue.enqueue("sync_full", {"a": 1})
     assert dedup is False
     assert job["status"] == "queued"
-    assert job["params"] == {"a": 1}
+    assert job["params"] == {"a": 1, "asset_id": "solusdt"}
     assert queue.get(job["id"]) is not None
 
 
@@ -141,7 +141,8 @@ def test_auto_sync_setting_and_scheduler(queue: JobQueue) -> None:
     assert scheduler.tick(queue, now=next_minute + 3, delay=3) is True
 
 
-def test_scheduler_dedup_does_not_mark_minute(queue: JobQueue) -> None:
+def test_scheduler_dedup_does_not_mark_minute(queue: JobQueue, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scheduler.assets, "sync_asset_ids", lambda: ["solusdt"])  # hermetic: ne az élő trading.json
     queue.set_auto_sync(True)
     queue.enqueue("sync_full")  # already queued
     assert scheduler.tick(queue, now=1_000_030.0, delay=3) is False

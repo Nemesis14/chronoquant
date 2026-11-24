@@ -45,8 +45,8 @@ def _make_client():  # noqa: ANN202 — python-binance Client, imported lazily
     return client
 
 
-def _symbol() -> str:
-    return str(utils.load_asset_config(None)["database"]["symbol"])
+def _symbol(asset_id: str | None = None) -> str:
+    return str(utils.load_asset_config(asset_id)["database"]["symbol"])
 
 
 def _f(value: Any) -> float:
@@ -107,7 +107,7 @@ def group_by_minute(fills: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
-def recent_trades(limit: int) -> dict[str, Any]:
+def recent_trades(limit: int, asset_id: str | None = None) -> dict[str, Any]:
     """Last fills (futures -> spot fallback), grouped per minute.
 
     Raises:
@@ -115,7 +115,7 @@ def recent_trades(limit: int) -> dict[str, Any]:
     """
     try:
         client = _make_client()
-        symbol = _symbol()
+        symbol = _symbol(asset_id)
     except Exception as exc:
         logger.warning("Binance client init failed: %s", exc)
         raise BinanceUnavailableError(str(exc)) from exc
@@ -143,34 +143,34 @@ def recent_trades(limit: int) -> dict[str, Any]:
 POSITION_CACHE_TTL_S = 45.0
 _monotonic = time.monotonic
 _position_lock = threading.Lock()
-_position_cache: tuple[float, dict[str, Any] | None] | None = None  # (expires_at, value)
+_position_cache: dict[str, tuple[float, dict[str, Any] | None]] = {}  # asset_id -> (expires_at, value)
 
 
 def clear_position_cache() -> None:
     """Drop the memoised open-position result (tests / forced refresh)."""
-    global _position_cache
     with _position_lock:
-        _position_cache = None
+        _position_cache.clear()
 
 
-def current_position() -> dict[str, Any] | None:
-    """The open Binance futures position for the asset (cached ``POSITION_CACHE_TTL_S``), or None."""
-    global _position_cache
+def current_position(asset_id: str | None = None) -> dict[str, Any] | None:
+    """The open Binance futures position of the asset (cached per asset for ``POSITION_CACHE_TTL_S``), or None."""
+    key = utils.resolve_asset_id(asset_id)
     with _position_lock:
         now = _monotonic()
-        if _position_cache is not None and now < _position_cache[0]:
-            cached = _position_cache[1]
+        entry = _position_cache.get(key)
+        if entry is not None and now < entry[0]:
+            cached = entry[1]
             return dict(cached) if cached is not None else None
-        value = _fetch_current_position()
-        _position_cache = (_monotonic() + POSITION_CACHE_TTL_S, value)
+        value = _fetch_current_position(key)
+        _position_cache[key] = (_monotonic() + POSITION_CACHE_TTL_S, value)
         return dict(value) if value is not None else None
 
 
-def _fetch_current_position() -> dict[str, Any] | None:
+def _fetch_current_position(asset_id: str | None = None) -> dict[str, Any] | None:
     """Uncached Binance lookup; errors are logged and swallowed (-> None)."""
     try:
         client = _make_client()
-        for p in client.futures_position_information(symbol=_symbol()):
+        for p in client.futures_position_information(symbol=_symbol(asset_id)):
             amt = float(p.get("positionAmt", 0))
             if amt == 0.0:
                 continue

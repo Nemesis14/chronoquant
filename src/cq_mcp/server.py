@@ -17,23 +17,24 @@ import anyio.to_thread
 from mcp.server.fastmcp import FastMCP
 from starlette.routing import Route
 
-from cq_mcp import tools_data, tools_jobs, tools_models, tools_reports, tools_sentiment
+from cq_mcp import tools_data, tools_jobs, tools_models, tools_reports, tools_scout, tools_sentiment
 
 SERVER_NAME = "chronoquant"
 MOUNT_PATH = "/mcp/chronoquant"
 
 INSTRUCTIONS = (
     "ChronoQuant trading research data. All tools only read, except `enqueue_sync` and `sentiment_refresh` (they start worker jobs). "
-    "Prefer the specific tools over `query_sql`; DuckDB aliases for SQL: live. lab. reg."
+    "Prefer the specific tools over `query_sql`; DuckDB aliases for SQL: live. lab. reg. "
+    "Several assets exist (see `list_assets`); every asset-specific tool takes an optional `asset` id and defaults to the default asset (solusdt)."
 )
 
 TOOLS: tuple[Callable[..., str], ...] = (
-    tools_models.get_status, tools_data.list_tables, tools_data.query_sql, tools_data.get_candles,
+    tools_models.list_assets, tools_models.get_status, tools_data.list_tables, tools_data.query_sql, tools_data.get_candles,
     tools_data.get_predictions, tools_data.get_latest_signal, tools_models.get_active_strategy,
     tools_models.get_trades, tools_models.get_equity, tools_models.list_models, tools_models.get_model,
     tools_models.get_registry, tools_reports.list_reports, tools_reports.read_report,
     tools_jobs.list_jobs, tools_jobs.enqueue_sync, tools_sentiment.sentiment_latest,
-    tools_sentiment.sentiment_refresh,
+    tools_sentiment.sentiment_refresh, tools_scout.scout_signals,
 )
 
 

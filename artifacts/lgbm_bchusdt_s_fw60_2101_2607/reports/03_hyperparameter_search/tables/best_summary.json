@@ -1,0 +1,1 @@
+{"columns": [{"key": "metric", "label": "Metrika", "type": "str"}, {"key": "value", "label": "Érték", "type": "str"}], "rows": [["Best trial №", "73"], ["valid_ratio_p075", "1.3395"], ["train_ratio_p075", "1.4037"], ["Train-valid gap", "0.0642"], ["Spearman ρ (valid)", "0.1001"], ["Decile monotonicity", "0.444"], ["Best iteration", "146"]], "total_rows": 7, "truncated": false}

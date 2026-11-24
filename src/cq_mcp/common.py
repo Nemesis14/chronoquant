@@ -6,9 +6,18 @@ import json
 from typing import Any
 
 import api.services.common as svc_common
+from worker import assets
 
 MAX_ROWS = 1000
 MAX_CHARS = 50_000
+
+
+def resolve_asset(asset: str | None) -> str:
+    """Asset id for a tool call (None -> default asset); ValueError listing the valid ids if unknown."""
+    try:
+        return assets.require_asset(asset)
+    except assets.UnknownAssetError as exc:
+        raise ValueError(f"{exc}; valid assets: {', '.join(assets.configured_asset_ids())}") from exc
 
 
 def clamp(value: int, low: int, high: int) -> int:

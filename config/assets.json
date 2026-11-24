@@ -1,6 +1,7 @@
 {
     "schema_version": 3,
     "default_asset_id": "solusdt",
+    "display_order": ["btcusdt", "bchusdt", "solusdt", "ethusdt"],
     "assets": {
         "solusdt": {
             "symbol": "SOLUSDT",
@@ -11,12 +12,32 @@
             "features_profile": "solusdt_fw60",
             "qty_step": 0.1
         },
+        "bchusdt": {
+            "symbol": "BCHUSDT",
+            "interval": "1m",
+            "market": "futures",
+            "db_path": "database/bchusdt/bchusdt.duckdb",
+            "metadata_path": "database/bchusdt/bchusdt.json",
+            "features_profile": "bchusdt_fw60",
+            "qty_step": 0.001
+        },
         "btcusdt": {
             "symbol": "BTCUSDT",
             "interval": "1m",
-            "market": "spot",
+            "market": "futures",
             "db_path": "database/btcusdt/btcusdt.duckdb",
-            "metadata_path": "database/btcusdt/btcusdt.json"
+            "metadata_path": "database/btcusdt/btcusdt.json",
+            "features_profile": "btcusdt_fw60",
+            "qty_step": 0.001
+        },
+        "ethusdt": {
+            "symbol": "ETHUSDT",
+            "interval": "1m",
+            "market": "futures",
+            "db_path": "database/ethusdt/ethusdt.duckdb",
+            "metadata_path": "database/ethusdt/ethusdt.json",
+            "features_profile": "ethusdt_fw60",
+            "qty_step": 0.001
         }
     }
 }

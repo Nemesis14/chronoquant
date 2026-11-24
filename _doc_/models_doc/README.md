@@ -17,3 +17,4 @@ A Quarto/ipynb/HTML kimenet megszűnt (epic_068). Két forma létezik:
 | `cluster_regime_oos_validation.md` | klaszter-rezsim OOS validáció (t867) |
 | `6500_cluster_regime_analysis_v2.md`, `6501_*.md`, `6502_*.md` | k=10 klaszter kutatás (Epic 065) |
 | `signal_frequency_train_vs_live.md` | élő vs kalibrációs signal-gyakoriság diagnosztika |
+| `bch_vs_sol_champion_2101_2607.md` | BCH vs SOL champion: lift, költség utáni stratégia, jelek forward MFE/MAE, verdikt (epic_069 t908) |

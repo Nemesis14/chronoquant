@@ -1,0 +1,205 @@
+{
+  "columns": [
+    {
+      "key": "model",
+      "label": "Modell",
+      "type": "str"
+    },
+    {
+      "digits": 4,
+      "key": "auc",
+      "label": "AUC",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "delta_auc",
+      "label": "ΔAUC",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "ci_lo",
+      "label": "CI alsó",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "ci_hi",
+      "label": "CI felső",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "logloss3",
+      "label": "3-oszt. LL",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "delta_logloss3",
+      "label": "ΔLL",
+      "type": "float"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top20",
+      "label": "Prec. felső 20%",
+      "type": "float"
+    },
+    {
+      "digits": 2,
+      "key": "lift_top20",
+      "label": "Lift 20%",
+      "type": "float"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top10",
+      "label": "Prec. felső 10%",
+      "type": "float"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top20_trthr",
+      "label": "Prec. 20% (train-küszöb)",
+      "type": "float"
+    },
+    {
+      "key": "n_top20_trthr",
+      "label": "n 20% (train-küszöb)",
+      "type": "int"
+    },
+    {
+      "key": "blocks_pos",
+      "label": "ΔAUC>0 blokk",
+      "type": "int"
+    },
+    {
+      "key": "blocks_prec_better",
+      "label": "Top20 jobb blokk",
+      "type": "int"
+    },
+    {
+      "digits": 4,
+      "key": "dauc_wo_best_block_mean",
+      "label": "ΔAUC legjobb blokk nélkül",
+      "type": "float"
+    },
+    {
+      "key": "assets_nonneg",
+      "label": "ΔAUC≥0 asset",
+      "type": "int"
+    },
+    {
+      "digits": 2,
+      "key": "cal_slope",
+      "label": "Kal. meredekség",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "perm_p",
+      "label": "perm. p",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "holm_p",
+      "label": "Holm p",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "spa_p",
+      "label": "SPA p",
+      "type": "float"
+    },
+    {
+      "digits": 1,
+      "key": "trade20_mean_net_bps",
+      "label": "Nettó bp (felső 20%)",
+      "type": "float"
+    },
+    {
+      "digits": 1,
+      "key": "trade20_ci_lo_bps",
+      "label": "CI alsó bp",
+      "type": "float"
+    },
+    {
+      "digits": 1,
+      "key": "trade20_ci_hi_bps",
+      "label": "CI felső bp",
+      "type": "float"
+    },
+    {
+      "key": "go_status",
+      "label": "Go / no-go",
+      "type": "str"
+    },
+    {
+      "key": "go_failed",
+      "label": "Bukott feltételek",
+      "type": "str"
+    }
+  ],
+  "rows": [
+    [
+      "S0C_logit",
+      0.6360584903817986,
+      0.0,
+      null,
+      null,
+      0.8008912141246958,
+      0.0,
+      0.2413793103448276,
+      1.700626959247649,
+      0.24770642201834864,
+      0.23990498812351543,
+      421,
+      0,
+      0,
+      0.0,
+      3,
+      0.9638381903896401,
+      0.000999000999000999,
+      null,
+      null,
+      2.711710487331737,
+      -14.737483292768559,
+      21.4432812573565,
+      "baseline",
+      ""
+    ],
+    [
+      "scout_hazard_r1",
+      0.6474099209061616,
+      0.011351430524362938,
+      -0.0039525994451922505,
+      0.02685765617861963,
+      0.7676530220289588,
+      -0.033238192095736974,
+      0.22758620689655173,
+      1.603448275862069,
+      0.24311926605504589,
+      0.2304147465437788,
+      434,
+      4,
+      0,
+      0.006136926099526208,
+      3,
+      0.8549034285800942,
+      0.26873126873126874,
+      0.8061938061938062,
+      0.23,
+      -8.862271814008626,
+      -28.098549857117547,
+      10.282348190184132,
+      "NO-GO",
+      "dauc,top20,stability,spa,holm,econ"
+    ]
+  ],
+  "total_rows": 2,
+  "truncated": false
+}

@@ -54,9 +54,10 @@ def source_info(step: str, generator: str) -> dict[str, Any]:
     return info
 
 
-def read_live(sql: str, params: list[Any] | None = None) -> pd.DataFrame | None:
+def read_live(sql: str, params: list[Any] | None = None,
+              asset_id: str | None = None) -> pd.DataFrame | None:
     """Run a query on the live DB read-only; ``None`` (and a log line) when it is locked/missing."""
-    path = utils.load_asset_config()["database"]["db_path"]
+    path = utils.load_asset_config(asset_id)["database"]["db_path"]
     try:
         con = duckdb.connect(str(path), read_only=True)
     except duckdb.Error as exc:

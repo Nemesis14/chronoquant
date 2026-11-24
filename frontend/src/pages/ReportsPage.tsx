@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FileText } from 'lucide-react'
+import { getAssets } from '../api/dashboard'
 import { getReport, listReports } from '../api/reports'
+import { loadLastAsset } from '../lib/asset'
 import { Card, Muted, PollNote } from '../components/dashboard/ui'
 import ReportMarkdown from '../components/reports/ReportMarkdown'
 import { usePolling } from '../lib/usePolling'
@@ -9,6 +11,8 @@ import type { ReportManifest } from '../types/reports'
 
 const GENERAL = 'general'
 const ALL = 'all'
+/** asset filter value: all assets (model reports of every asset + general). */
+const ANY_ASSET = 'all'
 
 const ownerLabel = (owner: string) => (owner === GENERAL ? 'Általános' : owner)
 
@@ -92,7 +96,19 @@ export default function ReportsPage() {
 
   // Manifest list only; chart / table / markdown content is fetched on click / scroll.
   const poll = usePolling((signal) => listReports(undefined, signal), 0, [])
-  const all = useMemo(() => poll.data?.items ?? [], [poll.data])
+  const assetsPoll = usePolling((signal) => getAssets(signal), 0, [])
+  const assetItems = useMemo(() => assetsPoll.data?.items ?? [], [assetsPoll.data])
+  // asset filter lives in ?asset=; default = last used dashboard asset
+  const assetParam = params.get('asset')
+  const assetFilter = assetParam ?? loadLastAsset() ?? ANY_ASSET
+  // model reports of the chosen asset + general reports (not asset-specific)
+  const all = useMemo(
+    () =>
+      (poll.data?.items ?? []).filter(
+        (r) => assetFilter === ANY_ASSET || !r.asset_id || r.asset_id === assetFilter,
+      ),
+    [poll.data, assetFilter],
+  )
 
   const owners = useMemo(() => {
     const set = new Set(all.map((r) => r.owner))
@@ -118,9 +134,31 @@ export default function ReportsPage() {
     setParams(next, { replace: true })
   }
 
+  const setAssetFilter = (value: string) => {
+    const next = new URLSearchParams(params)
+    next.set('asset', value)
+    next.delete('filter')
+    setParams(next, { replace: true })
+  }
+
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
       <Card title="Elemzések" className="lg:h-[calc(100vh-96px)] lg:overflow-y-auto">
+        <label className="mb-2 block text-xs text-cq-muted">
+          Asset
+          <select
+            value={assetFilter}
+            onChange={(e) => setAssetFilter(e.target.value)}
+            className="mt-1 block w-full rounded border border-cq-grid bg-cq-bg px-2 py-1 text-sm text-cq-text"
+          >
+            <option value={ANY_ASSET}>Mind</option>
+            {assetItems.map((a) => (
+              <option key={a.asset_id} value={a.asset_id}>
+                {a.symbol}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="mb-2 block text-xs text-cq-muted">
           Szűrő (modell / scope)
           <select

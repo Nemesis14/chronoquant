@@ -10,12 +10,22 @@ Data sources
 - targets     : Computed internally from DuckDB OHLCV via SQL window functions
 - features    : Computed internally from DuckDB OHLCV via Polars
 - predictions : Computed internally using champion models loaded from disk
+- levels      : S/R level + trendline features (feat_levels, epic_071) from DuckDB
+                OHLCV; full-history detector, incremental upsert (challenger only)
+- funding     : Settled futures funding rates (funding_rate) from Binance
+                fapi/v1/fundingRate; incremental after the stored max funding_ts
+- scout       : Impulse Scout forward-log (scout_signals, epic_074 / t941) from DuckDB
+                OHLCV via the frozen src/scout runtime; OPT-IN (not part of the
+                default table set) — e.g. --tables scout --asset-id btcusdt
 
 Dependency order (enforced by the pipeline)
 --------------------------------------------
 ohlcv  →  targets (full range, not chunked)
        →  features (monthly chunks)
               →  predictions (monthly chunks)
+       →  levels (full-history detector, rows >= --start or incremental)
+funding (independent; empty table: from --start or the earliest OHLCV row)
+ohlcv  →  scout (opt-in; --start = earliest t0, default and minimum 2026-11-01)
 
 Usage examples
 --------------
@@ -40,6 +50,11 @@ Usage examples
 
     # Single asset override
     uv run python src/database/sync_pipeline.py --asset-id solusdt
+
+    # Repair interior 1m gaps in feat_ohlcv_quant + predictions (epic_076 / t947);
+    # standalone mode (no other step runs), safe while the worker is live
+    uv run python src/data_handling/02_sync_pipeline.py --repair-gaps --asset-id bchusdt --dry-run
+    uv run python src/data_handling/02_sync_pipeline.py --repair-gaps --asset-id bchusdt
 """
 
 import argparse
@@ -57,6 +72,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 import utils
 from data_handling.store.duckdb_query import ohlcv_time_stats
 from data_handling.sync_tables.sync_features import sync_features
+from data_handling.sync_tables.sync_funding import sync_funding
+from data_handling.sync_tables.sync_levels import sync_levels
 from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
 from data_handling.sync_tables.sync_predictions import sync_predictions
 from data_handling.sync_tables.sync_targets import sync_targets
@@ -67,7 +84,9 @@ INIT_START_DATE  = "2017-01-01 00:00:00"
 LOOKBACK_BARS    = 2880          # extra minutes loaded before each chunk for indicator warmup
 DEFAULT_CHUNK_MONTHS = 3         # months per chunk (avoids OOM on large histories)
 
-ALL_TABLES = ("ohlcv", "targets", "features", "predictions")
+ALL_TABLES = ("ohlcv", "targets", "features", "predictions", "levels", "funding", "scout")
+#: tables run when --tables is omitted (scout is opt-in: experimental, per-asset decision)
+DEFAULT_TABLES = ("ohlcv", "targets", "features", "predictions", "levels", "funding")
 
 logger = logging.getLogger(__name__)
 
@@ -221,10 +240,23 @@ def _parse_args() -> argparse.Namespace:
         default = None,
         metavar = "TABLE[,TABLE...]",
         help    = (
-            "Comma-separated subset of tables to sync: ohlcv,targets,features,predictions. "
-            "Default: all tables. "
+            "Comma-separated subset of tables to sync: ohlcv,targets,features,predictions,levels,funding,scout. "
+            "Default: all tables except the opt-in scout. "
             "Dependency order is always enforced: ohlcv→targets, ohlcv→features→predictions."
         ),
+    )
+    parser.add_argument(
+        "--repair-gaps",
+        action = "store_true",
+        help   = (
+            "Standalone mode: backfill interior 1m gaps of feat_ohlcv_quant (vs ohlcv) and "
+            "predictions (vs feat_ohlcv_quant); no other step runs (epic_076 / t947)."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action = "store_true",
+        help   = "With --repair-gaps: only report the gaps, write nothing.",
     )
     return parser.parse_args()
 
@@ -243,7 +275,7 @@ def _resolve_tables(args: argparse.Namespace) -> set[str]:
     """
     tables: set[str]
     if args.tables is None:
-        tables = set(ALL_TABLES)
+        tables = set(DEFAULT_TABLES)
     else:
         tables = {t.strip().lower() for t in args.tables.split(",")}
         unknown = tables - set(ALL_TABLES)
@@ -351,6 +383,58 @@ def _run_predictions(
     logger.info("sync_predictions kesz: elapsed=%.1fs", time.monotonic() - t0)
 
 
+def _run_levels(asset_id: str | None, start: str | None, end: str | None) -> None:
+    """Upsert feat_levels (S/R + trendline features, epic_071 / t912).
+
+    The detector always runs on the full OHLCV history; ``start`` / ``end`` only
+    bound the rows written (no ``start`` = incremental from the last stored row).
+
+    Args:
+        asset_id : Asset key; uses default if None.
+        start    : Optional inclusive lower bound of the rows written.
+        end      : Optional inclusive upper bound.
+    """
+    logger.info("sync_levels indul: asset_id=%s start=%s end=%s",
+                asset_id or "default", start or "incremental", end)
+    t0 = time.monotonic()
+
+    n = sync_levels(asset_id=asset_id, start_time=start, end_time=end)
+
+    logger.info("sync_levels kesz: rows=%d elapsed=%.1fs", n, time.monotonic() - t0)
+
+
+def _run_funding(asset_id: str | None, start: str | None) -> None:
+    """Append settled funding rates (funding_rate) from Binance (epic_074 / t939).
+
+    Args:
+        asset_id : Asset key; uses default if None.
+        start    : Start used only when the table is empty (default: earliest OHLCV row).
+    """
+    logger.info("sync_funding indul: asset_id=%s", asset_id or "default")
+    t0 = time.monotonic()
+
+    n = sync_funding(asset_id=asset_id, start_time=start)
+
+    logger.info("sync_funding kesz: rows=%d elapsed=%.1fs", n, time.monotonic() - t0)
+
+
+def _run_scout(asset_id: str | None, start: str | None) -> None:
+    """Upsert the Impulse Scout forward-log (scout_signals, epic_074 / t941).
+
+    Args:
+        asset_id : Asset key; uses default if None.
+        start    : Optional earliest event t0 (must be >= the frozen live_start 2026-11-01).
+    """
+    from data_handling.sync_tables.sync_scout import (
+        sync_scout,  # noqa: PLC0415  (lazy: scout runtime import)
+    )
+
+    since = datetime.strptime(start, "%Y-%m-%d %H:%M:%S") if start else None
+    logger.info("sync_scout indul: asset_id=%s since=%s", asset_id or "default", start or "live_start")
+    res = sync_scout(asset_id=asset_id, since=since)
+    logger.info("sync_scout eredmeny: %s", res.to_dict())
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
@@ -358,6 +442,13 @@ def main() -> None:
     """Resolve config, validate CLI args, and run the requested pipeline steps."""
     args = _parse_args()
     _setup_logging(args.asset_id)
+
+    if args.repair_gaps:
+        from data_handling.sync_tables.repair_gaps import repair_gaps  # noqa: PLC0415
+
+        res = repair_gaps(asset_id=args.asset_id, dry_run=args.dry_run)
+        logger.info("repair_gaps eredmeny: %s", res.to_dict())
+        return
 
     tables   = _resolve_tables(args)
     asset_id = args.asset_id
@@ -400,6 +491,18 @@ def main() -> None:
     # ── Step 4: Predictions (chunked) ─────────────────────────────────────────
     if "predictions" in tables:
         _run_predictions(asset_id=asset_id, chunks=chunks)
+
+    # ── Step 5: Levels (feat_levels, not chunked: full-history detector) ─────
+    if "levels" in tables:
+        _run_levels(asset_id=asset_id, start=args.start, end=args.end)
+
+    # ── Step 6: Funding (Binance fundingRate, incremental) ───────────────────
+    if "funding" in tables:
+        _run_funding(asset_id=asset_id, start=args.start)
+
+    # ── Step 7: Scout forward-log (opt-in) ───────────────────────────────────
+    if "scout" in tables:
+        _run_scout(asset_id=asset_id, start=args.start)
 
     logger.info(
         "sync_pipeline kesz: elapsed=%.1fs  tables=%s",

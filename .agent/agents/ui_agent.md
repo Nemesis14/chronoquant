@@ -37,6 +37,7 @@ Load relevant module docs (only for affected modules):
 - `_doc_/database_and_code_doc/8350_frontend.md` — `frontend/`
 - `_doc_/database_and_code_doc/8360_scripts.md` — `scripts/`
 - `_doc_/database_and_code_doc/7130_trading_journal.md` — trade journal
+- `_doc_/database_and_code_doc/5800_scout_runtime.md` — Impulse Scout runtime (worker Scout lépés, `/api/scout/*`, MCP `scout_signals`, Scout panel)
 
 ---
 
@@ -45,8 +46,8 @@ Load relevant module docs (only for affected modules):
 | Path | Responsibility |
 |------|---------------|
 | `src/api/` | FastAPI app (`main.py`), `routers/`, `services/`, `schemas.py`, `chat/` (claude CLI runner + `persona_prompt.md`), `tests/` |
-| `src/worker/` | `python -m worker`: SQLite job queue, runner, auto-sync scheduler, `handlers/` (`sync_full`, `sync_predictions`, `sentiment_refresh`) |
-| `src/cq_mcp/` | `chronoquant` MCP szerver (`/mcp/chronoquant`), 18 tool |
+| `src/worker/` | `python -m worker`: SQLite job queue, runner, auto-sync scheduler, `handlers/` (`sync_full`, `sync_predictions`, `sentiment_refresh`, `sync_scout`), `scout_runner.py` |
+| `src/cq_mcp/` | `chronoquant` MCP szerver (`/mcp/chronoquant`), 20 tool (köztük `scout_signals`) |
 | `src/sentiment/` | `tv_report` (fetch, summary, author_backtest) |
 | `frontend/` | React 18 + TS + Vite + Tailwind SPA (`pages/`, `components/`, `api/`, `lib/`, `types/`) |
 | `src/trading/live/journal.py` | Trade journal (DuckDB); az order-logika törölve |

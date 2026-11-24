@@ -143,7 +143,7 @@ A 8 tábla séma-kivonata (minden táblának van `status DEFAULT 'draft'`, `crea
 | Tábla | PK | Kulcsmezők (FK / payload) |
 |-------|----|--------------------------|
 | `assets` | `asset_id` | symbol, interval, market |
-| `snapshots` | `snapshot_id` | asset_id, range_start/end, row_count, content_sha256, feature_set_hash |
+| `snapshots` | `snapshot_id` | asset_id, range_start/end, row_count, content_sha256, feature_set_hash (+ `values_sha256`, v3) |
 | `feature_sets` | `feature_set_id` | snapshot_id, n_input, n_selected, selected_cols (JSON) |
 | `models` | `model_id` | snapshot_id, feature_set_id, search_run_id, direction, oos_metric |
 | `search_runs` | `search_run_id` | model_id, stage, objective, best_params (JSON) |
@@ -163,12 +163,19 @@ munkamenethez). Mindkettő nullable — pending/inactive soroknál `NULL`.
 | `activated_at` | `TIMESTAMP` | Mikor vált aktívvá a deployment |
 | `previous_strategy_id` | `VARCHAR` | A leváltott strategy_id (rollback referencia) |
 
+### `_migration_003_snapshot_values_hash(conn)` — v3 (epic_076 / t949)
+
+**Célja:** Additív `snapshots.values_sha256 VARCHAR` (nullable) oszlop. A `content_sha256`
+csak az időrácsot / sorszámot / oszlopkészletet fedi (az id és a reuse kulcsa — változatlan);
+a `values_sha256` az értékeket is. Számítás és backfill: [`1410_snapshots_code.md`](1410_snapshots_code.md).
+
 ### `REG_MIGRATIONS` lista
 
 ```python
 REG_MIGRATIONS = [
     Migration(version=1, name="reg_schema_initial",         apply=_migration_001_reg_schema),
     Migration(version=2, name="deployments_lifecycle_cols", apply=_migration_002_deployments_lifecycle),
+    Migration(version=3, name="snapshot_values_sha256",     apply=_migration_003_snapshot_values_hash),
 ]
 ```
 

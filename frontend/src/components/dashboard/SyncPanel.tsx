@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../api/client'
-import { cancelJob, enqueueSync, getAutoSync, listJobs, setAutoSync } from '../../api/dashboard'
+import { cancelJob, enqueueSync, getAssets, getAutoSync, listJobs, setAutoSync } from '../../api/dashboard'
 import { useJobStream } from '../../lib/jobStream'
+import { useAsset } from '../../lib/asset'
 import { usePolling } from '../../lib/usePolling'
 import { ago, errMessage, fullTime, shortTime } from '../../lib/format'
 import type { Job, Status } from '../../types/api'
@@ -39,15 +40,21 @@ function JobLog({ jobId }: { jobId: string }) {
 }
 
 export default function SyncPanel({ status, onChanged }: { status: Status | null; onChanged: () => void }) {
+  const asset = useAsset()
   const running = status?.sync.running ?? false
-  const jobs = usePolling((s) => listJobs(8, s), running ? 2000 : 8000, [running])
+  const assets = usePolling((s) => getAssets(s), 0)
+  const defaultAsset = assets.data?.default_asset_id ?? 'solusdt'
+  const jobs = usePolling((s) => listJobs(40, s), running ? 2000 : 8000, [running])
   const auto = usePolling((s) => getAutoSync(s), 4000)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ kind: 'err' | 'info'; text: string } | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [showLog, setShowLog] = useState(true)
 
-  const list = jobs.data?.items ?? []
+  // the job list is global: show only this asset's jobs (legacy jobs without asset_id = default asset)
+  const list = (jobs.data?.items ?? [])
+    .filter((j) => String(j.params?.asset_id ?? defaultAsset) === asset)
+    .slice(0, 8)
   const active = list.find((j) => j.status === 'running') ?? list.find((j) => j.status === 'queued')
   const logJobId = selected ?? active?.id ?? list[0]?.id ?? null
   const last: Job | undefined = list.find((j) => j.status === 'succeeded' || j.status === 'failed')
@@ -101,7 +108,7 @@ export default function SyncPanel({ status, onChanged }: { status: Status | null
         <div className="flex gap-2">
           <button
             disabled={busy || running || !workerAlive}
-            onClick={() => void act(() => enqueueSync('sync_full'), 'Sync sorba állítva')}
+            onClick={() => void act(() => enqueueSync(asset, 'sync_full'), 'Sync sorba állítva')}
             className="flex-1 px-3 py-1.5 rounded bg-cq-blue/90 hover:bg-cq-blue text-white text-xs font-semibold disabled:opacity-40"
           >
             Sync

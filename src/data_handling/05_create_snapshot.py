@@ -80,6 +80,15 @@ def _parse_args() -> argparse.Namespace:
         metavar = "YYYY-MM-DD HH:MM:SS",
         help    = "Range upper bound, inclusive. Omit for full history.",
     )
+    parser.add_argument(
+        "--features-profile",
+        default = None,
+        metavar = "PROFILE_ID",
+        help    = (
+            "Feature profile; omit for the champion quant_train. A profile with "
+            "extra_feature_tables snapshots quant_train__<profile_id>."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -88,9 +97,10 @@ def main() -> None:
     args = _parse_args()
 
     asset_id = utils.resolve_asset_id(args.asset_id)
+    source   = utils.quant_train_table(args.features_profile)
     logger.info(
-        "create_snapshot indul: asset_id=%s horizon=fw%d start=%s end=%s",
-        asset_id, args.horizon, args.start, args.end,
+        "create_snapshot indul: asset_id=%s horizon=fw%d start=%s end=%s source=%s",
+        asset_id, args.horizon, args.start, args.end, source,
     )
 
     t0 = time.monotonic()
@@ -102,6 +112,7 @@ def main() -> None:
             horizon          = args.horizon,
             start_time       = args.start,
             end_time         = args.end,
+            source_table     = source,
         )
     finally:
         conn.close()
@@ -112,8 +123,8 @@ def main() -> None:
         verb, result.snapshot_id, result.row_count,
         result.range_start, result.range_end, time.monotonic() - t0,
     )
-    logger.info("content_sha256=%s feature_set_hash=%s",
-                result.content_sha256, result.feature_set_hash)
+    logger.info("content_sha256=%s feature_set_hash=%s values_sha256=%s",
+                result.content_sha256, result.feature_set_hash, result.values_sha256)
 
 
 if __name__ == "__main__":

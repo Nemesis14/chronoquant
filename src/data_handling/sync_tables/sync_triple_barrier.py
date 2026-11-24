@@ -196,7 +196,8 @@ def report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Triple-barrier label sync")
-    parser.add_argument("--asset-id", default="solusdt")
+    parser.add_argument("--asset-id", default=None,
+                        help="Asset key from config/assets.json (default: default_asset_id)")
     parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON)
     parser.add_argument("--barrier-bps", type=float, default=DEFAULT_BARRIER_BPS)
     parser.add_argument("--report", action="store_true", help="Csak eloszlas riport")

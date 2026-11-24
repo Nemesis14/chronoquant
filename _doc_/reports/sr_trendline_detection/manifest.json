@@ -1,0 +1,171 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/event_monthly.json",
+        "height": 340,
+        "id": "event_monthly",
+        "title": "Események havonta léptékenként (log skála)"
+      },
+      {
+        "file": "charts/overview_4h_m_l.json",
+        "height": 640,
+        "id": "overview_4h_m_l",
+        "title": "SOL 4h, utolsó 90 nap — m/l szintek"
+      },
+      {
+        "file": "charts/overview_1h_s.json",
+        "height": 640,
+        "id": "overview_1h_s",
+        "title": "SOL 1h, utolsó 30 nap — s szintek + trendvonalak"
+      },
+      {
+        "file": "charts/ex01_bounce_l.json",
+        "height": 500,
+        "id": "ex01_bounce_l",
+        "title": "Példa 1: Erős, többszörösen érintett szint visszapattanással — l-L000064 @ 2025-12-12 00:00"
+      },
+      {
+        "file": "charts/ex02_bounce_m.json",
+        "height": 500,
+        "id": "ex02_bounce_m",
+        "title": "Példa 2: Erős, többszörösen érintett szint visszapattanással — m-L000574 @ 2026-05-24 00:00"
+      },
+      {
+        "file": "charts/ex03_bounce_s.json",
+        "height": 500,
+        "id": "ex03_bounce_s",
+        "title": "Példa 3: Erős, többszörösen érintett szint visszapattanással — s-L002582 @ 2026-10-28 21:00"
+      },
+      {
+        "file": "charts/ex04_role_flip_l.json",
+        "height": 500,
+        "id": "ex04_role_flip_l",
+        "title": "Példa 4: Szerepcsere (áttört szint visszatesztje az új oldalról, tart) — l-L000091 @ 2026-07-09 00:00"
+      },
+      {
+        "file": "charts/ex05_role_flip_m.json",
+        "height": 500,
+        "id": "ex05_role_flip_m",
+        "title": "Példa 5: Szerepcsere (áttört szint visszatesztje az új oldalról, tart) — m-L000566 @ 2026-05-05 20:00"
+      },
+      {
+        "file": "charts/ex06_role_flip_s.json",
+        "height": 500,
+        "id": "ex06_role_flip_s",
+        "title": "Példa 6: Szerepcsere (áttört szint visszatesztje az új oldalról, tart) — s-L002502 @ 2026-08-18 07:00"
+      },
+      {
+        "file": "charts/ex07_line_break_retest_l.json",
+        "height": 500,
+        "id": "ex07_line_break_retest_l",
+        "title": "Példa 7: Trendvonal-kitörés + sikeres visszateszt — l-T000119 @ 2026-03-28 00:00"
+      },
+      {
+        "file": "charts/ex08_line_break_retest_m.json",
+        "height": 500,
+        "id": "ex08_line_break_retest_m",
+        "title": "Példa 8: Trendvonal-kitörés + sikeres visszateszt — m-T000818 @ 2026-04-27 16:00"
+      },
+      {
+        "file": "charts/ex09_line_break_retest_s.json",
+        "height": 500,
+        "id": "ex09_line_break_retest_s",
+        "title": "Példa 9: Trendvonal-kitörés + sikeres visszateszt — s-T003012 @ 2026-01-27 16:00"
+      },
+      {
+        "file": "charts/ex10_false_break_l.json",
+        "height": 500,
+        "id": "ex10_false_break_l",
+        "title": "Példa 10: Hamis kitörés (záróár visszatér ε-on belülre) — l-L000058 @ 2025-12-04 00:00"
+      },
+      {
+        "file": "charts/ex11_false_break_m.json",
+        "height": 500,
+        "id": "ex11_false_break_m",
+        "title": "Példa 11: Hamis kitörés (záróár visszatér ε-on belülre) — m-L000572 @ 2026-05-16 12:00"
+      },
+      {
+        "file": "charts/ex12_false_break_s.json",
+        "height": 500,
+        "id": "ex12_false_break_s",
+        "title": "Példa 12: Hamis kitörés (záróár visszatér ε-on belülre) — s-L002297 @ 2026-03-12 15:00"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/params.json",
+        "id": "params",
+        "title": "Detektor paraméterek (config/features.json → levels_detector)"
+      },
+      {
+        "file": "tables/scale_summary.json",
+        "id": "scale_summary",
+        "title": "Pivotok és szintek léptékenként"
+      },
+      {
+        "file": "tables/level_touch_dist.json",
+        "id": "level_touch_dist",
+        "title": "Szintek érintésszám-eloszlása"
+      },
+      {
+        "file": "tables/line_summary.json",
+        "id": "line_summary",
+        "title": "Trendvonalak léptékenként és típusonként"
+      },
+      {
+        "file": "tables/line_touch_dist.json",
+        "id": "line_touch_dist",
+        "title": "Trendvonalak érintésszám-eloszlása"
+      },
+      {
+        "file": "tables/event_counts.json",
+        "id": "event_counts",
+        "title": "Események típusonként"
+      },
+      {
+        "file": "tables/event_yearly.json",
+        "id": "event_yearly",
+        "title": "Események évenként (lépték_típus)"
+      },
+      {
+        "file": "tables/forward_raw.json",
+        "id": "forward_raw",
+        "title": "NYERS forward kimenet-arányok (placebo nélkül)"
+      },
+      {
+        "file": "tables/active_levels_now.json",
+        "id": "active_levels_now",
+        "title": "Aktív szintek az adat végén"
+      },
+      {
+        "file": "tables/examples.json",
+        "id": "examples",
+        "title": "A kiválasztott példák"
+      }
+    ]
+  },
+  "created_at": "2026-11-19T13:36:10Z",
+  "id": "sr_trendline_detection",
+  "model_id": null,
+  "order": 20,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.sr_detection",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "A t910 detektor kimenete SOLUSDT-n (s/m/l lépték): darabszámok, eloszlások, nyers kimenet-arányok, áttekintő gyertyás képek és determinisztikusan választott kinagyított példák. Ellenőrzőpont a feature-építés előtt.",
+  "tags": [
+    "sr",
+    "trendline",
+    "levels",
+    "epic_071",
+    "detector"
+  ],
+  "title": "S/R szintek és trendvonalak — detektálás vizuális ellenőrzése",
+  "updated_at": "2026-11-19T13:40:41Z"
+}

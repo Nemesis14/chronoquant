@@ -1,107 +1,112 @@
-# Epic 054: Alt-data feature discovery — derivatives, on-chain, flow
+# Epic 054: Alt-data feature discovery — derivatívák
+
+> **Frissítve 2026-08-21** — a t301 felmérés után a terv jelentősen egyszerűsödött.
+> Az eredeti "nem backfillelhető, gyűjtsünk hónapokig" premissza **téves volt**:
+> a Binance Vision archívum 2021-12-01-ig visszamenőleg ad 5 perces
+> pozicionáltsági adatot, ~20 MB-ban. A mérés tehát **most futtatható**.
 
 ## Goal
 
-Kiépíteni egy **feature discovery pipeline**-t, ami a jelenlegi tisztán
-OHLCV-alapú feature-készletet piaci mikrostruktúra- és on-chain adatokkal
-egészíti ki, majd **megméri**, hogy ezek hordoznak-e prediktív információt a
-`fw60` MFE targetre.
+Megmérni, hogy a Binance derivatíva-adatok (open interest, long/short
+pozicionáltság, prémium index, bázis) hozzáadnak-e bármit a meglévő,
+tisztán OHLCV-alapú feature-készlethez a `fw60` MFE target előrejelzésében.
 
-A jelenlegi modell mindent az árból és a volumenből származtat. Az ár azonban
-következmény: a pozicionáltság (open interest, funding, tőkeáttétel), a
-tőzsdei flow (be/ki áramlás) és a stablecoin-likviditás **okok** — ezek
-elvben előbb mozdulnak, mint az ár. Ez az epic azt méri meg, hogy a
-gyakorlatban is így van-e, a mi 1 perces rácsunkon és a mi 60 perces
-horizontunkon.
+A jelenlegi 208 feature mindent az árból és a volumenből származtat. Az ár
+azonban következmény: a pozicionáltság és a tőkeáttétel ára **okok** — elvben
+előbb mozdulnak. Ez az epic azt méri meg, hogy a gyakorlatban is így van-e.
 
-## A hipotézis
+## A kísérlet felépítése
 
-> A derivatíva-pozicionáltság és a tőzsdei flow változása **vezeti** a 60 perces
-> kilengést: OI ↑ + funding ↑ → tőkeáttétel épül → nagyobb likvidációs
-> potenciál; exchange inflow ugrás → eladási nyomás; outflow ugrás → akkumuláció.
+Nem "alt-only" modellt építünk — az IV és MI univariáns mérőszámok, ugyanazt
+adnák. Helyette **kontroll és kezelés**, azonos ablakon:
 
-Egyik sem önálló buy/sell jel — feature-ként mennek a modellbe, és ugyanazon a
-gate-en kell átmenniük, mint az `epic_053` figyelem-idősorának.
+| Modell | Feature-ök | Train | Valid |
+|---|---|---|---|
+| **C — kontroll** | 208 meglévő | 2022-01-01 → 2026-01-31 | 2026-02-01 → 2026-07-31 |
+| **T — kezelés** | 208 + 22 alt | ugyanaz | ugyanaz |
+| *champion (élő)* | 208 | 2021-01-01 → | ugyanaz | 
 
-## Gate
+C és T között **egyetlen dolog különbözik: a 22 alt-változó.** A különbségük
+tehát tényleg az alt-adat hatása, semmi másé. A valid ablak szándékosan azonos
+a championével, így a `top10_lift` közvetlenül összevethető.
 
-Ha egyetlen csoport (derivatives / flow / on-chain) sem éli túl a permutációs
-placebót és az FDR-korrekciót, az adott csoport lezárul. A **fizetős**
-adatforrásra (CryptoQuant, Glassnode, CoinGlass fizetős tier) csak akkor
-költünk, ha az ingyenes/olcsó rétegen már látszik jel. A drága adat nem
-belépő, hanem jutalom.
+A döntést a **kereskedési eredmény** is alátámasztja: strategy session mindkét
+modellre, `total_fact_log_return` és win rate összevetéssel.
 
 ## Scope
 
-- `src/data_handling/collectors/derivatives/` — új modul (Binance/Bybit public)
-- `src/data_handling/collectors/onchain/` — új modul (ingyenes chart/flow API-k)
-- `data/analyst_signal/raw/source=derivatives|onchain/` — raw parquet réteg
-- `database/analyst_signal/analyst_signal.duckdb` — `deriv_*` / `chain_*` táblák
-- `src/modeling/analyst_signal/` — feature normalizálás + gate mérés (közös az
-  epic_053 rétegével)
-- `_doc_/research/altdata_source_matrix.md` — forrásmátrix
-- `_doc_/research/altdata_gate.md` — gate riport
+- `src/data_handling/collectors/derivatives/` — Vision letöltő + likvidációs stream
+- `database/solusdt/solusdt.duckdb` → `altdata_5m`, `feat_altdata` táblák
+- `src/data_handling/sync_tables/_altdata_features_polars.py` — 22 feature
+- `config/models.json` — két új modell bejegyzés
+- `_doc_/research/altdata_source_matrix.md` — forrásmátrix (kész)
+- `_doc_/research/altdata_gate.md` — végső riport
 
-Nem érinti: `src/strategy/`, `src/trading/`, `src/ui/`, és **nem nyúl hozzá** a
-solusdt champion pipeline feature-készletéhez. A modellbe integrálás pozitív
-gate után, külön epicben történik.
+Nem érinti: `src/trading/`, `src/ui/`, és **nem módosítja az élő champion
+modellt** — a C és T modellek külön `model_id`-n futnak.
 
 ## Tasks
 
-- t301: Adatforrás-mátrix — mélység, granularitás, ár, Python-hozzáférés → analyst_agent
-- t302: Time-critical derivatives collector (OI, L/S ratio, taker flow, likvidációk) → database_agent
-- t303: Backfillelhető historikus ingest (funding, stablecoin supply, chain-aggregátumok) → database_agent
-- t304: Alt-data feature réteg — lag, delta, trailing z-score, rezsim-normalizálás → modeling_agent
-- t305: Gate mérés — lagged IC/MI, Granger, permutációs placebo, FDR → modeling_agent
-- t306: Riport és csoportonkénti go/no-go döntés → analyst_agent
+- t301: Adatforrás-mátrix → analyst_agent — **KÉSZ** (`pr_`)
+- t302: Likvidációs stream collector → database_agent *(párhuzamos, nem kritikus úton)*
+- t307: Vision letöltő → `altdata_5m` tábla → database_agent
+- t308: 22 feature számítása + `quant_train` join → database_agent
+- t309: Modell C (kontroll) → modeling_agent
+- t310: Modell T (kezelés) → modeling_agent
+- t311: Strategy session, összevetés, Tier 3/4 döntés → analyst_agent
 
-Sorrend: (t301 ∥ t302) → t303 → t304 → t305 → t306
+Sorrend: t307 → t308 → (t309 ∥ t310) → t311
+Párhuzamosan, függetlenül: t302
 
 ## Key Decisions
 
-- **A t302 nem várhat a t301-re.** A derivatíva-idősorok jelentős része
-  **nem backfillelhető**: a Binance futures `openInterestHist`,
-  `topLongShortAccountRatio` és `takerlongshortRatio` endpointjai ismerten
-  korlátozott (nagyságrendileg ~30 napos) visszamenőleges ablakot adnak, a
-  likvidációk historikusan pedig egyáltalán nem. Ugyanaz a logika, mint az
-  `epic_050`-nél: amit ma nem mentünk, az véglegesen elveszett. A gyűjtés
-  ezért a felméréssel **párhuzamosan** indul, nem utána.
-- **Saját node és raw blockchain letöltés kizárva.** A cím→entitás címkézés
-  (exchange / whale / miner / market maker) önálló data engineering projekt,
-  és pont az a rész, amiért a CryptoQuant/Glassnode-féle szolgáltatókat fizetik.
-  Ha ide jutunk, adatot veszünk, nem chaint szinkronizálunk.
-- **Asset-hasadás szándékos.** A derivatíva-réteg **közvetlenül SOLUSDT-re**
-  gyűjt (ez az aktív asset, és a SOL perp likvid). Az on-chain/stablecoin réteg
-  viszont **BTC/ETH + aggregált stablecoin** — ott van adatminőség és ott van
-  ingyenes historikus mélység; ezek piaci rezsim-feature-ök, nem SOL-specifikusak.
-  SOL-natív on-chain csak akkor, ha ingyen adódik.
-- **Point-in-time korrektség kötelező.** Két ismert csapda: (1) az on-chain
-  metrikák utólag revideálódnak és visszamenőleg felülíródnak — a ma letöltött
-  történelmi sor nem az, amit `t`-ben láttunk volna; (2) az exchange balance /
-  reserve típusú mezőket a szolgáltatók óránként *felülírják*, nem
-  eseményhez horgonyozzák. Minden felvett sor kap `observed_at` mezőt a
-  `value_ts` mellett — enélkül ugyanaz a lookahead, ami az `epic_051`
-  TradingView `updated_at`-jét megbuktatta.
-- **Likvidációs adat gyanús alapból.** A Binance 2021 óta throttle-olja a
-  likvidációs streamet (nagyságrendileg 1 esemény/másodperc), tehát a publikus
-  likvidációs volumen szisztematikusan alulmért, és nagy kilengéskor mér a
-  legrosszabbul — pont amikor számítana. Feature-ként használható, de a t306
-  riportnak ezt explicit korlátként kell kezelnie.
-- **Nem 300 feature-rel indulunk.** A t301 kimenete egy **10-20 elemű
-  shortlist**. A lag/delta/z-score expanzió multiplikátor: 15 nyers sorozat ×
-  7 lag × 4 transzformáció már 400+ oszlop, ami FDR mellett önmagában megöli a
-  szignifikanciát. A széles expanzió csak a gate-en átment csoportokra fut.
-- **Az `epic_051` validációs fegyelme kötelező.** Permutációs placebo + FDR,
-  nem nyers p-érték. A mérés a `t-1` lag konvencióval fut, mint minden más
-  feature a projektben.
+- **Fizetős szolgáltató nem kell.** A CoinGlass mélysége a felbontással
+  fordítottan arányos — a 4,7 éves 5 perces ablakot egyik tier sem adja meg,
+  a Vision ingyen igen. A CryptoQuant kizárva: a **Solana nincs a támogatott
+  asset-listáján**, és $99-ért csak napi felbontást ad.
+- **1 perces pozíció-adat sehol nem létezik.** Binance, Bybit, OKX mind 5m-nél
+  áll meg. Ez nem gond: a target 60 perces, és a sampler óránként vesz egy sort.
+- **Az 5m → 1m átvezetés forward-fill**, az utolsó lezárt 5 perces barból.
+  Sampler-változtatás nem kell — óránkénti mintavétel mellett a ffill nem hoz
+  létre ismétlődő mintasorokat.
+- **Minden ablak ≤ 240 perc, a normalizálás is.** A projekt embargója 240 perc;
+  hosszú baseline (30 napos z-score) nem fér bele. Ezért dimenziótlan arányok
+  (`oi_to_volume`, `retail_vs_top`, `basis`) trailing z-score helyett, ahol lehet.
+- **A train 2022-01-01-től indul**, mert a `metrics` 2021-12-01-től létezik.
+  A 11 hónap veszteséget a kontroll modell semlegesíti.
+- **A `bookDepth` (Tier 3) és `aggTrades` (Tier 4) kimarad az első körből** —
+  a bookDepth csak 2023-01-tól van, második lefedettségi határt vezetne be.
+  A t311 dönt róluk.
+- **A likvidáció az egyetlen nem backfillelhető adat**, ezért a t302 fut, de
+  nincs a kritikus úton. A Binance ~1 esemény/mp throttle-ja miatt eleve alulmér.
 
 ## Notes
 
-Előzmények: `epic_050` (leaderboard collector — ugyanaz a "gyűjts most, elemezz
-később" logika), `epic_053` (reddit attention gate — ugyanaz a gate-metodika és
-feature-normalizálási réteg újrahasznosítható).
+Előzmények: `epic_050` (leaderboard collector), `epic_053` (reddit attention
+gate — LEZÁRVA: volt jel, de nem derült ki, hogy hozzáad-e a meglévő
+volatilitás-feature-ökhöz). **Ez az epic pont azt a hibát kerüli el**: a
+kontroll/kezelés felépítés eleve az inkrementális értéket méri, nem az önálló
+korrelációt.
 
-A felvetés forrása: user research-jegyzet a CoinGlass V4 / CryptoQuant /
-Glassnode / Coin Metrics adatkínálatról (2026-08 állapot). A konkrét
-elérhetőségeket és árakat a t301 ellenőrzi — a jegyzetben szereplő állítások
-felmérési inputok, nem tények.
+---
+
+## Kimenet és folytatás (2026-08-22)
+
+Riport: [_doc_/research/altdata_gate.md](../../_doc_/research/altdata_gate.md)
+
+**Verdikt: GO, fenntartásokkal.** 20 a 22 alt-változóból túlélte a FE szűrést.
+A modell-metrikák alig javultak (lift +1%, a top/alsó spread romlott, a
+train–valid gap 38-szorosára ugrott), a **kereskedési eredmény viszont
+markánsan**: 8 bps kör-költségnél azonos gyakoriságon (415 vs 401 kötés)
+11,53 vs 8,60 bps/kötés — **+34% él**.
+
+Folytatás két külön epicben:
+
+- **`epic_055`** — kereskedési költség-modell a strategy rácskeresésbe.
+  Ez a vizsgálat legfontosabb mellékterméke: a kereső jelenleg bruttóra
+  optimalizál, és ezért olyan beállítást választott, ami a 100 USD tőkét
+  kilencszer felszámolta volna. Nem alt-data kérdés, alaprendszer-hiányosság.
+- **`epic_056`** — short irány és második valid ablak. A +34% egyetlen
+  6 hónapos ablakon és csak longban áll; ez erős jelzés, nem bizonyíték.
+
+Nyitva marad: `t302` likvidációs collector (az egyetlen nem backfillelhető adat).

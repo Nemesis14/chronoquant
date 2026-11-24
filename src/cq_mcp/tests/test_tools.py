@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
-from cq_mcp import tools_data, tools_jobs, tools_models, tools_reports, tools_sentiment
+from cq_mcp import tools_data, tools_jobs, tools_models, tools_reports, tools_scout, tools_sentiment
 from cq_mcp.common import dump
 from cq_mcp.server import MOUNT_PATH, TOOLS
 from worker.queue import JobQueue
@@ -18,7 +18,8 @@ from worker.queue import JobQueue
 EXPECTED_TOOLS = {
     "get_status", "list_tables", "query_sql", "get_candles", "get_predictions", "get_latest_signal",
     "get_active_strategy", "get_trades", "get_equity", "list_models", "get_model", "get_registry",
-    "list_reports", "read_report", "list_jobs", "enqueue_sync", "sentiment_latest", "sentiment_refresh",
+    "list_reports", "read_report", "list_jobs", "enqueue_sync", "sentiment_latest", "sentiment_refresh", "list_assets",
+    "scout_signals",
 }
 
 
@@ -177,6 +178,34 @@ def _rpc_payload(resp: Any) -> dict[str, Any]:
     return resp.json()
 
 
+def test_scout_signals(env: Path) -> None:
+    """No scout_signals table in the temp live DB -> available = false; with rows -> meta + items."""
+    out = j(tools_scout.scout_signals(asset="solusdt"))
+    assert out["available"] is False and out["items"] == [] and out["meta"]["experimental"] is True
+    import duckdb  # noqa: PLC0415
+
+    from api.tests.test_scout_api import _insert, _write_manifest  # noqa: PLC0415
+    from data_handling.store.duckdb_store import _m008_create_scout_signals  # noqa: PLC0415
+
+    _write_manifest(env)
+    with duckdb.connect(str(env / "live.duckdb")) as c:
+        _m008_create_scout_signals(c)
+        _insert(c, "2026-11-05 10:00:00", "resolved", 0.12)
+        _insert(c, "2026-11-23 02:42:00", "open", 0.16)
+    out = j(tools_scout.scout_signals(since="2026-11-10T00:00:00Z"))
+    assert out["available"] is True and out["counts"]["open"] == 1
+    assert [e["t0"] for e in out["items"]] == ["2026-11-23T02:42:00Z"]
+    assert out["meta"]["model_id"] == "scout_s0c_r1" and "recent" not in out
+
+
+def test_scout_signals_invalid_since(env: Path) -> None:
+    """An unparsable `since` -> friendly ValueError naming the value and the expected format (no raw parser error)."""
+    with pytest.raises(ValueError, match=r"invalid since: 'yesterday'; expected ISO-8601"):
+        tools_scout.scout_signals(since="yesterday")
+    with pytest.raises(ValueError, match="invalid since"):
+        tools_scout.scout_signals(since="2026-13-40")
+
+
 def test_mcp_endpoint_lists_and_calls_tools(env: Path) -> None:
     with TestClient(create_app(frontend_dist=env / "no_dist"), base_url="http://127.0.0.1:8600") as client:
         init = client.post(MOUNT_PATH, headers=HEADERS, json={
@@ -197,3 +226,25 @@ def test_mcp_endpoint_lists_and_calls_tools(env: Path) -> None:
         result = _rpc_payload(call)["result"]
         assert not result.get("isError")
         assert j(result["content"][0]["text"])["rows"] == [[600]]
+
+
+def test_asset_parameter(env: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    listing = j(tools_models.list_assets())
+    assert listing["default_asset_id"] == "solusdt"
+    assert {a["asset_id"] for a in listing["items"]} >= {"solusdt", "bchusdt"}
+    assert j(tools_models.get_status(asset="solusdt"))["asset_id"] == "solusdt"
+    assert j(tools_data.get_predictions(hours=1, asset="solusdt")) == j(tools_data.get_predictions(hours=1))
+    for call in (
+        lambda: tools_models.get_status(asset="dogeusdt"),
+        lambda: tools_data.query_sql("SELECT 1", asset="dogeusdt"),
+        lambda: tools_jobs.enqueue_sync(asset="dogeusdt"),
+    ):
+        with pytest.raises(ValueError, match="unknown asset"):
+            call()
+    queue = JobQueue(tmp_path / "jobs.sqlite", log_dir=tmp_path / "logs")
+    queue.register_worker()
+    monkeypatch.setattr(tools_jobs, "_queue", lambda: queue)
+    sol = j(tools_jobs.enqueue_sync())
+    bch = j(tools_jobs.enqueue_sync(asset="bchusdt"))
+    assert sol["job"]["params"]["asset_id"] == "solusdt" and bch["job"]["params"]["asset_id"] == "bchusdt"
+    assert bch["deduplicated"] is False and sol["job"]["id"] != bch["job"]["id"]

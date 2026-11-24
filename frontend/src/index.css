@@ -7,3 +7,15 @@ html, body, #root {
   color: #eaecef;
   color-scheme: dark;
 }
+
+/*
+ * t948: keep the page content clear of the floating chat button (ChatDock: fixed, right-5 /
+ * bottom-5, 48 px -> occupies the rightmost 68 px). Right gutter = 76 px minus the centred
+ * max-w-[1800px] margin (+8 px for the scrollbar that 100vw includes), never below 1rem;
+ * bottom padding lets the last card scroll above the button. Layout applies it only where the
+ * dock is visible (not on /chat).
+ */
+.cq-dock-clear {
+  padding-right: clamp(1rem, calc(84px - (100vw - 1800px) / 2), 76px);
+  padding-bottom: 80px;
+}

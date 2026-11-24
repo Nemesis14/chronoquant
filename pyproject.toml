@@ -35,6 +35,23 @@ dev = [
     "pyright>=1.1.400",
     "httpx>=0.28.1",
 ]
+# Opcionális kutatási csoport (epic_072): CPU torch (autoencoder embedding) + tslearn (k-Shape / DTW).
+# Telepítés: uv sync --group research  (a fő runtime nem tölti le)
+research = [
+    "torch",
+    "tslearn",
+    # epic_073 t935: idősor-alapmodell embedding (Chronos-Bolt; HF checkpoint futáskor töltődik le a HF cache-be)
+    "chronos-forecasting>=2.3,<3",
+]
+
+# CPU-only torch wheel-ek explicit indexről (csak a torch-ra; a research csoporthoz kötve)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", group = "research" }
 
 [tool.ruff]
 line-length = 100

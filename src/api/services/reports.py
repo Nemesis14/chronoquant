@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from api.errors import ApiError, bad_request, not_found
@@ -15,8 +16,28 @@ def _translate(exc: store.ReportError) -> ApiError:
 
 
 def list_manifests(scope: str | None, model_id: str | None) -> list[dict[str, Any]]:
-    """Manifest list only (no markdown / chart / table content)."""
-    return store.list_reports(scope, model_id)
+    """Manifest list only (no markdown / chart / table content).
+
+    Model reports get an ``asset_id`` (from ``artifacts/<owner>/manifest.json``; fallback: None);
+    general reports have ``asset_id = None`` (not asset-specific).
+    """
+    items = store.list_reports(scope, model_id)
+    assets: dict[str, str | None] = {}
+    for item in items:
+        owner = item["owner"]
+        if owner not in assets:
+            assets[owner] = None if owner == "general" else _model_asset(owner)
+        item["asset_id"] = assets[owner]
+    return items
+
+
+def _model_asset(model_id: str) -> str | None:
+    path = store.repo_root() / "artifacts" / model_id / "manifest.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")).get("asset_id")
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, str) else None
 
 
 def get_report(owner: str, slug: str) -> dict[str, Any]:

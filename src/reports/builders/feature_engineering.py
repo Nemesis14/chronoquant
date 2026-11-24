@@ -161,7 +161,7 @@ def compute(model_id: str, artifact_dir: Path | None = None,
     artifact_dir = artifact_dir or artifact_dir_of(model_id)
     snapshot_id = _resolve_snapshot(model_id, artifact_dir, snapshot_id)
     target = target_of(direction_of(model_id))
-    asset_id = utils.load_models_config()["models"][model_id].get("asset_id", "solusdt")
+    asset_id = utils.model_asset_id(model_id)
 
     df_all = _load_train(model_id, snapshot_id, asset_id)
     all_feats = [c for c in df_all.columns if c.startswith("feat_")]
@@ -292,10 +292,9 @@ def feature_set_dict(result: FeatureAnalysis) -> dict[str, Any]:
     dropped += [{"col": f, "reason": r} for f, r in result.dropped_mi.items()
                 if f not in result.dropped_qual]
     dropped += [{"col": f, "reason": r} for f, r in result.dropped_corr.items()]
-    parts = result.model_id.split("_")
     return {
         "run_id": now.strftime("run_%Y%m%d_%H%M%S"),
-        "asset_id": parts[1] if len(parts) > 1 else "solusdt",
+        "asset_id": utils.model_asset_id(result.model_id),
         "model_id": result.model_id,
         "target_col": result.target,
         "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),

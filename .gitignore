@@ -18,6 +18,8 @@ data/
 *.sqlite
 *.sqlite3
 *.parquet
+# frozen Impulse Scout artifact (t940): train OOF score is part of the hash-verified artifact
+!artifacts/scout_s0c_r1/train_oof.parquet
 
 # =============================================================================
 # Build artifacts
@@ -61,3 +63,11 @@ artifacts/_experiments/
 # frontend (epic_068)
 frontend/node_modules/
 frontend/dist/
+
+# =============================================================================
+# Runtime / frontend build leftovers
+# =============================================================================
+logs/*.pid
+logs/*.log.*
+frontend/*.timestamp-*.mjs
+*.tsbuildinfo

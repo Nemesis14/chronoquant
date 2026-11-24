@@ -99,7 +99,7 @@ def test_run_migrations_rolls_back_on_failure(tmp_path: Path) -> None:
 def test_ensure_registry_creates_eight_tables(tmp_path: Path) -> None:
     reg_path = str(tmp_path / "registry.duckdb")
     applied = registry.ensure_registry(reg_path)
-    # All REG_MIGRATIONS applied on a fresh database (currently v1 + v2)
+    # All REG_MIGRATIONS applied on a fresh database (currently v1..v3)
     assert set(applied) == {m.version for m in registry.REG_MIGRATIONS}
     assert Path(reg_path).exists()
 

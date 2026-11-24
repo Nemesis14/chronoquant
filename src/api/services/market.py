@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import utils
@@ -15,8 +15,8 @@ TF_MINUTES = {"1m": 1, "5m": 5, "15m": 15}
 MAX_CANDLE_HOURS = 24 * 14
 
 
-def config() -> dict[str, Any]:
-    db = utils.load_asset_config(None)["database"]
+def config(asset_id: str | None = None) -> dict[str, Any]:
+    db = utils.load_asset_config(asset_id)["database"]
     return {
         "asset_id": db.get("asset_id"),
         "symbol": db.get("symbol"),
@@ -26,11 +26,18 @@ def config() -> dict[str, Any]:
     }
 
 
-def candles(conn: Conn, hours: int, tf: str) -> dict[str, Any]:
-    """OHLCV resampled to ``tf``, anchored at the latest ohlcv bar."""
-    end = predictions.latest_time(conn, "ohlcv")
-    if end is None:
+def candles(conn: Conn, hours: int, tf: str, end: datetime | None = None) -> dict[str, Any]:
+    """OHLCV resampled to ``tf`` over ``[end - hours, end]``.
+
+    ``end`` defaults to the latest ohlcv bar and is capped at it (naive = UTC); the Scout event
+    chart (t943) uses it to load the window of an older event.
+    """
+    latest = predictions.latest_time(conn, "ohlcv")
+    if latest is None:
         return {"tf": tf, "from": None, "to": None, "candles": []}
+    if end is not None and end.tzinfo is not None:
+        end = end.astimezone(UTC).replace(tzinfo=None)
+    end = latest if end is None else min(end, latest)
     start = end - timedelta(hours=hours)
     minutes = TF_MINUTES[tf]
     ohlcv = common.quote(common.live_table("ohlcv"))
@@ -50,7 +57,9 @@ def candles(conn: Conn, hours: int, tf: str) -> dict[str, Any]:
     }
 
 
-def chart(conn: Conn, window: str, include_trade: bool = True) -> dict[str, Any]:
+def chart(
+    conn: Conn, window: str, include_trade: bool = True, asset_id: str | None = None
+) -> dict[str, Any]:
     """The main dashboard payload: bars + predictions + thresholds + active trade.
 
     ``include_trade=False`` skips the active-trade lookup (journal + Binance fallback) and
@@ -58,12 +67,12 @@ def chart(conn: Conn, window: str, include_trade: bool = True) -> dict[str, Any]
     """
     focus = WINDOWS[window]
     anchor = predictions.latest_time(conn, "predictions") or predictions.latest_time(conn, "ohlcv")
-    sessions = common.active_sessions()
+    sessions = common.active_sessions(asset_id)
     thresholds = {
         "long_entry": sessions["long"].entry_cutoff,
         "short_entry": sessions["short"].entry_cutoff,
     }
-    active = trades.active_position(conn) if include_trade else None
+    active = trades.active_position(conn, asset_id) if include_trade else None
     active_trade = (
         {
             "side": active.get("side"),
@@ -80,7 +89,7 @@ def chart(conn: Conn, window: str, include_trade: bool = True) -> dict[str, Any]
             "thresholds": thresholds, "active_trade": active_trade,
         }
     start = anchor - timedelta(hours=focus)
-    rows = predictions.load_rows(conn, start, anchor, base="ohlcv")
+    rows = predictions.load_rows(conn, start, anchor, base="ohlcv", asset_id=asset_id)
     bars = [
         {
             "t": r["t"],

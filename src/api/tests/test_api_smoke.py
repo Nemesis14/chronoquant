@@ -51,6 +51,20 @@ def test_candles_resample(client: TestClient) -> None:
     assert client.get("/api/market/candles", params={"tf": "7m"}).status_code == 422
 
 
+def test_candles_end(client: TestClient) -> None:
+    """``end`` moves the window back in time; a future ``end`` is capped at the latest bar."""
+    body = client.get(
+        "/api/market/candles", params={"hours": 1, "tf": "1m", "end": "2026-01-01T08:00:00Z"}
+    ).json()
+    assert body["to"] == "2026-01-01T08:00:00Z"
+    assert body["from"] == "2026-01-01T07:00:00Z"
+    assert body["candles"][0]["t"].startswith("2026-01-01T07:00")
+    assert body["candles"][-1]["t"].startswith("2026-01-01T08:00")
+    capped = client.get("/api/market/candles", params={"hours": 1, "end": "2030-01-01T00:00:00"}).json()
+    assert capped["to"] == client.get("/api/market/candles", params={"hours": 1}).json()["to"]
+    assert client.get("/api/market/candles", params={"end": "nope"}).status_code == 422
+
+
 def test_chart_payload(client: TestClient) -> None:
     body = client.get("/api/market/chart", params={"window": "4h"}).json()
     assert body["focus_hours"] == 4
@@ -121,6 +135,39 @@ def test_strat(client: TestClient) -> None:
     assert client.get('/api/strat/bad"id/trades').status_code in (400, 404)
 
 
+def test_strat_artifact_inactive_session_per_direction(env: Path) -> None:
+    """t946: a session outside trading.json resolves to its OWN direction's ``<model>/strategy`` dir.
+
+    Both sessions of a pair share (model_id_long, model_id_short) in reg.strategies; the short
+    session must not get the long model's strategy_artifact.json.
+    """
+    import json  # noqa: PLC0415
+
+    pair = ("lgbm_x_l", "lgbm_x_s")
+    sessions = {"strat_x_long": pair[0], "strat_x_short": pair[1]}
+    for sid, model_id in sessions.items():
+        d = env / "artifacts" / model_id / "strategy"
+        d.mkdir(parents=True)
+        (d / "strategy_artifact.json").write_text(json.dumps({"session_id": sid}), encoding="utf-8")
+    with duckdb.connect(str(env / "reg.duckdb")) as c:
+        for sid in sessions:
+            c.execute(
+                "INSERT INTO strategies VALUES (?, ?, ?, ?, 'candidate', TIMESTAMP '2026-01-05 00:00:00')",
+                [sid, pair[0], pair[1], sid],
+            )
+    with TestClient(create_app(frontend_dist=env / "no_dist")) as c:
+        for sid in sessions:
+            assert c.get(f"/api/strat/{sid}/artifact").json()["session_id"] == sid
+        # registered session without a matching artifact -> 404, not the sibling direction's file
+        with duckdb.connect(str(env / "reg.duckdb")) as reg:
+            reg.execute(
+                "INSERT INTO strategies VALUES ('strat_x_combo', ?, ?, 'strat_x_combo', 'candidate',"
+                " TIMESTAMP '2026-01-06 00:00:00')",
+                list(pair),
+            )
+        assert c.get("/api/strat/strat_x_combo/artifact").status_code == 404
+
+
 def test_registry(client: TestClient) -> None:
     active = client.get("/api/registry/active").json()
     assert active["live_models"] == {"long": MODEL_L, "short": MODEL_S}
@@ -165,6 +212,7 @@ def test_spa_fallback(env: Path) -> None:
     with TestClient(create_app(frontend_dist=dist)) as c:
         assert c.get("/").text == "<html>spa</html>"
         assert c.get("/trades").text == "<html>spa</html>"
+        assert c.get("/trades").headers["cache-control"] == "no-cache"  # t948: shell always revalidated
         assert c.get("/assets/app.js").text == "//js"
         assert c.get("/api/health").json()["status"] == "ok"
         nf = c.get("/api/unknown")

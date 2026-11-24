@@ -1,0 +1,174 @@
+{
+  "model_id": "scout_s0c_r1",
+  "display_name": "Impulse Scout S0+C logit r1 (kísérleti, NO-GO)",
+  "description": "Impulse Scout baseline (5300): S0 + C skalár logit, W4h_H8h, a15, pooled SOL+BTC+ETH train. Kísérleti – nem kereskedési jel; nem része a quant modellnek.",
+  "status": "experimental_no_go",
+  "family": "scout",
+  "generator": "scout.freeze",
+  "created_at": "2026-11-23T06:37:37+00:00",
+  "event_definition": {
+    "version": "5300 / 5200 v2",
+    "variant": "a15",
+    "min_a_sigma": 1.5,
+    "cell_id": "W4h_H8h",
+    "w_min": 240,
+    "h_min": 480,
+    "params_json": "{\"atr_n\": 14, \"bar15\": 15, \"cells\": [[\"W4h_H8h\", 240, 480]], \"cv_blocks\": 6, \"extra\": {}, \"holdout2_start\": \"2026-08-01\", \"impulse_mult\": 1.0, \"min_a_sigma\": 1.5, \"oos_start\": \"2026-02-01\", \"overlap_rule\": \"full_interval\", \"sigma_min_frac\": 0.9, \"sigma_window\": 10080, \"tie_break\": \"false_start\", \"train_start\": \"2021-01-01\", \"trend_bars\": 4320, \"velocity_bars\": 60, \"version\": \"v2\"}"
+  },
+  "model": {
+    "name": "S0C_logit",
+    "config": {
+      "c": 0.1,
+      "cols": [
+        "a_sigma",
+        "velocity_1h",
+        "pretrend_3d",
+        "log_sigma_1m",
+        "drop_depth",
+        "volume_ratio"
+      ]
+    },
+    "config_hash": "d23e9208110d",
+    "seed": 20260101,
+    "features": [
+      "a_sigma",
+      "velocity_1h",
+      "pretrend_3d",
+      "log_sigma_1m",
+      "drop_depth",
+      "volume_ratio"
+    ],
+    "mu": [
+      2.341160725386018,
+      0.6287649813767895,
+      -1.9059552716756463,
+      -6.94501960867198,
+      0.041471236077193024,
+      1.5647027223135235
+    ],
+    "sd": [
+      1.0577496218651559,
+      1.2554813713884798,
+      4.779083978391137,
+      0.48162652099986425,
+      0.04269505777449294,
+      0.8022863743845221
+    ],
+    "coef": [
+      -0.8135947969107965,
+      0.2051939649111451,
+      0.15246681660753872,
+      -0.08402559096029336,
+      -0.03905080222118434,
+      0.14921586631456446
+    ],
+    "intercept": -1.9408360903776514,
+    "q_false_start": 0.18152524167561762,
+    "classes": [
+      "impulse",
+      "false_start",
+      "sideways"
+    ]
+  },
+  "thresholds": {
+    "top20": 0.18786084218569238,
+    "top10": 0.21059064825697044,
+    "source": "train OOF score, 80th / 90th percentile"
+  },
+  "rules": [
+    {
+      "key": "default",
+      "rule": {
+        "name": "default",
+        "tp": [
+          "pstar",
+          0.0
+        ],
+        "sl": [
+          "low0",
+          0.0
+        ],
+        "time_min": null,
+        "partial_frac": 0.0,
+        "tp1": null,
+        "be_after_tp1": false,
+        "be_trigger_sigma": null,
+        "description": "P* / low[t0] / H (5300 triple barrier)"
+      }
+    },
+    {
+      "key": "r2_03",
+      "rule": {
+        "name": "R2_03_tp3s_sl15s",
+        "tp": [
+          "sigma",
+          3.0
+        ],
+        "sl": [
+          "sigma",
+          1.5
+        ],
+        "time_min": null,
+        "partial_frac": 0.0,
+        "tp1": null,
+        "be_after_tp1": false,
+        "be_trigger_sigma": null,
+        "description": "TP +3 σ_W / SL −1,5 σ_W / 8 h"
+      }
+    }
+  ],
+  "costs": {
+    "entry_order_type": "taker",
+    "exit_order_type": {
+      "sl": "taker",
+      "timeout": "taker",
+      "tp": "maker"
+    },
+    "maker_bps": 2.0,
+    "slippage_bps": 1.5,
+    "taker_bps": 5.0
+  },
+  "runtime": {
+    "detect_anchor": "2026-07-24T00:00:00",
+    "live_start": "2026-11-01T00:00:00",
+    "holdout2_start": "2026-08-01"
+  },
+  "train": {
+    "source": "research.\"scout_events_v1\" (split = train, a15, W4h_H8h)",
+    "assets": [
+      "btcusdt",
+      "ethusdt",
+      "solusdt"
+    ],
+    "n_events": 2170,
+    "n_impulse": 308,
+    "n_by_asset": {
+      "btcusdt": 717,
+      "ethusdt": 735,
+      "solusdt": 718
+    },
+    "t0_min": "2021-01-02T00:29:00",
+    "t0_max": "2026-01-30T18:23:00",
+    "label_end_max": "2026-01-31T06:23:00",
+    "frame_hash": "0a723719fc86eedc",
+    "fold_hash": "0d90521c16be85de",
+    "n_folds": 6,
+    "fold_bounds": [
+      "2021-01-01T00:00:00",
+      "2021-11-07T00:00:00",
+      "2022-09-12T00:00:00",
+      "2023-07-18T00:00:00",
+      "2024-05-23T00:00:00",
+      "2025-03-29T00:00:00",
+      "2026-02-01T00:00:00"
+    ],
+    "embargo_min": 480,
+    "oof_auc": 0.6360584903817986,
+    "oof_file": "train_oof.parquet"
+  },
+  "files": {
+    "model.pkl": "e7ad109b050b790cdb3e808b0a1e4a69051038727a3786d6d5b02695dc085b15",
+    "train_oof.parquet": "5745b6e90ad4982abf1617160ce047b3310af5668a4b8c7563728d2496951cc0"
+  },
+  "freeze_hash": "f0541e6d37ecfdab"
+}

@@ -13,11 +13,14 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Annotated
 
 import duckdb
+from fastapi import Depends, Query
 
 import utils
 from data_handling.store.readonly_query import open_readonly_connection
+from worker import assets
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +56,18 @@ def journal_db_path() -> str | None:
 
 
 @contextmanager
-def ro_connection() -> Iterator[duckdb.DuckDBPyConnection]:
-    """Yield a short-lived read-only connection; raise DbBusyError on a persistent lock."""
+def ro_connection(asset_id: str | None = None) -> Iterator[duckdb.DuckDBPyConnection]:
+    """Yield a short-lived read-only connection of ``asset_id`` (default asset if None).
+
+    Raises DbBusyError on a persistent lock.
+    """
     extra: dict[str, str] = {}
     jpath = journal_db_path()
     if jpath and Path(jpath).exists():
         extra["jrn"] = jpath
     try:
         conn = open_readonly_connection(
-            None, tries=ATTACH_TRIES, delay=ATTACH_DELAY, extra_targets=extra
+            asset_id, tries=ATTACH_TRIES, delay=ATTACH_DELAY, extra_targets=extra
         )
     except duckdb.IOException as exc:
         _set_busy(True)
@@ -74,7 +80,25 @@ def ro_connection() -> Iterator[duckdb.DuckDBPyConnection]:
         conn.close()
 
 
-def get_conn() -> Iterator[duckdb.DuckDBPyConnection]:
-    """FastAPI dependency: a per-request read-only connection (sync => threadpool)."""
-    with ro_connection() as conn:
+def get_asset(
+    asset: Annotated[
+        str | None,
+        Query(max_length=64, description="Asset id (config/assets.json); default asset if omitted"),
+    ] = None,
+) -> str:
+    """FastAPI dependency: the requested asset id (``?asset=``), default when omitted; unknown -> 404."""
+    try:
+        return assets.require_asset(asset)
+    except assets.UnknownAssetError as exc:
+        from api.errors import not_found  # noqa: PLC0415 - api.errors imports this module
+
+        raise not_found(str(exc)) from exc
+
+
+AssetDep = Annotated[str, Depends(get_asset)]
+
+
+def get_conn(asset_id: AssetDep) -> Iterator[duckdb.DuckDBPyConnection]:
+    """FastAPI dependency: a per-request read-only connection of the requested asset."""
+    with ro_connection(asset_id) as conn:
         yield conn

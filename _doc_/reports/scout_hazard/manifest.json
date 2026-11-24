@@ -1,0 +1,106 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/null_dauc.json",
+        "height": 300,
+        "id": "null_dauc",
+        "title": "ΔAUC permutációs null-eloszlása (piros: megfigyelt)"
+      },
+      {
+        "file": "charts/cif_quintiles.json",
+        "height": 420,
+        "id": "cif_quintiles",
+        "title": "CIF kvintilisenként: impulzus és hamis indulás (megfigyelt vs becsült)"
+      },
+      {
+        "file": "charts/time_calibration.json",
+        "height": 340,
+        "id": "time_calibration",
+        "title": "Időbeli kalibráció: pooled CIF megfigyelt vs becsült"
+      },
+      {
+        "file": "charts/hazard_shape.json",
+        "height": 320,
+        "id": "hazard_shape",
+        "title": "Átlagos diszkrét hazard 30 perces sávonként"
+      },
+      {
+        "file": "charts/blocks.json",
+        "height": 300,
+        "id": "blocks",
+        "title": "Blokkonkénti ΔAUC (hazard − baseline)"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/person_period.json",
+        "id": "person_period",
+        "title": "Személy-periódus sorok foldonként"
+      },
+      {
+        "file": "tables/comparison.json",
+        "id": "comparison",
+        "title": "Hazard vs baseline (összevont OOF)"
+      },
+      {
+        "file": "tables/quintiles.json",
+        "id": "quintiles",
+        "title": "Kvintilisek: CIF(H) megfigyelt vs becsült, impulzus medián τ"
+      },
+      {
+        "file": "tables/time_calibration_table.json",
+        "id": "time_calibration_table",
+        "title": "Időbeli kalibráció sávonként (pooled OOF)"
+      },
+      {
+        "file": "tables/coefficients.json",
+        "id": "coefficients",
+        "title": "Együtthatók (standardizált skála, teljes train illesztés)"
+      },
+      {
+        "file": "tables/blocks_table.json",
+        "id": "blocks_table",
+        "title": "Blokk-táblázat"
+      },
+      {
+        "file": "tables/assets_table.json",
+        "id": "assets_table",
+        "title": "Asset-bontás"
+      },
+      {
+        "file": "tables/calibration_asset.json",
+        "id": "calibration_asset",
+        "title": "Kalibráció (P(impulzus)) assetenként"
+      },
+      {
+        "file": "tables/trades.json",
+        "id": "trades",
+        "title": "Szimuláció: hazard vs baseline"
+      }
+    ]
+  },
+  "created_at": "2026-11-21T13:45:24Z",
+  "id": "scout_hazard",
+  "model_id": null,
+  "order": 36,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.scout_hazard_report",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "epic_073 t934: hazard modell (impulzus vs hamis indulás, oldalazás cenzorált H-nál), 2170 train esemény; AUC 0.6474 vs baseline 0.6361 (ΔAUC +0.0114), perm. p 0.2687.",
+  "tags": [
+    "scout",
+    "epic_073",
+    "hazard",
+    "competing_risks",
+    "benchmark"
+  ],
+  "title": "Impulse Scout — Modell 3: diszkrét idejű versengő kockázatok (H3, 1. kör)",
+  "updated_at": "2026-11-22T06:16:16Z"
+}

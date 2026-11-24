@@ -8,8 +8,10 @@ reproducible (plan sections 4.1, 5 step 1, 6).
 
 This module owns:
   * the ``snap`` schema bootstrap in the lab database,
-  * the content hash (sha256 over ordered row content) and the feature-set hash
-    (sha256 over the ordered feature column list),
+  * the content hash (time grid + row count + column set fingerprint; drives the
+    snapshot_id and reuse), the additive value hash ``values_sha256`` (fingerprint
+    of the frozen values, informational, epic_076 / t949) and the feature-set
+    hash (sha256 over the ordered feature column list),
   * the snapshot_id naming ``{asset}_fw{h}_{range}__{hash8}`` (plan 6),
   * CTAS of the immutable snapshot table + a ``reg.snapshots`` row,
   * reuse detection: an identical-content re-run does NOT overwrite — it returns
@@ -38,8 +40,25 @@ SNAP_SCHEMA = "snap"
 # Source table in the live (attached READ_ONLY) database.
 LIVE_SOURCE = "live.quant_train"
 
+
+def _live_source(source_table: str = "quant_train") -> str:
+    """Qualified live source table; ``quant_train`` (champion) or a profile table.
+
+    Challenger feature profiles (epic_071) build ``quant_train__<profile_id>``
+    (``utils.quant_train_table``); a snapshot of it carries the extra columns.
+    """
+    if source_table == "quant_train":
+        return LIVE_SOURCE
+    if not source_table.replace("_", "").isalnum():
+        raise ValueError(f"Invalid source table name: {source_table}")
+    return f'live."{source_table}"'
+
 # Number of hex chars of the content hash embedded in the snapshot_id (plan 6).
 HASH8_LEN = 8
+
+# Algorithm tag baked into the values_sha256 fingerprint. Bump it if the
+# fingerprint recipe changes (old hashes then stop matching by design).
+VALUES_HASH_VERSION = "v1"
 
 
 @dataclass(frozen=True)
@@ -55,6 +74,8 @@ class SnapshotResult:
         content_sha256   : Full sha256 over the ordered row content.
         feature_set_hash : sha256 over the ordered feature column list (superset).
         reused           : True if an identical snapshot already existed (no write).
+        values_sha256    : Value fingerprint of the frozen snap table (additive,
+                           not part of the snapshot_id); ``None`` if unavailable.
     """
 
     snapshot_id      : str
@@ -65,6 +86,7 @@ class SnapshotResult:
     content_sha256   : str
     feature_set_hash : str
     reused           : bool
+    values_sha256    : str | None = None
 
 
 # %% Schema bootstrap
@@ -123,6 +145,7 @@ def build_snapshot_id(asset_id: str, horizon: int, range_token: str, content_sha
 def _ordered_feature_columns(
     conn: duckdb.DuckDBPyConnection,
     exclude_features: list[str] | None = None,
+    source_table: str = "quant_train",
 ) -> list[str]:
     """Return the source table's feature columns, sorted (excludes open_time/targets).
 
@@ -136,17 +159,19 @@ def _ordered_feature_columns(
                            feature group (epic_054: alt-data held back from the
                            control model so treatment and control differ in the
                            candidate pool and nothing else).
+        source_table     : Live source table (default ``quant_train``).
     """
-    rows = conn.execute(f"SELECT * FROM {LIVE_SOURCE} LIMIT 0").description
+    rows = conn.execute(f"SELECT * FROM {_live_source(source_table)} LIMIT 0").description
     cols = [d[0] for d in rows]
     drop = set(exclude_features or ())
     return sorted(c for c in cols if c.startswith("feat_") and c not in drop)
 
 
 def _resolve_range(
-    conn       : duckdb.DuckDBPyConnection,
-    start_time : str | None,
-    end_time   : str | None,
+    conn         : duckdb.DuckDBPyConnection,
+    start_time   : str | None,
+    end_time     : str | None,
+    source_table : str = "quant_train",
 ) -> tuple[str, str]:
     """Resolve the effective inclusive range as ``YYYY-MM-DD HH:MM:SS`` strings.
 
@@ -165,7 +190,7 @@ def _resolve_range(
         f"""
         SELECT strftime(MIN(open_time), '%Y-%m-%d %H:%M:%S'),
                strftime(MAX(open_time), '%Y-%m-%d %H:%M:%S')
-        FROM {LIVE_SOURCE} {where}
+        FROM {_live_source(source_table)} {where}
         """,
         params,
     ).fetchone()
@@ -179,6 +204,7 @@ def compute_content_sha256(
     range_start : str,
     range_end   : str,
     column_set  : list[str] | None = None,
+    source_table: str = "quant_train",
 ) -> tuple[str, int]:
     """Compute the content hash and row count for a range of the source table.
 
@@ -208,7 +234,7 @@ def compute_content_sha256(
             SUM(hash(open_time))                  AS time_hash_sum,
             strftime(MIN(open_time), '%Y-%m-%d %H:%M:%S') AS min_t,
             strftime(MAX(open_time), '%Y-%m-%d %H:%M:%S') AS max_t
-        FROM {LIVE_SOURCE}
+        FROM {_live_source(source_table)}
         WHERE open_time BETWEEN ? AND ?
         """,
         [range_start, range_end],
@@ -232,13 +258,102 @@ def compute_content_sha256(
 def compute_feature_set_hash(
     conn: duckdb.DuckDBPyConnection,
     exclude_features: list[str] | None = None,
+    source_table: str = "quant_train",
 ) -> str:
     """Compute sha256 over the ordered feature column list of the source table."""
-    cols = _ordered_feature_columns(conn, exclude_features)
+    cols = _ordered_feature_columns(conn, exclude_features, source_table)
     joined = ",".join(cols)
     row = conn.execute("SELECT sha256(?)", [joined]).fetchone()
     assert row is not None
     return str(row[0])
+
+
+def compute_values_sha256(conn: duckdb.DuckDBPyConnection, table_fqn: str) -> str:
+    """Compute the value fingerprint of a (snapshot) table — additive to content_sha256.
+
+    ``content_sha256`` only sees the time grid, row count and column set, so two
+    assets frozen over the same grid (e.g. BTC and BCH) share it.  This hash also
+    covers every cell value: per column ``SUM(hash(open_time, col))`` — binding
+    each value to its row's open_time, so swapping values between rows changes the
+    hash, while the result is independent of physical row order — plus the row
+    count, combined over the sorted column names into one sha256.
+
+    Single full scan, no row materialisation (OOM-safe like content_sha256).
+    Caveat: DuckDB's ``hash()`` is not guaranteed stable across DuckDB major
+    versions; the fingerprint is tagged with ``VALUES_HASH_VERSION`` and is meant
+    for identity / change detection, not as a long-term archival checksum.
+
+    Args:
+        conn      : Open connection that can read ``table_fqn``.
+        table_fqn : Qualified (quoted where needed) table name, e.g. ``snap."<id>"``.
+
+    Returns:
+        64-char hex sha256.
+    """
+    import hashlib
+
+    desc = conn.execute(f"SELECT * FROM {table_fqn} LIMIT 0").description
+    cols = sorted(d[0] for d in desc)
+    if "open_time" not in cols:
+        raise ValueError(f"{table_fqn} has no open_time column")
+
+    def _q(c: str) -> str:
+        return '"' + c.replace('"', '""') + '"'
+
+    exprs = [
+        "SUM(hash(open_time))" if c == "open_time" else f"SUM(hash(open_time, {_q(c)}))"
+        for c in cols
+    ]
+    row = conn.execute(
+        f"SELECT COUNT(*), {', '.join(exprs)} FROM {table_fqn}"
+    ).fetchone()
+    assert row is not None
+    parts = [VALUES_HASH_VERSION, f"n={row[0]}"]
+    parts += [f"{c}={v}" for c, v in zip(cols, row[1:], strict=True)]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def backfill_values_sha256(
+    conn     : duckdb.DuckDBPyConnection,
+    asset_id : str,
+    force    : bool = False,
+) -> dict[str, str | None]:
+    """Fill ``reg.snapshots.values_sha256`` for an asset's existing snapshots.
+
+    Only rows whose ``snap."<snapshot_id>"`` table exists in the connected lab DB
+    are hashed; missing tables stay NULL.  ``snapshot_id`` / ``content_sha256``
+    are never touched.
+
+    Args:
+        conn     : Lab connection (lab default + ``reg`` read-write), i.e.
+                   utils.open_lab_connection(asset_id).
+        asset_id : Asset whose snapshots to backfill.
+        force    : Recompute even where values_sha256 is already set.
+
+    Returns:
+        ``{snapshot_id: values_sha256 | None}`` for every inspected row.
+    """
+    where = "" if force else " AND values_sha256 IS NULL"
+    ids = [
+        str(r[0])
+        for r in conn.execute(
+            f"SELECT snapshot_id FROM reg.snapshots WHERE asset_id = ?{where} ORDER BY snapshot_id",
+            [asset_id],
+        ).fetchall()
+    ]
+    out: dict[str, str | None] = {}
+    for sid in ids:
+        if not _snap_table_exists(conn, sid):
+            out[sid] = None
+            continue
+        vh = compute_values_sha256(conn, _snapshot_table_fqn(sid))
+        conn.execute(
+            "UPDATE reg.snapshots SET values_sha256 = ?, updated_at = now() WHERE snapshot_id = ?",
+            [vh, sid],
+        )
+        out[sid] = vh
+        logger.info("backfill_values_sha256: %s -> %s", sid, vh[:12])
+    return out
 
 
 # %% Snapshot creation
@@ -267,6 +382,23 @@ def _find_reusable_snapshot(
     return str(row[0]) if row is not None else None
 
 
+def _snap_table_exists(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> bool:
+    """True if ``snap."<snapshot_id>"`` exists in the (default) lab database."""
+    return conn.execute(
+        "SELECT 1 FROM information_schema.tables"
+        " WHERE table_schema = ? AND table_name = ?",
+        [SNAP_SCHEMA, snapshot_id],
+    ).fetchone() is not None
+
+
+def _stored_values_sha256(conn: duckdb.DuckDBPyConnection, snapshot_id: str) -> str | None:
+    """Return the registered values_sha256 of a snapshot (``None`` if unset)."""
+    row = conn.execute(
+        "SELECT values_sha256 FROM reg.snapshots WHERE snapshot_id = ?", [snapshot_id]
+    ).fetchone()
+    return str(row[0]) if row is not None and row[0] is not None else None
+
+
 def create_snapshot(
     conn       : duckdb.DuckDBPyConnection,
     asset_id   : str,
@@ -274,6 +406,7 @@ def create_snapshot(
     start_time : str | None = None,
     end_time   : str | None = None,
     exclude_features : list[str] | None = None,
+    source_table     : str = "quant_train",
 ) -> SnapshotResult:
     """Freeze a range of ``live.quant_train`` into an immutable snap table + reg row.
 
@@ -292,6 +425,10 @@ def create_snapshot(
         horizon    : Forward-window bar count for the id token (default 60 -> fw60).
         start_time : Optional inclusive lower bound, ``YYYY-MM-DD HH:MM:SS``.
         end_time   : Optional inclusive upper bound, ``YYYY-MM-DD HH:MM:SS``.
+        source_table : Live source table: ``quant_train`` (champion, default) or a
+                       challenger profile table ``quant_train__<profile_id>``
+                       (``utils.quant_train_table``). The column set enters the
+                       content hash, so the snapshot_id differs from the champion's.
 
     Returns:
         SnapshotResult describing the (new or reused) snapshot.
@@ -301,26 +438,32 @@ def create_snapshot(
     """
     ensure_snap_schema(conn)
 
-    range_start, range_end = _resolve_range(conn, start_time, end_time)
-    kept_columns = _ordered_feature_columns(conn, exclude_features)
+    range_start, range_end = _resolve_range(conn, start_time, end_time, source_table)
+    kept_columns = _ordered_feature_columns(conn, exclude_features, source_table)
     content_sha256, row_count = compute_content_sha256(
-        conn, range_start, range_end, column_set=kept_columns
+        conn, range_start, range_end, column_set=kept_columns, source_table=source_table
     )
-    feature_set_hash = compute_feature_set_hash(conn, exclude_features)
+    feature_set_hash = compute_feature_set_hash(conn, exclude_features, source_table)
     range_token = format_range(range_start, range_end)
     snapshot_id = build_snapshot_id(asset_id, horizon, range_token, content_sha256)
 
     existing = _find_reusable_snapshot(conn, asset_id, content_sha256)
-    table_exists = conn.execute(
-        "SELECT 1 FROM information_schema.tables"
-        " WHERE table_schema = ? AND table_name = ?",
-        [SNAP_SCHEMA, snapshot_id],
-    ).fetchone() is not None
+    table_exists = _snap_table_exists(conn, snapshot_id)
 
     if existing is not None and table_exists:
         logger.info(
             "create_snapshot: reuse %s (content hash matches, immutable)", existing
         )
+        # values_sha256 is additive: older rows may lack it — fill lazily from the
+        # frozen table (the snapshot itself is never rewritten).
+        values_sha256 = _stored_values_sha256(conn, existing)
+        if values_sha256 is None and _snap_table_exists(conn, existing):
+            values_sha256 = compute_values_sha256(conn, _snapshot_table_fqn(existing))
+            conn.execute(
+                "UPDATE reg.snapshots SET values_sha256 = ?, updated_at = now()"
+                " WHERE snapshot_id = ?",
+                [values_sha256, existing],
+            )
         return SnapshotResult(
             snapshot_id      = existing,
             asset_id         = asset_id,
@@ -330,11 +473,12 @@ def create_snapshot(
             content_sha256   = content_sha256,
             feature_set_hash = feature_set_hash,
             reused           = True,
+            values_sha256    = values_sha256,
         )
 
     fqn = _snapshot_table_fqn(snapshot_id)
     if exclude_features:
-        kept = _ordered_feature_columns(conn, exclude_features)
+        kept = _ordered_feature_columns(conn, exclude_features, source_table)
         select_list = ", ".join(
             ['open_time', *(f'"{c}"' for c in kept), 'long_mfe_fw60', 'short_mfe_fw60']
         )
@@ -344,12 +488,14 @@ def create_snapshot(
         f"""
         CREATE TABLE IF NOT EXISTS {fqn} AS
         SELECT {select_list}
-        FROM {LIVE_SOURCE}
+        FROM {_live_source(source_table)}
         WHERE open_time BETWEEN ? AND ?
         ORDER BY open_time
         """,
         [range_start, range_end],
     )
+    # Value fingerprint over what was actually frozen (additive; not in the id).
+    values_sha256 = compute_values_sha256(conn, fqn)
 
     registry.upsert(
         conn,
@@ -362,6 +508,7 @@ def create_snapshot(
             "row_count":        row_count,
             "content_sha256":   content_sha256,
             "feature_set_hash": feature_set_hash,
+            "values_sha256":    values_sha256,
             "status":           "candidate",
         },
     )
@@ -379,4 +526,5 @@ def create_snapshot(
         content_sha256   = content_sha256,
         feature_set_hash = feature_set_hash,
         reused           = False,
+        values_sha256    = values_sha256,
     )

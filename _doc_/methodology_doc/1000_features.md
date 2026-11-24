@@ -126,6 +126,7 @@ flowchart TD
 | Volume és aktivitás (Volume, Activity, Regime Rank) | `1400_features_volume_aktivitas.md` |
 | Kontextus és visszatekintés (Return Distance, SR Levels, Time/Session, Session Relative) | `1500_features_kontextus.md` |
 | Speciális indikátorok (Candle Shape, Ichimoku, Donchian, LinReg, Efficiency, Trend Slope, Extended Accel) | `1600_features_specialis.md` |
+| Támasz/ellenállás és trendvonal detektálás (pivot-szintek, trendvonalak, érintés/kitörés/visszateszt) — módszertan, kutatási fázis | `1700_features_sr_trendline.md` |
 
 ---
 

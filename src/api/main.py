@@ -20,7 +20,18 @@ from fastapi.staticfiles import StaticFiles
 
 import utils
 from api.errors import ApiError, register_error_handlers
-from api.routers import chat, equity, health, logs, market, predictions, registry, strat, trades
+from api.routers import (
+    chat,
+    equity,
+    health,
+    logs,
+    market,
+    predictions,
+    registry,
+    scout,
+    strat,
+    trades,
+)
 from cq_mcp.server import mcp_lifespan, mcp_route
 
 logger = logging.getLogger(__name__)
@@ -70,7 +81,9 @@ def _mount_frontend(app: FastAPI, dist: Path) -> None:
         candidate = (dist / full_path).resolve()
         if full_path and candidate.is_file() and dist_root in candidate.parents:
             return FileResponse(candidate)
-        return FileResponse(dist / "index.html")
+        # no-cache (t948): the browser must revalidate the shell so a fresh `npm run build`
+        # (new hashed /assets) is picked up on navigation, not only on reload
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 def create_app(frontend_dist: Path | None = None) -> FastAPI:
@@ -81,7 +94,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
     )
     register_error_handlers(app)
 
-    for router_module in (health, market, predictions, trades, equity, strat, registry, logs, chat):
+    for router_module in (health, market, predictions, scout, trades, equity, strat, registry, logs, chat):
         app.include_router(router_module.router)
     _include_optional_routers(app)
     # /mcp/chronoquant: route on the app router (no Mount => no 307 slash redirect), BEFORE the SPA fallback

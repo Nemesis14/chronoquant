@@ -21,6 +21,8 @@ export interface ReportManifest {
   title: string
   scope: 'model' | 'general'
   model_id: string | null
+  /** asset of the owning model (added by the API); null for general reports */
+  asset_id?: string | null
   created_at: string
   updated_at: string | null
   order: number

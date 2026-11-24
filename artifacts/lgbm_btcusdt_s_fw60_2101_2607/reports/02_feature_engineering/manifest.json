@@ -1,0 +1,1082 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/corr_price_action.json",
+        "height": 424,
+        "id": "corr_price_action",
+        "title": "Price Action: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_close_position.json",
+        "height": 360,
+        "id": "bin_close_position",
+        "title": "feat_close_position: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_ohlc_range.json",
+        "height": 360,
+        "id": "bin_ohlc_range",
+        "title": "feat_ohlc_range: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_10.json",
+        "height": 360,
+        "id": "bin_return_10",
+        "title": "feat_return_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_30.json",
+        "height": 360,
+        "id": "bin_return_30",
+        "title": "feat_return_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_60.json",
+        "height": 360,
+        "id": "bin_return_60",
+        "title": "feat_return_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_z_10.json",
+        "height": 360,
+        "id": "bin_return_z_10",
+        "title": "feat_return_z_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_z_60.json",
+        "height": 360,
+        "id": "bin_return_z_60",
+        "title": "feat_return_z_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_returns_kurt_14.json",
+        "height": 360,
+        "id": "bin_returns_kurt_14",
+        "title": "feat_returns_kurt_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_returns_log.json",
+        "height": 360,
+        "id": "bin_returns_log",
+        "title": "feat_returns_log: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_returns_sma_14.json",
+        "height": 360,
+        "id": "bin_returns_sma_14",
+        "title": "feat_returns_sma_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_returns_std_14.json",
+        "height": 360,
+        "id": "bin_returns_std_14",
+        "title": "feat_returns_std_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_volatility.json",
+        "height": 496,
+        "id": "corr_volatility",
+        "title": "Volatility: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_atr_14.json",
+        "height": 360,
+        "id": "bin_atr_14",
+        "title": "feat_atr_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_position_14.json",
+        "height": 360,
+        "id": "bin_bb_position_14",
+        "title": "feat_bb_position_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_position_140.json",
+        "height": 360,
+        "id": "bin_bb_position_140",
+        "title": "feat_bb_position_140: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_width_14.json",
+        "height": 360,
+        "id": "bin_bb_width_14",
+        "title": "feat_bb_width_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_width_140.json",
+        "height": 360,
+        "id": "bin_bb_width_140",
+        "title": "feat_bb_width_140: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_width_rank_20.json",
+        "height": 360,
+        "id": "bin_bb_width_rank_20",
+        "title": "feat_bb_width_rank_20: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bb_width_rank_60.json",
+        "height": 360,
+        "id": "bin_bb_width_rank_60",
+        "title": "feat_bb_width_rank_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_gk_vol_10.json",
+        "height": 360,
+        "id": "bin_gk_vol_10",
+        "title": "feat_gk_vol_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_gk_vol_30.json",
+        "height": 360,
+        "id": "bin_gk_vol_30",
+        "title": "feat_gk_vol_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_hist_vol_20.json",
+        "height": 360,
+        "id": "bin_hist_vol_20",
+        "title": "feat_hist_vol_20: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_hist_vol_rank_20.json",
+        "height": 360,
+        "id": "bin_hist_vol_rank_20",
+        "title": "feat_hist_vol_rank_20: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_natr_14.json",
+        "height": 360,
+        "id": "bin_natr_14",
+        "title": "feat_natr_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_natr_rank_20.json",
+        "height": 360,
+        "id": "bin_natr_rank_20",
+        "title": "feat_natr_rank_20: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_parkinson_vol_60.json",
+        "height": 360,
+        "id": "bin_parkinson_vol_60",
+        "title": "feat_parkinson_vol_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_volume.json",
+        "height": 380,
+        "id": "corr_volume",
+        "title": "Volume: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_ad_line.json",
+        "height": 360,
+        "id": "bin_ad_line",
+        "title": "feat_ad_line: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_mfi_14.json",
+        "height": 360,
+        "id": "bin_mfi_14",
+        "title": "feat_mfi_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_obv.json",
+        "height": 360,
+        "id": "bin_obv",
+        "title": "feat_obv: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_volume_confirmed_return_10.json",
+        "height": 360,
+        "id": "bin_volume_confirmed_return_10",
+        "title": "feat_volume_confirmed_return_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_volume_confirmed_return_30.json",
+        "height": 360,
+        "id": "bin_volume_confirmed_return_30",
+        "title": "feat_volume_confirmed_return_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_volume_sma_14.json",
+        "height": 360,
+        "id": "bin_volume_sma_14",
+        "title": "feat_volume_sma_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_candle_pattern.json",
+        "height": 448,
+        "id": "corr_candle_pattern",
+        "title": "Candle Pattern: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_body_ratio.json",
+        "height": 360,
+        "id": "bin_body_ratio",
+        "title": "feat_body_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_body_ratio_sma_10.json",
+        "height": 360,
+        "id": "bin_body_ratio_sma_10",
+        "title": "feat_body_ratio_sma_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_body_ratio_sma_30.json",
+        "height": 360,
+        "id": "bin_body_ratio_sma_30",
+        "title": "feat_body_ratio_sma_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bull_bars_ratio_10.json",
+        "height": 360,
+        "id": "bin_bull_bars_ratio_10",
+        "title": "feat_bull_bars_ratio_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bull_bars_ratio_30.json",
+        "height": 360,
+        "id": "bin_bull_bars_ratio_30",
+        "title": "feat_bull_bars_ratio_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_bull_bars_ratio_60.json",
+        "height": 360,
+        "id": "bin_bull_bars_ratio_60",
+        "title": "feat_bull_bars_ratio_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lower_wick_ratio.json",
+        "height": 360,
+        "id": "bin_lower_wick_ratio",
+        "title": "feat_lower_wick_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_signed_body_ratio.json",
+        "height": 360,
+        "id": "bin_signed_body_ratio",
+        "title": "feat_signed_body_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_signed_body_sma_10.json",
+        "height": 360,
+        "id": "bin_signed_body_sma_10",
+        "title": "feat_signed_body_sma_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_signed_body_sma_30.json",
+        "height": 360,
+        "id": "bin_signed_body_sma_30",
+        "title": "feat_signed_body_sma_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_upper_wick_ratio.json",
+        "height": 360,
+        "id": "bin_upper_wick_ratio",
+        "title": "feat_upper_wick_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_wick_imbalance_sma_30.json",
+        "height": 360,
+        "id": "bin_wick_imbalance_sma_30",
+        "title": "feat_wick_imbalance_sma_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_time_session.json",
+        "height": 448,
+        "id": "corr_time_session",
+        "title": "Time/Session: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_bars_into_session_norm.json",
+        "height": 360,
+        "id": "bin_bars_into_session_norm",
+        "title": "feat_bars_into_session_norm: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_day_open_return.json",
+        "height": 360,
+        "id": "bin_day_open_return",
+        "title": "feat_day_open_return: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_day_range_position.json",
+        "height": 360,
+        "id": "bin_day_range_position",
+        "title": "feat_day_range_position: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dayofweek_cos.json",
+        "height": 360,
+        "id": "bin_dayofweek_cos",
+        "title": "feat_dayofweek_cos: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dayofweek_sin.json",
+        "height": 360,
+        "id": "bin_dayofweek_sin",
+        "title": "feat_dayofweek_sin: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_hour_cos.json",
+        "height": 360,
+        "id": "bin_hour_cos",
+        "title": "feat_hour_cos: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_hour_sin.json",
+        "height": 360,
+        "id": "bin_hour_sin",
+        "title": "feat_hour_sin: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_session_asia.json",
+        "height": 360,
+        "id": "bin_session_asia",
+        "title": "feat_session_asia: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_session_europe.json",
+        "height": 360,
+        "id": "bin_session_europe",
+        "title": "feat_session_europe: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_session_us.json",
+        "height": 360,
+        "id": "bin_session_us",
+        "title": "feat_session_us: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_weekend.json",
+        "height": 360,
+        "id": "bin_weekend",
+        "title": "feat_weekend: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_weekly_open_return.json",
+        "height": 360,
+        "id": "bin_weekly_open_return",
+        "title": "feat_weekly_open_return: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_taker_flow.json",
+        "height": 380,
+        "id": "corr_taker_flow",
+        "title": "Taker Flow: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_avg_trade_quote_30.json",
+        "height": 360,
+        "id": "bin_avg_trade_quote_30",
+        "title": "feat_avg_trade_quote_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_quote_volume_ratio_10.json",
+        "height": 360,
+        "id": "bin_quote_volume_ratio_10",
+        "title": "feat_quote_volume_ratio_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_quote_volume_ratio_30.json",
+        "height": 360,
+        "id": "bin_quote_volume_ratio_30",
+        "title": "feat_quote_volume_ratio_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_quote_volume_ratio_60.json",
+        "height": 360,
+        "id": "bin_quote_volume_ratio_60",
+        "title": "feat_quote_volume_ratio_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_taker_buy_base_ratio_10.json",
+        "height": 360,
+        "id": "bin_taker_buy_base_ratio_10",
+        "title": "feat_taker_buy_base_ratio_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_taker_buy_base_ratio_30.json",
+        "height": 360,
+        "id": "bin_taker_buy_base_ratio_30",
+        "title": "feat_taker_buy_base_ratio_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_taker_flow_confirmed_return_30.json",
+        "height": 360,
+        "id": "bin_taker_flow_confirmed_return_30",
+        "title": "feat_taker_flow_confirmed_return_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_momentum.json",
+        "height": 380,
+        "id": "corr_momentum",
+        "title": "Momentum: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_roc_14.json",
+        "height": 360,
+        "id": "bin_roc_14",
+        "title": "feat_roc_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_roc_140.json",
+        "height": 360,
+        "id": "bin_roc_140",
+        "title": "feat_roc_140: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_rsi_14.json",
+        "height": 360,
+        "id": "bin_rsi_14",
+        "title": "feat_rsi_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_stoch_d_14.json",
+        "height": 360,
+        "id": "bin_stoch_d_14",
+        "title": "feat_stoch_d_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_trend.json",
+        "height": 380,
+        "id": "corr_trend",
+        "title": "Trend: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_adx_neg_14.json",
+        "height": 360,
+        "id": "bin_adx_neg_14",
+        "title": "feat_adx_neg_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_adx_pos_14.json",
+        "height": 360,
+        "id": "bin_adx_pos_14",
+        "title": "feat_adx_pos_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_ema_ratio_14.json",
+        "height": 360,
+        "id": "bin_ema_ratio_14",
+        "title": "feat_ema_ratio_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_ema_ratio_140.json",
+        "height": 360,
+        "id": "bin_ema_ratio_140",
+        "title": "feat_ema_ratio_140: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_kama_ratio_10_2_30.json",
+        "height": 360,
+        "id": "bin_kama_ratio_10_2_30",
+        "title": "feat_kama_ratio_10_2_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_macd_12_26.json",
+        "height": 360,
+        "id": "bin_macd_12_26",
+        "title": "feat_macd_12_26: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_macd_diff.json",
+        "height": 360,
+        "id": "bin_macd_diff",
+        "title": "feat_macd_diff: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_macd_signal_12_26_9.json",
+        "height": 360,
+        "id": "bin_macd_signal_12_26_9",
+        "title": "feat_macd_signal_12_26_9: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_wma_ratio_14.json",
+        "height": 360,
+        "id": "bin_wma_ratio_14",
+        "title": "feat_wma_ratio_14: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_autocorr_lag1_60.json",
+        "height": 360,
+        "id": "bin_return_autocorr_lag1_60",
+        "title": "feat_return_autocorr_lag1_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_market_structure.json",
+        "height": 880,
+        "id": "corr_market_structure",
+        "title": "Market Structure: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_atr_dist_high_10.json",
+        "height": 360,
+        "id": "bin_atr_dist_high_10",
+        "title": "feat_atr_dist_high_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_atr_dist_high_30.json",
+        "height": 360,
+        "id": "bin_atr_dist_high_30",
+        "title": "feat_atr_dist_high_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_atr_dist_high_60.json",
+        "height": 360,
+        "id": "bin_atr_dist_high_60",
+        "title": "feat_atr_dist_high_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_atr_dist_low_10.json",
+        "height": 360,
+        "id": "bin_atr_dist_low_10",
+        "title": "feat_atr_dist_low_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_atr_dist_low_30.json",
+        "height": 360,
+        "id": "bin_atr_dist_low_30",
+        "title": "feat_atr_dist_low_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_atr_dist_low_60.json",
+        "height": 360,
+        "id": "bin_atr_dist_low_60",
+        "title": "feat_atr_dist_low_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_high_10.json",
+        "height": 360,
+        "id": "bin_dist_rolling_high_10",
+        "title": "feat_dist_rolling_high_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_high_30.json",
+        "height": 360,
+        "id": "bin_dist_rolling_high_30",
+        "title": "feat_dist_rolling_high_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_high_60.json",
+        "height": 360,
+        "id": "bin_dist_rolling_high_60",
+        "title": "feat_dist_rolling_high_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_low_10.json",
+        "height": 360,
+        "id": "bin_dist_rolling_low_10",
+        "title": "feat_dist_rolling_low_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_low_30.json",
+        "height": 360,
+        "id": "bin_dist_rolling_low_30",
+        "title": "feat_dist_rolling_low_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_dist_rolling_low_60.json",
+        "height": 360,
+        "id": "bin_dist_rolling_low_60",
+        "title": "feat_dist_rolling_low_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_efficiency_ratio_10.json",
+        "height": 360,
+        "id": "bin_efficiency_ratio_10",
+        "title": "feat_efficiency_ratio_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_efficiency_ratio_30.json",
+        "height": 360,
+        "id": "bin_efficiency_ratio_30",
+        "title": "feat_efficiency_ratio_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_efficiency_ratio_60.json",
+        "height": 360,
+        "id": "bin_efficiency_ratio_60",
+        "title": "feat_efficiency_ratio_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_max_drawdown_10.json",
+        "height": 360,
+        "id": "bin_max_drawdown_10",
+        "title": "feat_max_drawdown_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_max_drawdown_30.json",
+        "height": 360,
+        "id": "bin_max_drawdown_30",
+        "title": "feat_max_drawdown_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_max_drawdown_60.json",
+        "height": 360,
+        "id": "bin_max_drawdown_60",
+        "title": "feat_max_drawdown_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_prev_session_high_dist.json",
+        "height": 360,
+        "id": "bin_prev_session_high_dist",
+        "title": "feat_prev_session_high_dist: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_prev_session_low_dist.json",
+        "height": 360,
+        "id": "bin_prev_session_low_dist",
+        "title": "feat_prev_session_low_dist: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_range_expansion_10_30.json",
+        "height": 360,
+        "id": "bin_range_expansion_10_30",
+        "title": "feat_range_expansion_10_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_recovery_ratio_10.json",
+        "height": 360,
+        "id": "bin_recovery_ratio_10",
+        "title": "feat_recovery_ratio_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_recovery_ratio_60.json",
+        "height": 360,
+        "id": "bin_recovery_ratio_60",
+        "title": "feat_recovery_ratio_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_rolling_drawdown_10.json",
+        "height": 360,
+        "id": "bin_rolling_drawdown_10",
+        "title": "feat_rolling_drawdown_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_rolling_drawdown_30.json",
+        "height": 360,
+        "id": "bin_rolling_drawdown_30",
+        "title": "feat_rolling_drawdown_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_rolling_drawdown_60.json",
+        "height": 360,
+        "id": "bin_rolling_drawdown_60",
+        "title": "feat_rolling_drawdown_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_time_since_high_30.json",
+        "height": 360,
+        "id": "bin_time_since_high_30",
+        "title": "feat_time_since_high_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_time_since_high_60.json",
+        "height": 360,
+        "id": "bin_time_since_high_60",
+        "title": "feat_time_since_high_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_time_since_low_10.json",
+        "height": 360,
+        "id": "bin_time_since_low_10",
+        "title": "feat_time_since_low_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_time_since_low_30.json",
+        "height": 360,
+        "id": "bin_time_since_low_30",
+        "title": "feat_time_since_low_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_swing.json",
+        "height": 380,
+        "id": "corr_swing",
+        "title": "Swing: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_directional_agreement_10_30.json",
+        "height": 360,
+        "id": "bin_directional_agreement_10_30",
+        "title": "feat_directional_agreement_10_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_higher_high_count_5.json",
+        "height": 360,
+        "id": "bin_higher_high_count_5",
+        "title": "feat_higher_high_count_5: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_higher_low_count_5.json",
+        "height": 360,
+        "id": "bin_higher_low_count_5",
+        "title": "feat_higher_low_count_5: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lower_low_count_5.json",
+        "height": 360,
+        "id": "bin_lower_low_count_5",
+        "title": "feat_lower_low_count_5: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_swing_low_5.json",
+        "height": 360,
+        "id": "bin_swing_low_5",
+        "title": "feat_swing_low_5: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_tail_risk.json",
+        "height": 380,
+        "id": "corr_tail_risk",
+        "title": "Tail Risk: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_neg_return_mean_10.json",
+        "height": 360,
+        "id": "bin_neg_return_mean_10",
+        "title": "feat_neg_return_mean_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_neg_return_mean_30.json",
+        "height": 360,
+        "id": "bin_neg_return_mean_30",
+        "title": "feat_neg_return_mean_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_neg_return_mean_60.json",
+        "height": 360,
+        "id": "bin_neg_return_mean_60",
+        "title": "feat_neg_return_mean_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_pos_return_mean_10.json",
+        "height": 360,
+        "id": "bin_pos_return_mean_10",
+        "title": "feat_pos_return_mean_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_pos_return_mean_30.json",
+        "height": 360,
+        "id": "bin_pos_return_mean_30",
+        "title": "feat_pos_return_mean_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_pos_return_mean_60.json",
+        "height": 360,
+        "id": "bin_pos_return_mean_60",
+        "title": "feat_pos_return_mean_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_ichimoku.json",
+        "height": 380,
+        "id": "corr_ichimoku",
+        "title": "Ichimoku: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_ichimoku_cloud_thickness.json",
+        "height": 360,
+        "id": "bin_ichimoku_cloud_thickness",
+        "title": "feat_ichimoku_cloud_thickness: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_kijun_ratio.json",
+        "height": 360,
+        "id": "bin_kijun_ratio",
+        "title": "feat_kijun_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_price_vs_tenkan.json",
+        "height": 360,
+        "id": "bin_price_vs_tenkan",
+        "title": "feat_price_vs_tenkan: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_senkou_b_ratio.json",
+        "height": 360,
+        "id": "bin_senkou_b_ratio",
+        "title": "feat_senkou_b_ratio: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_tenkan_kijun_delta.json",
+        "height": 360,
+        "id": "bin_tenkan_kijun_delta",
+        "title": "feat_tenkan_kijun_delta: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_donchian.json",
+        "height": 380,
+        "id": "corr_donchian",
+        "title": "Donchian: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_donchian_breakout_10.json",
+        "height": 360,
+        "id": "bin_donchian_breakout_10",
+        "title": "feat_donchian_breakout_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_position_10.json",
+        "height": 360,
+        "id": "bin_donchian_position_10",
+        "title": "feat_donchian_position_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_position_30.json",
+        "height": 360,
+        "id": "bin_donchian_position_30",
+        "title": "feat_donchian_position_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_position_60.json",
+        "height": 360,
+        "id": "bin_donchian_position_60",
+        "title": "feat_donchian_position_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_width_10.json",
+        "height": 360,
+        "id": "bin_donchian_width_10",
+        "title": "feat_donchian_width_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_width_30.json",
+        "height": 360,
+        "id": "bin_donchian_width_30",
+        "title": "feat_donchian_width_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_donchian_width_60.json",
+        "height": 360,
+        "id": "bin_donchian_width_60",
+        "title": "feat_donchian_width_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_trend_slope.json",
+        "height": 400,
+        "id": "corr_trend_slope",
+        "title": "Trend Slope: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_ema_slope_10.json",
+        "height": 360,
+        "id": "bin_ema_slope_10",
+        "title": "feat_ema_slope_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_ema_slope_30.json",
+        "height": 360,
+        "id": "bin_ema_slope_30",
+        "title": "feat_ema_slope_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_r2_10.json",
+        "height": 360,
+        "id": "bin_lr_r2_10",
+        "title": "feat_lr_r2_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_r2_60.json",
+        "height": 360,
+        "id": "bin_lr_r2_60",
+        "title": "feat_lr_r2_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_residual_10.json",
+        "height": 360,
+        "id": "bin_lr_residual_10",
+        "title": "feat_lr_residual_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_residual_30.json",
+        "height": 360,
+        "id": "bin_lr_residual_30",
+        "title": "feat_lr_residual_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_residual_60.json",
+        "height": 360,
+        "id": "bin_lr_residual_60",
+        "title": "feat_lr_residual_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_slope_10.json",
+        "height": 360,
+        "id": "bin_lr_slope_10",
+        "title": "feat_lr_slope_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_slope_30.json",
+        "height": 360,
+        "id": "bin_lr_slope_30",
+        "title": "feat_lr_slope_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_lr_slope_60.json",
+        "height": 360,
+        "id": "bin_lr_slope_60",
+        "title": "feat_lr_slope_60: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/corr_accel.json",
+        "height": 380,
+        "id": "corr_accel",
+        "title": "Accel: korrelációs mátrix"
+      },
+      {
+        "file": "charts/bin_return_momentum_delta_10.json",
+        "height": 360,
+        "id": "bin_return_momentum_delta_10",
+        "title": "feat_return_momentum_delta_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_return_momentum_delta_30.json",
+        "height": 360,
+        "id": "bin_return_momentum_delta_30",
+        "title": "feat_return_momentum_delta_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_roc_delta_10.json",
+        "height": 360,
+        "id": "bin_roc_delta_10",
+        "title": "feat_roc_delta_10: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_roc_delta_30.json",
+        "height": 360,
+        "id": "bin_roc_delta_30",
+        "title": "feat_roc_delta_30: bin-enkénti átlag target"
+      },
+      {
+        "file": "charts/bin_roc_delta_5.json",
+        "height": 360,
+        "id": "bin_roc_delta_5",
+        "title": "feat_roc_delta_5: bin-enkénti átlag target"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/iv_price_action.json",
+        "id": "iv_price_action",
+        "title": "Price Action: IV és MI"
+      },
+      {
+        "file": "tables/iv_volatility.json",
+        "id": "iv_volatility",
+        "title": "Volatility: IV és MI"
+      },
+      {
+        "file": "tables/iv_volume.json",
+        "id": "iv_volume",
+        "title": "Volume: IV és MI"
+      },
+      {
+        "file": "tables/iv_candle_pattern.json",
+        "id": "iv_candle_pattern",
+        "title": "Candle Pattern: IV és MI"
+      },
+      {
+        "file": "tables/iv_time_session.json",
+        "id": "iv_time_session",
+        "title": "Time/Session: IV és MI"
+      },
+      {
+        "file": "tables/iv_taker_flow.json",
+        "id": "iv_taker_flow",
+        "title": "Taker Flow: IV és MI"
+      },
+      {
+        "file": "tables/iv_momentum.json",
+        "id": "iv_momentum",
+        "title": "Momentum: IV és MI"
+      },
+      {
+        "file": "tables/iv_trend.json",
+        "id": "iv_trend",
+        "title": "Trend: IV és MI"
+      },
+      {
+        "file": "tables/iv_autocorrelation.json",
+        "id": "iv_autocorrelation",
+        "title": "Autocorrelation: IV és MI"
+      },
+      {
+        "file": "tables/iv_market_structure.json",
+        "id": "iv_market_structure",
+        "title": "Market Structure: IV és MI"
+      },
+      {
+        "file": "tables/iv_swing.json",
+        "id": "iv_swing",
+        "title": "Swing: IV és MI"
+      },
+      {
+        "file": "tables/iv_tail_risk.json",
+        "id": "iv_tail_risk",
+        "title": "Tail Risk: IV és MI"
+      },
+      {
+        "file": "tables/iv_ichimoku.json",
+        "id": "iv_ichimoku",
+        "title": "Ichimoku: IV és MI"
+      },
+      {
+        "file": "tables/iv_donchian.json",
+        "id": "iv_donchian",
+        "title": "Donchian: IV és MI"
+      },
+      {
+        "file": "tables/iv_trend_slope.json",
+        "id": "iv_trend_slope",
+        "title": "Trend Slope: IV és MI"
+      },
+      {
+        "file": "tables/iv_accel.json",
+        "id": "iv_accel",
+        "title": "Accel: IV és MI"
+      },
+      {
+        "file": "tables/group_champions.json",
+        "id": "group_champions",
+        "title": "Csoport bajnokok (legjobb MI)"
+      },
+      {
+        "file": "tables/top10_features.json",
+        "id": "top10_features",
+        "title": "Top 10 feature"
+      },
+      {
+        "file": "tables/all_features.json",
+        "id": "all_features",
+        "title": "Összes feature"
+      },
+      {
+        "file": "tables/selection_counts.json",
+        "id": "selection_counts",
+        "title": "Szelekció darabszámok"
+      }
+    ]
+  },
+  "created_at": "2026-11-23T07:45:34Z",
+  "id": "02_feature_engineering",
+  "model_id": "lgbm_btcusdt_s_fw60_2101_2607",
+  "order": 20,
+  "schema_version": 1,
+  "scope": "model",
+  "source": {
+    "generator": "reports.builders.feature_engineering",
+    "git_sha": "13ee2fb",
+    "kind": "pipeline_step",
+    "step": "feature_engineering"
+  },
+  "summary": "144 kiválasztott feature / 205 vizsgált (short), MI + korreláció alapú szelekció.",
+  "tags": [
+    "feature_engineering",
+    "short"
+  ],
+  "title": "Feature engineering (IV, MI, szelekció)",
+  "updated_at": "2026-11-23T09:38:40Z"
+}

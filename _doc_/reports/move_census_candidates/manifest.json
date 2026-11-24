@@ -1,0 +1,101 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/p_big_k3.json",
+        "height": 400,
+        "id": "p_big_k3",
+        "title": "P(nagy mozgás | jelölt) skálánként és ciklusszámonként (k = 3)"
+      },
+      {
+        "file": "charts/p_big_k4.json",
+        "height": 400,
+        "id": "p_big_k4",
+        "title": "P(nagy mozgás | jelölt) skálánként és ciklusszámonként (k = 4)"
+      },
+      {
+        "file": "charts/hits_k4.json",
+        "height": 340,
+        "id": "hits_k4",
+        "title": "Találati arány a stop előtt (k = 4, T ≥ 1 óra)"
+      },
+      {
+        "file": "charts/edge_r1.json",
+        "height": 400,
+        "id": "edge_r1",
+        "title": "Átlagos R a +1R céllal (k = 4)"
+      },
+      {
+        "file": "charts/edge_r2.json",
+        "height": 400,
+        "id": "edge_r2",
+        "title": "Átlagos R a +2R céllal (k = 4)"
+      },
+      {
+        "file": "charts/edge_r3.json",
+        "height": 400,
+        "id": "edge_r3",
+        "title": "Átlagos R a +3R céllal (k = 4)"
+      },
+      {
+        "file": "charts/strata_retr.json",
+        "height": 320,
+        "id": "strata_retr",
+        "title": "Nagy mozgássá válás a korrekció mélysége szerint"
+      },
+      {
+        "file": "charts/strata_vol.json",
+        "height": 320,
+        "id": "strata_vol",
+        "title": "Nagy mozgássá válás a volumen-arány szerint"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/strata.json",
+        "id": "strata",
+        "title": "Sávok: P(nagy) és E[R2] nap-klaszteres CI-vel"
+      },
+      {
+        "file": "tables/effective_n.json",
+        "id": "effective_n",
+        "title": "Jelöltek és különböző napok skálánként"
+      },
+      {
+        "file": "tables/summary.json",
+        "id": "summary",
+        "title": "Összesítő minden cellára (valós)"
+      },
+      {
+        "file": "tables/summary_demeaned.json",
+        "id": "summary_demeaned",
+        "title": "Ugyanez a drift-mentesített valós útvonalon"
+      },
+      {
+        "file": "tables/placebo_compare.json",
+        "id": "placebo_compare",
+        "title": "Valós vs placebo"
+      }
+    ]
+  },
+  "created_at": "2026-11-24T07:12:17Z",
+  "id": "move_census_candidates",
+  "model_id": null,
+  "order": 78,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.move_census_candidates",
+    "kind": "analysis"
+  },
+  "summary": "Kauzális jelöltek (megerősített mélypont), a nagy mozgássá válás bázisrátája és az R-szorzós élük, placebóval.",
+  "tags": [
+    "research",
+    "scout2",
+    "move_census",
+    "candidates"
+  ],
+  "title": "Korai-impulzus jelöltek: a nevező — BTCUSDT (epic_077 / t953)",
+  "updated_at": "2026-11-24T07:12:17Z"
+}

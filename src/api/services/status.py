@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
 from datetime import UTC, datetime
 from typing import Any
 
+import utils
 from api import deps
 from api.services import common, market
 
@@ -32,8 +34,20 @@ def _beat_epoch(value: Any) -> float | None:
     return (dt if dt.tzinfo else dt.replace(tzinfo=UTC)).timestamp()
 
 
-def worker_and_sync() -> tuple[dict[str, Any], dict[str, Any]]:
-    """Read the worker heartbeat and sync state from the job-queue SQLite (read-only).
+def _job_asset(params_json: Any, default_asset: str) -> str:
+    """Asset id of a sync job's params (jobs enqueued before multi-asset support = default asset)."""
+    try:
+        params = json.loads(params_json or "{}")
+    except (TypeError, ValueError):
+        return default_asset
+    return str(params.get("asset_id") or default_asset) if isinstance(params, dict) else default_asset
+
+
+def worker_and_sync(asset_id: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Read the worker heartbeat and the asset's sync state from the job-queue SQLite (read-only).
+
+    ``sync`` covers only the sync jobs of ``asset_id`` (default asset if None); the worker
+    heartbeat and the ``auto_sync`` switch are global.
 
     The queue is owned by the worker (blueprint §5.2); a missing or unreadable file means
     "worker down, no sync".  Column names follow the blueprint.
@@ -43,6 +57,8 @@ def worker_and_sync() -> tuple[dict[str, Any], dict[str, Any]]:
         "running": False, "job_id": None, "last_finished_at": None, "last_status": None,
         "auto_sync": False,
     }
+    asset = utils.resolve_asset_id(asset_id)
+    default_asset = utils.default_asset_id()
     path = common.repo_path(JOBS_DB_REL)
     if not path.is_file():
         return worker, sync
@@ -58,16 +74,29 @@ def worker_and_sync() -> tuple[dict[str, Any], dict[str, Any]]:
                     if epoch is not None else None
                 )
                 worker["alive"] = epoch is not None and (time.time() - epoch) < HEARTBEAT_ALIVE_S
-            running = conn.execute(
-                "SELECT id FROM jobs WHERE kind IN ('sync_full', 'sync_predictions')"
-                " AND status = 'running' ORDER BY created_at DESC LIMIT 1"
-            ).fetchone()
+            running = next(
+                (
+                    r for r in conn.execute(
+                        "SELECT id, params_json FROM jobs WHERE kind IN ('sync_full', 'sync_predictions')"
+                        " AND status = 'running' ORDER BY created_at DESC"
+                    )
+                    if _job_asset(r["params_json"], default_asset) == asset
+                ),
+                None,
+            )
             if running is not None:
                 sync["running"], sync["job_id"] = True, running["id"]
-            last = conn.execute(
-                "SELECT status, finished_at FROM jobs WHERE kind IN ('sync_full', 'sync_predictions')"
-                " AND status IN ('succeeded', 'failed') ORDER BY finished_at DESC LIMIT 1"
-            ).fetchone()
+            last = next(
+                (
+                    r for r in conn.execute(
+                        "SELECT status, finished_at, params_json FROM jobs"
+                        " WHERE kind IN ('sync_full', 'sync_predictions')"
+                        " AND status IN ('succeeded', 'failed') ORDER BY finished_at DESC LIMIT 200"
+                    )
+                    if _job_asset(r["params_json"], default_asset) == asset
+                ),
+                None,
+            )
             if last is not None:
                 sync["last_status"] = last["status"]
                 sync["last_finished_at"] = common.iso_z(last["finished_at"])
@@ -92,12 +121,12 @@ def _live_section(conn: Any, key: str) -> dict[str, Any]:
     }
 
 
-def status() -> dict[str, Any]:
-    cfg = market.config()
+def status(asset_id: str | None = None) -> dict[str, Any]:
+    cfg = market.config(asset_id)
     live: dict[str, Any] | None = None
     models: dict[str, Any] = {"long": {"model_id": None}, "short": {"model_id": None}}
     try:
-        with deps.ro_connection() as conn:
+        with deps.ro_connection(asset_id) as conn:
             live = {key: _live_section(conn, key) for key in ("ohlcv", "features", "predictions")}
             preds = common.live_table("predictions")
             if common.table_exists(conn, "live", "main", preds):
@@ -109,7 +138,7 @@ def status() -> dict[str, Any]:
                     models = {"long": {"model_id": row[0]}, "short": {"model_id": row[1]}}
     except deps.DbBusyError:
         logger.info("status: database busy, returning partial status")
-    worker, sync = worker_and_sync()
+    worker, sync = worker_and_sync(asset_id)
     return {
         "asset_id": cfg["asset_id"],
         "symbol": cfg["symbol"],

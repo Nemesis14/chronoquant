@@ -1,0 +1,107 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/cycles_c20.json",
+        "height": 380,
+        "id": "cycles_c20",
+        "title": "Ciklusszám-eloszlás, valós vs placebo (c = 0.2, k = 4, minden skála)"
+      },
+      {
+        "file": "charts/cycles_c33.json",
+        "height": 380,
+        "id": "cycles_c33",
+        "title": "Ciklusszám-eloszlás, valós vs placebo (c = 0.33, k = 4, minden skála)"
+      },
+      {
+        "file": "charts/first_leg_c20.json",
+        "height": 380,
+        "id": "first_leg_c20",
+        "title": "Első lökés hossza skálánként (c = 0.2; whisker p10–p90)"
+      },
+      {
+        "file": "charts/first_leg_c33.json",
+        "height": 380,
+        "id": "first_leg_c33",
+        "title": "Első lökés hossza skálánként (c = 0.33; whisker p10–p90)"
+      },
+      {
+        "file": "charts/order_stats.json",
+        "height": 380,
+        "id": "order_stats",
+        "title": "A későbbi lökések az elsőhöz képest (valós vs placebo)"
+      },
+      {
+        "file": "charts/retr_stats.json",
+        "height": 380,
+        "id": "retr_stats",
+        "title": "Korrekció-mélység és a legnagyobb lökés helye (valós vs placebo)"
+      },
+      {
+        "file": "charts/inv_net.json",
+        "height": 340,
+        "id": "inv_net",
+        "title": "az első lökés a mozgás nettójának hányada"
+      },
+      {
+        "file": "charts/inv_dur.json",
+        "height": 340,
+        "id": "inv_dur",
+        "title": "az első lökés a mozgás idejének hányada"
+      },
+      {
+        "file": "charts/inv_retr.json",
+        "height": 340,
+        "id": "inv_retr",
+        "title": "az első korrekció mélysége / első lökés"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/first_leg_table_c20.json",
+        "id": "first_leg_table_c20",
+        "title": "Első lökés: hossz- és méretkvantilisek (c = 0.2)"
+      },
+      {
+        "file": "tables/first_leg_table_c33.json",
+        "id": "first_leg_table_c33",
+        "title": "Első lökés: hossz- és méretkvantilisek (c = 0.33)"
+      },
+      {
+        "file": "tables/volume_ratio.json",
+        "id": "volume_ratio",
+        "title": "Volumen-arány valós adaton (c = 0,10, k = 4)"
+      },
+      {
+        "file": "tables/ks_to_pooled.json",
+        "id": "ks_to_pooled",
+        "title": "KS-távolság a pooled eloszlástól (távolság, nem p-érték: a beágyazott mozgások nem függetlenek)"
+      },
+      {
+        "file": "tables/slopes.json",
+        "id": "slopes",
+        "title": "Darabszám log-log meredekség (cellák ≥ 10 mozgással)"
+      }
+    ]
+  },
+  "created_at": "2026-11-24T07:09:53Z",
+  "id": "move_census_anatomy",
+  "model_id": null,
+  "order": 77,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.move_census_anatomy",
+    "kind": "analysis"
+  },
+  "summary": "Leg-felbontás, ciklusszám, első lökés időkerete és skála-invariancia, placebóval összevetve.",
+  "tags": [
+    "research",
+    "scout2",
+    "move_census",
+    "anatomy"
+  ],
+  "title": "A nagy mozgások anatómiája — BTCUSDT long (epic_077 / t952)",
+  "updated_at": "2026-11-24T07:09:53Z"
+}

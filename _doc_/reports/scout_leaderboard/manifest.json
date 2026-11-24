@@ -1,0 +1,86 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/dauc.json",
+        "height": 360,
+        "id": "dauc",
+        "title": "ΔAUC és 95% CI modellenként"
+      },
+      {
+        "file": "charts/equity_round2.json",
+        "height": 460,
+        "id": "equity_round2",
+        "title": "Equity görbék (kumulált nettó bp, időrendben) — 2. kör"
+      },
+      {
+        "file": "charts/blocks_round2.json",
+        "height": 400,
+        "id": "blocks_round2",
+        "title": "Blokkonkénti átlagos nettó bp: referencia + a 3 legnagyobb átlagú változat"
+      },
+      {
+        "file": "charts/equity_round1.json",
+        "height": 460,
+        "id": "equity_round1",
+        "title": "Equity görbék — 1. kör modellek, felső 20%"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/leaderboard.json",
+        "id": "leaderboard",
+        "title": "1. kör leaderboard (univerzum SPA, együttes Holm, újraszámolt kapuk)"
+      },
+      {
+        "file": "tables/gates.json",
+        "id": "gates",
+        "title": "Go / no-go kapuk (5300 A1–A7 + B) modellenként"
+      },
+      {
+        "file": "tables/perm_sources.json",
+        "id": "perm_sources",
+        "title": "Permutációs p-értékek forrása (tárolt futások) és a H1–H3 Holm"
+      },
+      {
+        "file": "tables/round2.json",
+        "id": "round2",
+        "title": "2. kör: szabályváltozatok (+ az 1. körös referencia)"
+      },
+      {
+        "file": "tables/stability.json",
+        "id": "stability",
+        "title": "Stabilitás: átlagos nettó bp blokkonként és assetenként"
+      },
+      {
+        "file": "tables/round1_trades.json",
+        "id": "round1_trades",
+        "title": "1. kör: modellek × felső 20% / 10%, alap triple barrier"
+      }
+    ]
+  },
+  "created_at": "2026-11-22T06:16:13Z",
+  "id": "scout_leaderboard",
+  "model_id": null,
+  "order": 33,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.scout_leaderboard",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "epic_073 t936: 7 modell a közös purged CV-n (2170 esemény); univerzum SPA p 0.2300, H1–H3 Holm min. 0.8062; mind NO-GO. 2. kör (12 előre regisztrált szabály a baseline score-on): kiválasztott R2_03_tp3s_sl15s +15.5 bp [-5.2; +37.7], stratégia-SPA p 0.4416 → NO-GO.",
+  "tags": [
+    "scout",
+    "epic_073",
+    "leaderboard",
+    "spa",
+    "holm",
+    "trading_rules"
+  ],
+  "title": "Impulse Scout leaderboard — 1. kör univerzum, 2. kör kereskedési szabályok (t936)",
+  "updated_at": "2026-11-22T06:16:13Z"
+}

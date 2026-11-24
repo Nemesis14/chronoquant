@@ -32,7 +32,9 @@ def latest_time(conn: Conn, table_key: str) -> datetime | None:
     return value if isinstance(value, datetime) else None
 
 
-def load_rows(conn: Conn, start: datetime, end: datetime, base: str = "ohlcv") -> list[dict[str, Any]]:
+def load_rows(
+    conn: Conn, start: datetime, end: datetime, base: str = "ohlcv", asset_id: str | None = None
+) -> list[dict[str, Any]]:
     """OHLCV joined with predictions over ``[start, end]``, rank-percentile columns added.
 
     Keys: t (ISO-Z), open, high, low, close, long_raw, short_raw, long_pct, short_pct,
@@ -64,7 +66,7 @@ def load_rows(conn: Conn, start: datetime, end: datetime, base: str = "ohlcv") -
     else:
         return []
     rows = common.fetch_rows(conn, sql, params)
-    sessions = common.active_sessions()
+    sessions = common.active_sessions(asset_id)
     for side in ("long", "short"):
         raw = pd.Series([num(r[f"{side}_raw"]) for r in rows], dtype="float64")
         pct = common.apply_rank(raw, sessions[side].rank_lookup()).tolist()
@@ -73,20 +75,20 @@ def load_rows(conn: Conn, start: datetime, end: datetime, base: str = "ohlcv") -
     return rows
 
 
-def history(conn: Conn, hours: int) -> list[dict[str, Any]]:
+def history(conn: Conn, hours: int, asset_id: str | None = None) -> list[dict[str, Any]]:
     end = latest_time(conn, "predictions")
     if end is None:
         return []
-    rows = load_rows(conn, end - timedelta(hours=hours), end, base="predictions")
+    rows = load_rows(conn, end - timedelta(hours=hours), end, base="predictions", asset_id=asset_id)
     keys = ("close", "long_pct", "short_pct", "long_raw", "short_raw")
     return [{"t": r["t"], **{k: num(r[k]) for k in keys}} for r in rows]
 
 
-def latest(conn: Conn) -> dict[str, Any] | None:
+def latest(conn: Conn, asset_id: str | None = None) -> dict[str, Any] | None:
     end = latest_time(conn, "predictions")
     if end is None:
         return None
-    rows = load_rows(conn, end - timedelta(hours=1), end, base="predictions")
+    rows = load_rows(conn, end - timedelta(hours=1), end, base="predictions", asset_id=asset_id)
     if not rows:
         return None
     r = rows[-1]
@@ -100,13 +102,13 @@ def latest(conn: Conn) -> dict[str, Any] | None:
     }
 
 
-def signals(conn: Conn, hours: int) -> list[dict[str, Any]]:
+def signals(conn: Conn, hours: int, asset_id: str | None = None) -> list[dict[str, Any]]:
     """Threshold crossings (pct rises to/above the active entry cutoff) per side."""
     end = latest_time(conn, "predictions")
     if end is None:
         return []
-    rows = load_rows(conn, end - timedelta(hours=hours), end, base="predictions")
-    sessions = common.active_sessions()
+    rows = load_rows(conn, end - timedelta(hours=hours), end, base="predictions", asset_id=asset_id)
+    sessions = common.active_sessions(asset_id)
     out: list[dict[str, Any]] = []
     for side in ("long", "short"):
         cutoff = sessions[side].entry_cutoff

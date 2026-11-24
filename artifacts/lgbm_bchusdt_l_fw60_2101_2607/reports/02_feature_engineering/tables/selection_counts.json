@@ -1,0 +1,1 @@
+{"columns": [{"key": "category", "label": "Kategória", "type": "str"}, {"key": "count", "label": "Darab", "type": "int"}], "rows": [["selected", 138], ["top10", 10], ["top1_per_group", 16], ["dropped (quality)", 3], ["dropped (MI)", 49], ["dropped (duplikátum)", 18]], "total_rows": 6, "truncated": false}

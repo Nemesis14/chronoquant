@@ -1,0 +1,30 @@
+{
+    "model_id": "lgbm_bchusdt_s_fw60_2101_2607",
+    "display_name": "BCH Short LightGBM 2101-2607",
+    "description": "BCH short model - train/valid split, train 2021-01 to 2026-01, valid 2026-02 to 2026-07 (SOL champion window, epic_069).",
+    "asset_id": "bchusdt",
+    "target_name": "short_mfe_fw60",
+    "family": "lightgbm",
+    "trainer": "lightgbm_regression",
+    "sampling": {
+        "sample_id": "bchusdt_fw60_2101_2607",
+        "sample_dir": "artifacts/lgbm_bchusdt_s_fw60_2101_2607",
+        "snapshot_id": "bchusdt_fw60_2101_2607__51471332",
+        "sampling_mode": "train_valid_split",
+        "seed": 42,
+        "train_start": "2021-01-01",
+        "train_end": "2026-01-31",
+        "valid_start": "2026-02-01",
+        "valid_end": "2026-07-31",
+        "feature_lookback_embargo_minutes": 240,
+        "target_purge_minutes": 60
+    },
+    "created_at": "2026-11-07T08:45:27.509704+00:00",
+    "pipeline_status": "analyze_done",
+    "provenance": {
+        "snapshot_id": "bchusdt_fw60_2101_2607__51471332",
+        "content_sha256": "51471332c77990a2014d8b4d3ab5bf41455752b3f998c9ff38cdbcd495a4259f",
+        "feature_set_id": "fs_bchusdt_fw60_s__2ef55084"
+    },
+    "updated_at": "2026-11-07T09:28:05.050290+00:00"
+}

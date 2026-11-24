@@ -1,0 +1,27 @@
+{
+    "params": {
+        "objective": "regression",
+        "boosting_type": "gbdt",
+        "metric": "rmse",
+        "subsample_freq": 1,
+        "force_col_wise": true,
+        "verbosity": -1,
+        "n_jobs": 4,
+        "num_leaves": 4,
+        "max_depth": 2,
+        "min_child_samples": 397,
+        "min_child_weight": 0.0001325334260006654,
+        "min_split_gain": 0.0,
+        "reg_alpha": 0.2309786149269357,
+        "reg_lambda": 22.65315641394886,
+        "subsample": 0.4582939144639281,
+        "colsample_bytree": 0.6572558349795685,
+        "learning_rate": 0.008422980195004657,
+        "max_bin": 63,
+        "path_smooth": 0.5804314717414073,
+        "extra_trees": true,
+        "n_estimators": 916,
+        "random_state": 42
+    },
+    "n_estimators": 916
+}

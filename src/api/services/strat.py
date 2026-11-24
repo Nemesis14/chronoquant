@@ -45,16 +45,16 @@ def _card(sess: common.ActiveSession) -> dict[str, Any] | None:
     }
 
 
-def active() -> dict[str, Any]:
+def active(asset_id: str | None = None) -> dict[str, Any]:
     """Cards for the active long / short strategies (``None`` when the artifact is missing)."""
-    sessions = common.active_sessions()
+    sessions = common.active_sessions(asset_id)
     return {side: _card(sess) for side, sess in sessions.items()}
 
 
-def equity_summary() -> dict[str, Any]:
+def equity_summary(asset_id: str | None = None) -> dict[str, Any]:
     return {
         side: _metrics(sess.artifact) if sess.artifact else None
-        for side, sess in common.active_sessions().items()
+        for side, sess in common.active_sessions(asset_id).items()
     }
 
 
@@ -104,9 +104,9 @@ def sessions(conn: Conn) -> list[dict[str, Any]]:
     return out
 
 
-def _artifact_path(conn: Conn, session_id: str) -> Path | None:
+def _artifact_path(conn: Conn, session_id: str, asset_id: str | None = None) -> Path | None:
     """Locate ``strategy_artifact.json`` of a session (active config, registry, convention)."""
-    for sess in common.active_sessions().values():
+    for sess in common.active_sessions(asset_id).values():
         if sess.table_prefix == session_id and sess.artifact_dir:
             return sess.artifact_dir / "strategy_artifact.json"
     if common.table_exists(conn, "reg", "main", "artifacts"):
@@ -119,20 +119,24 @@ def _artifact_path(conn: Conn, session_id: str) -> Path | None:
             return Path(str(row[0]))
     if common.table_exists(conn, "reg", "main", "strategies"):
         row = conn.execute(
-            "SELECT model_id_long FROM reg.main.strategies WHERE session_id = ? LIMIT 1",
+            "SELECT model_id_long, model_id_short FROM reg.main.strategies WHERE session_id = ? LIMIT 1",
             [session_id],
         ).fetchone()
-        if row and row[0]:
-            cand = common.repo_path(f"artifacts/{row[0]}/strategy/strategy_artifact.json")
-            if cand.is_file():
+        # Both directions share the model pair; the long and the short session live under their own
+        # model's ``strategy/`` dir, so pick the artifact whose own session_id matches (t946).
+        for model_id in row or ():
+            if not model_id:
+                continue
+            cand = common.repo_path(f"artifacts/{model_id}/strategy/strategy_artifact.json")
+            if cand.is_file() and common.read_json(cand).get("session_id") == session_id:
                 return cand
     cand = common.repo_path(f"artifacts/{session_id}/strategy_artifact.json")
     return cand if cand.is_file() else None
 
 
-def artifact(conn: Conn, session_id: str) -> dict[str, Any]:
+def artifact(conn: Conn, session_id: str, asset_id: str | None = None) -> dict[str, Any]:
     check_session_id(session_id)
-    path = _artifact_path(conn, session_id)
+    path = _artifact_path(conn, session_id, asset_id)
     data = common.read_json(path) if path else {}
     if not data:
         raise not_found(f"strategy artifact not found for session {session_id}")
@@ -163,11 +167,13 @@ def grid(conn: Conn, session_id: str, top: int, sort: str) -> dict[str, Any]:
     return {"items": items, "total": total}
 
 
-def equity(conn: Conn, session: str, direction: str) -> dict[str, Any]:
+def equity(
+    conn: Conn, session: str, direction: str, asset_id: str | None = None
+) -> dict[str, Any]:
     """Equity points of the active long/short sessions (or one explicit session id)."""
     ids: dict[str, str | None]
     if session == "active":
-        act = common.active_sessions()
+        act = common.active_sessions(asset_id)
         ids = {"long": act["long"].table_prefix, "short": act["short"].table_prefix}
         wanted = ("long", "short") if direction == "both" else (direction,)
     else:
@@ -198,5 +204,5 @@ def equity(conn: Conn, session: str, direction: str) -> dict[str, Any]:
         "session_ids": {k: v for k, v in ids.items()},
         "points": points,
         "series": series if (direction == "both" or session != "active") else None,
-        "summary": equity_summary(),
+        "summary": equity_summary(asset_id),
     }

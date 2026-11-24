@@ -19,6 +19,8 @@ function loadOpen(): boolean {
  * Floating chat button + right-side sliding panel (epic_067 t878 behaviour). The page stays
  * usable while it is open, and the panel is kept mounted while closed so a running turn is
  * not interrupted. Mount once in the layout: `<ChatDock />`. Hidden on the /chat route.
+ * The button's footprint (bottom-5 / right-5, 48 px) is reserved by `.cq-dock-clear` on the
+ * layout `<main>` (index.css, t948) — keep the two in sync.
  */
 export default function ChatDock() {
   const { pathname } = useLocation()

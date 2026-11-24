@@ -1,5 +1,6 @@
 import { getActiveStrategies, getActiveTrade, getBinanceFills, getRegistryActive } from '../../api/dashboard'
 import { ApiError } from '../../api/client'
+import { useAsset } from '../../lib/asset'
 import { usePolling } from '../../lib/usePolling'
 import { ago, DASH, num, pct, pnlColor, shortTime, sideColor, signed } from '../../lib/format'
 import type { Status, StrategyCard } from '../../types/api'
@@ -7,7 +8,8 @@ import { Card, DataTable, KV, Muted, PollNote, Spinner } from './ui'
 
 /** Active position. Slow (Binance fallback ~4 s) -> own poll, never blocks the chart. */
 export function ActiveTradeCard() {
-  const poll = usePolling((s) => getActiveTrade(s), 30_000)
+  const asset = useAsset()
+  const poll = usePolling((s) => getActiveTrade(asset, s), 30_000, [asset])
   const notFound = poll.error instanceof ApiError && poll.error.status === 404
   const p = notFound ? null : poll.data
   return (
@@ -58,7 +60,8 @@ function StratRow({ side, c }: { side: 'long' | 'short'; c: StrategyCard | null 
 }
 
 export function StrategyPanel() {
-  const poll = usePolling((s) => getActiveStrategies(s), 120_000)
+  const asset = useAsset()
+  const poll = usePolling((s) => getActiveStrategies(asset, s), 120_000, [asset])
   return (
     <Card title="Aktív stratégia" right={poll.refreshing && <Spinner />}>
       <StratRow side="long" c={poll.data?.long ?? null} />
@@ -69,7 +72,8 @@ export function StrategyPanel() {
 }
 
 export function ModelsPanel({ status }: { status: Status | null }) {
-  const reg = usePolling((s) => getRegistryActive(s), 120_000)
+  const asset = useAsset()
+  const reg = usePolling((s) => getRegistryActive(asset, s), 120_000, [asset])
   const live = status?.live
   return (
     <Card title="Modellek és adat" right={reg.refreshing && <Spinner />}>
@@ -95,7 +99,8 @@ export function ModelsPanel({ status }: { status: Status | null }) {
 }
 
 export function BinanceFillsPanel() {
-  const poll = usePolling((s) => getBinanceFills(60, s), 120_000)
+  const asset = useAsset()
+  const poll = usePolling((s) => getBinanceFills(asset, 60, s), 120_000, [asset])
   const unavailable = poll.error instanceof ApiError && poll.error.code === 'binance_unavailable'
   const items = poll.data?.items ?? []
   return (

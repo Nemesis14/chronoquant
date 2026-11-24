@@ -1,5 +1,5 @@
 # =============================================================================
-# sync_full handler: OHLCV -> features -> predictions
+# sync_full handler: OHLCV -> funding -> scout -> features -> predictions
 # =============================================================================
 # Purpose:
 #  - Port of src/ui/sync.py::_run_database_sync_locked (same steps, same order)
@@ -21,8 +21,10 @@ from data_handling.store.duckdb_query import (
     ohlcv_row_count,
 )
 from data_handling.sync_tables.sync_features import sync_features
+from data_handling.sync_tables.sync_funding import sync_funding
 from data_handling.sync_tables.sync_ohlcv import sync_ohlcv
 from data_handling.sync_tables.sync_predictions import sync_predictions
+from worker import scout_runner
 
 
 def sync_result_payload(
@@ -61,10 +63,21 @@ def run_sync_full(params: dict[str, Any], logger: logging.Logger) -> dict[str, A
         rows_before, rows_after, rows_after - rows_before,
     )
 
+    # Funding (epic_074 / t939): network call only when a settlement is due; never fails the job.
+    try:
+        sync_funding(asset_id=asset_id, only_if_due=True)
+    except Exception:
+        logger.warning("Funding sync failed (non-fatal)", exc_info=True)
+
+    # Impulse Scout forward-log (epic_074 / t942): Scout assets only, new bars + throttle; never fails the job.
+    scout = scout_runner.maybe_run_scout(
+        utils.resolve_asset_id(asset_id), rows_after - rows_before, logger
+    )
+
     if not ohlcv_latest_ts or pd.to_datetime(ohlcv_latest_ts) < pd.to_datetime(start_time):
         logger.info("No new OHLCV interval found for feature and prediction sync")
         logger.info("Database sync complete")
-        return sync_result_payload(start_time, ohlcv_latest_ts, rows_before, rows_after)
+        return {**sync_result_payload(start_time, ohlcv_latest_ts, rows_before, rows_after), "scout": scout}
 
     logger.info("Feature sync started: %s -> %s", start_time, ohlcv_latest_ts)
     sync_features(start_time, end_time=ohlcv_latest_ts, asset_id=asset_id)
@@ -77,4 +90,4 @@ def run_sync_full(params: dict[str, Any], logger: logging.Logger) -> dict[str, A
     sync_predictions(pred_start_time, end_time=ohlcv_latest_ts, asset_id=asset_id)
 
     logger.info("Database sync complete")
-    return sync_result_payload(start_time, ohlcv_latest_ts, rows_before, rows_after)
+    return {**sync_result_payload(start_time, ohlcv_latest_ts, rows_before, rows_after), "scout": scout}

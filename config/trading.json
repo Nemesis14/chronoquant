@@ -1,7 +1,20 @@
 {
     "schema_version": 1,
-    "strategy_session_long_id": "lgbm_solusdt_l_fw60_2101_2607/strategy",
-    "strategy_session_short_id": "lgbm_solusdt_s_fw60_2101_2607/strategy",
+    "assets": {
+        "solusdt": {
+            "strategy_session_long_id": "lgbm_solusdt_l_fw60_2101_2607/strategy",
+            "strategy_session_short_id": "lgbm_solusdt_s_fw60_2101_2607/strategy"
+        },
+        "bchusdt": {
+            "strategy_session_long_id": "lgbm_bchusdt_l_fw60_2101_2607/strategy",
+            "strategy_session_short_id": "lgbm_bchusdt_s_fw60_2101_2607/strategy"
+        },
+        "btcusdt": {
+            "strategy_session_long_id": "lgbm_btcusdt_l_fw60_2101_2607/strategy",
+            "strategy_session_short_id": "lgbm_btcusdt_s_fw60_2101_2607/strategy"
+        },
+        "ethusdt": {}
+    },
     "ohlcv_sync_delay_seconds": 3,
     "db_path": "database/trading.duckdb"
 }

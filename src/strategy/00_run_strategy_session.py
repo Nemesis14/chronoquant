@@ -26,6 +26,7 @@ if __package__ in (None, ""):
 import argparse
 import logging
 
+import utils
 from strategy.strategy.build_table import build_scored_table
 from strategy.strategy.calibrate import fit_calibration
 from strategy.strategy.search import search_strategy
@@ -71,6 +72,12 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = _parse_args()
 
+    # Asset: --asset-id, else the long model's asset_id, else the default asset.
+    asset_id = args.asset_id or utils.model_asset_id(args.long_model)
+    short_asset = utils.model_asset_id(args.short_model)
+    if short_asset != asset_id:
+        raise SystemExit(f"long/short model asset mismatch: {asset_id} vs {short_asset}")
+
     session_id = args.session_id or derive_session_id(args.long_model, args.short_model)
     directions = [d.strip() for d in args.directions.split(",")]
 
@@ -83,7 +90,7 @@ if __name__ == "__main__":
     scored_df = build_scored_table(
         long_model_id  = args.long_model,
         short_model_id = args.short_model,
-        asset_id       = args.asset_id,
+        asset_id       = asset_id,
         snapshot_id    = args.snapshot_id,
     )
     print(f"[OK] scored table: {len(scored_df)} rows")
@@ -104,7 +111,7 @@ if __name__ == "__main__":
         start          = args.opt_start,
         end            = args.opt_end,
         directions     = directions,
-        asset_id       = args.asset_id,
+        asset_id       = asset_id,
         max_hold_bars  = args.max_hold_minutes,
     )
 

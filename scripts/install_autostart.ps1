@@ -19,7 +19,7 @@ $start = Join-Path $PSScriptRoot 'start.ps1'
 $user  = "$env:USERDOMAIN\$env:USERNAME"
 
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$start`" -NoBrowser"
+    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$start`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
 $trigger.Delay = 'PT30S'   # halozat/lemezek alljanak fel
 $settings = New-ScheduledTaskSettingsSet `

@@ -167,13 +167,38 @@ def test_target_short_mfe_range(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_target_row_count_matches_features(conn: duckdb.DuckDBPyConnection) -> None:
-    feat_row   = conn.execute("SELECT COUNT(*) FROM feat_ohlcv_quant").fetchone()
-    tgt_row    = conn.execute("SELECT COUNT(*) FROM target").fetchone()
-    feat_count = feat_row[0] if feat_row else 0
-    tgt_count  = tgt_row[0] if tgt_row else 0
-    print(f"\nfeat_ohlcv_quant rows: {feat_count:,}  |  target rows: {tgt_count:,}")
-    assert feat_count == tgt_count, (
-        f"Row count mismatch: feat_ohlcv_quant={feat_count:,}, target={tgt_count:,}"
+    """target and feat_ohlcv_quant align row-for-row over target's covered range.
+
+    The live worker (sync_full: ohlcv -> funding -> scout -> features ->
+    predictions) does NOT refresh ``target``; it is rebuilt at retrain time via
+    ``02_sync_pipeline.py --tables targets``.  So target legitimately ends before
+    feat_ohlcv_quant (epic_076 / t949) and a total-count equality is the wrong
+    expectation.  The invariant that must hold: same start, target not past the
+    feature tail, and an identical row count up to target's MAX(open_time) with
+    no target row lacking a feature row.
+    """
+    row = conn.execute("""
+        SELECT
+            (SELECT MIN(open_time) FROM feat_ohlcv_quant),
+            (SELECT MAX(open_time) FROM feat_ohlcv_quant),
+            (SELECT MIN(open_time) FROM target),
+            (SELECT MAX(open_time) FROM target),
+            (SELECT COUNT(*) FROM target),
+            (SELECT COUNT(*) FROM feat_ohlcv_quant
+              WHERE open_time <= (SELECT MAX(open_time) FROM target)),
+            (SELECT COUNT(*) FROM target t ANTI JOIN feat_ohlcv_quant f USING (open_time))
+    """).fetchone()
+    assert row is not None
+    f_min, f_max, t_min, t_max, tgt_count, feat_upto, orphans = row
+    print(
+        f"\nfeat_ohlcv_quant: {f_min} -> {f_max}  |  target: {t_min} -> {t_max}"
+        f"\nrows up to target max: feat={feat_upto:,} target={tgt_count:,}"
+    )
+    assert t_min == f_min, f"Start mismatch: feat={f_min}, target={t_min}"
+    assert t_max <= f_max, f"target ({t_max}) extends past feat_ohlcv_quant ({f_max})"
+    assert orphans == 0, f"{orphans} target rows have no feat_ohlcv_quant row"
+    assert feat_upto == tgt_count, (
+        f"Row count mismatch up to target max: feat_ohlcv_quant={feat_upto:,}, target={tgt_count:,}"
     )
 
 

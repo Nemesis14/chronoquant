@@ -1,0 +1,89 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/null_dauc.json",
+        "height": 320,
+        "id": "null_dauc",
+        "title": "ΔAUC permutációs null (H1)"
+      },
+      {
+        "file": "charts/blocks.json",
+        "height": 340,
+        "id": "blocks",
+        "title": "Blokkonkénti AUC: modell vs baseline"
+      },
+      {
+        "file": "charts/importance.json",
+        "height": 450,
+        "id": "importance",
+        "title": "Jellemző-fontosság (felső 25)"
+      },
+      {
+        "file": "charts/importance_groups.json",
+        "height": 300,
+        "id": "importance_groups",
+        "title": "Fontosság csoportonként"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/comparison.json",
+        "id": "comparison",
+        "title": "Modell vs baseline: fő metrikák"
+      },
+      {
+        "file": "tables/gates.json",
+        "id": "gates",
+        "title": "Go / no-go feltételek (5300 A1–A7 + B) — NO-GO"
+      },
+      {
+        "file": "tables/blocks_table.json",
+        "id": "blocks_table",
+        "title": "Blokk-táblázat"
+      },
+      {
+        "file": "tables/assets_table.json",
+        "id": "assets_table",
+        "title": "Asset-bontás"
+      },
+      {
+        "file": "tables/calibration_asset.json",
+        "id": "calibration_asset",
+        "title": "Kalibráció assetenként (modell)"
+      },
+      {
+        "file": "tables/importance_table.json",
+        "id": "importance_table",
+        "title": "Jellemző-fontosság (mind)"
+      },
+      {
+        "file": "tables/trades.json",
+        "id": "trades",
+        "title": "Szimuláció: modell vs baseline"
+      }
+    ]
+  },
+  "created_at": "2026-11-21T14:58:20Z",
+  "id": "scout_lgbm",
+  "model_id": null,
+  "order": 34,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.scout_models_lgbm",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "t932: scout_lgbm_r1 vs baseline S0 + C a közös purged CV-n (2170 esemény, btcusdt,ethusdt,solusdt): AUC 0.6233 vs 0.6361 (ΔAUC -0.0128, perm. p 0.7203); go/no-go: NO-GO.",
+  "tags": [
+    "scout",
+    "epic_073",
+    "lightgbm",
+    "H1"
+  ],
+  "title": "Impulse Scout P1 — LightGBM kézi prefix-jellemzőkön + order flow (H1, 1. forduló)",
+  "updated_at": "2026-11-22T06:16:16Z"
+}

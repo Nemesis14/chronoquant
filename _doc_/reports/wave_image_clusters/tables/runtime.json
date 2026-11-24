@@ -1,0 +1,1 @@
+{"columns": [{"key": "step", "label": "Lépés", "type": "str"}, {"digits": 1, "key": "seconds", "label": "mp", "type": "float"}], "rows": [["Teljes futás", 1567.3147836999997], ["k-választás (6 fold × AE + 7 k + baseline-ok)", 1449.165399000005], ["Végső illesztés (AE + k-means)", 81.58745450000424]], "total_rows": 3, "truncated": false}

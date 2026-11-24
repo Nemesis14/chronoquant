@@ -14,9 +14,11 @@ def default_handlers() -> dict[str, Handler]:
     from worker.handlers.sentiment_refresh import run_sentiment_refresh
     from worker.handlers.sync_full import run_sync_full
     from worker.handlers.sync_predictions import run_sync_predictions
+    from worker.handlers.sync_scout import run_sync_scout
 
     return {
         "sync_full": run_sync_full,
         "sync_predictions": run_sync_predictions,
         "sentiment_refresh": run_sentiment_refresh,
+        "sync_scout": run_sync_scout,
     }

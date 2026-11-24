@@ -1,0 +1,116 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/delta_forest.json",
+        "height": 900,
+        "id": "delta_forest",
+        "title": "Δ (valódi − placebo) cellánként, train vs OOS, 95% CI"
+      },
+      {
+        "file": "charts/train_vs_oos.json",
+        "height": 460,
+        "id": "train_vs_oos",
+        "title": "Train vs OOS Δ cellánként (pont mérete ~ √n)"
+      },
+      {
+        "file": "charts/placebo_hist_s.json",
+        "height": 1000,
+        "id": "placebo_hist_s",
+        "title": "Lépték s: placebo készletek arány-eloszlása és a valódi arány"
+      },
+      {
+        "file": "charts/placebo_hist_m.json",
+        "height": 1000,
+        "id": "placebo_hist_m",
+        "title": "Lépték m: placebo készletek arány-eloszlása és a valódi arány"
+      },
+      {
+        "file": "charts/placebo_hist_l.json",
+        "height": 1000,
+        "id": "placebo_hist_l",
+        "title": "Lépték l: placebo készletek arány-eloszlása és a valódi arány"
+      },
+      {
+        "file": "charts/memory_curve.json",
+        "height": 460,
+        "id": "memory_curve",
+        "title": "Memória-görbe: Δ bounce a kor szerint, léptékenként (train folytonos, OOS pontozott)"
+      },
+      {
+        "file": "charts/feat_rho.json",
+        "height": 1100,
+        "id": "feat_rho",
+        "title": "feat_levels: Spearman ρ a champion targetekkel (train)"
+      },
+      {
+        "file": "charts/feat_redundancy.json",
+        "height": 440,
+        "id": "feat_redundancy",
+        "title": "Hasznosság vs redundancia"
+      },
+      {
+        "file": "charts/feat_deciles.json",
+        "height": 580,
+        "id": "feat_deciles",
+        "title": "A 6 legerősebb feat_levels oszlop decilis-átlagai (train)"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/verification.json",
+        "id": "verification",
+        "title": "Ellenőrzés: a 0. placebo készlet a detektor függvényein = vektorizált futás"
+      },
+      {
+        "file": "tables/placebo_check.json",
+        "id": "placebo_check",
+        "title": "Valódi vs placebo kvantilisek (ATR-egység)"
+      },
+      {
+        "file": "tables/go_nogo.json",
+        "id": "go_nogo",
+        "title": "Valódi vs placebo arányok, Δ, p-értékek és döntés cellánként"
+      },
+      {
+        "file": "tables/memory.json",
+        "id": "memory",
+        "title": "Memória-görbe táblázat (touch → bounce)"
+      },
+      {
+        "file": "tables/champion_benchmark.json",
+        "id": "champion_benchmark",
+        "title": "Champion feature-ök |Spearman ρ| a targettel (train, óránként)"
+      },
+      {
+        "file": "tables/feat_diag.json",
+        "id": "feat_diag",
+        "title": "feat_levels egyváltozós diagnosztika (|ρ| szerint rendezve)"
+      }
+    ]
+  },
+  "created_at": "2026-11-19T15:16:41Z",
+  "id": "sr_placebo_study",
+  "model_id": null,
+  "order": 21,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.sr_placebo",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "Osler-féle placebo-teszt (1000 véletlen szint-/vonalkészlet, napi blokk-bootstrap, Holm): 0 / 36 cella GO a 1700 küszöbök szerint. Memória-görbe a szint kora szerint, feat_levels egyváltozós diagnosztika és javaslat a t914 feature-válogatásra.",
+  "tags": [
+    "sr",
+    "trendline",
+    "levels",
+    "epic_071",
+    "placebo",
+    "event_study"
+  ],
+  "title": "S/R szintek és trendvonalak — placebo eseménytanulmány és memória-görbe",
+  "updated_at": "2026-11-19T15:27:41Z"
+}

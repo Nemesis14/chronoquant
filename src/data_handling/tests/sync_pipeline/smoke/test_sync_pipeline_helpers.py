@@ -80,9 +80,14 @@ def _make_args(tables: str | None = None, skip_ohlcv: bool = False) -> argparse.
 
 
 def test_resolve_tables_default_returns_all() -> None:
-    """No --tables arg returns the full set of tables."""
+    """No --tables arg returns every table except the opt-in scout (t941)."""
     result = _resolve_tables(_make_args())
-    assert result == set(ALL_TABLES)
+    assert result == set(ALL_TABLES) - {"scout"}
+
+
+def test_resolve_tables_scout_is_opt_in() -> None:
+    """--tables=scout is accepted explicitly (Impulse Scout forward-log, epic_074 / t941)."""
+    assert _resolve_tables(_make_args(tables="scout")) == {"scout"}
 
 
 def test_resolve_tables_subset() -> None:
@@ -95,7 +100,7 @@ def test_resolve_tables_skip_ohlcv_removes_ohlcv() -> None:
     """--skip-ohlcv discards 'ohlcv' from the requested set."""
     result = _resolve_tables(_make_args(skip_ohlcv=True))
     assert "ohlcv" not in result
-    assert result == {"targets", "features", "predictions"}
+    assert result == {"targets", "features", "predictions", "levels", "funding"}
 
 
 def test_resolve_tables_unknown_table_exits(monkeypatch: pytest.MonkeyPatch) -> None:

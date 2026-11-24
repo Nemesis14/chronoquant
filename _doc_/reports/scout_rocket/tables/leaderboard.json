@@ -1,0 +1,247 @@
+{
+  "columns": [
+    {
+      "key": "model",
+      "label": "Modell",
+      "type": "str"
+    },
+    {
+      "key": "family",
+      "label": "Család",
+      "type": "str"
+    },
+    {
+      "key": "hypothesis",
+      "label": "Státusz",
+      "type": "str"
+    },
+    {
+      "key": "round",
+      "label": "Forduló",
+      "type": "int"
+    },
+    {
+      "digits": 4,
+      "key": "auc",
+      "label": "AUC",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "delta_auc",
+      "label": "ΔAUC",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "ci_lo",
+      "label": "CI alsó",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "ci_hi",
+      "label": "CI felső",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "logloss3",
+      "label": "3-oszt. LL",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "delta_logloss3",
+      "label": "ΔLL",
+      "type": "float"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top20",
+      "label": "Prec. felső 20% (fold-rang)",
+      "type": "float"
+    },
+    {
+      "digits": 2,
+      "key": "lift_top20",
+      "label": "Lift 20%",
+      "type": "float"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top10",
+      "label": "Prec. felső 10% (fold-rang)",
+      "type": "float"
+    },
+    {
+      "digits": 2,
+      "key": "lift_top10",
+      "label": "Lift 10%",
+      "type": "float"
+    },
+    {
+      "key": "blocks_prec_better",
+      "label": "Top20 jobb blokk",
+      "type": "int"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top20_trthr",
+      "label": "Prec. 20% (train-küszöb)",
+      "type": "float"
+    },
+    {
+      "key": "n_top20_trthr",
+      "label": "n 20% (train-küszöb)",
+      "type": "int"
+    },
+    {
+      "digits": 3,
+      "key": "prec_top10_trthr",
+      "label": "Prec. 10% (train-küszöb)",
+      "type": "float"
+    },
+    {
+      "key": "n_top10_trthr",
+      "label": "n 10% (train-küszöb)",
+      "type": "int"
+    },
+    {
+      "key": "blocks_pos",
+      "label": "ΔAUC>0 blokk",
+      "type": "int"
+    },
+    {
+      "digits": 4,
+      "key": "dauc_wo_best_block_mean",
+      "label": "ΔAUC legjobb blokk nélkül",
+      "type": "float"
+    },
+    {
+      "digits": 2,
+      "key": "cal_slope",
+      "label": "Kal. meredekség",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "perm_p",
+      "label": "perm. p",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "holm_p",
+      "label": "Holm p",
+      "type": "float"
+    },
+    {
+      "digits": 4,
+      "key": "spa_p",
+      "label": "SPA p",
+      "type": "float"
+    },
+    {
+      "key": "go_status",
+      "label": "Go / no-go",
+      "type": "str"
+    },
+    {
+      "key": "go_failed",
+      "label": "Bukott feltételek",
+      "type": "str"
+    }
+  ],
+  "rows": [
+    [
+      "S0C_logit",
+      "B0",
+      "kísérleti",
+      1,
+      0.6360584903817986,
+      0.0,
+      null,
+      null,
+      0.8008912141246958,
+      0.0,
+      0.2413793103448276,
+      1.700626959247649,
+      0.24770642201834864,
+      1.7452043369474564,
+      0,
+      0.23990498812351543,
+      421,
+      0.24336283185840707,
+      226,
+      0,
+      0.0,
+      0.9638381903896401,
+      0.000999000999000999,
+      null,
+      null,
+      "baseline",
+      ""
+    ],
+    [
+      "scout_minirocket_r1",
+      "P2",
+      "H2",
+      1,
+      0.6323915075257718,
+      -0.003666982856026846,
+      -0.034854477954197105,
+      0.029503857080172915,
+      0.7775946907798815,
+      -0.023296523344814246,
+      0.2160919540229885,
+      1.522466039707419,
+      0.23394495412844038,
+      1.6482485404503753,
+      1,
+      0.21428571428571427,
+      406,
+      0.22162162162162163,
+      185,
+      3,
+      -0.012740193050788728,
+      0.9768763725156642,
+      0.30569430569430567,
+      0.8061938061938062,
+      0.23,
+      "NO-GO",
+      "dauc,top20,stability,holm,econ,not_spa_best"
+    ],
+    [
+      "scout_inception_r1",
+      "X1",
+      "kísérleti",
+      1,
+      0.6270732489851717,
+      -0.00898524139662693,
+      -0.042398543212309465,
+      0.02465319584065769,
+      0.7877607436564333,
+      -0.013130470468262434,
+      0.23448275862068965,
+      1.6520376175548588,
+      0.27522935779816515,
+      1.939115929941618,
+      3,
+      0.23580786026200873,
+      458,
+      0.26294820717131473,
+      251,
+      3,
+      -0.018353191174653526,
+      0.8626875425595213,
+      null,
+      null,
+      0.23,
+      "NO-GO",
+      "dauc,top20,stability,econ,not_spa_best"
+    ]
+  ],
+  "total_rows": 3,
+  "truncated": false
+}

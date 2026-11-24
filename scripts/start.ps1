@@ -24,10 +24,10 @@ if (-not (Test-ApiHealthy)) {
         -RedirectStandardOutput (Join-Path $script:LogDir 'api.out.log') `
         -RedirectStandardError  (Join-Path $script:LogDir 'api.err.log')
 
-    $deadline = (Get-Date).AddSeconds(90)
+    $deadline = (Get-Date).AddSeconds(900)
     while (-not (Test-ApiHealthy) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
     if (-not (Test-ApiHealthy)) {
-        Write-Error "Az API nem allt fel 90 mp alatt. Nezd meg: $script:LogDir\api.err.log"
+        Write-Error "Az API nem allt fel 900 mp alatt. Nezd meg: $script:LogDir\api.err.log"
         exit 1
     }
 }

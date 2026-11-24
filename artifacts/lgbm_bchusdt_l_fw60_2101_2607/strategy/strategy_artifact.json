@@ -1,0 +1,46 @@
+{
+  "session_id": "strat_bchusdt_fw60_long_2101_2607",
+  "long_model": "lgbm_bchusdt_l_fw60_2101_2607",
+  "short_model": "lgbm_bchusdt_s_fw60_2101_2607",
+  "signal_mode": "rank_first",
+  "evaluation_mode": "same_window",
+  "fit_period": {
+    "start": "2026-02-01",
+    "end": "2026-07-31"
+  },
+  "rank_lookup_long_path": "rank_lookup_long.parquet",
+  "rank_lookup_short_path": "rank_lookup_short.parquet",
+  "isotonic_long_path": "isotonic_long.pkl",
+  "isotonic_short_path": "isotonic_short.pkl",
+  "decision_params": {
+    "entry_cutoff": 0.99,
+    "tp_spec": "bucket_p75_mfe",
+    "sl_spec": "none",
+    "directions": [
+      "long"
+    ],
+    "max_hold_minutes": 60,
+    "same_bar_conflict_rule": "sl_first"
+  },
+  "search_info": {
+    "search_type": "grid",
+    "n_setups_evaluated": 200,
+    "best_objective": "net_log_return",
+    "best_value": -0.212355
+  },
+  "metrics": {
+    "n_trades": 203,
+    "total_fact_log_return": 0.01163,
+    "avg_fact_log_return": 5.7e-05,
+    "compounded_return_pct": 1.1698,
+    "win_rate": 0.5517,
+    "avg_hold_minutes": 44.75,
+    "sufficient_sample": true
+  },
+  "trades_table": "strat.\"strat_bchusdt_fw60_long_2101_2607__trades\"",
+  "equity_table": "strat.\"strat_bchusdt_fw60_long_2101_2607__equity\"",
+  "cutoffs_table": "strat.\"strat_bchusdt_fw60_long_2101_2607__cutoffs\"",
+  "summary_table": "strat.\"strat_bchusdt_fw60_long_2101_2607__summary\"",
+  "grid_results_table": "strat.\"strat_bchusdt_fw60_long_2101_2607__grid_results\"",
+  "calibrated_at": "2026-11-07T09:19:24Z"
+}

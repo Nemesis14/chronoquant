@@ -34,7 +34,10 @@ function Stop-Api {
 function Get-WorkerPid {
     if (-not (Test-Path $script:WorkerPidFile)) { return $null }
     $id = [int](Get-Content $script:WorkerPidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
-    if ($id -and (Get-Process -Id $id -ErrorAction SilentlyContinue)) { return $id }
+    if (-not $id) { return $null }
+    # pid-ujrahasznalat ellen: a folyamat parancssora `-m worker` kell legyen (reboot utan a regi pid mas programe lehet)
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue
+    if ($proc -and $proc.CommandLine -match '-m\s+worker') { return $id }
     return $null
 }
 

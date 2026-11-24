@@ -15,7 +15,7 @@ Shared operating principles for all AI agents working on ChronoQuant.
 - Prefer small, independently validatable work units.
 - Record assumptions explicitly in plans, reviews, and documentation.
 - **`_jira_/archive/` olvasása tilos** — soha ne keresd, listázd, vagy olvasd be. Aktív taskok csak `_jira_/epic_*/`-ban találhatók.
-- **Aktív asset: SOLUSDT** — BCHUSDT és más párok ne kapjanak fejlesztési munkát.
+- **Aktív assetek:** quant modellpár élőben SOLUSDT (default), BCHUSDT, BTCUSDT (BCH/BTC stratégiája NET negatív → csak jelzés); ETHUSDT data-only (sync, nincs quant modell). Impulse Scout (`src/scout`, kísérleti, NO-GO — nem kereskedési jel) SOL/BTC/ETH-n fut. Új asset vagy modell csak user döntésre.
 
 ---
 

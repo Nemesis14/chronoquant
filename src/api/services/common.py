@@ -200,17 +200,16 @@ class ActiveSession:
             return None
 
 
-def active_sessions() -> dict[str, ActiveSession]:
-    """Active long / short strategy sessions from ``config/trading.json``."""
+def active_sessions(asset_id: str | None = None) -> dict[str, ActiveSession]:
+    """Active long / short strategy sessions of an asset (``config/trading.json``, default asset if None)."""
     try:
-        cfg = utils.load_trading_config()
+        ids = utils.strategy_session_ids(asset_id)
     except Exception:
         logger.exception("active_sessions: trading config unavailable")
-        cfg = {}
-    fallback = cfg.get("strategy_session_id") or None
+        ids = {"long": None, "short": None}
     return {
-        "long": ActiveSession("long", cfg.get("strategy_session_long_id") or fallback),
-        "short": ActiveSession("short", cfg.get("strategy_session_short_id") or fallback),
+        "long": ActiveSession("long", ids.get("long")),
+        "short": ActiveSession("short", ids.get("short")),
     }
 
 

@@ -28,6 +28,10 @@ Usage examples
 
     # Explicit asset
     uv run python src/database/03_build_quant_train.py --asset-id solusdt
+
+    # Challenger profile (epic_071): solusdt_fw60 + feat_levels
+    #   -> own table quant_train__solusdt_fw60_sr, champion quant_train untouched
+    uv run python src/data_handling/03_build_quant_train.py --features-profile solusdt_fw60_sr
 """
 
 import argparse
@@ -75,6 +79,16 @@ def _parse_args() -> argparse.Namespace:
         metavar = "YYYY-MM-DD HH:MM:SS",
         help    = "Range upper bound, inclusive. Omit for full rebuild.",
     )
+    parser.add_argument(
+        "--features-profile",
+        default = None,
+        metavar = "PROFILE_ID",
+        help    = (
+            "Feature profile from config/features.json. Omit for the asset's champion "
+            "profile (-> quant_train). A profile with extra_feature_tables builds "
+            "quant_train__<profile_id>."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -84,15 +98,17 @@ def main() -> None:
 
     mode = "full rebuild" if (args.start is None and args.end is None) else "range rebuild"
     logger.info(
-        "quant_train build indul: asset_id=%s mode=%s start=%s end=%s",
+        "quant_train build indul: asset_id=%s mode=%s start=%s end=%s profile=%s",
         args.asset_id or "default", mode, args.start, args.end,
+        args.features_profile or "champion",
     )
 
     t0 = time.monotonic()
     n = sync_quant_train(
-        asset_id   = args.asset_id,
-        start_time = args.start,
-        end_time   = args.end,
+        asset_id         = args.asset_id,
+        start_time       = args.start,
+        end_time         = args.end,
+        features_profile = args.features_profile,
     )
     logger.info("quant_train build kesz: rows=%d elapsed=%.1fs", n, time.monotonic() - t0)
 

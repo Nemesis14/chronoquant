@@ -65,13 +65,25 @@ def test_predictions_no_null_scores(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_predictions_score_range(conn: duckdb.DuckDBPyConnection) -> None:
-    """long_pred and short_pred are probabilities — must be in [0, 1]."""
-    row = conn.execute(
-        "SELECT COUNT(*) FROM predictions"
-        " WHERE long_pred < 0 OR long_pred > 1 OR short_pred < 0 OR short_pred > 1"
-    ).fetchone()
-    violations = row[0] if row else 0
-    assert violations == 0, f"{violations} predictions rows with scores outside [0, 1]"
+    """long_pred / short_pred are finite and within a plausible magnitude.
+
+    The champion models are LightGBM *regressors* (``objective: regression``) of
+    the fw60 MFE log-returns, so short_pred is negative and neither is a
+    probability — the former ``[0, 1]`` expectation dates from classifier models
+    (epic_076 / t949).  The bound [-2, 2] matches the target MFE sanity bounds
+    and also admits a ``predict_proba`` model (values in [0, 1]).
+    """
+    row = conn.execute("""
+        SELECT
+            COUNT(*) FILTER (WHERE NOT isfinite(long_pred) OR NOT isfinite(short_pred)
+                               OR ABS(long_pred) > 2 OR ABS(short_pred) > 2),
+            MIN(long_pred), MAX(long_pred), MIN(short_pred), MAX(short_pred)
+        FROM predictions
+    """).fetchone()
+    assert row is not None
+    violations, l_min, l_max, s_min, s_max = row
+    print(f"\nlong_pred: [{l_min}, {l_max}]  short_pred: [{s_min}, {s_max}]")
+    assert violations == 0, f"{violations} predictions rows with non-finite or |score| > 2"
 
 
 def test_predictions_no_duplicate_open_time(conn: duckdb.DuckDBPyConnection) -> None:

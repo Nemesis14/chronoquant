@@ -22,7 +22,9 @@ from typing import Any, Literal
 import utils
 from worker.logs import job_log_path, log_size
 
-JOB_KINDS: tuple[str, ...] = ("sync_full", "sync_predictions", "sentiment_refresh")
+JOB_KINDS: tuple[str, ...] = ("sync_full", "sync_predictions", "sentiment_refresh", "sync_scout")
+#: Kinds that work on one asset: params carry ``asset_id`` and the dedup key includes it.
+ASSET_KINDS: tuple[str, ...] = ("sync_full", "sync_predictions", "sync_scout")
 ACTIVE_STATUSES: tuple[str, ...] = ("queued", "running")
 TERMINAL_STATUSES: tuple[str, ...] = ("succeeded", "failed", "canceled")
 HEARTBEAT_ALIVE_SECONDS = 15
@@ -77,6 +79,11 @@ def default_db_path() -> Path:
     return Path(utils.repo_root()) / "database" / "_jobs" / "jobs.sqlite"
 
 
+def job_asset_id(params: dict[str, Any] | None) -> str:
+    """Asset id of an asset-kind job's params (missing = default asset, as before multi-asset)."""
+    return utils.resolve_asset_id((params or {}).get("asset_id"))
+
+
 def new_job_id(now: datetime | None = None) -> str:
     return f"{(now or utc_now()).strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(3)}"
 
@@ -121,18 +128,32 @@ class JobQueue:
     def enqueue(self, kind: str, params: dict[str, Any] | None = None) -> tuple[dict, bool]:
         """Insert a queued job; return (job, deduplicated).
 
-        If a queued/running job of the same kind exists, it is returned instead.
+        If a queued/running job of the same kind (and, for asset kinds, the same asset) exists,
+        it is returned instead.  Asset kinds get ``params["asset_id"]`` normalised (default asset
+        when omitted), so the dedup key is always ``(kind, asset_id)``.
         """
         if kind not in JOB_KINDS:
             raise ValueError(f"unknown job kind: {kind}")
+        params = dict(params or {})
+        asset_id = job_asset_id(params) if kind in ASSET_KINDS else None
+        if asset_id is not None:
+            params["asset_id"] = asset_id
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                existing = conn.execute(
+                candidates = conn.execute(
                     "SELECT * FROM jobs WHERE kind = ? AND status IN ('queued', 'running') "
-                    "ORDER BY rowid LIMIT 1",
+                    "ORDER BY rowid",
                     (kind,),
-                ).fetchone()
+                ).fetchall()
+                existing = next(
+                    (
+                        r for r in candidates
+                        if asset_id is None
+                        or job_asset_id(json.loads(r["params_json"] or "{}")) == asset_id
+                    ),
+                    None,
+                )
                 if existing is not None:
                     conn.execute("COMMIT")
                     return self._row_to_job(existing), True
@@ -144,7 +165,7 @@ class JobQueue:
                     (
                         job_id,
                         kind,
-                        json.dumps(params or {}),
+                        json.dumps(params),
                         to_iso(now),
                         str(job_log_path(job_id, self.log_dir)),
                     ),

@@ -23,6 +23,12 @@ A lezárt kutatások és kísérletek rövid összefoglalói. A kutatási kód �
 | [EMA/SMA keresztezés](ma_cross.md) | 2026-09-05 | Nincs kereskedhető él (win rate ~50%) | Lezárt, nemleges |
 | [RSI-divergencia](rsi_divergence.md) | 2026-09 | R² szűrővel nem robusztus, a hatás kicsi | Lezárt, nemleges |
 | [tv_report (piaci hangulat)](tv_report.md) | 2026-09 – | A chat „piaci összkép" képességének motorja | ÉL, költözik (t896) |
+| [S/R szintek placebo-teszt](sr_placebo_study.md) | 2026-11-19 | 0/36 cella GO: a valódi szintek/vonalak ≈ véletlen placebo; memória-görbe lapos | Lezárt, nemleges (t914 döntés: user) |
+| [Hullám-kezdetek kép-klaszterezése](wave_image_clustering.md) | 2026-11-19 – 20 | Képkoncepció NO-GO (W4h_H8h): ΔAUC +0,029, perm. p 0,26; a skalár alap (AUC 0,665) valós, a kép nem ad többet | Lezárt, nemleges (folytatás: user) |
+| [Impulse Scout (több-asset impulzus-modellek)](impulse_scout.md) | 2026-11-21 – 22 | 6 modell egyike sem veri az S0 + C logitot (univerzum SPA p 0,23, Holm 0,81); 2. kör (12 szabály): legjobb TP 3σ/SL 1,5σ +15,5 bp, CI [−5,2; +37,7], SPA p 0,44 → NO-GO | Lezárt, nemleges (holdout-2 legkorábban 2027-04 vége) |
+| [Multi-skálás nagy-mozgás katalógus](move_census.md) | 2026-11-24 | Skálafüggetlen zigzag-katalógus BTC/SOL/ETH 1m-en: szerkezet, bázisráta, R-szorzós él ≈ véletlen előjelű placebo (martingál); egyetlen valós eltérés: enyhe visszafordulás, SOL-on több nagy mozgás | Lezárt, nemleges (ár-geometria önmagában) |
+| [Előrejelezhető-e a nagy lökés? (jelölt + változók)](cand_pred.md) | 2026-11-24 | 48 változó / 6 csoport (zigzag, volumen, VWAP, flow, quant, alakok) forward, idő szerinti próbája a valós idejű jelölteken BTC-n, placebóval: az AUC ~0,52 a placebón is, +1R-nál 0,50; nincs használható előrejelzés | Lezárt, nemleges |
+| [Kitörés-előrejelezhetőség v2 (118 változó, 4 modell, nullok)](cand_v2.md) | 2026-11-24 | Offset felett a nagy mozgásra +0,0004 log-loss (AUC +0,006, MDE 0,019), +1R-n nincs jel; a hozam-IC 0,035 rövid távú visszafordulás, 3–6 bps < 13 bps díj; mindkét null lefutott | Lezárt, nemleges |
 | [Elliott-hullámok](elliott_waves/overview.md) | 2026-06 | Algoritmikus spec + 4. hullám befejezési tanulmány (a `docs/`-ból áthozva, t890; kód nincs a repóban) | Archív kutatási spec |
 
 A modell-szintű riportok (champion search, mintavétel, rezsim-OOS stb.) a `_doc_/models_doc/` alatt vannak, nem itt.

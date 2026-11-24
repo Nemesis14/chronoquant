@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 
 from api import schemas
-from api.deps import get_conn
+from api.deps import AssetDep, get_conn
 from api.services import registry
 from api.services.common import Conn
 
@@ -15,8 +15,8 @@ router = APIRouter(prefix="/api/registry", tags=["registry"])
 
 
 @router.get("/active", response_model=schemas.RegistryActive)
-def get_active(conn: Annotated[Conn, Depends(get_conn)]) -> dict[str, Any]:
-    return registry.active(conn)
+def get_active(conn: Annotated[Conn, Depends(get_conn)], asset_id: AssetDep) -> dict[str, Any]:
+    return registry.active(conn, asset_id)
 
 
 # Static sub-paths first: "/models/{id}" must not be swallowed by "/{table}".

@@ -1,0 +1,103 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/prefix_close.json",
+        "height": 320,
+        "id": "prefix_close",
+        "title": "Átlagos close_sigma prefix osztályonként"
+      },
+      {
+        "file": "charts/prefix_imb.json",
+        "height": 320,
+        "id": "prefix_imb",
+        "title": "Átlagos taker_imb prefix osztályonként"
+      },
+      {
+        "file": "charts/null_rocket.json",
+        "height": 320,
+        "id": "null_rocket",
+        "title": "MiniRocket ΔAUC permutációs null (N = 1000, teljes refit)"
+      },
+      {
+        "file": "charts/blocks_rocket.json",
+        "height": 340,
+        "id": "blocks_rocket",
+        "title": "Blokkonkénti AUC és ΔAUC — MiniRocket"
+      },
+      {
+        "file": "charts/blocks_inception.json",
+        "height": 340,
+        "id": "blocks_inception",
+        "title": "Blokkonkénti AUC és ΔAUC — InceptionTime"
+      },
+      {
+        "file": "charts/reliability_rocket.json",
+        "height": 320,
+        "id": "reliability_rocket",
+        "title": "Megbízhatósági görbe — MiniRocket"
+      },
+      {
+        "file": "charts/reliability_inception.json",
+        "height": 320,
+        "id": "reliability_inception",
+        "title": "Megbízhatósági görbe — InceptionTime"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/leaderboard.json",
+        "id": "leaderboard",
+        "title": "Leaderboard: baseline + MiniRocket + InceptionTime"
+      },
+      {
+        "file": "tables/assets_rocket.json",
+        "id": "assets_rocket",
+        "title": "Asset-bontás — MiniRocket"
+      },
+      {
+        "file": "tables/assets_inception.json",
+        "id": "assets_inception",
+        "title": "Asset-bontás — InceptionTime"
+      },
+      {
+        "file": "tables/calibration_asset.json",
+        "id": "calibration_asset",
+        "title": "Kalibráció assetenként"
+      },
+      {
+        "file": "tables/trades.json",
+        "id": "trades",
+        "title": "Szimuláció: jelzés-szám, hit / stop / időkorlát, nettó hozam (bp)"
+      },
+      {
+        "file": "tables/runtime.json",
+        "id": "runtime",
+        "title": "Futásidő (4 magos CPU, párhuzamos agent-futások mellett)"
+      }
+    ]
+  },
+  "created_at": "2026-11-21T19:40:38Z",
+  "id": "scout_rocket",
+  "model_id": null,
+  "order": 35,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.scout_rocket_report",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "epic_073 t933: MiniRocket ΔAUC -0.0037 [-0.0349; 0.0295], perm. p 0.3057 (N=1000); InceptionTime ΔAUC -0.0090; baseline AUC 0.6361; 2170 train esemény (SOL+BTC+ETH).",
+  "tags": [
+    "scout",
+    "epic_073",
+    "minirocket",
+    "inceptiontime",
+    "leaderboard"
+  ],
+  "title": "Impulse Scout — Modell 2: MiniRocket (H2) + InceptionTime a nyers prefixen",
+  "updated_at": "2026-11-22T06:16:16Z"
+}

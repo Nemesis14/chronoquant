@@ -43,8 +43,8 @@ def _iso(series: pd.Series) -> pd.Series:
     return series.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _load_trades(session_id: str, valid_start: str) -> pd.DataFrame:
-    con = duckdb.connect(utils.lab_db_path(), read_only=True)
+def _load_trades(session_id: str, valid_start: str, asset_id: str | None = None) -> pd.DataFrame:
+    con = duckdb.connect(utils.lab_db_path(asset_id), read_only=True)
     try:
         trades = con.execute(
             f"""
@@ -148,7 +148,7 @@ def build(model_id: str, artifact_dir: Path | None = None, root: Path | None = N
     max_hold = int(params["max_hold_minutes"])
     sl_spec = params.get("sl_spec", "none")
 
-    trades = _load_trades(session_id, valid_start)
+    trades = _load_trades(session_id, valid_start, utils.model_asset_id(model_id))
     dir_label = "Long" if direction == "long" else "Short"
     pct_low = direction == "short"
 
@@ -232,6 +232,7 @@ def build(model_id: str, artifact_dir: Path | None = None, root: Path | None = N
             WHERE p.open_time >= ? ORDER BY p.open_time
             """,
             [valid_start],
+            asset_id=utils.model_asset_id(model_id),
         )
         if live is None or live.empty:
             rb.add_markdown("_Az élő adatbázis nem érhető el (zárolt) - a heti ábrák kimaradtak._")

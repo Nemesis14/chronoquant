@@ -145,6 +145,100 @@ def _m005_add_model_stamp_cols(conn: duckdb.DuckDBPyConnection) -> None:
         conn.execute(f'ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "{col}" VARCHAR')
 
 
+def _feat_levels_v1_columns() -> list[str]:
+    """Frozen feat_* column list of feat_levels v1 (epic_071 / t912).
+
+    Spelled out here (not imported from the feature module) so the migration
+    DDL never changes silently; a new feature column needs a new migration.
+    """
+    cols: list[str] = []
+    for x in ("s", "m", "l"):
+        cols += [f"feat_sr_dist_res_atr_{x}", f"feat_sr_dist_sup_atr_{x}",
+                 f"feat_sr_strength_res_{x}", f"feat_sr_strength_sup_{x}",
+                 f"feat_sr_touches_res_{x}", f"feat_sr_touches_sup_{x}",
+                 f"feat_sr_flips_res_{x}", f"feat_sr_flips_sup_{x}",
+                 f"feat_sr_n_active_{x}"]
+        if x in ("s", "m"):
+            cols += [f"feat_sr_is_round_res_{x}", f"feat_sr_is_round_sup_{x}"]
+        cols += [f"feat_sr_break_age_{x}", f"feat_sr_break_dir_{x}",
+                 f"feat_sr_retest_flag_{x}"]
+    for x in ("s", "m"):
+        cols += [f"feat_tl_dist_sup_atr_{x}", f"feat_tl_dist_res_atr_{x}",
+                 f"feat_tl_break_age_{x}", f"feat_tl_break_dir_{x}",
+                 f"feat_tl_retest_flag_{x}"]
+    return cols
+
+
+def _m006_create_feat_levels(conn: duckdb.DuckDBPyConnection) -> None:
+    """v6: Create feat_levels (S/R level + trendline features, epic_071 / t912).
+
+    One row per 1m bar (PK open_time); every feature is DOUBLE and NULL when
+    its object does not exist at the bar. Written by sync_tables/sync_levels.py.
+    """
+    feat_ddl = ",\n            ".join(f'"{c}" DOUBLE' for c in _feat_levels_v1_columns())
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS feat_levels (
+            open_time    TIMESTAMP PRIMARY KEY,
+            available_ts TIMESTAMP,
+            {feat_ddl}
+        )
+    """)
+
+
+def _m007_create_funding_rate(conn: duckdb.DuckDBPyConnection) -> None:
+    """v7: Create funding_rate (settled Binance futures funding, epic_074 / t939).
+
+    One row per settlement: ``funding_ts`` = settlement moment, ``funding_rate``
+    = rate charged then (read by strategy.costs.load_funding_schedule).
+    IF NOT EXISTS: the older ad-hoc SOL/BCH tables are left as they are.
+    Written by sync_tables/sync_funding.py.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS funding_rate (
+            funding_ts   TIMESTAMP,
+            funding_rate DOUBLE,
+            mark_price   DOUBLE
+        )
+    """)
+
+
+#: Writer-owned scout_signals columns (not produced by scout.run).
+SCOUT_SIGNALS_EXTRA_COLUMNS: dict[str, str] = {"scored_at": "TIMESTAMP", "backfilled": "BOOLEAN"}
+
+
+def scout_signals_columns() -> dict[str, str]:
+    """Column -> DuckDB type of scout_signals (epic_074 / t941).
+
+    Single source of truth: ``scout.OUTPUT_SCHEMA`` (t940 runtime contract) plus
+    the writer columns ``scored_at`` / ``backfilled``.  Imported lazily so the
+    store (and the read-only API) does not pay the scout import cost.
+    """
+    from scout import OUTPUT_SCHEMA  # noqa: PLC0415  (lazy: heavy research imports)
+
+    cols = {c: _sql_type_from_polars(t) for c, t in OUTPUT_SCHEMA.items()}
+    return {**cols, **SCOUT_SIGNALS_EXTRA_COLUMNS}
+
+
+def _m008_create_scout_signals(conn: duckdb.DuckDBPyConnection) -> None:
+    """v8: Create scout_signals (Impulse Scout forward-log, epic_074 / t941).
+
+    One row per detected event (PK event_id = ``asset|cell|t0``); columns =
+    ``scout.OUTPUT_SCHEMA`` + scored_at + backfilled.  Prediction columns are
+    immutable after insert (enforced by sync_tables/sync_scout.py).  A changed
+    OUTPUT_SCHEMA (new artifact version) needs a new migration — sync_scout
+    refuses to write when the table and the runtime schema differ.
+    """
+    ddl = ",\n            ".join(
+        f'"{c}" {t}{" PRIMARY KEY" if c == "event_id" else ""}'
+        for c, t in scout_signals_columns().items()
+    )
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS scout_signals (
+            {ddl}
+        )
+    """)
+
+
 #: Ordered list of live-DB migrations.  Always append — never reorder or delete.
 LIVE_DB_MIGRATIONS: list[Migration] = [
     Migration(version=1, name="create_core_tables", apply=_m001_create_core_tables),
@@ -152,6 +246,9 @@ LIVE_DB_MIGRATIONS: list[Migration] = [
     Migration(version=3, name="drop_legacy_split_cols", apply=_m003_drop_legacy_split_cols),
     Migration(version=4, name="drop_predictions_boolean_targets", apply=_m004_drop_predictions_boolean_targets),
     Migration(version=5, name="add_model_stamp_cols", apply=_m005_add_model_stamp_cols),
+    Migration(version=6, name="create_feat_levels", apply=_m006_create_feat_levels),
+    Migration(version=7, name="create_funding_rate", apply=_m007_create_funding_rate),
+    Migration(version=8, name="create_scout_signals", apply=_m008_create_scout_signals),
 ]
 
 
@@ -222,9 +319,11 @@ def _ensure_feat_ohlcv_quant_table(conn: duckdb.DuckDBPyConnection, df: pl.DataF
 
 
 def rebuild_quant_train(
-    conn: duckdb.DuckDBPyConnection,
-    start_time: str | None = None,
-    end_time: str | None = None,
+    conn                 : duckdb.DuckDBPyConnection,
+    start_time           : str | None = None,
+    end_time             : str | None = None,
+    extra_feature_tables : list[str] | None = None,
+    table_name           : str = "quant_train",
 ) -> int:
     """Rebuild quant_train as an INNER JOIN of feat_ohlcv_quant and target.
 
@@ -234,13 +333,25 @@ def rebuild_quant_train(
     Rows where long_mfe_fw60 or short_mfe_fw60 is NULL are excluded.
     The feat_* column list is discovered dynamically from feat_ohlcv_quant.
 
+    Challenger profiles (epic_071 / t912) add whole feature tables (e.g.
+    ``feat_levels``) on top: each one is LEFT JOINed on open_time, so the row
+    set is exactly that of the champion join, and its feat_* columns are
+    appended. Such a build writes to its own table (``table_name``, by
+    convention ``quant_train__<profile_id>``) -- the champion ``quant_train``
+    is never touched by a challenger build.
+
     Args:
-        conn       : Open DuckDB read-write connection.
-        start_time : Optional range lower bound, inclusive (YYYY-MM-DD HH:MM:SS).
-        end_time   : Optional range upper bound, inclusive (YYYY-MM-DD HH:MM:SS).
+        conn                 : Open DuckDB read-write connection.
+        start_time           : Optional range lower bound, inclusive (YYYY-MM-DD HH:MM:SS).
+        end_time             : Optional range upper bound, inclusive (YYYY-MM-DD HH:MM:SS).
+        extra_feature_tables : Additional feat tables to LEFT JOIN (default none).
+        table_name           : Output table (default ``quant_train``).
 
     Returns:
-        Total row count in quant_train after rebuild.
+        Total row count in the output table after rebuild.
+
+    Raises:
+        ValueError: If an extra table is missing or repeats a feature column.
     """
     if not _tbl_exists(conn, "feat_ohlcv_quant"):
         logger.warning("rebuild_quant_train: feat_ohlcv_quant tabla hianyzik -- skip")
@@ -248,15 +359,22 @@ def rebuild_quant_train(
     if not _tbl_exists(conn, "target"):
         logger.warning("rebuild_quant_train: target tabla hianyzik -- skip")
         return 0
+    extras = list(extra_feature_tables or [])
+    if extras and table_name == "quant_train":
+        raise ValueError("extra_feature_tables require a table_name other than quant_train")
 
-    feat_cols = [
-        row[0]
-        for row in conn.execute(
-            "SELECT column_name FROM information_schema.columns"
-            " WHERE table_name = 'feat_ohlcv_quant' ORDER BY ordinal_position"
-        ).fetchall()
-        if row[0].startswith("feat_")
-    ]
+    def _feat_cols(table: str) -> list[str]:
+        return [
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_name = ? ORDER BY ordinal_position",
+                [table],
+            ).fetchall()
+            if row[0].startswith("feat_")
+        ]
+
+    feat_cols = _feat_cols("feat_ohlcv_quant")
 
     # Target columns are discovered rather than hardcoded so a new horizon
     # (epic_057: fw240) or a new label family (epic_058: tb_label_*) flows
@@ -272,8 +390,22 @@ def rebuild_quant_train(
 
     select_parts = ["f.open_time"]
     select_parts += [f'f."{c}"' for c in feat_cols]
+    join_sql = ""
+    seen = set(feat_cols)
+    for i, extra in enumerate(extras):
+        if not _tbl_exists(conn, extra):
+            raise ValueError(f"rebuild_quant_train: extra feature table missing: {extra}")
+        cols = _feat_cols(extra)
+        dup = seen.intersection(cols)
+        if dup:
+            raise ValueError(f"rebuild_quant_train: {extra} repeats columns {sorted(dup)}")
+        seen.update(cols)
+        alias = f"x{i}"
+        select_parts += [f'{alias}."{c}"' for c in cols]
+        join_sql += f' LEFT JOIN "{extra}" {alias} ON f.open_time = {alias}.open_time'
     select_parts += [f't."{c}"' for c in target_cols]
     select_cols = ", ".join(select_parts)
+    out = f'"{table_name}"' if table_name != "quant_train" else "quant_train"
 
     null_filter = "t.long_mfe_fw60 IS NOT NULL AND t.short_mfe_fw60 IS NOT NULL"
 
@@ -281,20 +413,20 @@ def rebuild_quant_train(
 
     if is_full:
         conn.execute(f"""
-            CREATE OR REPLACE TABLE quant_train AS
+            CREATE OR REPLACE TABLE {out} AS
             SELECT {select_cols}
             FROM feat_ohlcv_quant f
-            INNER JOIN target t ON f.open_time = t.open_time
+            INNER JOIN target t ON f.open_time = t.open_time{join_sql}
             WHERE {null_filter}
         """)
     else:
         # Range rebuild: ensure table exists, then delete + insert
-        if not _tbl_exists(conn, "quant_train"):
+        if not _tbl_exists(conn, table_name):
             conn.execute(f"""
-                CREATE TABLE quant_train AS
+                CREATE TABLE {out} AS
                 SELECT {select_cols}
                 FROM feat_ohlcv_quant f
-                INNER JOIN target t ON f.open_time = t.open_time
+                INNER JOIN target t ON f.open_time = t.open_time{join_sql}
                 WHERE 1 = 0
             """)
 
@@ -308,7 +440,7 @@ def rebuild_quant_train(
             del_params.append(end_time)
         if del_conds:
             conn.execute(
-                f"DELETE FROM quant_train WHERE {' AND '.join(del_conds)}",
+                f"DELETE FROM {out} WHERE {' AND '.join(del_conds)}",
                 del_params,
             )
 
@@ -323,19 +455,20 @@ def rebuild_quant_train(
 
         conn.execute(
             f"""
-            INSERT INTO quant_train
+            INSERT INTO {out}
             SELECT {select_cols}
             FROM feat_ohlcv_quant f
-            INNER JOIN target t ON f.open_time = t.open_time
+            INNER JOIN target t ON f.open_time = t.open_time{join_sql}
             WHERE {' AND '.join(ins_conds)}
             ORDER BY f.open_time
         """,
             ins_params,
         )
 
-    result = conn.execute("SELECT COUNT(*) FROM quant_train").fetchone()
+    result = conn.execute(f"SELECT COUNT(*) FROM {out}").fetchone()
     n = int(result[0]) if result else 0
-    logger.info("rebuild_quant_train: rows=%d start=%s end=%s", n, start_time, end_time)
+    logger.info("rebuild_quant_train: table=%s rows=%d start=%s end=%s",
+                table_name, n, start_time, end_time)
     return n
 
 
@@ -451,6 +584,61 @@ def insert_feat_ohlcv_quant(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -
     _ensure_feat_ohlcv_quant_table(conn, df)
     n = _insert_append_only(conn, "feat_ohlcv_quant", df)
     logger.info("insert_feat_ohlcv_quant: inserted=%d", n)
+    return n
+
+
+def backfill_feat_ohlcv_quant(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> int:
+    """Insert feature rows for interior gaps, skipping open_times already stored.
+
+    Unlike insert_feat_ohlcv_quant (append-only after MAX(open_time)), this fills
+    holes inside the stored range (epic_076 / t947 gap repair).  Existing rows are
+    left unchanged.  feat_ohlcv_quant has no primary key, so the skip is an
+    anti-join (NOT EXISTS) on open_time against the stored table.
+
+    Args:
+        conn : Open DuckDB connection.
+        df   : Polars DataFrame with open_time and feat_* columns.
+
+    Returns:
+        Number of rows inserted.
+    """
+    if df.is_empty():
+        return 0
+    _ensure_feat_ohlcv_quant_table(conn, df)
+
+    col_list = ", ".join(f'"{c}"' for c in df.columns)
+    conn.register("_feat_backfill_batch", df)
+    try:
+        conn.execute("BEGIN")
+        try:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM _feat_backfill_batch b
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM feat_ohlcv_quant f WHERE f.open_time = b.open_time
+                )
+                """
+            ).fetchone()
+            n = int(row[0]) if row else 0
+            if n > 0:
+                conn.execute(
+                    f"""
+                    INSERT INTO feat_ohlcv_quant ({col_list})
+                    SELECT {col_list} FROM _feat_backfill_batch b
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM feat_ohlcv_quant f WHERE f.open_time = b.open_time
+                    )
+                    ORDER BY open_time
+                    """
+                )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.unregister("_feat_backfill_batch")
+
+    logger.info("backfill_feat_ohlcv_quant: inserted=%d", n)
     return n
 
 
@@ -573,4 +761,51 @@ def backfill_predictions(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> i
 
     n = n_after - n_before
     logger.info("backfill_predictions: inserted=%d", n)
+    return n
+
+
+def insert_funding_rate(conn: duckdb.DuckDBPyConnection, df: pl.DataFrame) -> int:
+    """Insert settled funding rows whose funding_ts is not stored yet (idempotent).
+
+    Only the columns present in both ``df`` and the existing ``funding_rate``
+    table are written, so the older ad-hoc SOL/BCH tables (possibly without
+    ``mark_price``) are served too.  ``funding_ts`` and ``funding_rate`` are required.
+
+    Args:
+        conn : Open DuckDB connection (funding_rate must exist — call ensure_tables).
+        df   : Polars DataFrame with funding_ts (Datetime), funding_rate[, mark_price].
+
+    Returns:
+        Number of rows inserted.
+    """
+    if df.is_empty():
+        return 0
+
+    table_cols = {
+        row[0]
+        for row in conn.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'funding_rate'"
+        ).fetchall()
+    }
+    cols = [c for c in df.columns if c in table_cols]
+    if "funding_ts" not in cols or "funding_rate" not in cols:
+        raise ValueError(f"funding_rate table/batch lacks funding_ts/funding_rate: {sorted(table_cols)}")
+
+    col_list = ", ".join(f'"{c}"' for c in cols)
+    conn.register("_funding_batch", df.select(cols).unique(subset=["funding_ts"], keep="last"))
+    try:
+        before = conn.execute("SELECT COUNT(*) FROM funding_rate").fetchone()
+        conn.execute(f"""
+            INSERT INTO funding_rate ({col_list})
+            SELECT {col_list} FROM _funding_batch b
+            WHERE NOT EXISTS (SELECT 1 FROM funding_rate f WHERE f.funding_ts = b.funding_ts)
+            ORDER BY funding_ts
+        """)
+        after = conn.execute("SELECT COUNT(*) FROM funding_rate").fetchone()
+    finally:
+        conn.unregister("_funding_batch")
+
+    n = (int(after[0]) if after else 0) - (int(before[0]) if before else 0)
+    logger.info("insert_funding_rate: inserted=%d", n)
     return n

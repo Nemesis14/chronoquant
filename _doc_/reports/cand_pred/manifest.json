@@ -1,0 +1,88 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/timescale.json",
+        "height": 360,
+        "id": "timescale",
+        "title": "Mélypont → megerősítés és a teljes nagy mozgás hossza (k = 4)"
+      },
+      {
+        "file": "charts/auc_big.json",
+        "height": 520,
+        "id": "auc_big",
+        "title": "AUC modellenként — nagy mozgás lesz (≥ 4σ_T)"
+      },
+      {
+        "file": "charts/auc_hit1.json",
+        "height": 520,
+        "id": "auc_hit1",
+        "title": "AUC modellenként — +1R a stop előtt"
+      },
+      {
+        "file": "charts/univar_big.json",
+        "height": 480,
+        "id": "univar_big",
+        "title": "Egyváltozós AUC — nagy mozgás lesz (≥ 4σ_T)"
+      },
+      {
+        "file": "charts/univar_hit1.json",
+        "height": 480,
+        "id": "univar_hit1",
+        "title": "Egyváltozós AUC — +1R a stop előtt"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/timescale_table.json",
+        "id": "timescale_table",
+        "title": "Időtáv skálánként (k = 4)"
+      },
+      {
+        "file": "tables/groups.json",
+        "id": "groups",
+        "title": "Változócsoportok"
+      },
+      {
+        "file": "tables/metrics.json",
+        "id": "metrics",
+        "title": "Valós metrikák (AUC, lift, log-loss skill, CI-k)"
+      },
+      {
+        "file": "tables/compare.json",
+        "id": "compare",
+        "title": "Valós vs placebo (AUC, ΔAUC, lift)"
+      },
+      {
+        "file": "tables/compare_univar.json",
+        "id": "compare_univar",
+        "title": "Egyváltozós AUC: valós vs placebo"
+      },
+      {
+        "file": "tables/selected.json",
+        "id": "selected",
+        "title": "A forward-kiválasztás által választott csoportok évenként"
+      }
+    ]
+  },
+  "created_at": "2026-11-24T10:02:18Z",
+  "id": "cand_pred",
+  "model_id": null,
+  "order": 79,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.cand_pred_model",
+    "kind": "analysis"
+  },
+  "summary": "Hat változócsoport forward, idő szerinti próbája a valós időben felismert jelölteken, placebóval.",
+  "tags": [
+    "research",
+    "scout2",
+    "move_census",
+    "predictability"
+  ],
+  "title": "Előrejelezhető-e a nagy lökés az első szakaszból? — BTCUSDT (epic_078)",
+  "updated_at": "2026-11-24T10:02:18Z"
+}

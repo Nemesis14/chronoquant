@@ -21,9 +21,9 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from worker import scheduler
+from worker import assets, scheduler
 from worker.logs import read_log, read_log_entries
-from worker.queue import TERMINAL_STATUSES, JobQueue
+from worker.queue import ASSET_KINDS, TERMINAL_STATUSES, JobQueue
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -46,7 +46,7 @@ QueueDep = Annotated[JobQueue, Depends(get_queue)]
 
 
 class JobCreate(BaseModel):
-    kind: Literal["sync_full", "sync_predictions", "sentiment_refresh"]
+    kind: Literal["sync_full", "sync_predictions", "sentiment_refresh", "sync_scout"]
     params: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -79,6 +79,15 @@ def _auto_sync_payload(queue: JobQueue) -> dict[str, Any]:
 def create_job(body: JobCreate, queue: QueueDep) -> Any:
     if not queue.worker_info()["alive"]:
         return _error(503, "worker is not running", "worker_down")
+    if body.kind in ASSET_KINDS:
+        try:
+            assets.require_asset(body.params.get("asset_id"))
+        except assets.UnknownAssetError as exc:
+            return _error(404, str(exc), "not_found")
+    if body.kind == "sync_scout":
+        asset_id = assets.require_asset(body.params.get("asset_id"))
+        if asset_id not in assets.scout_asset_ids():
+            return _error(400, f"not a Scout asset: {asset_id}", "bad_request")
     job, deduplicated = queue.enqueue(body.kind, body.params)
     return {"job": job, "deduplicated": deduplicated}
 

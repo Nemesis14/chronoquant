@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getClosedTrades, getEquity, getJournal } from '../../api/dashboard'
+import { useAsset } from '../../lib/asset'
 import { usePolling } from '../../lib/usePolling'
 import { DASH, num, pct, pnlColor, shortTime, sideColor, signed } from '../../lib/format'
 import type { Row } from '../../types/api'
@@ -8,7 +9,8 @@ import LogPanel from './LogPanel'
 import { Col, DataTable, Muted, PollNote, Spinner } from './ui'
 
 function EquityTab() {
-  const poll = usePolling((s) => getEquity(s), 300_000)
+  const asset = useAsset()
+  const poll = usePolling((s) => getEquity(asset, s), 300_000, [asset])
   const sm = poll.data?.summary
   return (
     <div>
@@ -33,7 +35,8 @@ function EquityTab() {
 }
 
 function ClosedTab() {
-  const poll = usePolling((s) => getClosedTrades(300, s), 300_000)
+  const asset = useAsset()
+  const poll = usePolling((s) => getClosedTrades(asset, 300, s), 300_000, [asset])
   const items = poll.data?.items ?? []
   return (
     <div>
@@ -75,7 +78,8 @@ function cell(v: Row[string], key: string) {
 
 function JournalTab() {
   const [kind, setKind] = useState<JKind>('positions')
-  const poll = usePolling((s) => getJournal(kind, 100, s), 60_000, [kind])
+  const asset = useAsset()
+  const poll = usePolling((s) => getJournal(asset, kind, 100, s), 60_000, [asset, kind])
   const rows = poll.data?.items ?? []
   const keys = (rows[0] ? Object.keys(rows[0]) : JOURNAL_COLS[kind]).filter((k) => !k.endsWith('_json'))
   const cols: Col<Row>[] = keys.slice(0, 12).map((k) => ({ key: k, label: k, render: (r) => cell(r[k], k) }))

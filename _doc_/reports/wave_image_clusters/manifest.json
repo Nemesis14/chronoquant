@@ -1,0 +1,120 @@
+{
+  "content": {
+    "charts": [
+      {
+        "file": "charts/kselect_ll.json",
+        "height": 340,
+        "id": "kselect_ll",
+        "title": "k-választás: OOF ΔLL a konstans prediktorhoz képest"
+      },
+      {
+        "file": "charts/kselect_stability.json",
+        "height": 340,
+        "id": "kselect_stability",
+        "title": "Klaszter-stabilitás foldok között (ARI)"
+      },
+      {
+        "file": "charts/centroid_images.json",
+        "height": 540,
+        "id": "centroid_images",
+        "title": "Klaszter-centroid (átlag) képek, k = 10"
+      },
+      {
+        "file": "charts/medoid_images.json",
+        "height": 540,
+        "id": "medoid_images",
+        "title": "Klaszter-medoid (a centroidhoz legközelebbi) események képei"
+      },
+      {
+        "file": "charts/cluster_sizes.json",
+        "height": 300,
+        "id": "cluster_sizes",
+        "title": "Klaszter-méretek (train esemény)"
+      },
+      {
+        "file": "charts/cluster_shares.json",
+        "height": 380,
+        "id": "cluster_shares",
+        "title": "Osztályarányok klaszterenként (impulzus / hamis indulás / oldalazás, train, leíró)"
+      },
+      {
+        "file": "charts/cones.json",
+        "height": 600,
+        "id": "cones",
+        "title": "Klaszterenkénti p10–p90 kimenet-tölcsér a feltétel nélkülihez képest (k = 10)"
+      },
+      {
+        "file": "charts/method_rates.json",
+        "height": 340,
+        "id": "method_rates",
+        "title": "Klaszterenkénti impulzus-arány módszerenként (train, leíró)"
+      },
+      {
+        "file": "charts/recon.json",
+        "height": 730,
+        "id": "recon",
+        "title": "AE rekonstrukció-példák (train)"
+      }
+    ],
+    "markdown": "report.md",
+    "tables": [
+      {
+        "file": "tables/params.json",
+        "id": "params",
+        "title": "Definíciók és beállítások"
+      },
+      {
+        "file": "tables/kselect.json",
+        "id": "kselect",
+        "title": "k-választás cellánként és módszerenként (OOF, 6 blokk)"
+      },
+      {
+        "file": "tables/kselect_blocks.json",
+        "id": "kselect_blocks",
+        "title": "Blokkonkénti OOF log-loss a kiválasztott k = 10 mellett"
+      },
+      {
+        "file": "tables/cluster_summary.json",
+        "id": "cluster_summary",
+        "title": "Klaszterek összegzése (train, leíró)"
+      },
+      {
+        "file": "tables/baseline.json",
+        "id": "baseline",
+        "title": "AE embedding vs nyers útvonal baseline-ok"
+      },
+      {
+        "file": "tables/baseline_clusters.json",
+        "id": "baseline_clusters",
+        "title": "Klaszter-méretek és osztályarányok módszerenként (train, leíró)"
+      },
+      {
+        "file": "tables/runtime.json",
+        "id": "runtime",
+        "title": "Futási idő (CPU, 1 szál)"
+      }
+    ]
+  },
+  "created_at": "2026-11-20T15:05:31Z",
+  "id": "wave_image_clusters",
+  "model_id": null,
+  "order": 31,
+  "schema_version": 1,
+  "scope": "general",
+  "source": {
+    "generator": "reports.builders.wave_image_clusters",
+    "git_sha": "13ee2fb",
+    "kind": "analysis",
+    "step": "analysis"
+  },
+  "summary": "5200 v2 / t919: a W4h_H8h cella prefix-képei (15m OHLC + volumen), konvolúciós autoencoder embedding, k-means (k = 10, a 6 blokkos purged CV OOF log-loss szerint), k-Shape / DTW baseline, klaszter-centroid képek és kimenet-tölcsérek. Csak train; a klaszterenkénti osztályarányok leíróak, nem bizonyítékok.",
+  "tags": [
+    "wave",
+    "epic_072",
+    "clustering",
+    "embedding",
+    "v2"
+  ],
+  "title": "Hullámkezdet kép-klaszterek — AE embedding, k-választás, tölcsérek (W4h_H8h, train)",
+  "updated_at": "2026-11-20T15:05:31Z"
+}

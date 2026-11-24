@@ -1,0 +1,50 @@
+{
+  "columns": [
+    {
+      "key": "feltétel",
+      "label": "Feltétel",
+      "type": "str"
+    },
+    {
+      "key": "teljesül",
+      "label": "Teljesül",
+      "type": "str"
+    }
+  ],
+  "rows": [
+    [
+      "min_events",
+      "igen"
+    ],
+    [
+      "dauc",
+      "nem"
+    ],
+    [
+      "holm",
+      "nem"
+    ],
+    [
+      "logloss",
+      "igen"
+    ],
+    [
+      "top20",
+      "nem"
+    ],
+    [
+      "stability",
+      "nem"
+    ],
+    [
+      "spa",
+      "n/a"
+    ],
+    [
+      "econ",
+      "nem"
+    ]
+  ],
+  "total_rows": 8,
+  "truncated": false
+}

@@ -29,6 +29,7 @@ A lezárt kutatások és kísérletek rövid összefoglalói. A kutatási kód �
 | [Multi-skálás nagy-mozgás katalógus](move_census.md) | 2026-11-24 | Skálafüggetlen zigzag-katalógus BTC/SOL/ETH 1m-en: szerkezet, bázisráta, R-szorzós él ≈ véletlen előjelű placebo (martingál); egyetlen valós eltérés: enyhe visszafordulás, SOL-on több nagy mozgás | Lezárt, nemleges (ár-geometria önmagában) |
 | [Előrejelezhető-e a nagy lökés? (jelölt + változók)](cand_pred.md) | 2026-11-24 | 48 változó / 6 csoport (zigzag, volumen, VWAP, flow, quant, alakok) forward, idő szerinti próbája a valós idejű jelölteken BTC-n, placebóval: az AUC ~0,52 a placebón is, +1R-nál 0,50; nincs használható előrejelzés | Lezárt, nemleges |
 | [Kitörés-előrejelezhetőség v2 (118 változó, 4 modell, nullok)](cand_v2.md) | 2026-11-24 | Offset felett a nagy mozgásra +0,0004 log-loss (AUC +0,006, MDE 0,019), +1R-n nincs jel; a hozam-IC 0,035 rövid távú visszafordulás, 3–6 bps < 13 bps díj; mindkét null lefutott | Lezárt, nemleges |
+| [Elliott-hullámok tesztje (3. és 5. hullám)](elliott_test.md) | 2026-11-24 | Szigorú, kauzális 1-2-1-2 / 1-2-3-4 setupok 7 skálán: találati arány ≈ véletlen bolyongás (legjobb többlet +0,009, CI ∋ 0, placebo-null p 0,68), díj után minden változat negatív | Lezárt, nemleges |
 | [Elliott-hullámok](elliott_waves/overview.md) | 2026-06 | Algoritmikus spec + 4. hullám befejezési tanulmány (a `docs/`-ból áthozva, t890; kód nincs a repóban) | Archív kutatási spec |
 
 A modell-szintű riportok (champion search, mintavétel, rezsim-OOS stb.) a `_doc_/models_doc/` alatt vannak, nem itt.

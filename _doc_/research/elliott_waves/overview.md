@@ -166,3 +166,7 @@ buffer        = max(0.1 × ATR14, 1–2 tick)
 2. **Precision / recall** — hány setup után jött valóban Wave 3 jellegű emelkedés?
 3. **Score threshold optimalizálás** — melyik score-határ felett a legjobb a precision?
 4. **Feature engineering** — a setup paraméterek (R_big, R_sub, score, lag, ATR) használata ML modell bemeneteként
+
+---
+
+> **Teszt-eredmény (epic_080):** a fenti szabályokat a σ-zigzag alapú kauzális detektorral 7 skálán mértük BTC 1m-en; a találati arány ≈ véletlen bolyongás, nincs találat. Részletek: [`../elliott_test.md`](../elliott_test.md).
